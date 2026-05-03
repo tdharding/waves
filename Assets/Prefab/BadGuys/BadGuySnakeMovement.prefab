@@ -1,0 +1,70 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &1636817358382708894
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6647594978126251956}
+  - component: {fileID: 3341628744645892158}
+  m_Layer: 0
+  m_Name: BadGuySnakeMovement
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6647594978126251956
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1636817358382708894}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.10621, y: 0, z: 0.12739}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &3341628744645892158
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1636817358382708894}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2fa25eb8c7eea55469200e9cda4602e0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BadGuySnakeMovement
+  snakeVFX: {fileID: 0}
+  headVisual: {fileID: 0}
+  boat: {fileID: 0}
+  followSpeed: 0.34
+  obstacleLayer:
+    serializedVersion: 2
+    m_Bits: 16384
+  lookAheadDistance: 0.1
+  castRadius: 0.3
+  fanRayCount: 12
+  fanAngle: 360
+  avoidanceWeight: 21.8
+  straightenStrengthP1: 0.1
+  straightenStrengthP2: 0.05
+  straightenStrengthP3: 0.02
+  bodyFollowSpeed: 5
+  spacing: 0.15
+  p0: {fileID: 0}
+  p1: {fileID: 0}
+  p2: {fileID: 0}
+  p3: {fileID: 0}
+  waterTransform: {fileID: 0}
+  heightMultiplier: 1
+  extraYOffset: 0

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -E \"\\\\.\\(cs\\)$\")",
+      "Bash(xargs grep *)",
+      "Bash(xargs cat *)",
+      "Bash(rm \"C:\\\\Users\\\\tomdh\\\\Waves\\\\Assets\\\\ScriptsData\\\\VisualEffectGraphScripts\\\\DepthFoam.hlsl\")",
+      "Bash(rm \"C:\\\\Users\\\\tomdh\\\\Waves\\\\Assets\\\\ScriptsData\\\\VisualEffectGraphScripts\\\\DepthFoam.hlsl.meta\")",
+      "Bash(grep -v \"^--$\")",
+      "Bash(git --version)"
+    ]
+  }
+}

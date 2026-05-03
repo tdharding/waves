@@ -1,0 +1,48 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 88b6f058feac51f46a3f56ed88db9a43, type: 3}
+  m_Name: LevelSelectWorld1Data
+  m_EditorClassIdentifier:
+  hillPoints: []
+  nodes: []
+  paths: []
+  junctions: []
+  shops: []
+  obstacles: []
+  arenas: []
+  junctionScriptObject: {fileID: 0}
+  junctionPrefab: {fileID: 0}
+  junctionRightFacingPrefab: {fileID: 0}
+  junctionLeftFacingPrefab: {fileID: 0}
+  arenaPrefab: {fileID: 0}
+  arenaEntrancePrefab: {fileID: 0}
+  arenaRadius: 10
+  obstaclePrefab: {fileID: 0}
+  shopPrefab: {fileID: 0}
+  riverBlockPrefab: {fileID: 0}
+  junctionGapPadding: 0
+  splineInstantiateSpacing: 0.15
+  curveSubdivisions: 5
+  branchStartOffset: 0.5
+  arenaHeadOffset: 5
+  landscapeTilePrefab: {fileID: 0}
+  landscapeTileSize: 10
+  landscapeTilesX: 10
+  landscapeTilesZ: 10
+  landscapeOffset: {x: 0, y: 0}
+  landscapeWorldY: 0
+  landscapeTool: {fileID: 0}
+  boatPathManager: {fileID: 0}
+  canvasOriginX: 0
+  canvasOriginZ: 0
+  canvasUnitsPerPixel: 0.1
+  canvasWorldY: 0

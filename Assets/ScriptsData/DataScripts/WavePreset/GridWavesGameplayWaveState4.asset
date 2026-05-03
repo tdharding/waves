@@ -1,0 +1,55 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3e8c5527e5cf59d468851ded0a7e0ff3, type: 3}
+  m_Name: GridWavesGameplayWaveState4
+  m_EditorClassIdentifier: Assembly-CSharp::WavePreset
+  state:
+    Frequency: 12.85
+    Speed: 0.43
+    RippleDepth: 0.1
+    Smoothness: 0
+    Transparency: 1
+    Strength: 0.61
+    TroughRingWave1Brightness: 85.35
+    PeakRingWave2Brightness: 4.99
+    TwirlBaseStrength: 3.52
+    TwirlSlopeBoost: 0.2
+    TwirlScale: 6.98
+    DepthTwirlStrength: 4.24
+    DepthFadeStrength: -2.88
+    DepthFadeLine: 5.55
+    WhirlpoolTwirlStrength: 4.33
+    WhirlpoolAreaTwirlStrength: -1.75
+    SoulFishTwirlStrength: 0.65
+    WhirlpoolTaper: 0.668
+    WhirlpoolDarkRadiusMult: 1.006
+    WhirlpoolDarkStrength: 1
+    WhirlpoolFalloffPower: 0.1
+    WaveStepRate: 4000
+    BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    LightDirection: {x: -87.25, y: -186.88, z: 33.8}
+    FoamDitherSize: 1.08
+    FoamDistanceDepth: -3.18
+    FoamDepthFade: -0.58
+    FoamColor: {r: 0, g: 0, b: 0, a: 1}
+    FoamLine: 0.06
+    DepthFade: 1.33
+    DepthColour: {r: 0.4528302, g: 0.41651833, b: 0.41651833, a: 0}
+    DistanceDepth: 0.45
+    NormalTexture: {fileID: 2800000, guid: b428682cdd9054e468cb9dc6758f697f, type: 3}
+  sonarEnabled: 1
+  musicIntro: {fileID: 8300000, guid: f2689d7d69db99749b0756d52ea81f5e, type: 3}
+  musicLoop: {fileID: 8300000, guid: f2689d7d69db99749b0756d52ea81f5e, type: 3}
+  lights:
+  - color: {r: 1, g: 1, b: 1, a: 1}
+    intensity: 12.9
+    range: 8.56

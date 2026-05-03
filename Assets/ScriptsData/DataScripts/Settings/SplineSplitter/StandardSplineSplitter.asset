@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ebb630e1de6f2ee48be46e57ffb8c902, type: 3}
+  m_Name: StandardSplineSplitter
+  m_EditorClassIdentifier: Assembly-CSharp-Editor::SplineSplitterPreset
+  subdivisions: 5
+  splitT: 0.519
+  keepOriginal: 0
+  copySplineInstantiate: 1
+  splitToSameObject: 1
+  knotMode: 2
+  addJunction: 1
+  junctionPrefab: {fileID: 1054175076011857233, guid: 4112896818a87814181c705d9fb75161, type: 3}
+  junctionDownFacingPrefab: {fileID: 0}
+  junctionUpFacingPrefab: {fileID: 0}
+  junctionScriptObject: {fileID: 0}
+  padding: 0
+  junctionPosOffset: {x: -0.25, y: -0.35, z: 0}
+  junctionRotOffset: {x: -90, y: 0, z: 0}

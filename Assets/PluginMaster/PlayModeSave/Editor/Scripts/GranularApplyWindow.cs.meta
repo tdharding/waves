@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 197f5d1b1dd5eb44b93cb3876e3e04f6
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 177452
+  packageName: Play Mode Save
+  packageVersion: 4.1.4
+  assetPath: Assets/PluginMaster/PlayModeSave/Editor/Scripts/GranularApplyWindow.cs
+  uploadId: 849396

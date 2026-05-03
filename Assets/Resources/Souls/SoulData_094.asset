@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 997e454d1ec453e4cb6284a9a98ea5ca, type: 3}
+  m_Name: SoulData_094
+  m_EditorClassIdentifier: Assembly-CSharp::SoulData
+  soulDataIdentity: 94
+  fishPrefab: {fileID: 253525322543634003, guid: 33e03828ca8448643a20c3e33023a29a, type: 3}
+  homeLevelID: 
+  associatedWavePreset: {fileID: 0}
+  allocated: 0
+  allocatedToLevelID: 
+  soulName: Soul #94
+  videoClip: {fileID: 32900000, guid: de7323e32bc90f543a97eb2217c26d56, type: 3}

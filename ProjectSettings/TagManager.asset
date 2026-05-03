@@ -1,0 +1,75 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!78 &1
+TagManager:
+  serializedVersion: 3
+  tags:
+  - Fish
+  - MazeWalls
+  - Boat
+  - WavePlane
+  - SonarGrid
+  - StartPoint
+  - SoulStartPoint
+  - SoulWhirl
+  - SoulCamera
+  - BoatPrefab
+  - SoulFishRealityPoint
+  - FinishMarker
+  - LowHMazeWall
+  - TallHMazeWall
+  - LowSpikeTrap
+  - WaterSplashFX
+  - LevelSelectPathObstacle
+  - BadGuySnake
+  - OuterWalls
+  - LevelCenter
+  layers:
+  - Default
+  - TransparentFX
+  - Ignore Raycast
+  - 
+  - Water
+  - UI
+  - Boat1
+  - Excluded1
+  - MazeEdge1
+  - sonarGrid
+  - LatticeCamera2
+  - SoulFish
+  - MazeCenter
+  - WaterSplashFX
+  - AiObstacleLayer
+  - Interaction
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  m_SortingLayers:
+  - name: Top1
+    uniqueID: 1371406733
+    locked: 0
+  - name: Default
+    uniqueID: 0
+    locked: 0
+  m_RenderingLayers:
+  - Default
+  - Light Layer 1
+  - Light Layer 2
+  - Light Layer 3
+  - Light Layer 4
+  - Light Layer 5
+  - Light Layer 6
+  - Light Layer 7

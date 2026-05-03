@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6aa64b1c52c024849b1661e319d36ae7, type: 3}
+  m_Name: Level1a
+  m_EditorClassIdentifier: Assembly-CSharp::LevelAllocation
+  levelID: Level1a
+  gameplayMusic: {fileID: 8300000, guid: 5bfc1dadd8db66643b2f07379bb5bb7c, type: 3}
+  bossMusicIntro: {fileID: 8300000, guid: 087405ed6ac2393459b9d10ffc61beaa, type: 3}
+  bossMusicLoop: {fileID: 8300000, guid: bc29a421e592ef34ba4acc9ee430a2b0, type: 3}
+  defaultFOV: 7
+  cameraProfile: {fileID: 0}
+  snakePrefab: {fileID: 8941178421646824244, guid: f48dbcef25199b14097f20ec67bb7b48, type: 3}
+  snakeSpawnOnVisit: 10
+  gridData: {fileID: 11400000, guid: aa6d73f345d54394aaa7eeebc7f71a36, type: 2}
+  arenaProfiles:
+  - {fileID: 11400000, guid: 72edee6e35d2a4f47afa3484ef153ba2, type: 2}
+  runtimeSoulIdentities: 
+  prefabs:
+  - {fileID: 4089478517322769272, guid: 0ad9522f599f9b64d8410dc3a60b232a, type: 3}
+  - {fileID: 4089478517322769272, guid: 1a032652afd70634ab2638a21f129895, type: 3}
+  - {fileID: 270666992747770035, guid: 456f1ee0aa8fbf44c9a87128f0123d5b, type: 3}
+  soulFishPrefab: {fileID: 253525322543634003, guid: 33e03828ca8448643a20c3e33023a29a, type: 3}
+  sculptureSetPiecePrefab: {fileID: 7703717001378262509, guid: ed10b2848172a2246abef86cec9c9073, type: 3}
+  soulToRealityProxyPrefab: {fileID: 8197490962818866576, guid: 2f35829a8140d3d40a7364957fefcd87, type: 3}
+  startPrefab: {fileID: 8666999057420387378, guid: 18c534e2bdb8e3c43b038f64fcb07fae, type: 3}
+  soulStartPrefab: {fileID: 7197165120358527805, guid: 19f2b5265d1396f46949ffa1bbe16c0b, type: 3}
+  finishPrefab: {fileID: 4675500947090663755, guid: 87e90f719ef38c84bbc70ab8f1d46dfa, type: 3}
+  soulFinishPrefab: {fileID: 7444385867039168638, guid: 9280b484f2dbc534b9ac89bc321c414f, type: 3}
+  orbPrefab: {fileID: 13745983444609949, guid: e2b3e951ca33a014d9a69c133d4e4c2e, type: 3}
+  gameplayWavePreset: {fileID: 11400000, guid: 3c3129a581286d74a943d52187bb2e54, type: 2}
+  runtimeWavePresetOverride: {fileID: 0}
+  gongWavePreset: {fileID: 11400000, guid: d95df37c16e841447a57601a4d0549df, type: 2}
+  unlocksObstacleID: Level1Obstacle
+  startRitual: {fileID: 11400000, guid: 92326603b74a1794990608e5383954c4, type: 2}
+  displayName: Level 1a
+  isTimeTrial: 0
+  timeLimitSeconds: 60

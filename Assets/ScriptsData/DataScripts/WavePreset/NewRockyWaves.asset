@@ -1,0 +1,55 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3e8c5527e5cf59d468851ded0a7e0ff3, type: 3}
+  m_Name: NewRockyWaves
+  m_EditorClassIdentifier: Assembly-CSharp::WavePreset
+  state:
+    Frequency: 13
+    Speed: 1.5
+    RippleDepth: 0.15
+    Smoothness: 0.063
+    Transparency: 0.993
+    Strength: 0.56
+    TroughRingWave1Brightness: 16.2
+    PeakRingWave2Brightness: -0.6
+    TwirlBaseStrength: 1.87
+    TwirlSlopeBoost: 1.18
+    TwirlScale: 11.52
+    DepthTwirlStrength: 4.89
+    DepthFadeStrength: 1.8
+    DepthFadeLine: 4.11
+    WhirlpoolTwirlStrength: 4.33
+    WhirlpoolAreaTwirlStrength: -1.75
+    SoulFishTwirlStrength: 0.65
+    WhirlpoolTaper: 0.668
+    WhirlpoolDarkRadiusMult: 1.006
+    WhirlpoolDarkStrength: 1
+    WhirlpoolFalloffPower: 0.1
+    WaveStepRate: 4000
+    BaseColor: {r: 0.7169812, g: 0.7169812, b: 0.7169812, a: 1}
+    LightDirection: {x: -17.8, y: -188.5, z: -17.18}
+    FoamDitherSize: 3.09
+    FoamDistanceDepth: -0.37
+    FoamDepthFade: -0.25
+    FoamColor: {r: 0, g: 0, b: 0, a: 1}
+    FoamLine: 0.04
+    DepthFade: 1.4
+    DepthColour: {r: 1, g: 1, b: 1, a: 0}
+    DistanceDepth: 0.87
+    NormalTexture: {fileID: 2800000, guid: 51ac2df266ae63944938104912d2a50c, type: 3}
+  sonarEnabled: 1
+  musicIntro: {fileID: 8300000, guid: bc29a421e592ef34ba4acc9ee430a2b0, type: 3}
+  musicLoop: {fileID: 8300000, guid: bc29a421e592ef34ba4acc9ee430a2b0, type: 3}
+  lights:
+  - color: {r: 1, g: 1, b: 1, a: 1}
+    intensity: 16.4
+    range: 8.75

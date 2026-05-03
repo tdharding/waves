@@ -1,0 +1,73 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &3527760037473594992
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8914392371405347767}
+  - component: {fileID: 469741030003108212}
+  m_Layer: 0
+  m_Name: LevelSpawner
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8914392371405347767
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3527760037473594992}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: -31.4, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &469741030003108212
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3527760037473594992}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4193e7a0fd8714a4cb5a5ef39adaec2a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LevelSpawner
+  gridData: {fileID: 0}
+  prefabs:
+  - {fileID: 4089478517322769272, guid: 0ad9522f599f9b64d8410dc3a60b232a, type: 3}
+  - {fileID: 4089478517322769272, guid: 1a032652afd70634ab2638a21f129895, type: 3}
+  - {fileID: 270666992747770035, guid: 456f1ee0aa8fbf44c9a87128f0123d5b, type: 3}
+  - {fileID: 253525322543634003, guid: 33e03828ca8448643a20c3e33023a29a, type: 3}
+  soulToRealityProxyPrefab: {fileID: 8197490962818866576, guid: 2f35829a8140d3d40a7364957fefcd87, type: 3}
+  startPrefab: {fileID: 8666999057420387378, guid: 18c534e2bdb8e3c43b038f64fcb07fae, type: 3}
+  soulStartPrefab: {fileID: 7197165120358527805, guid: 19f2b5265d1396f46949ffa1bbe16c0b, type: 3}
+  finishPrefab: {fileID: 4675500947090663755, guid: 87e90f719ef38c84bbc70ab8f1d46dfa, type: 3}
+  soulFinishPrefab: {fileID: 7444385867039168638, guid: 9280b484f2dbc534b9ac89bc321c414f, type: 3}
+  orbPrefab: {fileID: 13745983444609949, guid: e2b3e951ca33a014d9a69c133d4e4c2e, type: 3}
+  sculptureSetPiecePrefab: {fileID: 0}
+  spawnParent: {fileID: 0}
+  soulSpawnParent: {fileID: 0}
+  referencePlane: {fileID: 0}
+  applyMinus90XRotation: 1
+  applyPostSpawnY180Rotation: 1
+  postSpawnPositionOffset: {x: 0.6, y: 1.5, z: 0}
+  soulPostSpawnPositionOffset: {x: 0.6, y: -46, z: 0}
+  mazeStartY: -1
+  mazeEndY: 1.5
+  mazeMoveDuration: 3
+  mazeSound: {fileID: 0}
+  fishingController: {fileID: 0}
+  whirlFX: {fileID: 0}
+  mazeSpawned: 0

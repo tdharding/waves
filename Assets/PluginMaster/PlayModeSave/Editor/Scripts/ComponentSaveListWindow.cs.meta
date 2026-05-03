@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 01fe38cb09bfd614eb442243f90fa2dd
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 177452
+  packageName: Play Mode Save
+  packageVersion: 4.1.4
+  assetPath: Assets/PluginMaster/PlayModeSave/Editor/Scripts/ComponentSaveListWindow.cs
+  uploadId: 849396
