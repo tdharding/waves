@@ -127,12 +127,17 @@ public class LevelSelectDesignerData : ScriptableObject
     public LevelSelectBoatControl      boatControl;
     public LevelSelectCameraController cameraController;
     public SoulDisplaySlotManager      soulDisplaySlotManager;
+    public PauseManager                pauseManager;
     public PauseMenuUI                 pauseMenuUI;
     public PortalConfirmUI             portalConfirmUI;
     public SoulsOnBoatDisplayManager   soulsOnBoatDisplayManager;
 
     // Script object prefabs (from Prefab/ScriptPrefabs)
+    public GameObject cameraPrefab;
     public GameObject dataControllerPrefab;
+    public GameObject pathPrefab;
+    public GameObject branchWaterExtrudePrefab;
+    public GameObject barrierPrefab;
     public GameObject pauseManagerScriptPrefab;
     public GameObject portalConfirmUIScriptPrefab;
     public GameObject soulsOnBoatDisplayScriptPrefab;
@@ -143,6 +148,7 @@ public class LevelSelectDesignerData : ScriptableObject
     public GameObject pauseMenuPrefab;
     public GameObject portalConfirmUIPrefab;
     public GameObject soulsOnBoatDisplayPrefab;
+    public GameObject junctionPromptUIPrefab;
 
     // Canvas state
     public float canvasOriginX      = 0f;

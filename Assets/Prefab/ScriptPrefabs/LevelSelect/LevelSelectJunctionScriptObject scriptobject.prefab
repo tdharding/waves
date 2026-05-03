@@ -73,13 +73,11 @@ MonoBehaviour:
     useNearestPoint: 1
     entryFromStart: 0
     autoReturn: 1
-    switchKey: 273
   sideB:
     segmentID: Branch0A
     segment: {fileID: 0}
     useNearestPoint: 0
     entryFromStart: 1
     autoReturn: 0
-    switchKey: 274
   transitionDuration: 0.5
-  junctionUIRoot: {fileID: 0}
+  debugLog: 0

@@ -16,7 +16,7 @@ public class LevelSelectBoatControl : MonoBehaviour
     [SerializeField] private float meshFlipSpeed = 5f;
 
     [Header("Movement")]
-    [SerializeField] private float baseSpeed = 2f;
+    [SerializeField] private float baseSpeed = 1f;
     [SerializeField] private float boostMultiplier = 2.5f;
 
     [Header("Debug")]
@@ -85,8 +85,12 @@ public class LevelSelectBoatControl : MonoBehaviour
         else
         {
             var seg = RiverSegmentRegistry.Instance?.GetSegment(defaultSegmentID);
+            // Fallback: grab the first registered main-river segment if default ID not found
+            if (seg == null) seg = RiverSegmentRegistry.Instance?.GetFirstByType(RiverSegmentID.SegmentType.MainRiver);
             if (seg != null)
                 AttachContainer(seg.GetComponent<SplineContainer>());
+            else
+                Debug.LogWarning("[LevelSelectBoatControl] No segment found — check defaultSegmentID or ensure paths are baked.", this);
         }
 
         _progress = GameProgressData.GetBoatProgress(defaultSplineProgress);
@@ -103,7 +107,7 @@ public class LevelSelectBoatControl : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.DownArrow))
         {
             _isReversed = !_isReversed;
-            _meshTargetRotation = _isReversed ? Quaternion.Euler(0f, 180f, 0f) : Quaternion.identity;
+            _meshTargetRotation = _isReversed ? Quaternion.Euler(0f, 0f, 180f) : Quaternion.identity;
         }
 
         // Path selection signals (junction node reads these)
@@ -171,7 +175,7 @@ public class LevelSelectBoatControl : MonoBehaviour
 
         // Entry at t=1 means travelling toward t=0, so mark as reversed.
         _isReversed = startT > 0.5f;
-        _meshTargetRotation = _isReversed ? Quaternion.Euler(0f, 180f, 0f) : Quaternion.identity;
+        _meshTargetRotation = _isReversed ? Quaternion.Euler(0f, 0f, 180f) : Quaternion.identity;
         SnapMeshRotation(_meshTargetRotation);
 
         var segID = newSegment.GetComponent<RiverSegmentID>();

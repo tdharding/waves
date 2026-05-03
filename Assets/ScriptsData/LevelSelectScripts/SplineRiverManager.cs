@@ -19,7 +19,7 @@ public class SplineRiverManager : MonoBehaviour
     [SerializeField] private List<SplineContainer> _sourceSegments = new();
 
     [Header("Settings")]
-    [SerializeField] private float _extrudeSpeed = 0.5f;
+    [SerializeField] private float _extrudeSpeed = 1f;
     [SerializeField] private float _overshoot    = 0.05f;
     [SerializeField] private float _branchOvershoot = 0.5f;
 
@@ -65,6 +65,13 @@ public class SplineRiverManager : MonoBehaviour
     }
 
     // ─────────────────────────────────────────────────────────────
+    public void SetupContainers(SplineContainer mainContainer, SplineExtrude mainExtrude, GameObject barrierPrefab)
+    {
+        _mainContainer = mainContainer;
+        _mainExtrude   = mainExtrude;
+        if (barrierPrefab != null) _barrierPrefab = barrierPrefab;
+    }
+
     // Lifecycle
     // ─────────────────────────────────────────────────────────────
     private void Awake()
@@ -392,18 +399,25 @@ private IEnumerator AnimateMainExtrude(float target)
     public void Stitch()
     {
         if (_sourceSegments == null || _sourceSegments.Count == 0) return;
+        if (_branchPrefab == null) { Debug.LogError("[SplineRiverManager] No branch prefab assigned.", this); return; }
 
-        // 1. Cleanup existing objects
-        while (_mainContainer.Splines.Count > 0)
-            _mainContainer.RemoveSplineAt(0);
-
+        // 1. Cleanup existing children
         for (int i = transform.childCount - 1; i >= 0; i--)
             DestroyImmediate(transform.GetChild(i).gameObject);
 
         _branches.Clear();
-        _branchBarriers.Clear(); // Clear barrier refs — they were children and are now destroyed
+        _branchBarriers.Clear();
 
-        // 2. Prepare the Main River Spline
+        // 2. Spawn main river from branchPrefab — same as branches, no pre-wired container needed
+        var mainObj = Instantiate(_branchPrefab, transform);
+        mainObj.name = "MainRiver";
+        _mainContainer = mainObj.GetComponent<SplineContainer>();
+        _mainExtrude   = mainObj.GetComponent<SplineExtrude>();
+
+        while (_mainContainer.Splines.Count > 0)
+            _mainContainer.RemoveSplineAt(0);
+
+        // 3. Prepare the Main River Spline
         Spline mainSpline = new Spline();
         _mainContainer.AddSpline(mainSpline);
 

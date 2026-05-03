@@ -168,14 +168,18 @@ public class LevelSelectDataController : MonoBehaviour
     {
         if (boatControl == null) return;
 
-        var playerBoat = GameObject.Find("PlayerBoat");
-        if (playerBoat == null || playerBoat.transform.childCount == 0) return;
-
-        var boatGo = playerBoat.transform.GetChild(0).gameObject;
+        var boatGo = GameObject.Find("LevelSelectBoat");
+        if (boatGo == null) return;
 
         var splineAnimate = boatGo.GetComponentInChildren<SplineAnimate>();
         var boatCollider  = boatGo.GetComponentInChildren<Collider>();
-        var meshTransform = boatGo.transform.childCount > 0 ? boatGo.transform.GetChild(0) : null;
+
+        // Find TheBoatVis by tag "Boat" for the flip mesh transform
+        Transform meshTransform = null;
+        foreach (Transform child in boatGo.GetComponentsInChildren<Transform>())
+        {
+            if (child.CompareTag("Boat")) { meshTransform = child; break; }
+        }
 
         boatControl.WireBoatReferences(splineAnimate, boatCollider, boatGo.transform, meshTransform);
         Debug.Log("[LevelSelectDataController] Boat references wired from PlayerBoat.");
@@ -186,10 +190,11 @@ public class LevelSelectDataController : MonoBehaviour
         var camController = FindObjectOfType<LevelSelectCameraController>();
         if (camController == null || camController.cam == null) return;
 
-        var playerBoat = GameObject.Find("PlayerBoat");
-        if (playerBoat != null && playerBoat.transform.childCount > 0)
+        Transform followTarget = GameObject.Find("LevelSelectBoat")?.transform;
+
+        if (followTarget != null)
         {
-            camController.cam.Follow = playerBoat.transform.GetChild(0);
+            camController.SetFollowTarget(followTarget);
             Debug.Log("[LevelSelectDataController] Camera follow target set to LevelSelectBoat.");
         }
     }

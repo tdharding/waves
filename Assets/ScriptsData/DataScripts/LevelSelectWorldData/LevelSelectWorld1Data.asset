@@ -29,13 +29,30 @@ MonoBehaviour:
   - id: 6df50f3b-1bdd-4e04-838c-4faeff94ae95
     worldPosition: {x: -83.41587, y: 0, z: -0.6364459}
     type: 0
+  - id: 0005e200-1a7e-4194-9333-0bfa94edbc76
+    worldPosition: {x: -23.00307, y: 0, z: -7.8551025}
+    type: 0
+  - id: ddea9eb2-95e8-4097-806e-1e0e66b8e9be
+    worldPosition: {x: 20.208778, y: 0, z: -12.789955}
+    type: 1
+  - id: 78f56dc3-50d7-4a57-ae93-ba231bbcacd4
+    worldPosition: {x: 40.68251, y: 0, z: -70.34658}
+    type: 0
+  - id: b436d86d-80d1-43d0-9f0b-82cd754bfbdd
+    worldPosition: {x: 82.87421, y: 0, z: -73.928894}
+    type: 0
+  - id: 509ce4f4-456e-4fad-8a53-37835865bbd5
+    worldPosition: {x: 97.99953, y: 0, z: -108.55792}
+    type: 0
   paths:
   - pathId: cb512902-99c4-4aa3-973b-d4a908cef861
     segmentId: MainRiver
     nodeIds:
     - 6c2c0bb8-0ed6-4a0c-a0c7-31ed04a6984b
     - 59214d0b-2605-484c-986e-6dbb5f2e6200
+    - ddea9eb2-95e8-4097-806e-1e0e66b8e9be
     - ff60207e-a025-44dd-83d2-7a99e14cc11c
+    - 0005e200-1a7e-4194-9333-0bfa94edbc76
     - b7f81683-1033-46e0-8122-7f98073aa8b7
     - 6df50f3b-1bdd-4e04-838c-4faeff94ae95
     isLeftPath: 0
@@ -47,7 +64,30 @@ MonoBehaviour:
     extrudeOnExit: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.27, g: 0.45396018, b: 0.9, a: 1}
-  junctions: []
+  - pathId: a8720131-18cc-4cae-b3f9-c706970745f3
+    segmentId: Branch_01
+    nodeIds:
+    - ddea9eb2-95e8-4097-806e-1e0e66b8e9be
+    - 78f56dc3-50d7-4a57-ae93-ba231bbcacd4
+    - b436d86d-80d1-43d0-9f0b-82cd754bfbdd
+    - 509ce4f4-456e-4fad-8a53-37835865bbd5
+    isLeftPath: 0
+    isRightPath: 1
+    segmentType: 1
+    riverName: Branch_01
+    leadsToArena: 0
+    arenaIsAtEnd: 0
+    extrudeOnExit: 0
+    arenaGridDataGuid: 
+    editorColor: {r: 0.8018868, g: 0.20097704, b: 0, a: 1}
+  junctions:
+  - junctionId: 85fda583-0c00-4577-af02-66b45d0fd909
+    nodeId: ddea9eb2-95e8-4097-806e-1e0e66b8e9be
+    pathIds:
+    - cb512902-99c4-4aa3-973b-d4a908cef861
+    - a8720131-18cc-4cae-b3f9-c706970745f3
+    riverPathId: cb512902-99c4-4aa3-973b-d4a908cef861
+    branchPathId: a8720131-18cc-4cae-b3f9-c706970745f3
   shops: []
   obstacles: []
   arenas: []
@@ -67,10 +107,10 @@ MonoBehaviour:
   branchStartOffset: 0.5
   arenaHeadOffset: 5
   landscapeTilePrefab: {fileID: 849136606222838744, guid: 78fcaaa5184a3c2448e4c351b4ed9e79, type: 3}
-  landscapeTileSize: 17.19
-  landscapeTilesX: 10
-  landscapeTilesZ: 10
-  landscapeOffset: {x: -86.11, y: -86.1}
+  landscapeTileSize: 41.24
+  landscapeTilesX: 5
+  landscapeTilesZ: 5
+  landscapeOffset: {x: -97.9, y: -130.9}
   landscapeWorldY: -1.65
   landscapeTool: {fileID: 0}
   boatPathManager: {fileID: 0}
@@ -81,10 +121,15 @@ MonoBehaviour:
   boatControl: {fileID: 0}
   cameraController: {fileID: 0}
   soulDisplaySlotManager: {fileID: 0}
+  pauseManager: {fileID: 0}
   pauseMenuUI: {fileID: 0}
   portalConfirmUI: {fileID: 0}
   soulsOnBoatDisplayManager: {fileID: 0}
+  cameraPrefab: {fileID: 5450230635296789988, guid: fe8178a8b0cae4447b5ffd9ae4e14c6d, type: 3}
   dataControllerPrefab: {fileID: 3035356737094321521, guid: 6b22932c3e7b0874081f1cf19cb45440, type: 3}
+  pathPrefab: {fileID: 6414728786108141072, guid: f4129452c015d6547947f34b10d1341f, type: 3}
+  branchWaterExtrudePrefab: {fileID: 1541003137950059885, guid: 236c1531b2c82bc40a42e7657502f16a, type: 3}
+  barrierPrefab: {fileID: 5827812438927096501, guid: 81f54d9e5f0cd2149a669edc76b1ab99, type: 3}
   pauseManagerScriptPrefab: {fileID: 6401531644574261173, guid: bbbf8fae451ede54099f8b840c7f35f3, type: 3}
   portalConfirmUIScriptPrefab: {fileID: 2016724640348184634, guid: 50d0c938afb39ff46804f74b97ba6334, type: 3}
   soulsOnBoatDisplayScriptPrefab: {fileID: 6589475697257968682, guid: 9848bdf02a10a194e94177b011aa6f0e, type: 3}

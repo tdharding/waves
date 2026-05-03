@@ -587,10 +587,8 @@ public class LevelSelectDesignerWindow : EditorWindow
         EditorGUILayout.Space(6);
         EditorGUILayout.LabelField("UI Script Prefabs", EditorStyles.boldLabel);
         EditorGUI.BeginChangeCheck();
-        _data.pauseManagerScriptPrefab = (GameObject)EditorGUILayout.ObjectField(
-            "Pause Manager",      _data.pauseManagerScriptPrefab,      typeof(GameObject), false);
-        _data.portalConfirmUIScriptPrefab = (GameObject)EditorGUILayout.ObjectField(
-            "Portal Confirm UI",  _data.portalConfirmUIScriptPrefab,   typeof(GameObject), false);
+        _data.cameraPrefab = (GameObject)EditorGUILayout.ObjectField(
+            "Camera",             _data.cameraPrefab,              typeof(GameObject), false);
         _data.soulsOnBoatDisplayScriptPrefab = (GameObject)EditorGUILayout.ObjectField(
             "Souls Display Mgr",  _data.soulsOnBoatDisplayScriptPrefab, typeof(GameObject), false);
         if (EditorGUI.EndChangeCheck()) EditorUtility.SetDirty(_data);
@@ -628,7 +626,10 @@ public class LevelSelectDesignerWindow : EditorWindow
         EditorGUILayout.LabelField("Split Preset", GUILayout.Width(100));
         _splitPreset = (SplineSplitterPreset)EditorGUILayout.ObjectField(_splitPreset, typeof(SplineSplitterPreset), false);
         EditorGUILayout.EndHorizontal();
-        _data.riverBlockPrefab         = (GameObject)EditorGUILayout.ObjectField("Block",            _data.riverBlockPrefab,         typeof(GameObject), false);
+        _data.pathPrefab                = (GameObject)EditorGUILayout.ObjectField("Path Prefab",         _data.pathPrefab,                typeof(GameObject), false);
+        _data.branchWaterExtrudePrefab  = (GameObject)EditorGUILayout.ObjectField("Branch Extrude",      _data.branchWaterExtrudePrefab,  typeof(GameObject), false);
+        _data.barrierPrefab             = (GameObject)EditorGUILayout.ObjectField("Barrier",              _data.barrierPrefab,             typeof(GameObject), false);
+        _data.riverBlockPrefab          = (GameObject)EditorGUILayout.ObjectField("Block",               _data.riverBlockPrefab,          typeof(GameObject), false);
         _data.splineInstantiateSpacing = EditorGUILayout.FloatField("Block Spacing",                  _data.splineInstantiateSpacing);
 
         EditorGUILayout.Space(4);
@@ -683,6 +684,11 @@ public class LevelSelectDesignerWindow : EditorWindow
             () => { var f = UnityEngine.Object.FindObjectOfType<SplineRiverManager>();    if (f) _data.riverManager    = f; },
             () => { if (DeployScriptOnly<SplineRiverManager>("SplineRiverManager",    out var c, null)) _data.riverManager    = c; });
 
+        bool riverExtrusionReady = GameObject.Find("RiverExtrusion") != null;
+        DrawDeployRow("River Extrusion",   riverExtrusionReady,
+            () => { },
+            () => DeployRiverExtrusion());
+
         DrawDeployRow("Spline Manager",    _data.splineManager    != null,
             () => { var f = UnityEngine.Object.FindObjectOfType<LevelSelectSplineManager>(); if (f) _data.splineManager = f; },
             () => { if (DeployScriptOnly<LevelSelectSplineManager>("LevelSelectSplineManager", out var c, null)) _data.splineManager = c; });
@@ -714,12 +720,6 @@ public class LevelSelectDesignerWindow : EditorWindow
         // UI Script Objects
         EditorGUILayout.Space(4);
         EditorGUILayout.LabelField("UI Scripts", EditorStyles.miniBoldLabel);
-        DrawDeployRow("PauseMenuUI",              _data.pauseMenuUI              != null,
-            () => TryFind<PauseMenuUI>(v              => _data.pauseMenuUI              = v),
-            () => { if (DeployScriptOnly<PauseMenuUI>("PauseManager_Script",             out var c, _data.pauseManagerScriptPrefab))       _data.pauseMenuUI              = c; });
-        DrawDeployRow("PortalConfirmUI",          _data.portalConfirmUI          != null,
-            () => TryFind<PortalConfirmUI>(v          => _data.portalConfirmUI          = v),
-            () => { if (DeployScriptOnly<PortalConfirmUI>("PortalConfirmUI_Script",     out var c, _data.portalConfirmUIScriptPrefab))    _data.portalConfirmUI          = c; });
         DrawDeployRow("SoulsOnBoatDisplay",       _data.soulsOnBoatDisplayManager != null,
             () => TryFind<SoulsOnBoatDisplayManager>(v => _data.soulsOnBoatDisplayManager = v),
             () => { if (DeployScriptOnly<SoulsOnBoatDisplayManager>("SoulsDisplay_Script", out var c, _data.soulsOnBoatDisplayScriptPrefab)) _data.soulsOnBoatDisplayManager = c; });
@@ -815,6 +815,67 @@ public class LevelSelectDesignerWindow : EditorWindow
         EditorUtility.SetDirty(go);
     }
 
+    private void DeployRiverExtrusion()
+    {
+        if (_data.riverManager == null)
+        {
+            Debug.LogWarning("[LevelSelectDesigner] Cannot deploy RiverExtrusion — SplineRiverManager not yet deployed.");
+            return;
+        }
+
+        var parent = FindOrCreateParent("RiverExtrusion");
+
+        // Find or create the main highway child
+        var highwayT = parent.transform.Find("MainHighway");
+        GameObject highwayGo;
+        if (highwayT == null)
+        {
+            highwayGo = new GameObject("MainHighway");
+            Undo.RegisterCreatedObjectUndo(highwayGo, "Deploy MainHighway");
+            highwayGo.transform.SetParent(parent.transform, false);
+        }
+        else
+        {
+            highwayGo = highwayT.gameObject;
+        }
+
+        var container = highwayGo.GetComponent<SplineContainer>();
+        if (container == null) container = Undo.AddComponent<SplineContainer>(highwayGo);
+
+        var extrude = highwayGo.GetComponent<SplineExtrude>();
+        if (extrude == null) extrude = Undo.AddComponent<SplineExtrude>(highwayGo);
+
+        // Mirror SplineExtrude settings from BranchWaterExtrudePrefab
+        if (_data.branchWaterExtrudePrefab != null)
+        {
+            var branchExtrude = _data.branchWaterExtrudePrefab.GetComponentInChildren<SplineExtrude>();
+            if (branchExtrude != null)
+            {
+                EditorUtility.CopySerialized(branchExtrude, extrude);
+                EditorUtility.SetDirty(extrude);
+            }
+        }
+
+        // Wire into SplineRiverManager
+        if (_data.riverManager != null)
+        {
+            // Direct assignment for immediate effect
+            _data.riverManager.SetupContainers(container, extrude, _data.barrierPrefab);
+
+            // Also persist via SerializedObject so values survive domain reload
+            var so = new SerializedObject(_data.riverManager);
+            so.Update();
+            var mc = so.FindProperty("_mainContainer");
+            var me = so.FindProperty("_mainExtrude");
+            var mb = so.FindProperty("_barrierPrefab");
+            if (mc != null) mc.objectReferenceValue = container;
+            if (me != null) me.objectReferenceValue = extrude;
+            if (mb != null && _data.barrierPrefab != null) mb.objectReferenceValue = _data.barrierPrefab;
+            so.ApplyModifiedProperties();
+            EditorUtility.SetDirty(_data.riverManager);
+        }
+    }
+
     private void DeployBoat()
     {
         if (DeployScriptOnly<LevelSelectBoatControl>("LevelSelectBoatControl", out var c, null))
@@ -847,21 +908,50 @@ public class LevelSelectDesignerWindow : EditorWindow
 
     private void DeployCameraController()
     {
-        var parent = FindOrCreateParent("LEVELSELECT_SCRIPTS");
+        var parent = FindOrCreateParent("CAMERA");
 
-        var go = GameObject.Find("LevelSelectCamera");
+        // Destroy stale GO if it's not a prefab instance of the assigned prefab
+        var existing = GameObject.Find("LevelSelectCamera");
+        if (existing != null && _data.cameraPrefab != null &&
+            PrefabUtility.GetCorrespondingObjectFromSource(existing) != _data.cameraPrefab)
+        {
+            Undo.DestroyObjectImmediate(existing);
+            existing = null;
+        }
+
+        var go = existing;
         if (go == null)
         {
-            go = new GameObject("LevelSelectCamera");
-            Undo.RegisterCreatedObjectUndo(go, "Deploy Camera Controller");
+            if (_data.cameraPrefab != null)
+            {
+                go = (GameObject)PrefabUtility.InstantiatePrefab(_data.cameraPrefab);
+                Undo.RegisterCreatedObjectUndo(go, "Deploy Camera");
+                go.name = "LevelSelectCamera";
+            }
+            else
+            {
+                go = new GameObject("LevelSelectCamera");
+                Undo.RegisterCreatedObjectUndo(go, "Deploy Camera Controller");
+            }
         }
 
         if (go.transform.parent != parent.transform)
             go.transform.SetParent(parent.transform, false);
 
+        // Wire LevelSelectCameraController
         var comp = go.GetComponent<LevelSelectCameraController>();
         if (comp == null) comp = Undo.AddComponent<LevelSelectCameraController>(go);
         _data.cameraController = comp;
+
+        // Wire the CinemachineCamera from the prefab into the controller
+        var vcam = go.GetComponentInChildren<Unity.Cinemachine.CinemachineCamera>();
+        if (vcam != null && comp.cam == null)
+        {
+            var so = new SerializedObject(comp);
+            var prop = so.FindProperty("cam");
+            if (prop != null) { prop.objectReferenceValue = vcam; so.ApplyModifiedProperties(); }
+            EditorUtility.SetDirty(comp);
+        }
     }
 
     private void DeployCinemachine()
@@ -908,16 +998,36 @@ public class LevelSelectDesignerWindow : EditorWindow
         if (_data.segmentRegistry  == null) { if (DeployScriptOnly<RiverSegmentRegistry>("RiverSegmentRegistry",         out var c, null))              _data.segmentRegistry  = c; }
         if (_data.dataController   == null) { if (DeployScriptOnly<LevelSelectDataController>("LevelSelectDataController", out var c, _data.dataControllerPrefab)) _data.dataController = c; }
         if (_data.boatPathManager  == null) { if (DeployScriptOnly<SplinePathStitcher>("BoatPathManager",                 out var c, null))              _data.boatPathManager  = c; }
+        if (_data.boatPathManager != null && _data.pathPrefab != null)
+        {
+            var so = new SerializedObject(_data.boatPathManager);
+            var pp = so.FindProperty("_pathPrefab");
+            if (pp != null && pp.objectReferenceValue == null) { pp.objectReferenceValue = _data.pathPrefab; so.ApplyModifiedProperties(); EditorUtility.SetDirty(_data.boatPathManager); }
+        }
         if (_data.riverManager     == null) { if (DeployScriptOnly<SplineRiverManager>("SplineRiverManager",              out var c, null))              _data.riverManager     = c; }
+        DeployRiverExtrusion();
+        if (_data.riverManager != null && (_data.branchWaterExtrudePrefab != null || _data.barrierPrefab != null))
+        {
+            var so = new SerializedObject(_data.riverManager);
+            var bp = so.FindProperty("_branchPrefab");
+            var br = so.FindProperty("_barrierPrefab");
+            bool dirty = false;
+            if (bp != null && bp.objectReferenceValue == null && _data.branchWaterExtrudePrefab != null) { bp.objectReferenceValue = _data.branchWaterExtrudePrefab; dirty = true; }
+            if (br != null && br.objectReferenceValue == null && _data.barrierPrefab            != null) { br.objectReferenceValue = _data.barrierPrefab;            dirty = true; }
+            if (dirty) { so.ApplyModifiedProperties(); EditorUtility.SetDirty(_data.riverManager); }
+        }
         if (_data.splineManager    == null) { if (DeployScriptOnly<LevelSelectSplineManager>("LevelSelectSplineManager",  out var c, null))              _data.splineManager    = c; }
+        if (_data.splineManager != null && _data.riverManager != null)
+        {
+            var so = new SerializedObject(_data.splineManager);
+            var pp = so.FindProperty("_riverManager");
+            if (pp != null && pp.objectReferenceValue == null) { pp.objectReferenceValue = _data.riverManager; so.ApplyModifiedProperties(); EditorUtility.SetDirty(_data.splineManager); }
+        }
         if (_data.boatControl      == null) DeployBoat();
         var _playerBoatGo = GameObject.Find("PlayerBoat");
         if (_playerBoatGo == null || _playerBoatGo.transform.childCount == 0) DeployPlayerBoat();
         DeployCameraController();
-        if (GameObject.Find("LevelSelectVCam") == null) DeployCinemachine();
         if (_data.soulDisplaySlotManager   == null) { if (DeployScriptOnly<SoulDisplaySlotManager>("SoulDisplaySlotManager",   out var c, null)) _data.soulDisplaySlotManager   = c; }
-        if (_data.pauseMenuUI              == null) { if (DeployScriptOnly<PauseMenuUI>("PauseManager_Script",           out var c, _data.pauseManagerScriptPrefab))       _data.pauseMenuUI              = c; }
-        if (_data.portalConfirmUI          == null) { if (DeployScriptOnly<PortalConfirmUI>("PortalConfirmUI_Script",   out var c, _data.portalConfirmUIScriptPrefab))    _data.portalConfirmUI          = c; }
         if (_data.soulsOnBoatDisplayManager == null) { if (DeployScriptOnly<SoulsOnBoatDisplayManager>("SoulsDisplay_Script", out var c, _data.soulsOnBoatDisplayScriptPrefab)) _data.soulsOnBoatDisplayManager = c; }
         // UI Canvas prefabs — only deploy if CANVAS parent prefab is assigned
         if (_data.canvasParentPrefab != null)
@@ -932,6 +1042,7 @@ public class LevelSelectDesignerWindow : EditorWindow
             if (GameObject.Find("PortalEnterYNUI")   == null) DeployUIPrefab(_data.portalConfirmUIPrefab,    "PortalEnterYNUI");
             if (GameObject.Find("SoulsDisplayBarUI") == null) DeployUIPrefab(_data.soulsOnBoatDisplayPrefab, "SoulsDisplayBarUI");
         }
+        WirePauseMenuPanels();
         EditorUtility.SetDirty(_data);
     }
 
@@ -948,9 +1059,57 @@ public class LevelSelectDesignerWindow : EditorWindow
         TryFind<LandscapeTool>(v             => _data.landscapeTool          = v);
         TryFind<SoulDisplaySlotManager>(v       => _data.soulDisplaySlotManager    = v);
         TryFind<PauseMenuUI>(v                  => _data.pauseMenuUI               = v);
-        TryFind<PortalConfirmUI>(v              => _data.portalConfirmUI           = v);
         TryFind<SoulsOnBoatDisplayManager>(v    => _data.soulsOnBoatDisplayManager = v);
         EditorUtility.SetDirty(_data);
+    }
+
+    private void WirePauseMenuPanels()
+    {
+        var canvasGo = GameObject.Find("PauseMenuUI");
+        if (canvasGo == null) return;
+
+
+        // Wire panel children into PauseMenuUI script on the canvas
+        var uiScript = canvasGo.GetComponent<PauseMenuUI>()
+                    ?? canvasGo.GetComponentInChildren<PauseMenuUI>();
+        if (uiScript != null)
+        {
+            uiScript.mainPanel     = FindChildGO(canvasGo, "MainPanel",     "Main Panel");
+            uiScript.aboutPanel    = FindChildGO(canvasGo, "AboutPanel",    "About Panel");
+            uiScript.controlsPanel = FindChildGO(canvasGo, "ControlsPanel", "Controls Panel");
+            uiScript.settingsPanel = FindChildGO(canvasGo, "SettingsPanel", "Settings Panel");
+            EditorUtility.SetDirty(uiScript);
+            _data.pauseMenuUI = uiScript;
+        }
+
+        Debug.Log("[LevelSelectDesigner] PauseMenuUI panels wired.");
+    }
+
+    private static GameObject FindChildGO(GameObject root, params string[] names)
+    {
+        foreach (var name in names)
+        {
+            var t = root.transform.Find(name);
+            if (t != null) return t.gameObject;
+        }
+        // Deep search if not found as direct child
+        foreach (var name in names)
+        {
+            var found = FindDeep(root.transform, name);
+            if (found != null) return found.gameObject;
+        }
+        return null;
+    }
+
+    private static Transform FindDeep(Transform parent, string name)
+    {
+        foreach (Transform child in parent)
+        {
+            if (child.name == name) return child;
+            var found = FindDeep(child, name);
+            if (found != null) return found;
+        }
+        return null;
     }
 
     private static void TryFind<T>(System.Action<T> assign) where T : Component
@@ -961,6 +1120,24 @@ public class LevelSelectDesignerWindow : EditorWindow
 
     private void WireAllSceneObjects()
     {
+        // Auto-fill defaultSegmentID on boat control from first main river path in data
+        if (_data.boatControl != null && _data.paths.Count > 0)
+        {
+            var mainPath = _data.paths.Find(p => p.segmentType == LevelSelectDesignerData.SegmentType.MainRiver)
+                        ?? _data.paths[0];
+            if (!string.IsNullOrEmpty(mainPath.segmentId))
+            {
+                var so = new SerializedObject(_data.boatControl);
+                var prop = so.FindProperty("defaultSegmentID");
+                if (prop != null && prop.stringValue != mainPath.segmentId)
+                {
+                    prop.stringValue = mainPath.segmentId;
+                    so.ApplyModifiedProperties();
+                    EditorUtility.SetDirty(_data.boatControl);
+                }
+            }
+        }
+
         if (_data.dataController != null && _data.boatControl != null)
         {
             var so = new SerializedObject(_data.dataController);
@@ -986,6 +1163,8 @@ public class LevelSelectDesignerWindow : EditorWindow
             EditorUtility.SetDirty(_data.soulsOnBoatDisplayManager);
         }
 
+        WirePauseMenuPanels();
+
         Debug.Log("[LevelSelectDesigner] Wire All complete.");
     }
 
@@ -1009,7 +1188,7 @@ public class LevelSelectDesignerWindow : EditorWindow
         if (GUILayout.Button("GENERATE", GUILayout.Height(30)))
         {
             PruneLooseNodes();
-            Generate();
+            EditorApplication.delayCall += () => { if (_data != null) Generate(); };
         }
         GUI.backgroundColor = prevColor;
 
@@ -1017,7 +1196,7 @@ public class LevelSelectDesignerWindow : EditorWindow
         {
             PruneLooseNodes();
             ClearGeneratedObjects();
-            Generate();
+            EditorApplication.delayCall += () => { if (_data != null) Generate(); };
         }
 
         if (GUILayout.Button("Clear Generated", GUILayout.Height(24)))
@@ -2513,6 +2692,9 @@ public class LevelSelectDesignerWindow : EditorWindow
         int undoGroup = Undo.GetCurrentGroup();
         Undo.SetCurrentGroupName("Generate Level Select");
 
+        // Deploy and wire all scene script objects FIRST so managers exist before path generation
+        DeployAllSceneObjects();
+
         var mainVisuals = FindOrCreateParent("MAINRIVERVISUALS");
         var branches    = FindOrCreateParent("RIVERBRANCHES");
         var junctionsGO = FindOrCreateParent("RIVERJUNCTIONS");
@@ -2571,20 +2753,9 @@ public class LevelSelectDesignerWindow : EditorWindow
         GenerateObstacles(obstaclesGO);
         GenerateArenas();
 
-        // Spawn BoatPathManager before WireSourceSegments so FindObjectOfType picks it up
-        SplinePathStitcher stitcher = null;
-        if (_data.boatPathManager != null)
-        {
-            var boatParent = FindOrCreateParent("BoatPaths");
-            var bpmGO = (GameObject)PrefabUtility.InstantiatePrefab(_data.boatPathManager.gameObject);
-            Undo.RegisterCreatedObjectUndo(bpmGO, "Spawn BoatPathManager");
-            bpmGO.transform.SetParent(boatParent.transform, false);
-            bpmGO.transform.localPosition = Vector3.zero;
-            stitcher = bpmGO.GetComponent<SplinePathStitcher>();
-        }
-
         WireSourceSegments(generatedContainers);
 
+        var stitcher = _data.boatPathManager;
         if (stitcher != null)
         {
             stitcher.BakePaths();
@@ -2597,7 +2768,6 @@ public class LevelSelectDesignerWindow : EditorWindow
 
         GenerateLandscapeTiles();
         SyncHillPointsToScene();
-        DeployAllSceneObjects();
 
         Undo.CollapseUndoOperations(undoGroup);
         Debug.Log($"[LevelSelectDesigner] Generated {generatedContainers.Count} segment(s), " +
@@ -3155,12 +3325,12 @@ public class LevelSelectDesignerWindow : EditorWindow
             EditorUtility.SetDirty(target);
         }
 
-        Wire(FindObjectOfType<SplineRiverManager>());
-        Wire(FindObjectOfType<SplinePathStitcher>());
+        Wire(_data.riverManager     ?? FindObjectOfType<SplineRiverManager>());
+        Wire(_data.boatPathManager  ?? FindObjectOfType<SplinePathStitcher>());
 
         // Wire SplineRiverManager → LevelSelectSplineManager._riverManager
-        var splineManager = FindObjectOfType<LevelSelectSplineManager>();
-        var riverManager  = FindObjectOfType<SplineRiverManager>();
+        var splineManager = _data.splineManager ?? FindObjectOfType<LevelSelectSplineManager>();
+        var riverManager  = _data.riverManager  ?? FindObjectOfType<SplineRiverManager>();
         if (splineManager != null && riverManager != null)
         {
             var so = new SerializedObject(splineManager);
@@ -3182,7 +3352,7 @@ public class LevelSelectDesignerWindow : EditorWindow
 
     private void ClearGeneratedObjects()
     {
-        foreach (var name in new[] { "MAINRIVERVISUALS", "RIVERBRANCHES", "RIVERJUNCTIONS", "RIVERGATEsobstacles", "ARENAS", "BoatPaths", "LANDSCAPETILES", "LEVELSELECT_SCRIPTS", "PlayerBoat", "CANVAS" })
+        foreach (var name in new[] { "MAINRIVERVISUALS", "RIVERBRANCHES", "RIVERJUNCTIONS", "RIVERGATEsobstacles", "ARENAS", "BoatPaths", "LANDSCAPETILES", "LEVELSELECT_SCRIPTS", "PlayerBoat", "CANVAS", "RiverExtrusion", "CAMERA" })
         {
             var go = GameObject.Find(name);
             if (go == null) continue;
