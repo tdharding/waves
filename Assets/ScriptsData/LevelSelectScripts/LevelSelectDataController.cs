@@ -40,6 +40,8 @@ public class LevelSelectDataController : MonoBehaviour
         ResetCollisionMaterial();
         WireSoulFishDisplay();
         WireJunctionNodes();
+        WireBoatReferences();
+        WireCameraFollowTarget();
     }
 
     void Start()
@@ -160,6 +162,36 @@ public class LevelSelectDataController : MonoBehaviour
 
         if (junctions.Length > 0)
             Debug.Log($"[LevelSelectDataController] Wired LevelSelectBoatControl to {junctions.Length} junction(s).");
+    }
+
+    void WireBoatReferences()
+    {
+        if (boatControl == null) return;
+
+        var playerBoat = GameObject.Find("PlayerBoat");
+        if (playerBoat == null || playerBoat.transform.childCount == 0) return;
+
+        var boatGo = playerBoat.transform.GetChild(0).gameObject;
+
+        var splineAnimate = boatGo.GetComponentInChildren<SplineAnimate>();
+        var boatCollider  = boatGo.GetComponentInChildren<Collider>();
+        var meshTransform = boatGo.transform.childCount > 0 ? boatGo.transform.GetChild(0) : null;
+
+        boatControl.WireBoatReferences(splineAnimate, boatCollider, boatGo.transform, meshTransform);
+        Debug.Log("[LevelSelectDataController] Boat references wired from PlayerBoat.");
+    }
+
+    void WireCameraFollowTarget()
+    {
+        var camController = FindObjectOfType<LevelSelectCameraController>();
+        if (camController == null || camController.cam == null) return;
+
+        var playerBoat = GameObject.Find("PlayerBoat");
+        if (playerBoat != null && playerBoat.transform.childCount > 0)
+        {
+            camController.cam.Follow = playerBoat.transform.GetChild(0);
+            Debug.Log("[LevelSelectDataController] Camera follow target set to LevelSelectBoat.");
+        }
     }
 
     void RemoveUnlockedObstacles()

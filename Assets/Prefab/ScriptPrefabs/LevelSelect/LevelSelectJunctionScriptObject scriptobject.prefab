@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 6352730452257853624}
   - component: {fileID: 3032856673346868661}
   m_Layer: 0
-  m_Name: LevelSelectJunctionScriptObject
+  m_Name: LevelSelectJunctionScriptObject scriptobject
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

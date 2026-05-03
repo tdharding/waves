@@ -582,27 +582,411 @@ public class LevelSelectDesignerWindow : EditorWindow
         if (EditorGUI.EndChangeCheck()) EditorUtility.SetDirty(_data);
     }
 
+    private void DrawUIScriptPrefabsSection()
+    {
+        EditorGUILayout.Space(6);
+        EditorGUILayout.LabelField("UI Script Prefabs", EditorStyles.boldLabel);
+        EditorGUI.BeginChangeCheck();
+        _data.pauseManagerScriptPrefab = (GameObject)EditorGUILayout.ObjectField(
+            "Pause Manager",      _data.pauseManagerScriptPrefab,      typeof(GameObject), false);
+        _data.portalConfirmUIScriptPrefab = (GameObject)EditorGUILayout.ObjectField(
+            "Portal Confirm UI",  _data.portalConfirmUIScriptPrefab,   typeof(GameObject), false);
+        _data.soulsOnBoatDisplayScriptPrefab = (GameObject)EditorGUILayout.ObjectField(
+            "Souls Display Mgr",  _data.soulsOnBoatDisplayScriptPrefab, typeof(GameObject), false);
+        if (EditorGUI.EndChangeCheck()) EditorUtility.SetDirty(_data);
+    }
+
+    private void DrawUICanvasPrefabsSection()
+    {
+        EditorGUILayout.Space(6);
+        EditorGUILayout.LabelField("UI Canvas Prefabs", EditorStyles.boldLabel);
+
+        EditorGUI.BeginChangeCheck();
+        _data.canvasParentPrefab = (GameObject)EditorGUILayout.ObjectField(
+            "CANVAS Parent",        _data.canvasParentPrefab,       typeof(GameObject), false);
+        _data.pauseMenuPrefab = (GameObject)EditorGUILayout.ObjectField(
+            "Pause Menu UI",        _data.pauseMenuPrefab,          typeof(GameObject), false);
+        _data.portalConfirmUIPrefab = (GameObject)EditorGUILayout.ObjectField(
+            "Portal Enter YN UI",   _data.portalConfirmUIPrefab,    typeof(GameObject), false);
+        _data.soulsOnBoatDisplayPrefab = (GameObject)EditorGUILayout.ObjectField(
+            "Souls Display Bar UI", _data.soulsOnBoatDisplayPrefab, typeof(GameObject), false);
+        if (EditorGUI.EndChangeCheck()) EditorUtility.SetDirty(_data);
+    }
+
     private void DrawPrefabsSection()
     {
         EditorGUILayout.Space(4);
         EditorGUI.BeginChangeCheck();
+
+        EditorGUILayout.LabelField("Core", EditorStyles.miniBoldLabel);
+        _data.dataControllerPrefab = (GameObject)EditorGUILayout.ObjectField(
+            "Data Controller", _data.dataControllerPrefab, typeof(GameObject), false);
+
+        EditorGUILayout.Space(4);
+        EditorGUILayout.LabelField("River", EditorStyles.miniBoldLabel);
         EditorGUILayout.BeginHorizontal();
         EditorGUILayout.LabelField("Split Preset", GUILayout.Width(100));
         _splitPreset = (SplineSplitterPreset)EditorGUILayout.ObjectField(_splitPreset, typeof(SplineSplitterPreset), false);
         EditorGUILayout.EndHorizontal();
-        _data.junctionScriptObject     = (GameObject)EditorGUILayout.ObjectField("Junction Script Obj", _data.junctionScriptObject,    typeof(GameObject), false);
-        _data.junctionRightFacingPrefab = (GameObject)EditorGUILayout.ObjectField("Junction Right",        _data.junctionRightFacingPrefab, typeof(GameObject), false);
-        _data.junctionLeftFacingPrefab   = (GameObject)EditorGUILayout.ObjectField("Junction Left",          _data.junctionLeftFacingPrefab,   typeof(GameObject), false);
-        _data.junctionPrefab           = (GameObject)EditorGUILayout.ObjectField("Junction (fallback)",  _data.junctionPrefab,           typeof(GameObject), false);
+        _data.riverBlockPrefab         = (GameObject)EditorGUILayout.ObjectField("Block",            _data.riverBlockPrefab,         typeof(GameObject), false);
+        _data.splineInstantiateSpacing = EditorGUILayout.FloatField("Block Spacing",                  _data.splineInstantiateSpacing);
+
+        EditorGUILayout.Space(4);
+        EditorGUILayout.LabelField("Junctions", EditorStyles.miniBoldLabel);
+        _data.junctionScriptObject      = (GameObject)EditorGUILayout.ObjectField("Script Object",   _data.junctionScriptObject,      typeof(GameObject), false);
+        _data.junctionRightFacingPrefab = (GameObject)EditorGUILayout.ObjectField("Right Facing",    _data.junctionRightFacingPrefab, typeof(GameObject), false);
+        _data.junctionLeftFacingPrefab  = (GameObject)EditorGUILayout.ObjectField("Left Facing",     _data.junctionLeftFacingPrefab,  typeof(GameObject), false);
+        _data.junctionPrefab            = (GameObject)EditorGUILayout.ObjectField("Fallback",         _data.junctionPrefab,            typeof(GameObject), false);
+        _data.junctionGapPadding        = EditorGUILayout.FloatField("Gap Padding",                   _data.junctionGapPadding);
+
+        EditorGUILayout.Space(4);
+        EditorGUILayout.LabelField("Arenas", EditorStyles.miniBoldLabel);
         _data.arenaPrefab         = (GameObject)EditorGUILayout.ObjectField("Arena Head",     _data.arenaPrefab,         typeof(GameObject), false);
         _data.arenaEntrancePrefab = (GameObject)EditorGUILayout.ObjectField("Arena Entrance", _data.arenaEntrancePrefab, typeof(GameObject), false);
-        _data.arenaRadius         = EditorGUILayout.FloatField("Arena Radius", _data.arenaRadius);
-        _data.obstaclePrefab   = (GameObject)EditorGUILayout.ObjectField("Obstacle",  _data.obstaclePrefab,   typeof(GameObject), false);
-        _data.shopPrefab       = (GameObject)EditorGUILayout.ObjectField("Shop",      _data.shopPrefab,       typeof(GameObject), false);
-        _data.riverBlockPrefab = (GameObject)EditorGUILayout.ObjectField("Block",     _data.riverBlockPrefab, typeof(GameObject), false);
-        _data.junctionGapPadding       = EditorGUILayout.FloatField("Junction Gap",  _data.junctionGapPadding);
-        _data.splineInstantiateSpacing = EditorGUILayout.FloatField("Block Spacing", _data.splineInstantiateSpacing);
+        _data.arenaRadius         = EditorGUILayout.FloatField("Arena Radius",                _data.arenaRadius);
+
+        EditorGUILayout.Space(4);
+        EditorGUILayout.LabelField("Obstacles & Shops", EditorStyles.miniBoldLabel);
+        _data.obstaclePrefab = (GameObject)EditorGUILayout.ObjectField("Obstacle", _data.obstaclePrefab, typeof(GameObject), false);
+        _data.shopPrefab     = (GameObject)EditorGUILayout.ObjectField("Shop",     _data.shopPrefab,     typeof(GameObject), false);
+
+        EditorGUILayout.Space(4);
+        EditorGUILayout.LabelField("Player", EditorStyles.miniBoldLabel);
+        _data.boatPrefab = (GameObject)EditorGUILayout.ObjectField("Boat", _data.boatPrefab, typeof(GameObject), false);
+
+        EditorGUILayout.Space(4);
+        EditorGUILayout.LabelField("Landscape", EditorStyles.miniBoldLabel);
+        _data.landscapeTilePrefab = (GameObject)EditorGUILayout.ObjectField("Tile Prefab", _data.landscapeTilePrefab, typeof(GameObject), false);
+
         if (EditorGUI.EndChangeCheck()) EditorUtility.SetDirty(_data);
+    }
+
+    // ── Scene Deploy ──────────────────────────────────────────────
+    private void DrawSceneDeploySection()
+    {
+        EditorGUILayout.Space(6);
+        EditorGUILayout.LabelField("Level Select Script Objects", EditorStyles.boldLabel);
+
+        DrawDeployRow("Segment Registry",  _data.segmentRegistry  != null,
+            () => { var f = UnityEngine.Object.FindObjectOfType<RiverSegmentRegistry>();  if (f) _data.segmentRegistry  = f; },
+            () => { if (DeployScriptOnly<RiverSegmentRegistry>("RiverSegmentRegistry", out var c, null)) _data.segmentRegistry = c; });
+
+        DrawDeployRow("Data Controller",   _data.dataController   != null,
+            () => { var f = UnityEngine.Object.FindObjectOfType<LevelSelectDataController>(); if (f) _data.dataController   = f; },
+            () => { if (DeployScriptOnly<LevelSelectDataController>("LevelSelectDataController", out var c, _data.dataControllerPrefab)) _data.dataController = c; });
+
+        DrawDeployRow("Boat Path Manager", _data.boatPathManager  != null,
+            () => { var f = UnityEngine.Object.FindObjectOfType<SplinePathStitcher>(); if (f) _data.boatPathManager = f; },
+            () => { if (DeployScriptOnly<SplinePathStitcher>("BoatPathManager", out var c, null)) _data.boatPathManager = c; });
+
+        DrawDeployRow("River Manager",     _data.riverManager     != null,
+            () => { var f = UnityEngine.Object.FindObjectOfType<SplineRiverManager>();    if (f) _data.riverManager    = f; },
+            () => { if (DeployScriptOnly<SplineRiverManager>("SplineRiverManager",    out var c, null)) _data.riverManager    = c; });
+
+        DrawDeployRow("Spline Manager",    _data.splineManager    != null,
+            () => { var f = UnityEngine.Object.FindObjectOfType<LevelSelectSplineManager>(); if (f) _data.splineManager = f; },
+            () => { if (DeployScriptOnly<LevelSelectSplineManager>("LevelSelectSplineManager", out var c, null)) _data.splineManager = c; });
+
+        DrawDeployRow("Boat Control",      _data.boatControl      != null,
+            () => { var f = UnityEngine.Object.FindObjectOfType<LevelSelectBoatControl>(); if (f) _data.boatControl = f; },
+            () => DeployBoat());
+
+        var playerBoatGo = GameObject.Find("PlayerBoat");
+        bool playerBoatReady = playerBoatGo != null && playerBoatGo.transform.childCount > 0;
+        DrawDeployRow("Player Boat GO", playerBoatReady,
+            () => { },
+            () => DeployPlayerBoat());
+
+        DrawDeployRow("Camera Controller", _data.cameraController != null,
+            () => { var f = UnityEngine.Object.FindObjectOfType<LevelSelectCameraController>(); if (f) _data.cameraController = f; },
+            () => DeployCameraController());
+
+        bool vcamReady = GameObject.Find("LevelSelectVCam") != null;
+        DrawDeployRow("Cinemachine Vcam", vcamReady,
+            () => { },
+            () => DeployCinemachine());
+
+
+        DrawDeployRow("Soul Slot Manager", _data.soulDisplaySlotManager != null,
+            () => { var f = UnityEngine.Object.FindObjectOfType<SoulDisplaySlotManager>(); if (f) _data.soulDisplaySlotManager = f; },
+            () => { if (DeployScriptOnly<SoulDisplaySlotManager>("SoulDisplaySlotManager", out var c, null)) _data.soulDisplaySlotManager = c; });
+
+        // UI Script Objects
+        EditorGUILayout.Space(4);
+        EditorGUILayout.LabelField("UI Scripts", EditorStyles.miniBoldLabel);
+        DrawDeployRow("PauseMenuUI",              _data.pauseMenuUI              != null,
+            () => TryFind<PauseMenuUI>(v              => _data.pauseMenuUI              = v),
+            () => { if (DeployScriptOnly<PauseMenuUI>("PauseManager_Script",             out var c, _data.pauseManagerScriptPrefab))       _data.pauseMenuUI              = c; });
+        DrawDeployRow("PortalConfirmUI",          _data.portalConfirmUI          != null,
+            () => TryFind<PortalConfirmUI>(v          => _data.portalConfirmUI          = v),
+            () => { if (DeployScriptOnly<PortalConfirmUI>("PortalConfirmUI_Script",     out var c, _data.portalConfirmUIScriptPrefab))    _data.portalConfirmUI          = c; });
+        DrawDeployRow("SoulsOnBoatDisplay",       _data.soulsOnBoatDisplayManager != null,
+            () => TryFind<SoulsOnBoatDisplayManager>(v => _data.soulsOnBoatDisplayManager = v),
+            () => { if (DeployScriptOnly<SoulsOnBoatDisplayManager>("SoulsDisplay_Script", out var c, _data.soulsOnBoatDisplayScriptPrefab)) _data.soulsOnBoatDisplayManager = c; });
+
+        EditorGUILayout.Space(4);
+
+
+        EditorGUILayout.Space(4);
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Auto-Find All", GUILayout.Height(22)))
+            AutoFindAll();
+        if (GUILayout.Button("Wire All", GUILayout.Height(22)))
+            WireAllSceneObjects();
+        EditorGUILayout.EndHorizontal();
+    }
+
+    private void DrawDeployRow(string label, bool present,
+        System.Action onFind, System.Action onDeploy)
+    {
+        EditorGUILayout.BeginHorizontal();
+
+        var dotStyle = new GUIStyle(EditorStyles.label) { fixedWidth = 14 };
+        var prevCol = GUI.color;
+        GUI.color = present ? new Color(0.4f, 1f, 0.5f) : new Color(1f, 0.4f, 0.4f);
+        EditorGUILayout.LabelField("●", dotStyle);
+        GUI.color = prevCol;
+
+        EditorGUILayout.LabelField(label, GUILayout.Width(104));
+
+        if (GUILayout.Button("Find", EditorStyles.miniButton, GUILayout.Width(34)))
+        {
+            onFind();
+            EditorUtility.SetDirty(_data);
+        }
+
+        if (!present)
+        {
+            var prevBg = GUI.backgroundColor;
+            GUI.backgroundColor = new Color(0.5f, 0.8f, 1f);
+            if (GUILayout.Button("Deploy", EditorStyles.miniButton, GUILayout.Width(46)))
+            {
+                onDeploy();
+                EditorUtility.SetDirty(_data);
+            }
+            GUI.backgroundColor = prevBg;
+        }
+
+        EditorGUILayout.EndHorizontal();
+    }
+
+    private bool DeployScriptOnly<T>(string goName, out T result, GameObject prefabOverride) where T : Component
+    {
+        result = null;
+        var parent = FindOrCreateParent("LEVELSELECT_SCRIPTS");
+
+        GameObject go;
+        if (prefabOverride != null)
+        {
+            go = (GameObject)PrefabUtility.InstantiatePrefab(prefabOverride);
+            Undo.RegisterCreatedObjectUndo(go, $"Deploy {goName}");
+            go.transform.SetParent(parent.transform, false);
+        }
+        else
+        {
+            go = GameObject.Find(goName);
+            if (go == null)
+            {
+                go = new GameObject(goName);
+                Undo.RegisterCreatedObjectUndo(go, $"Deploy {goName}");
+                go.transform.SetParent(parent.transform, false);
+            }
+        }
+        var comp = go.GetComponent<T>();
+        if (comp == null) comp = Undo.AddComponent<T>(go);
+        result = comp;
+        return comp != null;
+    }
+
+    private void DeployUIPrefab(GameObject prefab, string goName)
+    {
+        if (prefab == null)
+        {
+            Debug.LogWarning($"[LevelSelectDesigner] No prefab set for {goName}.");
+            return;
+        }
+        if (GameObject.Find(goName) != null) return;
+
+        var canvasGo = GameObject.Find("CANVAS");
+        var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+        Undo.RegisterCreatedObjectUndo(go, $"Deploy {goName}");
+        go.name = goName;
+        if (canvasGo != null) go.transform.SetParent(canvasGo.transform, false);
+        EditorUtility.SetDirty(go);
+    }
+
+    private void DeployBoat()
+    {
+        if (DeployScriptOnly<LevelSelectBoatControl>("LevelSelectBoatControl", out var c, null))
+        {
+            _data.boatControl = c;
+            EditorUtility.SetDirty(_data);
+        }
+    }
+
+    private void DeployPlayerBoat()
+    {
+        var parent = FindOrCreateParent("PlayerBoat");
+
+        // Only deploy the boat child if it doesn't already exist under the parent
+        if (parent.transform.childCount > 0) return;
+
+        GameObject boat;
+        if (_data.boatPrefab != null)
+        {
+            boat = (GameObject)PrefabUtility.InstantiatePrefab(_data.boatPrefab);
+            Undo.RegisterCreatedObjectUndo(boat, "Deploy Boat");
+        }
+        else
+        {
+            boat = new GameObject("LevelSelectBoat");
+            Undo.RegisterCreatedObjectUndo(boat, "Deploy Boat");
+        }
+        boat.transform.SetParent(parent.transform, false);
+    }
+
+    private void DeployCameraController()
+    {
+        var parent = FindOrCreateParent("LEVELSELECT_SCRIPTS");
+
+        var go = GameObject.Find("LevelSelectCamera");
+        if (go == null)
+        {
+            go = new GameObject("LevelSelectCamera");
+            Undo.RegisterCreatedObjectUndo(go, "Deploy Camera Controller");
+        }
+
+        if (go.transform.parent != parent.transform)
+            go.transform.SetParent(parent.transform, false);
+
+        var comp = go.GetComponent<LevelSelectCameraController>();
+        if (comp == null) comp = Undo.AddComponent<LevelSelectCameraController>(go);
+        _data.cameraController = comp;
+    }
+
+    private void DeployCinemachine()
+    {
+        var scriptsParent = FindOrCreateParent("LEVELSELECT_SCRIPTS");
+
+        // 1. Add CinemachineBrain to the main camera
+        var mainCam = UnityEngine.Object.FindObjectOfType<Camera>();
+        if (mainCam != null)
+        {
+            if (mainCam.GetComponent<Unity.Cinemachine.CinemachineBrain>() == null)
+                Undo.AddComponent<Unity.Cinemachine.CinemachineBrain>(mainCam.gameObject);
+        }
+        else
+            Debug.LogWarning("[LevelSelectDesigner] No Camera found in scene — add a Main Camera first.");
+
+        // 2. Create CinemachineCamera GO under LEVELSELECT_SCRIPTS
+        var vcamGo = GameObject.Find("LevelSelectVCam");
+        if (vcamGo == null)
+        {
+            vcamGo = new GameObject("LevelSelectVCam");
+            Undo.RegisterCreatedObjectUndo(vcamGo, "Deploy CinemachineCamera");
+            vcamGo.transform.SetParent(scriptsParent.transform, false);
+        }
+
+        var vcam = vcamGo.GetComponent<Unity.Cinemachine.CinemachineCamera>();
+        if (vcam == null) vcam = Undo.AddComponent<Unity.Cinemachine.CinemachineCamera>(vcamGo);
+
+        // 3. Wire vcam into LevelSelectCameraController
+        if (_data.cameraController != null)
+        {
+            var so = new SerializedObject(_data.cameraController);
+            var prop = so.FindProperty("cam");
+            if (prop != null) { prop.objectReferenceValue = vcam; so.ApplyModifiedProperties(); }
+            EditorUtility.SetDirty(_data.cameraController);
+        }
+
+        Debug.Log("[LevelSelectDesigner] Cinemachine deployed and wired.");
+    }
+
+    private void DeployAllSceneObjects()
+    {
+        AutoFindAll();
+        if (_data.segmentRegistry  == null) { if (DeployScriptOnly<RiverSegmentRegistry>("RiverSegmentRegistry",         out var c, null))              _data.segmentRegistry  = c; }
+        if (_data.dataController   == null) { if (DeployScriptOnly<LevelSelectDataController>("LevelSelectDataController", out var c, _data.dataControllerPrefab)) _data.dataController = c; }
+        if (_data.boatPathManager  == null) { if (DeployScriptOnly<SplinePathStitcher>("BoatPathManager",                 out var c, null))              _data.boatPathManager  = c; }
+        if (_data.riverManager     == null) { if (DeployScriptOnly<SplineRiverManager>("SplineRiverManager",              out var c, null))              _data.riverManager     = c; }
+        if (_data.splineManager    == null) { if (DeployScriptOnly<LevelSelectSplineManager>("LevelSelectSplineManager",  out var c, null))              _data.splineManager    = c; }
+        if (_data.boatControl      == null) DeployBoat();
+        var _playerBoatGo = GameObject.Find("PlayerBoat");
+        if (_playerBoatGo == null || _playerBoatGo.transform.childCount == 0) DeployPlayerBoat();
+        DeployCameraController();
+        if (GameObject.Find("LevelSelectVCam") == null) DeployCinemachine();
+        if (_data.soulDisplaySlotManager   == null) { if (DeployScriptOnly<SoulDisplaySlotManager>("SoulDisplaySlotManager",   out var c, null)) _data.soulDisplaySlotManager   = c; }
+        if (_data.pauseMenuUI              == null) { if (DeployScriptOnly<PauseMenuUI>("PauseManager_Script",           out var c, _data.pauseManagerScriptPrefab))       _data.pauseMenuUI              = c; }
+        if (_data.portalConfirmUI          == null) { if (DeployScriptOnly<PortalConfirmUI>("PortalConfirmUI_Script",   out var c, _data.portalConfirmUIScriptPrefab))    _data.portalConfirmUI          = c; }
+        if (_data.soulsOnBoatDisplayManager == null) { if (DeployScriptOnly<SoulsOnBoatDisplayManager>("SoulsDisplay_Script", out var c, _data.soulsOnBoatDisplayScriptPrefab)) _data.soulsOnBoatDisplayManager = c; }
+        // UI Canvas prefabs — only deploy if CANVAS parent prefab is assigned
+        if (_data.canvasParentPrefab != null)
+        {
+            if (GameObject.Find("CANVAS") == null)
+            {
+                var canvas = (GameObject)PrefabUtility.InstantiatePrefab(_data.canvasParentPrefab);
+                Undo.RegisterCreatedObjectUndo(canvas, "Deploy CANVAS");
+                canvas.name = "CANVAS";
+            }
+            if (GameObject.Find("PauseMenuUI")       == null) DeployUIPrefab(_data.pauseMenuPrefab,          "PauseMenuUI");
+            if (GameObject.Find("PortalEnterYNUI")   == null) DeployUIPrefab(_data.portalConfirmUIPrefab,    "PortalEnterYNUI");
+            if (GameObject.Find("SoulsDisplayBarUI") == null) DeployUIPrefab(_data.soulsOnBoatDisplayPrefab, "SoulsDisplayBarUI");
+        }
+        EditorUtility.SetDirty(_data);
+    }
+
+    private void AutoFindAll()
+    {
+        Undo.RecordObject(_data, "Auto-Find Scene Objects");
+        TryFind<RiverSegmentRegistry>(v   => _data.segmentRegistry   = v);
+        TryFind<LevelSelectDataController>(v => _data.dataController = v);
+        TryFind<SplinePathStitcher>(v     => _data.boatPathManager   = v);
+        TryFind<SplineRiverManager>(v     => _data.riverManager      = v);
+        TryFind<LevelSelectSplineManager>(v => _data.splineManager   = v);
+        TryFind<LevelSelectBoatControl>(v => _data.boatControl       = v);
+        TryFind<LevelSelectCameraController>(v => _data.cameraController = v);
+        TryFind<LandscapeTool>(v             => _data.landscapeTool          = v);
+        TryFind<SoulDisplaySlotManager>(v       => _data.soulDisplaySlotManager    = v);
+        TryFind<PauseMenuUI>(v                  => _data.pauseMenuUI               = v);
+        TryFind<PortalConfirmUI>(v              => _data.portalConfirmUI           = v);
+        TryFind<SoulsOnBoatDisplayManager>(v    => _data.soulsOnBoatDisplayManager = v);
+        EditorUtility.SetDirty(_data);
+    }
+
+    private static void TryFind<T>(System.Action<T> assign) where T : Component
+    {
+        var found = UnityEngine.Object.FindObjectOfType<T>();
+        if (found != null) assign(found);
+    }
+
+    private void WireAllSceneObjects()
+    {
+        if (_data.dataController != null && _data.boatControl != null)
+        {
+            var so = new SerializedObject(_data.dataController);
+            var prop = so.FindProperty("boatControl");
+            if (prop != null) { prop.objectReferenceValue = _data.boatControl; so.ApplyModifiedProperties(); }
+            EditorUtility.SetDirty(_data.dataController);
+        }
+
+        if (_data.splineManager != null && _data.riverManager != null)
+        {
+            var so = new SerializedObject(_data.splineManager);
+            var prop = so.FindProperty("_riverManager");
+            if (prop != null) { prop.objectReferenceValue = _data.riverManager; so.ApplyModifiedProperties(); }
+            EditorUtility.SetDirty(_data.splineManager);
+        }
+
+        // Wire SoulsOnBoatDisplayManager.slotManager → SoulDisplaySlotManager
+        if (_data.soulsOnBoatDisplayManager != null && _data.soulDisplaySlotManager != null)
+        {
+            var so = new SerializedObject(_data.soulsOnBoatDisplayManager);
+            var prop = so.FindProperty("slotManager");
+            if (prop != null) { prop.objectReferenceValue = _data.soulDisplaySlotManager; so.ApplyModifiedProperties(); }
+            EditorUtility.SetDirty(_data.soulsOnBoatDisplayManager);
+        }
+
+        Debug.Log("[LevelSelectDesigner] Wire All complete.");
     }
 
     private void DrawCanvasSettingsSection()
@@ -1561,6 +1945,9 @@ public class LevelSelectDesignerWindow : EditorWindow
             if (_foldSetup)
             {
                 DrawSceneRefsSection();
+                DrawSceneDeploySection();
+                DrawUIScriptPrefabsSection();
+                DrawUICanvasPrefabsSection();
                 DrawPrefabsSection();
             }
             EditorGUILayout.Space(2);
@@ -2210,6 +2597,7 @@ public class LevelSelectDesignerWindow : EditorWindow
 
         GenerateLandscapeTiles();
         SyncHillPointsToScene();
+        DeployAllSceneObjects();
 
         Undo.CollapseUndoOperations(undoGroup);
         Debug.Log($"[LevelSelectDesigner] Generated {generatedContainers.Count} segment(s), " +
@@ -2794,13 +3182,27 @@ public class LevelSelectDesignerWindow : EditorWindow
 
     private void ClearGeneratedObjects()
     {
-        foreach (var name in new[] { "MAINRIVERVISUALS", "RIVERBRANCHES", "RIVERJUNCTIONS", "RIVERGATEsobstacles", "ARENAS", "BoatPaths", "LANDSCAPETILES" })
+        foreach (var name in new[] { "MAINRIVERVISUALS", "RIVERBRANCHES", "RIVERJUNCTIONS", "RIVERGATEsobstacles", "ARENAS", "BoatPaths", "LANDSCAPETILES", "LEVELSELECT_SCRIPTS", "PlayerBoat", "CANVAS" })
         {
             var go = GameObject.Find(name);
             if (go == null) continue;
             var children = Enumerable.Range(0, go.transform.childCount)
                 .Select(i => go.transform.GetChild(i).gameObject).ToList();
             foreach (var child in children) Undo.DestroyObjectImmediate(child);
+        }
+
+        // Clear scene object references so deploy status resets
+        if (_data != null)
+        {
+            Undo.RecordObject(_data, "Clear Scene References");
+            _data.segmentRegistry  = null;
+            _data.dataController   = null;
+            _data.riverManager     = null;
+            _data.splineManager    = null;
+            _data.boatControl      = null;
+            _data.cameraController      = null;
+            _data.soulDisplaySlotManager = null;
+            EditorUtility.SetDirty(_data);
         }
     }
 

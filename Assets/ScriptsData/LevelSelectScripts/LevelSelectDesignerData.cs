@@ -119,6 +119,31 @@ public class LevelSelectDesignerData : ScriptableObject
     public LandscapeTool       landscapeTool;
     public SplinePathStitcher  boatPathManager;
 
+    // Extended scene object references — managed by Scene Deploy panel
+    public LevelSelectDataController   dataController;
+    public SplineRiverManager          riverManager;
+    public RiverSegmentRegistry        segmentRegistry;
+    public LevelSelectSplineManager    splineManager;
+    public LevelSelectBoatControl      boatControl;
+    public LevelSelectCameraController cameraController;
+    public SoulDisplaySlotManager      soulDisplaySlotManager;
+    public PauseMenuUI                 pauseMenuUI;
+    public PortalConfirmUI             portalConfirmUI;
+    public SoulsOnBoatDisplayManager   soulsOnBoatDisplayManager;
+
+    // Script object prefabs (from Prefab/ScriptPrefabs)
+    public GameObject dataControllerPrefab;
+    public GameObject pauseManagerScriptPrefab;
+    public GameObject portalConfirmUIScriptPrefab;
+    public GameObject soulsOnBoatDisplayScriptPrefab;
+    public GameObject boatPrefab;
+
+    // UI Canvas prefabs
+    public GameObject canvasParentPrefab;
+    public GameObject pauseMenuPrefab;
+    public GameObject portalConfirmUIPrefab;
+    public GameObject soulsOnBoatDisplayPrefab;
+
     // Canvas state
     public float canvasOriginX      = 0f;
     public float canvasOriginZ      = 0f;

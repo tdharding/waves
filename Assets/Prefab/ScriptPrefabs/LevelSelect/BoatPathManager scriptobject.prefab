@@ -464,7 +464,7 @@ GameObject:
   - component: {fileID: 5391963891438706681}
   - component: {fileID: 1411789377277504636}
   m_Layer: 0
-  m_Name: BoatPathManager
+  m_Name: BoatPathManager scriptobject
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

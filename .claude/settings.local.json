@@ -25,7 +25,10 @@
       "Bash(git commit *)",
       "Bash(git remote *)",
       "Bash(git branch *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\tomdh\\\\Waves\" -Directory)",
+      "Bash(Select-Object Name)",
+      "Bash(grep -E \"\\\\.prefab\\\\.meta|\\\\.prefab$\")"
     ]
   }
 }

@@ -179,6 +179,14 @@ public class LevelSelectBoatControl : MonoBehaviour
             GameProgressData.SaveBoatState(segID.SegmentID, startT, isLeftPath, isRightPath);
     }
 
+    public void WireBoatReferences(SplineAnimate splineAnimate, Collider boatCollider, Transform boatTransform, Transform meshTransform = null)
+    {
+        _splineAnimate = splineAnimate;
+        _boatCollider  = boatCollider;
+        _boatTransform = boatTransform;
+        if (meshTransform != null) _meshTransform = meshTransform;
+    }
+
     public void RestoreToSegment(SplineContainer segment, float progress)
     {
         AttachContainer(segment);

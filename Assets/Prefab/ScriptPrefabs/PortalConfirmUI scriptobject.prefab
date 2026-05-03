@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1 &3035356737094321521
+--- !u!1 &2016724640348184634
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -8,46 +8,43 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 5096709119916271318}
-  - component: {fileID: 4348034381448838093}
+  - component: {fileID: 3383915500753985122}
+  - component: {fileID: 7035742290925956264}
   m_Layer: 0
-  m_Name: LevelSelectDataController
+  m_Name: PortalConfirmUI scriptobject
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &5096709119916271318
+--- !u!4 &3383915500753985122
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3035356737094321521}
+  m_GameObject: {fileID: 2016724640348184634}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -2.69128, y: 0, z: -5.71044}
+  m_LocalPosition: {x: -10.12358, y: 0, z: 7.80168}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &4348034381448838093
+--- !u!114 &7035742290925956264
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3035356737094321521}
+  m_GameObject: {fileID: 2016724640348184634}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f005c4267328ede4bae704a19df8b7ad, type: 3}
+  m_Script: {fileID: 11500000, guid: 53bac96d111697743803a4adc3905e4d, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LevelSelectSceneBootstrap
-  unlockCursor: 1
-  showCursor: 1
-  collisionMaterial: {fileID: 2100000, guid: 174b2731eede17f4d91c96123121c30c, type: 2}
-  timeScale: 1
-  resumeAudio: 1
-  enforceEventSystem: 1
-  boatControl: {fileID: 0}
+  m_EditorClassIdentifier: Assembly-CSharp::PortalConfirmUI
+  panel: {fileID: 0}
+  promptText: {fileID: 0}
+  yesButton: {fileID: 0}
+  noButton: {fileID: 0}
