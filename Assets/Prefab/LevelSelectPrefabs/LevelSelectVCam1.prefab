@@ -12,7 +12,8 @@ GameObject:
   - component: {fileID: 748590965730954521}
   - component: {fileID: 3847456969208307706}
   - component: {fileID: 5780885650236562386}
-  - component: {fileID: 5119583117754857797}
+  - component: {fileID: 6327238328819729557}
+  - component: {fileID: 317757123456395364}
   m_Layer: 0
   m_Name: LevelSelectVCam1
   m_TagString: Untagged
@@ -138,7 +139,7 @@ MonoBehaviour:
     Time: 0
     Smoothing: 0
     IgnoreY: 0
---- !u!114 &5119583117754857797
+--- !u!114 &6327238328819729557
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -147,11 +148,31 @@ MonoBehaviour:
   m_GameObject: {fileID: 5450230635296789988}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 172515602e62fb746b5d573b38a5fe58, type: 3}
+  m_Script: {fileID: 11500000, guid: cab3018199a78ff47acec29b8e3e723c, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Unity.RenderPipelines.Core.Runtime::UnityEngine.Rendering.Volume
-  m_IsGlobal: 1
-  priority: 0
-  blendDistance: 0
-  weight: 1
-  sharedProfile: {fileID: 11400000, guid: 9eafecbf7740f374b941e60136993d6f, type: 2}
+  m_EditorClassIdentifier: Assembly-CSharp::LevelSelectCameraController
+  cam: {fileID: 748590965730954521}
+  zoomSpeed: 10
+  minFOV: 5
+  maxFOV: 60
+  defaultFOV: 30
+  orbitSpeed: 150
+  pitchMin: -60
+  pitchMax: 45
+--- !u!114 &317757123456395364
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5450230635296789988}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 449ef5ebbe24720439ec31d15f7b6f3d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Cinemachine::Unity.Cinemachine.CinemachineVolumeSettings
+  Weight: 1
+  FocusTracking: 2
+  FocusTarget: {fileID: 0}
+  FocusOffset: 0
+  Profile: {fileID: 11400000, guid: 9eafecbf7740f374b941e60136993d6f, type: 2}

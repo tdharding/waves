@@ -72,11 +72,11 @@ Material:
     - _Gradient_Noise_displacement: 20.12
     - _GridEdgeSoftness: 0
     - _GridLinesColourOpacity: -4.06
-    - _LandscapeScale: 70.44
+    - _LandscapeScale: 12.1
     - _MaskDistance1: 0
     - _MaskFade1: 0
     - _MaskSubtraction: 0
-    - _NormalStrength: 2.93
+    - _NormalStrength: 1.05
     - _Normal_Strength: 1.8
     - _PointCount: 0
     - _QueueControl: 0
@@ -91,14 +91,14 @@ Material:
     - _Voronoi2: 7.79
     - _maskRotationAmount: 0
     m_Colors:
-    - _BaseColour: {r: 0.20125782, g: 0.20125782, b: 0.20125782, a: 1}
+    - _BaseColour: {r: 0.26415092, g: 0.26415092, b: 0.26415092, a: 1}
     - _Black: {r: 0, g: 0, b: 0, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _DitherMultiplier: {r: 0, g: 0, b: 0, a: 0}
     - _GridLinesColour: {r: 1, g: 1, b: 1, a: 1}
-    - _LightRemap1: {r: -54.32, g: 2.1, b: 0, a: 0}
-    - _LightRemap2: {r: -2.6, g: -2.4, b: 0, a: 0}
-    - _Light_Angle: {r: -4, g: -359.5, b: 1288.47, a: 0}
+    - _LightRemap1: {r: -32.82, g: 3.1, b: 0, a: 0}
+    - _LightRemap2: {r: -3.8, g: 0.27, b: 0, a: 0}
+    - _Light_Angle: {r: -59.1, g: -15.1, b: 0, a: 0}
     - _NormalTiling: {r: 1, g: 1, b: 0, a: 0}
     - _RotationAxis: {r: 0, g: 0, b: 0, a: 0}
     - _Tiling: {r: 1, g: 1, b: 0, a: 0}

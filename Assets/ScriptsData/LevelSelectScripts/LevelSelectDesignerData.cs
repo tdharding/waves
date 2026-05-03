@@ -146,9 +146,8 @@ public class LevelSelectDesignerData : ScriptableObject
     // UI Canvas prefabs
     public GameObject canvasParentPrefab;
     public GameObject pauseMenuPrefab;
-    public GameObject portalConfirmUIPrefab;
+    public GameObject boatHUDPrefab;
     public GameObject soulsOnBoatDisplayPrefab;
-    public GameObject junctionPromptUIPrefab;
 
     // Canvas state
     public float canvasOriginX      = 0f;

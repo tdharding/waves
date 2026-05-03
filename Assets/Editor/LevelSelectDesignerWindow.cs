@@ -604,10 +604,10 @@ public class LevelSelectDesignerWindow : EditorWindow
             "CANVAS Parent",        _data.canvasParentPrefab,       typeof(GameObject), false);
         _data.pauseMenuPrefab = (GameObject)EditorGUILayout.ObjectField(
             "Pause Menu UI",        _data.pauseMenuPrefab,          typeof(GameObject), false);
-        _data.portalConfirmUIPrefab = (GameObject)EditorGUILayout.ObjectField(
-            "Portal Enter YN UI",   _data.portalConfirmUIPrefab,    typeof(GameObject), false);
+        _data.boatHUDPrefab = (GameObject)EditorGUILayout.ObjectField(
+            "Boat HUD Prompts",     _data.boatHUDPrefab,             typeof(GameObject), false);
         _data.soulsOnBoatDisplayPrefab = (GameObject)EditorGUILayout.ObjectField(
-            "Souls Display Bar UI", _data.soulsOnBoatDisplayPrefab, typeof(GameObject), false);
+            "Souls Display Bar UI", _data.soulsOnBoatDisplayPrefab,  typeof(GameObject), false);
         if (EditorGUI.EndChangeCheck()) EditorUtility.SetDirty(_data);
     }
 
@@ -1039,7 +1039,7 @@ public class LevelSelectDesignerWindow : EditorWindow
                 canvas.name = "CANVAS";
             }
             if (GameObject.Find("PauseMenuUI")       == null) DeployUIPrefab(_data.pauseMenuPrefab,          "PauseMenuUI");
-            if (GameObject.Find("PortalEnterYNUI")   == null) DeployUIPrefab(_data.portalConfirmUIPrefab,    "PortalEnterYNUI");
+            if (GameObject.Find("BoatHUDPrompts")    == null) DeployUIPrefab(_data.boatHUDPrefab,            "BoatHUDPrompts");
             if (GameObject.Find("SoulsDisplayBarUI") == null) DeployUIPrefab(_data.soulsOnBoatDisplayPrefab, "SoulsDisplayBarUI");
         }
         WirePauseMenuPanels();
@@ -3741,6 +3741,26 @@ public class LevelSelectDesignerWindow : EditorWindow
             {
                 _selectedHillPointId = sel ? null : hp.id;
                 Repaint();
+            }
+            GUI.backgroundColor = new Color(0.4f, 0.8f, 1f);
+            if (GUILayout.Button("❐", EditorStyles.miniButton, GUILayout.Width(20)))
+            {
+                Undo.RecordObject(_data, "Duplicate Hill Point");
+                var dupe = new LevelSelectDesignerData.LandscapeHillPoint
+                {
+                    id         = System.Guid.NewGuid().ToString(),
+                    positionXZ = hp.positionXZ + new Vector2(2f, 2f),
+                    scale      = hp.scale,
+                    height     = hp.height,
+                };
+                _data.hillPoints.Insert(i + 1, dupe);
+                _selectedHillPointId = dupe.id;
+                EditorUtility.SetDirty(_data);
+                SyncHillPointsToScene();
+                GUI.backgroundColor = rowBg;
+                EditorGUILayout.EndHorizontal();
+                EditorGUILayout.EndVertical();
+                break;
             }
             GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
             if (GUILayout.Button("✕", EditorStyles.miniButton, GUILayout.Width(20)))

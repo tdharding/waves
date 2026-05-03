@@ -123,7 +123,7 @@ Material:
     - _AddPrecomputedVelocity: 0
     - _AlphaClip: 0
     - _AlphaToMask: 0
-    - _ArenaRadius1: -2
+    - _ArenaRadius1: 45.53
     - _Blend: 0
     - _BlendModePreserveSpecular: 1
     - _BoatDither: -0.8
@@ -274,7 +274,7 @@ Material:
     - _depthcontrast1: 12.75
     - _depthstrenght: 0.03
     m_Colors:
-    - _ArenaMask: {r: 0, g: 0, b: 0, a: 0}
+    - _ArenaMask: {r: 1, g: 3.74, b: 1, a: 0}
     - _BaseColor: {r: 0.7169812, g: 0.7169812, b: 0.7169812, a: 1}
     - _BoatForward: {r: 0.8709857, g: -0.28336903, b: 0.40135533, a: 0}
     - _BoatPosition: {r: -0.866866, g: 0.09921097, b: 2.024442, a: 0}
@@ -309,7 +309,7 @@ Material:
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
     - _SurfaceColourTest1: {r: 0, g: 0.8023877, b: 1, a: 1}
     - _Tiling: {r: 20, g: 20, b: 0, a: 0}
-    - _WaveCenter: {r: 0, g: -0.16, b: 0, a: 0}
+    - _WaveCenter: {r: 220, g: 3, b: 42.9, a: 0}
     - _WaveCenter5: {r: 0.34, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

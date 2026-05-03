@@ -13,6 +13,8 @@ public class BoatHUD : MonoBehaviour
     private RectTransform _rect;
     private Canvas        _canvas;
 
+    public void SetBoatTransform(Transform t) => boatTransform = t;
+
     private void Awake()
     {
         _rect   = GetComponent<RectTransform>();

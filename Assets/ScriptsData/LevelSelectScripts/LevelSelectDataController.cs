@@ -42,6 +42,7 @@ public class LevelSelectDataController : MonoBehaviour
         WireJunctionNodes();
         WireBoatReferences();
         WireCameraFollowTarget();
+        WireBoatHUD();
     }
 
     void Start()
@@ -162,6 +163,18 @@ public class LevelSelectDataController : MonoBehaviour
 
         if (junctions.Length > 0)
             Debug.Log($"[LevelSelectDataController] Wired LevelSelectBoatControl to {junctions.Length} junction(s).");
+    }
+
+    void WireBoatHUD()
+    {
+        var hud = FindObjectOfType<BoatHUD>();
+        if (hud == null) return;
+
+        var boat = GameObject.Find("LevelSelectBoat");
+        if (boat == null) return;
+
+        hud.SetBoatTransform(boat.transform);
+        Debug.Log("[LevelSelectDataController] BoatHUD wired to LevelSelectBoat.");
     }
 
     void WireBoatReferences()
