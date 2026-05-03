@@ -25,6 +25,7 @@ public class LevelSelectDesignerWindow : EditorWindow
     private string _selectedJunctionNodeId;
     private string _selectedHillPointId;
     private bool   _isDraggingHillPoint;
+    private bool   _canvasFocused;
     private int    _selectedEntranceIdx   = -1;
 
     // Right panel foldout states
@@ -687,7 +688,19 @@ public class LevelSelectDesignerWindow : EditorWindow
             GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
 
         if (Event.current.type == EventType.Repaint)
+        {
             EditorGUI.DrawRect(_canvasRect, new Color(0.15f, 0.15f, 0.15f));
+
+            if (_canvasFocused)
+            {
+                const float B = 2f;
+                var col = new Color(0.3f, 0.7f, 1f, 0.9f);
+                EditorGUI.DrawRect(new Rect(_canvasRect.x, _canvasRect.y, _canvasRect.width, B), col);
+                EditorGUI.DrawRect(new Rect(_canvasRect.x, _canvasRect.yMax - B, _canvasRect.width, B), col);
+                EditorGUI.DrawRect(new Rect(_canvasRect.x, _canvasRect.y, B, _canvasRect.height), col);
+                EditorGUI.DrawRect(new Rect(_canvasRect.xMax - B, _canvasRect.y, B, _canvasRect.height), col);
+            }
+        }
 
         if (_canvasRect.width < 10) return;
 
@@ -770,6 +783,22 @@ public class LevelSelectDesignerWindow : EditorWindow
 
         bool inCanvas = _canvasRect.Contains(e.mousePosition);
 
+        // Claim / release sticky keyboard focus
+        if (e.type == EventType.MouseDown)
+        {
+            if (inCanvas)
+            {
+                _canvasFocused = true;
+                GUIUtility.keyboardControl = 0; // pull focus away from any text field
+                Repaint();
+            }
+            else if (!inCanvas)
+            {
+                _canvasFocused = false;
+                Repaint();
+            }
+        }
+
         // Track Space key — consume it so it doesn't trigger Unity shortcuts
         if (e.type == EventType.KeyDown && e.keyCode == KeyCode.Space && inCanvas)
         {
@@ -787,7 +816,7 @@ public class LevelSelectDesignerWindow : EditorWindow
             e.Use();
         }
 
-        if (!inCanvas && !_isDraggingNode && !_isPanning) return;
+        if (!inCanvas && !_canvasFocused && !_isDraggingNode && !_isPanning) return;
 
         // Space + left-drag  OR  middle-mouse: pan
         bool startSpacePan  = _spaceHeld && e.type == EventType.MouseDown && e.button == 0 && inCanvas;

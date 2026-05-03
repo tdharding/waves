@@ -7,7 +7,25 @@
       "Bash(rm \"C:\\\\Users\\\\tomdh\\\\Waves\\\\Assets\\\\ScriptsData\\\\VisualEffectGraphScripts\\\\DepthFoam.hlsl\")",
       "Bash(rm \"C:\\\\Users\\\\tomdh\\\\Waves\\\\Assets\\\\ScriptsData\\\\VisualEffectGraphScripts\\\\DepthFoam.hlsl.meta\")",
       "Bash(grep -v \"^--$\")",
-      "Bash(git --version)"
+      "Bash(git --version)",
+      "Bash(powershell -command \"Get-Content 'c:\\\\Users\\\\tomdh\\\\Waves\\\\Assets\\\\Scenes\\\\LevelSelectWorlds\\\\LevelSelectWorld1.unity' -TotalCount 5\")",
+      "Bash(powershell -command \"Get-ChildItem 'c:\\\\Users\\\\tomdh\\\\Waves\\\\Temp' -Recurse -Filter '*LevelSelectWorld1*' -ErrorAction SilentlyContinue | Select-Object FullName, LastWriteTime\")",
+      "Bash(powershell -command \"Get-ChildItem 'c:\\\\Users\\\\tomdh\\\\Waves' -Recurse -Filter '*LevelSelectWorld1*' -ErrorAction SilentlyContinue | Select-Object FullName, LastWriteTime, Length\")",
+      "PowerShell(Get-WmiObject Win32_ShadowCopy)",
+      "Bash(powershell -command \"Get-Content 'c:\\\\Users\\\\tomdh\\\\Waves\\\\Assets\\\\Scenes\\\\LevelSelect.unity' -TotalCount 3\")",
+      "Bash(powershell -command \"Get-Content 'c:\\\\Users\\\\tomdh\\\\Waves\\\\Assets\\\\Scenes\\\\LevelSelect.unity' -TotalCount 200\")",
+      "Bash(python -c ' *)",
+      "Bash(cat)",
+      "Bash(powershell -command \"Get-Content 'c:\\\\Users\\\\tomdh\\\\Waves\\\\Assets\\\\Prefab\\\\LevelSelectPrefabs\\\\LEVELSELECTPREFABPACKAGE.prefab' -TotalCount 3\")",
+      "Bash(powershell -command ' *)",
+      "PowerShell($bytes = [System.IO.File]::ReadAllBytes\\('c:\\\\Users\\\\tomdh\\\\Waves\\\\Assets\\\\Prefab\\\\LevelSelectPrefabs\\\\LEVELSELECTPREFABPACKAGE.prefab'\\); $bytes[0])",
+      "PowerShell(\\(Get-Item 'c:\\\\Users\\\\tomdh\\\\Waves\\\\Assets\\\\Prefab\\\\LevelSelectPrefabs\\\\LEVELSELECTPREFABPACKAGE.prefab'\\).Length)",
+      "PowerShell($bytes = [System.IO.File]::ReadAllBytes\\('c:\\\\Users\\\\tomdh\\\\Waves\\\\Assets\\\\Prefab\\\\LevelSelectPrefabs\\\\LEVELSELECTPREFABPACKAGE.prefab'\\); $bytes[0..7] -join ',')",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git remote *)",
+      "Bash(git branch *)",
+      "Bash(git push *)"
     ]
   }
 }

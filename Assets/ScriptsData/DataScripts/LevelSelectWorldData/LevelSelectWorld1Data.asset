@@ -11,37 +11,69 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 88b6f058feac51f46a3f56ed88db9a43, type: 3}
   m_Name: LevelSelectWorld1Data
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   hillPoints: []
-  nodes: []
-  paths: []
+  nodes:
+  - id: 4f3595c6-3c42-47c7-bdac-75d60d6b0f5d
+    worldPosition: {x: 82.53438, y: 0, z: -7.771697}
+    type: 0
+  - id: 81a0d2eb-3f39-48f9-aad8-19db97008d10
+    worldPosition: {x: 45.825077, y: 0, z: 0.59877324}
+    type: 0
+  - id: 98e494e4-5c9a-4a82-affd-dc7f9ceb6299
+    worldPosition: {x: 7.24787, y: 0, z: -5.980057}
+    type: 0
+  - id: c520033e-430d-4d18-b5b6-62a18c49a2bb
+    worldPosition: {x: -45.417107, y: 0, z: -0.35046583}
+    type: 0
+  - id: 03182c90-85ca-4a8e-b1e6-25b3fbfe41a4
+    worldPosition: {x: -84.13783, y: 0, z: -18.068424}
+    type: 0
+  paths:
+  - pathId: df3f73da-598f-4476-ae26-8609709c08c2
+    segmentId: 
+    nodeIds:
+    - 4f3595c6-3c42-47c7-bdac-75d60d6b0f5d
+    - 81a0d2eb-3f39-48f9-aad8-19db97008d10
+    - 98e494e4-5c9a-4a82-affd-dc7f9ceb6299
+    - c520033e-430d-4d18-b5b6-62a18c49a2bb
+    - 03182c90-85ca-4a8e-b1e6-25b3fbfe41a4
+    isLeftPath: 0
+    isRightPath: 0
+    segmentType: 0
+    riverName: Main_00
+    leadsToArena: 0
+    arenaIsAtEnd: 0
+    extrudeOnExit: 0
+    arenaGridDataGuid: 
+    editorColor: {r: 0.9, g: 0.27, b: 0.27, a: 1}
   junctions: []
   shops: []
   obstacles: []
   arenas: []
-  junctionScriptObject: {fileID: 0}
-  junctionPrefab: {fileID: 0}
-  junctionRightFacingPrefab: {fileID: 0}
-  junctionLeftFacingPrefab: {fileID: 0}
-  arenaPrefab: {fileID: 0}
-  arenaEntrancePrefab: {fileID: 0}
+  junctionScriptObject: {fileID: 3543737601092306643, guid: cdc03d5a67a4c8a4ca447c17a1a65a6b, type: 3}
+  junctionPrefab: {fileID: 3543737601092306643, guid: cdc03d5a67a4c8a4ca447c17a1a65a6b, type: 3}
+  junctionRightFacingPrefab: {fileID: 1054175076011857233, guid: 08a0e3b54a9037545a500567ad11a7af, type: 3}
+  junctionLeftFacingPrefab: {fileID: 1054175076011857233, guid: 4112896818a87814181c705d9fb75161, type: 3}
+  arenaPrefab: {fileID: 2736547367387928057, guid: 6c59f54a649039247a7e250b203fff38, type: 3}
+  arenaEntrancePrefab: {fileID: 3190444306040296516, guid: fb37ce94a14f8f24a9a64d50b2d45a57, type: 3}
   arenaRadius: 10
-  obstaclePrefab: {fileID: 0}
-  shopPrefab: {fileID: 0}
-  riverBlockPrefab: {fileID: 0}
+  obstaclePrefab: {fileID: 5547052044951733551, guid: 343705c9ba8011941978eabad3d8f143, type: 3}
+  shopPrefab: {fileID: 5139625902506829726, guid: 4cf4b2f660ffe3a47a1134471c985525, type: 3}
+  riverBlockPrefab: {fileID: 8220959671730015965, guid: 070f6a1ad10a0e34aa3247fe890bb1a4, type: 3}
   junctionGapPadding: 0
   splineInstantiateSpacing: 0.15
   curveSubdivisions: 5
   branchStartOffset: 0.5
   arenaHeadOffset: 5
   landscapeTilePrefab: {fileID: 0}
-  landscapeTileSize: 10
+  landscapeTileSize: 17.19
   landscapeTilesX: 10
   landscapeTilesZ: 10
-  landscapeOffset: {x: 0, y: 0}
+  landscapeOffset: {x: -86.11, y: -86.1}
   landscapeWorldY: 0
-  landscapeTool: {fileID: 0}
-  boatPathManager: {fileID: 0}
+  landscapeTool: {fileID: 7203647551442377192, guid: 41221ee0a3fd3fd46818046b41168f54, type: 3}
+  boatPathManager: {fileID: 1411789377277504636, guid: 67be81245dd883547acae4957bb93d33, type: 3}
   canvasOriginX: 0
   canvasOriginZ: 0
   canvasUnitsPerPixel: 0.1
