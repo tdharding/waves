@@ -177,6 +177,8 @@ Material:
     - _ColorAddSubDiff: {r: 0, g: 0, b: 0, a: 0}
     - _DitherMultiplier: {r: 0, g: 0, b: 0, a: 0}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+    - _FadeEndWorld: {r: 102.93261, g: 3.1658895, b: -17.56, a: 0}
+    - _FadeStartWorld: {r: 160.8126, g: -3.8941104, b: -13.3, a: 0}
     - _GridLinesColour: {r: 0.6603774, g: 0.6603774, b: 0.6603774, a: 1}
     - _Light_Angle: {r: -10.98, g: -1.66, b: 16.29, a: 0}
     - _NormalTiling: {r: 4.3, g: 0.36, b: 0, a: 0}
@@ -185,5 +187,6 @@ Material:
     - _Tiling: {r: 0.3, g: 1, b: 0, a: 0}
     - _Vector1Colour: {r: 1, g: 1, b: 1, a: 1}
     - _Vector2Colour: {r: 0.0754717, g: 0.0754717, b: 0.0754717, a: 1}
+    - _White: {r: 0, g: 0, b: 0, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

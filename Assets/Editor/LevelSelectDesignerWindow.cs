@@ -66,6 +66,30 @@ public class LevelSelectDesignerWindow : EditorWindow
     // ── Panel sizes ───────────────────────────────────────────────
     private float   _leftPanelWidth  = 210f;
     private float   _rightPanelWidth = 175f;
+
+    // ── GridData resource cache ───────────────────────────────────
+    private GridData[] _gridDataOptions;
+    private string[]   _gridDataLabels;
+
+    private void EnsureGridDataCache()
+    {
+        if (_gridDataOptions != null) return;
+        _gridDataOptions = Resources.LoadAll<GridData>("Levels");
+        _gridDataLabels  = new string[_gridDataOptions.Length + 1];
+        _gridDataLabels[0] = "(none)";
+        for (int i = 0; i < _gridDataOptions.Length; i++)
+            _gridDataLabels[i + 1] = _gridDataOptions[i].displayName;
+    }
+
+    private GridData DrawGridDataPopup(string label, GridData current)
+    {
+        EnsureGridDataCache();
+        int currentIdx = 0;
+        for (int i = 0; i < _gridDataOptions.Length; i++)
+            if (_gridDataOptions[i] == current) { currentIdx = i + 1; break; }
+        int selected = EditorGUILayout.Popup(label, currentIdx, _gridDataLabels);
+        return selected == 0 ? null : _gridDataOptions[selected - 1];
+    }
     private bool    _isResizingLeft;
     private bool    _isResizingRight;
     private Vector2 _leftScroll;
@@ -302,7 +326,9 @@ public class LevelSelectDesignerWindow : EditorWindow
     // ══════════════════════════════════════════════════════════════
     private void DrawLeftPanel()
     {
-        EditorGUILayout.BeginVertical(GUILayout.Width(_leftPanelWidth), GUILayout.ExpandHeight(true));
+        Rect leftRect = EditorGUILayout.BeginVertical(GUILayout.Width(_leftPanelWidth), GUILayout.ExpandHeight(true));
+        if (Event.current.type == EventType.Repaint)
+            EditorGUI.DrawRect(leftRect, new Color(0.22f, 0.22f, 0.22f, 1f));
         _leftScroll = EditorGUILayout.BeginScrollView(_leftScroll);
 
         if (_data == null)
@@ -415,7 +441,89 @@ public class LevelSelectDesignerWindow : EditorWindow
             EditorUtility.SetDirty(_data);
         }
 
+        // ── Node Y heights ────────────────────────────────────────
+        EditorGUILayout.Space(4);
+        EditorGUILayout.LabelField("Node Heights (Y)", EditorStyles.boldLabel);
+        for (int i = 0; i < path.nodeIds.Count; i++)
+        {
+            var node = _data.nodes.Find(n => n.id == path.nodeIds[i]);
+            if (node == null) continue;
+
+            string typeLabel = node.type switch
+            {
+                LevelSelectDesignerData.NodeType.JunctionSplit => "◆",
+                LevelSelectDesignerData.NodeType.ArenaEnd      => "▲",
+                LevelSelectDesignerData.NodeType.ShopEnd       => "★",
+                _                                              => "●"
+            };
+
+            bool isSelected = node.id == _selectedNodeId;
+            var prevBg = GUI.backgroundColor;
+            if (isSelected) GUI.backgroundColor = new Color(0.3f, 0.7f, 1f);
+
+            EditorGUILayout.BeginHorizontal(EditorStyles.helpBox);
+            EditorGUILayout.LabelField($"{typeLabel} {i}", GUILayout.Width(36));
+            EditorGUI.BeginChangeCheck();
+            float newY = EditorGUILayout.FloatField(node.worldPosition.y, GUILayout.Width(52));
+            if (EditorGUI.EndChangeCheck())
+            {
+                Undo.RecordObject(_data, "Edit Node Y");
+                node.worldPosition = new Vector3(node.worldPosition.x, newY, node.worldPosition.z);
+                EditorUtility.SetDirty(_data);
+            }
+            EditorGUILayout.EndHorizontal();
+            GUI.backgroundColor = prevBg;
+        }
+
         // ── Arena info ────────────────────────────────────────────
+        EditorGUILayout.Space(4);
+
+        // End toggle — synced with arenaIsAtEnd checkbox above
+        EditorGUILayout.BeginHorizontal();
+        GUI.enabled = path.nodeIds.Count > 0;
+        var startBg = GUI.backgroundColor;
+        GUI.backgroundColor = !path.arenaIsAtEnd ? new Color(0.3f, 0.7f, 1f) : Color.gray;
+        if (GUILayout.Button("Start", EditorStyles.miniButtonLeft) && path.arenaIsAtEnd)
+        {
+            Undo.RecordObject(_data, "Move Arena to Start");
+            MoveArenaToEnd(path, atEnd: false);
+        }
+        GUI.backgroundColor = path.arenaIsAtEnd ? new Color(0.3f, 0.7f, 1f) : Color.gray;
+        if (GUILayout.Button("End", EditorStyles.miniButtonRight) && !path.arenaIsAtEnd)
+        {
+            Undo.RecordObject(_data, "Move Arena to End");
+            MoveArenaToEnd(path, atEnd: true);
+        }
+        GUI.backgroundColor = startBg;
+        GUI.enabled = true;
+        EditorGUILayout.EndHorizontal();
+
+        if (!path.leadsToArena || path.nodeIds.Count == 0)
+        {
+            GUI.enabled = path.nodeIds.Count > 0;
+            var prevBg = GUI.backgroundColor;
+            GUI.backgroundColor = new Color(0.4f, 1f, 0.5f);
+            if (GUILayout.Button("Add Arena", GUILayout.Height(22)))
+            {
+                Undo.RecordObject(_data, "Add Arena");
+                string targetNodeId = path.arenaIsAtEnd
+                    ? path.nodeIds[path.nodeIds.Count - 1]
+                    : path.nodeIds[0];
+                var targetNode = _data.nodes.Find(n => n.id == targetNodeId);
+                if (targetNode != null)
+                {
+                    targetNode.type = LevelSelectDesignerData.NodeType.ArenaEnd;
+                    if (!_data.arenas.Exists(a => a.nodeId == targetNodeId))
+                        _data.arenas.Add(new LevelSelectDesignerData.DesignerArena { nodeId = targetNodeId });
+                    path.leadsToArena = true;
+                    _selectedArenaNodeId = targetNodeId;
+                    EditorUtility.SetDirty(_data);
+                }
+            }
+            GUI.backgroundColor = prevBg;
+            GUI.enabled = true;
+        }
+
         if (path.leadsToArena && path.nodeIds.Count > 0)
         {
             string arenaNodeId = path.arenaIsAtEnd
@@ -443,8 +551,7 @@ public class LevelSelectDesignerWindow : EditorWindow
                 }
 
                 EditorGUI.BeginChangeCheck();
-                arena.gridData = (GridData)EditorGUILayout.ObjectField(
-                    "GridData", arena.gridData, typeof(GridData), false);
+                arena.gridData = DrawGridDataPopup("GridData", arena.gridData);
                 arena.arenaPrefabOverride = (GameObject)EditorGUILayout.ObjectField(
                     "Prefab Override", arena.arenaPrefabOverride, typeof(GameObject), false);
                 if (EditorGUI.EndChangeCheck())
@@ -507,8 +614,7 @@ public class LevelSelectDesignerWindow : EditorWindow
         EditorGUILayout.LabelField("Arena", EditorStyles.boldLabel);
 
         EditorGUI.BeginChangeCheck();
-        arena.gridData = (GridData)EditorGUILayout.ObjectField(
-            "GridData", arena.gridData, typeof(GridData), false);
+        arena.gridData = DrawGridDataPopup("GridData", arena.gridData);
         arena.arenaPrefabOverride = (GameObject)EditorGUILayout.ObjectField(
             "Prefab Override", arena.arenaPrefabOverride, typeof(GameObject), false);
 
@@ -1267,12 +1373,21 @@ public class LevelSelectDesignerWindow : EditorWindow
 
         if (_canvasRect.width < 10) return;
 
+        // Event handling uses absolute window coords — must run before BeginClip shifts the system
+        if (_data != null)
+            HandleCanvasEvents();
+
+        // Clip all drawing to the canvas rect so nothing bleeds over the side panels.
+        // Temporarily remap _canvasRect to canvas-local coords so WorldToCanvas
+        // returns positions relative to the clip origin.
+        var absoluteCanvasRect = _canvasRect;
+        _canvasRect = new Rect(Vector2.zero, _canvasRect.size);
+        GUI.BeginClip(absoluteCanvasRect);
+
         DrawCanvasGrid();
 
         if (_data != null)
         {
-            HandleCanvasEvents();
-
             Handles.BeginGUI();
             DrawLandscapeTilesOnCanvas();
             DrawPaths();
@@ -1282,6 +1397,9 @@ public class LevelSelectDesignerWindow : EditorWindow
             DrawInProgressPath();
             Handles.EndGUI();
         }
+
+        GUI.EndClip();
+        _canvasRect = absoluteCanvasRect;
 
         // Mode hint
         if (Event.current.type == EventType.Repaint)
@@ -1668,7 +1786,8 @@ public class LevelSelectDesignerWindow : EditorWindow
             if (node != null)
             {
                 Undo.RecordObject(_data, "Move Node");
-                node.worldPosition = CanvasToWorldPos(e.mousePosition - _dragOffset);
+                var np = CanvasToWorldPos(e.mousePosition - _dragOffset);
+                node.worldPosition = new Vector3(np.x, node.worldPosition.y, np.z);
                 EditorUtility.SetDirty(_data);
                 Repaint();
             }
@@ -1803,6 +1922,33 @@ public class LevelSelectDesignerWindow : EditorWindow
         EditorUtility.SetDirty(_data);
         Repaint();
         e.Use();
+    }
+
+    private void MoveArenaToEnd(LevelSelectDesignerData.DesignerPath path, bool atEnd)
+    {
+        if (path.nodeIds.Count == 0) return;
+
+        // Remove arena from old endpoint
+        string oldNodeId = path.arenaIsAtEnd
+            ? path.nodeIds[path.nodeIds.Count - 1]
+            : path.nodeIds[0];
+        var oldNode = _data.nodes.Find(n => n.id == oldNodeId);
+        if (oldNode != null) oldNode.type = LevelSelectDesignerData.NodeType.Waypoint;
+
+        // Move the DesignerArena entry to the new endpoint
+        string newNodeId = atEnd
+            ? path.nodeIds[path.nodeIds.Count - 1]
+            : path.nodeIds[0];
+        var existing = _data.arenas.Find(a => a.nodeId == oldNodeId);
+        if (existing != null) existing.nodeId = newNodeId;
+        else _data.arenas.Add(new LevelSelectDesignerData.DesignerArena { nodeId = newNodeId });
+
+        var newNode = _data.nodes.Find(n => n.id == newNodeId);
+        if (newNode != null) newNode.type = LevelSelectDesignerData.NodeType.ArenaEnd;
+
+        path.arenaIsAtEnd    = atEnd;
+        _selectedArenaNodeId = newNodeId;
+        EditorUtility.SetDirty(_data);
     }
 
     private void RemoveArena(string nodeId)
@@ -2114,7 +2260,9 @@ public class LevelSelectDesignerWindow : EditorWindow
     // ══════════════════════════════════════════════════════════════
     private void DrawRightPanel()
     {
-        EditorGUILayout.BeginVertical(GUILayout.Width(_rightPanelWidth), GUILayout.ExpandHeight(true));
+        Rect rightRect = EditorGUILayout.BeginVertical(GUILayout.Width(_rightPanelWidth), GUILayout.ExpandHeight(true));
+        if (Event.current.type == EventType.Repaint)
+            EditorGUI.DrawRect(rightRect, new Color(0.22f, 0.22f, 0.22f, 1f));
         _rightScroll = EditorGUILayout.BeginScrollView(_rightScroll);
 
         if (_data != null)
@@ -2214,9 +2362,7 @@ public class LevelSelectDesignerWindow : EditorWindow
             EditorGUILayout.EndHorizontal();
 
             EditorGUI.BeginChangeCheck();
-            var newGrid = (GridData)EditorGUILayout.ObjectField(
-                arena.gridData, typeof(GridData), false,
-                GUILayout.Height(EditorGUIUtility.singleLineHeight));
+            var newGrid = DrawGridDataPopup("", arena.gridData);
             if (EditorGUI.EndChangeCheck())
             {
                 Undo.RecordObject(_data, "Set Arena GridData");
