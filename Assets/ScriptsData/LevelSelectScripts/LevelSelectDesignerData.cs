@@ -141,6 +141,7 @@ public class LevelSelectDesignerData : ScriptableObject
     public GameObject pauseManagerScriptPrefab;
     public GameObject portalConfirmUIScriptPrefab;
     public GameObject soulsOnBoatDisplayScriptPrefab;
+    public GameObject arenaSoulsWindowPrefab;
     public GameObject boatPrefab;
 
     // UI Canvas prefabs

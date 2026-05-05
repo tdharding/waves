@@ -1,12 +1,13 @@
 using UnityEngine;
-using TMPro;
+using UnityEngine.UI;
 
 public class JunctionPromptUI : MonoBehaviour
 {
     public static JunctionPromptUI Instance { get; private set; }
 
     [SerializeField] private GameObject panel;
-    [SerializeField] private TMP_Text   promptText;
+    [SerializeField] private Image      leftArrow;
+    [SerializeField] private Image      rightArrow;
 
     private void Awake()
     {
@@ -21,10 +22,21 @@ public class JunctionPromptUI : MonoBehaviour
 
     public void Show(bool hasLeft, bool hasRight)
     {
-        string text = "";
-        if (hasLeft)  text += "◄ ";
-        if (hasRight) text += "► ";
-        if (promptText != null) promptText.text = text.Trim();
+        if (leftArrow  != null)
+        {
+            leftArrow.gameObject.SetActive(hasLeft);
+            // Flip horizontally so the right-pointing sprite becomes a left arrow
+            var s = leftArrow.transform.localScale;
+            leftArrow.transform.localScale = new Vector3(-Mathf.Abs(s.x), s.y, s.z);
+        }
+
+        if (rightArrow != null)
+        {
+            rightArrow.gameObject.SetActive(hasRight);
+            var s = rightArrow.transform.localScale;
+            rightArrow.transform.localScale = new Vector3(Mathf.Abs(s.x), s.y, s.z);
+        }
+
         if (panel != null) panel.SetActive(true);
     }
 

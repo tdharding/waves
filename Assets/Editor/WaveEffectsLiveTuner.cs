@@ -18,10 +18,11 @@ public class WaveEffectsLiveTuner : EditorWindow
     [SerializeField] bool       applyLive = true;
 
     // Wave Motion
-    [SerializeField] float frequency    = 1f;
-    [SerializeField] float speed        = 1f;
-    [SerializeField] float rippleDepth  = 1f;
-    [SerializeField] float waveStepRate = 10f;
+    [SerializeField] float   frequency    = 1f;
+    [SerializeField] float   speed        = 1f;
+    [SerializeField] float   rippleDepth  = 1f;
+    [SerializeField] float   waveStepRate = 10f;
+    [SerializeField] Vector4 waveCenter   = Vector4.zero;
 
     // Surface
     [SerializeField] float smoothness   = 0.5f;
@@ -283,6 +284,7 @@ public class WaveEffectsLiveTuner : EditorWindow
         speed        = EditorGUILayout.FloatField("Speed",          speed);
         rippleDepth  = EditorGUILayout.FloatField("Ripple Depth",   rippleDepth);
         waveStepRate = EditorGUILayout.FloatField("Wave Step Rate", waveStepRate);
+        waveCenter   = EditorGUILayout.Vector4Field("Wave Center",  waveCenter);
     }
 
     void DrawSurface()
@@ -563,6 +565,8 @@ public class WaveEffectsLiveTuner : EditorWindow
 
         if (normalTexture && !string.IsNullOrEmpty(normalTextureProp))
             waveMaterial.SetTexture(normalTextureProp, normalTexture);
+
+        waveMaterial.SetVector("_WaveCenter", waveCenter);
     }
 
     void ApplyToLights()
@@ -619,6 +623,7 @@ public class WaveEffectsLiveTuner : EditorWindow
         distanceDepth          = s.DistanceDepth;
         lightDirection         = s.LightDirection;
         if (s.NormalTexture) normalTexture = s.NormalTexture;
+        waveCenter = s.WaveCenter;
 
         musicIntro = preset.musicIntro;
         musicLoop  = preset.musicLoop;
@@ -716,6 +721,7 @@ public class WaveEffectsLiveTuner : EditorWindow
         DepthColour               = depthColour,
         DistanceDepth             = distanceDepth,
         NormalTexture             = normalTexture,
+        WaveCenter                = waveCenter,
     };
 
     WavePreset.WaveLightEntry[] BuildLightEntries()

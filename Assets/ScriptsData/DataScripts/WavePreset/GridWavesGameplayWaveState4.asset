@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: GridWavesGameplayWaveState4
   m_EditorClassIdentifier: Assembly-CSharp::WavePreset
   state:
-    Frequency: 12.85
+    Frequency: 14.65
     Speed: 0.43
     RippleDepth: 0.1
     Smoothness: 0
@@ -46,10 +46,8 @@ MonoBehaviour:
     DepthColour: {r: 0.4528302, g: 0.41651833, b: 0.41651833, a: 0}
     DistanceDepth: 0.45
     NormalTexture: {fileID: 2800000, guid: b428682cdd9054e468cb9dc6758f697f, type: 3}
+    WaveCenter: {x: 0.05, y: 0.68, z: -0.08, w: 0}
   sonarEnabled: 1
   musicIntro: {fileID: 8300000, guid: f2689d7d69db99749b0756d52ea81f5e, type: 3}
   musicLoop: {fileID: 8300000, guid: f2689d7d69db99749b0756d52ea81f5e, type: 3}
-  lights:
-  - color: {r: 1, g: 1, b: 1, a: 1}
-    intensity: 12.9
-    range: 8.56
+  lights: []

@@ -697,6 +697,8 @@ public class LevelSelectDesignerWindow : EditorWindow
             "Camera",             _data.cameraPrefab,              typeof(GameObject), false);
         _data.soulsOnBoatDisplayScriptPrefab = (GameObject)EditorGUILayout.ObjectField(
             "Souls Display Mgr",  _data.soulsOnBoatDisplayScriptPrefab, typeof(GameObject), false);
+        _data.arenaSoulsWindowPrefab = (GameObject)EditorGUILayout.ObjectField(
+            "Arena Souls Window", _data.arenaSoulsWindowPrefab,         typeof(GameObject), false);
         if (EditorGUI.EndChangeCheck()) EditorUtility.SetDirty(_data);
     }
 
@@ -813,22 +815,16 @@ public class LevelSelectDesignerWindow : EditorWindow
             () => { var f = UnityEngine.Object.FindObjectOfType<LevelSelectCameraController>(); if (f) _data.cameraController = f; },
             () => DeployCameraController());
 
-        bool vcamReady = GameObject.Find("LevelSelectVCam") != null;
-        DrawDeployRow("Cinemachine Vcam", vcamReady,
-            () => { },
-            () => DeployCinemachine());
-
-
-        DrawDeployRow("Soul Slot Manager", _data.soulDisplaySlotManager != null,
-            () => { var f = UnityEngine.Object.FindObjectOfType<SoulDisplaySlotManager>(); if (f) _data.soulDisplaySlotManager = f; },
-            () => { if (DeployScriptOnly<SoulDisplaySlotManager>("SoulDisplaySlotManager", out var c, null)) _data.soulDisplaySlotManager = c; });
-
         // UI Script Objects
         EditorGUILayout.Space(4);
         EditorGUILayout.LabelField("UI Scripts", EditorStyles.miniBoldLabel);
         DrawDeployRow("SoulsOnBoatDisplay",       _data.soulsOnBoatDisplayManager != null,
             () => TryFind<SoulsOnBoatDisplayManager>(v => _data.soulsOnBoatDisplayManager = v),
-            () => { if (DeployScriptOnly<SoulsOnBoatDisplayManager>("SoulsDisplay_Script", out var c, _data.soulsOnBoatDisplayScriptPrefab)) _data.soulsOnBoatDisplayManager = c; });
+            () => DeploySoulsOnBoatDisplay());
+
+        DrawDeployRow("Arena Souls Window", GameObject.Find("ArenaSoulsWindow") != null,
+            () => { },
+            () => DeployArenaSoulsWindow());
 
         EditorGUILayout.Space(4);
 
@@ -874,6 +870,43 @@ public class LevelSelectDesignerWindow : EditorWindow
         }
 
         EditorGUILayout.EndHorizontal();
+    }
+
+    private void DeploySoulsOnBoatDisplay()
+    {
+        if (!DeployScriptOnly<SoulsOnBoatDisplayManager>("SoulsDisplay_Script", out var manager, _data.soulsOnBoatDisplayScriptPrefab))
+            return;
+        _data.soulsOnBoatDisplayManager = manager;
+
+        // Wire slotManager and iconParent from SoulsDisplayBarUI
+        var barUI = GameObject.Find("SoulsDisplayBarUI");
+        if (barUI == null) { Debug.LogWarning("[LevelSelectDesigner] SoulsDisplayBarUI not found — deploy UI Canvas first."); return; }
+
+        var slotManager = barUI.GetComponentInChildren<SoulDisplaySlotManager>();
+        var iconParent  = barUI.transform;
+
+        var so = new SerializedObject(manager);
+        var slotProp = so.FindProperty("slotManager");
+        var iconProp = so.FindProperty("iconParent");
+        if (slotProp != null) slotProp.objectReferenceValue = slotManager;
+        if (iconProp != null) iconProp.objectReferenceValue = iconParent;
+        so.ApplyModifiedProperties();
+        EditorUtility.SetDirty(manager);
+    }
+
+    private void DeployArenaSoulsWindow()
+    {
+        if (_data.arenaSoulsWindowPrefab == null)
+        {
+            Debug.LogWarning("[LevelSelectDesigner] Arena Souls Window prefab not assigned.");
+            return;
+        }
+        var existing = GameObject.Find("ArenaSoulsWindow");
+        if (existing != null) return;
+        var parent = FindOrCreateParent("LEVELSELECT_SCRIPTS");
+        var go = (GameObject)PrefabUtility.InstantiatePrefab(_data.arenaSoulsWindowPrefab, parent.transform);
+        Undo.RegisterCreatedObjectUndo(go, "Deploy Arena Souls Window");
+        go.name = "ArenaSoulsWindow";
     }
 
     private bool DeployScriptOnly<T>(string goName, out T result, GameObject prefabOverride) where T : Component
@@ -1133,8 +1166,8 @@ public class LevelSelectDesignerWindow : EditorWindow
         var _playerBoatGo = GameObject.Find("PlayerBoat");
         if (_playerBoatGo == null || _playerBoatGo.transform.childCount == 0) DeployPlayerBoat();
         DeployCameraController();
-        if (_data.soulDisplaySlotManager   == null) { if (DeployScriptOnly<SoulDisplaySlotManager>("SoulDisplaySlotManager",   out var c, null)) _data.soulDisplaySlotManager   = c; }
-        if (_data.soulsOnBoatDisplayManager == null) { if (DeployScriptOnly<SoulsOnBoatDisplayManager>("SoulsDisplay_Script", out var c, _data.soulsOnBoatDisplayScriptPrefab)) _data.soulsOnBoatDisplayManager = c; }
+        if (_data.soulsOnBoatDisplayManager == null) DeploySoulsOnBoatDisplay();
+        if (GameObject.Find("ArenaSoulsWindow") == null) DeployArenaSoulsWindow();
         // UI Canvas prefabs — only deploy if CANVAS parent prefab is assigned
         if (_data.canvasParentPrefab != null)
         {

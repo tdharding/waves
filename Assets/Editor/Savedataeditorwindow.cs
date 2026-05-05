@@ -201,28 +201,16 @@ public class SaveDataEditorWindow : EditorWindow
         if (!_showLauncher) return;
 
         // Populate scene list from build settings
-        if (_sceneNames == null)
-        {
-            var scenes = UnityEditor.EditorBuildSettings.scenes;
-            _sceneNames = new string[scenes.Length];
-            for (int i = 0; i < scenes.Length; i++)
-                _sceneNames[i] = System.IO.Path.GetFileNameWithoutExtension(scenes[i].path);
+        if (_sceneNames == null || _sceneNames.Length == 0)
+            RefreshSceneNames();
 
-            string savedScene = EditorPrefs.GetString(PrefScene, "");
-            if (!string.IsNullOrEmpty(savedScene))
-            {
-                int idx = System.Array.IndexOf(_sceneNames, savedScene);
-                if (idx >= 0) _selectedSceneIndex = idx;
-            }
-        }
+        EditorGUILayout.LabelField("Scene", EditorStyles.miniLabel);
 
         // Populate level grid data
         if (_allGridData == null)
             RefreshGridData();
 
-        // Scene picker
-        EditorGUILayout.LabelField("Scene", EditorStyles.miniLabel);
-        if (_sceneNames.Length > 0)
+        if (_sceneNames != null && _sceneNames.Length > 0)
             _selectedSceneIndex = EditorGUILayout.Popup(_selectedSceneIndex, _sceneNames);
         else
             EditorGUILayout.LabelField("  (no scenes in Build Settings)", EditorStyles.miniLabel);
@@ -278,6 +266,18 @@ public class SaveDataEditorWindow : EditorWindow
 
         EditorGUILayout.EndHorizontal();
         EditorGUILayout.Space(6);
+    }
+
+    private void RefreshSceneNames()
+    {
+        _sceneNames = new[] { "Waves1", "LevelSelectWorld1a" };
+
+        string savedScene = EditorPrefs.GetString(PrefScene, "");
+        if (!string.IsNullOrEmpty(savedScene))
+        {
+            int idx = System.Array.IndexOf(_sceneNames, savedScene);
+            if (idx >= 0) _selectedSceneIndex = idx;
+        }
     }
 
     private void RefreshGridData()

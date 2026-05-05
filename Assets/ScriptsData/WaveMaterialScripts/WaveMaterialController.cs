@@ -46,6 +46,7 @@ public class WaveMaterialController : MonoBehaviour
         public float DistanceDepth;
 
         public Texture2D NormalTexture;
+        public Vector4 WaveCenter;
     }
 
     [Header("Soul Fish Mask")]
@@ -121,6 +122,8 @@ public Renderer mapWaveRenderer;
 
         if (state.NormalTexture)
             waveMaterial.SetTexture("_NormalTexture", state.NormalTexture);
+
+        waveMaterial.SetVector("_WaveCenter", state.WaveCenter);
     }
 
   

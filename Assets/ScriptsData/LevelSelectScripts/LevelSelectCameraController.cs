@@ -7,26 +7,33 @@ public class LevelSelectCameraController : MonoBehaviour
     public CinemachineCamera cam;
 
     [Header("Scroll Zoom")]
-    public float zoomSpeed  = 10f;
-    public float minFOV     = 5f;
-    public float maxFOV     = 60f;
-    public float defaultFOV = 30f;
+    public float zoomSpeed       = 10f;
+    public float minFOV          = 5f;
+    public float maxFOV          = 60f;
+    public float defaultFOV      = 30f;
+    public float minDistance     = 5f;
+    public float maxDistance     = 12f;
+    public float defaultDistance = 5.16f;
 
     [Header("Orbit (Middle Mouse)")]
     public float orbitSpeed = 150f;
     public float pitchMin   = -60f;
     public float pitchMax   = 45f;
 
-    private float     _currentFOV;
-    private float     _yaw;
-    private float     _pitch;
-    private Transform _orbitPivot;
-    private Transform _boatTarget;
+    private float                        _currentFOV;
+    private float                        _yaw;
+    private float                        _pitch;
+    private Transform                    _orbitPivot;
+    private Transform                    _boatTarget;
+    private CinemachinePositionComposer  _positionComposer;
 
     private void Start()
     {
+        if (cam != null)
+            cam.TryGetComponent(out _positionComposer);
+
         _currentFOV = defaultFOV;
-        ApplyFOV();
+        ApplyZoom();
     }
 
     // Called by LevelSelectDataController at runtime
@@ -60,7 +67,7 @@ public class LevelSelectCameraController : MonoBehaviour
         if (Mathf.Abs(scroll) >= 0.01f)
         {
             _currentFOV = Mathf.Clamp(_currentFOV - scroll * zoomSpeed, minFOV, maxFOV);
-            ApplyFOV();
+            ApplyZoom();
         }
 
         // Middle mouse orbit
@@ -79,10 +86,16 @@ public class LevelSelectCameraController : MonoBehaviour
         }
     }
 
-    private void ApplyFOV()
+    private void ApplyZoom()
     {
         var lens = cam.Lens;
         lens.FieldOfView = _currentFOV;
         cam.Lens = lens;
+
+        if (_positionComposer != null)
+        {
+            float t = Mathf.InverseLerp(minFOV, maxFOV, _currentFOV);
+            _positionComposer.CameraDistance = Mathf.Lerp(minDistance, maxDistance, t);
+        }
     }
 }

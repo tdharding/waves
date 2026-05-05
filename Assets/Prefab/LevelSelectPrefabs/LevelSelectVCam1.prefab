@@ -155,7 +155,10 @@ MonoBehaviour:
   zoomSpeed: 10
   minFOV: 5
   maxFOV: 60
-  defaultFOV: 30
+  defaultFOV: 12
+  minDistance: 5
+  maxDistance: 30
+  defaultDistance: 5.16
   orbitSpeed: 150
   pitchMin: -60
   pitchMax: 45
