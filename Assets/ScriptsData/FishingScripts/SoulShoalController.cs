@@ -1,173 +1,137 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Splines;
 
 public class SoulShoalController : MonoBehaviour
 {
     [Header("Refs")]
     public GameObject boat;
-    public GameObject fishContainer;
+    public SplineContainer splineContainer;
+    public FishingController fishingController;
+
+    [Header("Spawning")]
+    public GameObject fishMeshPrefab;
+    public int soulCount = 1;
 
     [Header("Distances")]
     public float fishingDistance = 8f;
-    public float soundFalloffDistance = 30f;
 
-    [Header("Audio")]
-    public AudioSource proximitySound;
-    public float maxVolume = 0.9f;
-    public float fadeSpeed = 2f;
+    public bool IsActive  { get; private set; }
+    public bool CanFish   { get; private set; }
 
-    public bool IsActive { get; private set; }
-    public bool CanFish { get; private set; }
+    private readonly List<Transform> fishList = new List<Transform>();
+    private List<Vector3> _nodePositions = new List<Vector3>();
+    private bool _wasActive;
 
-    private bool soundPlaying = false;
-
-    private List<Transform> fishList = new List<Transform>();
-    private int remainingFish = 0;
-
-    // ---------------------------------------------------------
-    void Start()
+    // Called by LevelSpawner before Start() to pass zone node world positions
+    public void InitZone(List<Vector3> nodePositions)
     {
-        RegisterAllFish();
+        _nodePositions = nodePositions;
     }
 
-    /// <summary>
-    /// Set the SoulBoat reference directly. Called from LevelDataController after SpawnSoulBoat().
-    /// </summary>
-    public void SetSoulBoat(Transform soulBoat)
+    // Called by LevelSpawner to set per-fish soul identity before spawning
+    // zoneIndex and soulIndex used to build unique linkIDs
+    public void SpawnFish(List<GridData.SoulZone> zones, int zoneIndex, string levelID)
     {
-        boat = soulBoat != null ? soulBoat.gameObject : null;
-    }
+        if (fishMeshPrefab == null || splineContainer == null) return;
 
-    bool EnsureBoat()
-    {
-        return boat != null;
-    }
+        var zone = zones[zoneIndex];
 
-    // ---------------------------------------------------------
-    void RegisterAllFish()
-    {
-        fishList.Clear();
-        AddFishRecursive(fishContainer.transform);
-
-        remainingFish = fishList.Count;
-
-        if (remainingFish == 0)
-            Debug.LogWarning($"{name}: Shoal contains NO fish objects!");
-    }
-
-    void AddFishRecursive(Transform root)
-    {
-        foreach (Transform child in root)
+        for (int i = 0; i < zone.souls.Count; i++)
         {
-            if (child.CompareTag("Fish"))
-                fishList.Add(child);
+            var soulData = zone.souls[i];
+            if (soulData == null) continue;
 
-            AddFishRecursive(child);
+            int linkID = zoneIndex * 100 + i;
+
+            if (GameProgressData.IsSoulCaught(levelID, linkID))
+            {
+                Debug.Log($"[SoulShoalController] Soul linkID {linkID} already caught — skipping.");
+                continue;
+            }
+
+            GameObject fish = Instantiate(fishMeshPrefab, splineContainer.transform);
+
+            // Assign spline
+            var splineAnimate = fish.GetComponent<SplineAnimate>();
+            if (splineAnimate != null)
+                splineAnimate.Container = splineContainer;
+
+            // Wire fishing behaviour
+            var fishingBehaviour = fish.GetComponent<FishFishingBehaviour>();
+            if (fishingBehaviour != null)
+                fishingBehaviour.fishing = fishingController;
+
+            // Per-fish identity label
+            var label = fish.GetComponent<LinkIdentityLabel>() ?? fish.AddComponent<LinkIdentityLabel>();
+            label.SetLabel(linkID, "SoulFish");
+            label.soulDataIdentity = soulData.soulDataIdentity;
+
+            // Per-fish proximity audio
+            fish.GetComponent<SoulFishProximityAudio>()?.Init(boat != null ? boat.transform : null);
+
+            fishList.Add(fish.transform);
+
+            Debug.Log($"[SoulShoalController] Spawned fish — zone {zoneIndex}, soul {i}, linkID {linkID}.");
         }
     }
 
     // ---------------------------------------------------------
     void Update()
     {
-        if (!EnsureBoat())
-            return;
+        if (boat == null) return;
 
         int alive = 0;
         for (int i = 0; i < fishList.Count; i++)
-        {
-            if (fishList[i] != null)
-                alive++;
-        }
+            if (fishList[i] != null) alive++;
 
-        remainingFish = alive;
-        bool shoalEmpty = (remainingFish == 0);
+        bool shoalEmpty = alive == 0;
+        _wasActive = IsActive;
+        IsActive   = !shoalEmpty;
 
-        float d = Vector3.Distance(boat.transform.position, transform.position);
+        float d = (_nodePositions.Count > 0)
+            ? ClosestDistance(boat.transform.position, _nodePositions)
+            : Vector3.Distance(boat.transform.position, transform.position);
 
-        // ---------------------------------------------
-        // Shoal Active (distance-free)
-        // ---------------------------------------------
-        IsActive = !shoalEmpty;
-        SetFishVisuals(IsActive);
-
-        // ---------------------------------------------
-        // Fishing Distance
-        // ---------------------------------------------
         CanFish = !shoalEmpty && d <= fishingDistance;
 
-        // ---------------------------------------------
-        // Proximity Audio
-        // ---------------------------------------------
-        HandleAudio(shoalEmpty, d);
+        if (_wasActive && !IsActive)
+            OnShoalDepleted();
     }
 
     // ---------------------------------------------------------
-    void SetFishVisuals(bool visible)
+    void OnShoalDepleted()
     {
-        if (fishContainer == null)
-            return;
-
-        Renderer[] rends = fishContainer.GetComponentsInChildren<Renderer>(true);
-
-        foreach (var r in rends)
-            r.enabled = visible;
+        // Stub — wired up in the map-link review pass.
+        // Per-fish wave/map unregistration is already handled by SoulFishWaveReference.OnDisable().
+        Debug.Log($"[SoulShoalController] Shoal depleted: {gameObject.name}");
     }
 
     // ---------------------------------------------------------
-    void HandleAudio(bool shoalEmpty, float distance)
+    float ClosestDistance(Vector3 pos, List<Vector3> points)
     {
-        if (proximitySound == null)
-            return;
-
-        if (shoalEmpty)
-        {
-            proximitySound.volume = Mathf.MoveTowards(
-                proximitySound.volume,
-                0f,
-                Time.deltaTime * fadeSpeed
-            );
-
-            if (proximitySound.volume <= 0.01f && soundPlaying)
-            {
-                proximitySound.Stop();
-                soundPlaying = false;
-            }
-
-            return;
-        }
-
-        float targetVolume = Mathf.Lerp(
-            0f,
-            maxVolume,
-            Mathf.InverseLerp(soundFalloffDistance, 0f, distance)
-        );
-
-        if (!soundPlaying && targetVolume > 0.01f)
-        {
-            proximitySound.Play();
-            soundPlaying = true;
-        }
-
-        proximitySound.volume = Mathf.MoveTowards(
-            proximitySound.volume,
-            targetVolume,
-            Time.deltaTime * fadeSpeed
-        );
-
-        if (soundPlaying && proximitySound.volume <= 0.01f)
-        {
-            proximitySound.Stop();
-            soundPlaying = false;
-        }
+        float min = float.MaxValue;
+        foreach (var p in points)
+            min = Mathf.Min(min, Vector3.Distance(pos, p));
+        return min;
     }
 
     // ---------------------------------------------------------
     void OnDrawGizmosSelected()
     {
-        Gizmos.color = Color.yellow;
-        Gizmos.DrawWireSphere(transform.position, fishingDistance);
+        if (_nodePositions == null || _nodePositions.Count == 0)
+        {
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawWireSphere(transform.position, fishingDistance);
+            return;
+        }
 
-        Gizmos.color = Color.cyan;
-        Gizmos.DrawWireSphere(transform.position, soundFalloffDistance);
+        Gizmos.color = Color.yellow;
+        for (int i = 0; i < _nodePositions.Count; i++)
+        {
+            Gizmos.DrawWireSphere(_nodePositions[i], fishingDistance);
+            if (i < _nodePositions.Count - 1)
+                Gizmos.DrawLine(_nodePositions[i], _nodePositions[i + 1]);
+        }
     }
 }

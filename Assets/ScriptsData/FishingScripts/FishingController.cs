@@ -70,10 +70,14 @@ public class FishingController : MonoBehaviour
         soulCaptureSFX?.PlayRandomCapture();
         ActivateNextSoulVisual();
 
-        if (VideoPlayerController.Instance != null)
-            VideoPlayerController.Instance.PlaySoulVideo(fishLabel.soulDataIdentity);
-        else
-            Debug.LogWarning("[FishingController] VideoPlayerController.Instance is missing!");
+        bool videoEnabled = LevelDataController.Instance == null || LevelDataController.Instance.EnableVideoPlayback;
+        if (videoEnabled)
+        {
+            if (VideoPlayerController.Instance != null)
+                VideoPlayerController.Instance.PlaySoulVideo(fishLabel.soulDataIdentity);
+            else
+                Debug.LogWarning("[FishingController] VideoPlayerController.Instance is missing!");
+        }
 
         if (LevelSoulTracker.Instance != null)
             LevelSoulTracker.Instance.AddSoulToBoat(fishLabel.linkID, fishLabel.soulDataIdentity);

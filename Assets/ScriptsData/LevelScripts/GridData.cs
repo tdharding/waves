@@ -84,9 +84,7 @@ public class GridData : ScriptableObject
     public int[] overlayCells = new int[CellCount];
 
     // ─────────────────────────────────────────────
-    // SOUL SPAWN POINTS
-    // Explicit list of cells where souls spawn.
-    // Soul identity assigned per-point in Grid Designer.
+    // SOUL SPAWN POINTS (legacy — migrated to soulZones on load)
     // ─────────────────────────────────────────────
 
     [System.Serializable]
@@ -100,6 +98,39 @@ public class GridData : ScriptableObject
     }
 
     public List<SoulSpawnPoint> soulSpawnPoints = new List<SoulSpawnPoint>();
+
+    // ─────────────────────────────────────────────
+    // SOUL ZONES
+    // Each zone is a SoulFishArea with 1+ designer-placed nodes.
+    // 1 node = circular scatter area. 2+ nodes = path area.
+    // ─────────────────────────────────────────────
+
+    [System.Serializable]
+    public class SoulZone
+    {
+        [Tooltip("Ordered grid cell indices placed by designer. 1 node = circular area, 2+ = path.")]
+        public List<int> nodes = new List<int>();
+
+        [Tooltip("Scatter/path radius for spline knot generation and wave mask.")]
+        public float radius = 3f;
+
+        [Tooltip("Number of spline knots to generate for fish swim path.")]
+        public int knotCount = 8;
+
+        [Tooltip("Soul identities in this zone. Each entry spawns one fish mesh instance.")]
+        public List<SoulData> souls = new List<SoulData>();
+    }
+
+    public List<SoulZone> soulZones = new List<SoulZone>();
+
+    public int GetTotalSoulCount()
+    {
+        if (soulZones == null) return 0;
+        int total = 0;
+        foreach (var zone in soulZones)
+            total += zone.souls?.Count ?? 0;
+        return total;
+    }
 
     // ─────────────────────────────────────────────
     // ARENA PORTALS

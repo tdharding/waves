@@ -24,8 +24,12 @@ public class LevelSelectEnter : MonoBehaviour
 
         LevelSelectBoatControl boatControl = FindObjectOfType<LevelSelectBoatControl>();
 
+        string levelName = gridData != null && !string.IsNullOrEmpty(gridData.displayName)
+            ? gridData.displayName
+            : "ENTER?";
+
         PortalConfirmUI.Instance?.Show(
-            "ENTER?",
+            levelName,
             onConfirm: () =>
             {
                 CommitSelection();

@@ -53,12 +53,12 @@ public class BoatCollisionHandler : MonoBehaviour
     // COLLISION
     // ─────────────────────────────────────────────
 
-    private void OnControllerColliderHit(ControllerColliderHit hit)
+    private void OnCollisionEnter(Collision collision)
     {
         bool hasValidTag = false;
         foreach (string tag in validTags)
         {
-            if (hit.collider.CompareTag(tag))
+            if (collision.collider.CompareTag(tag))
             {
                 hasValidTag = true;
                 break;

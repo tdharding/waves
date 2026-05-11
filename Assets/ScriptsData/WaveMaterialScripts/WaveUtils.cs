@@ -52,6 +52,27 @@ public static class WaveUtils
         return -Mathf.Sin(dist * p.frequency - Time.time * p.speed) * p.ripple * p.meshScale * multiplier;
     }
 
+    public static float SampleHeightSmooth(Vector3 worldPos, WaveParams p, float multiplier = 1f)
+    {
+        return SampleWaveSmooth(worldPos, p, multiplier) - SampleWhirlpoolDepth(worldPos, p);
+    }
+
+    public static Vector3 GetNormal(Vector3 worldPos, WaveParams p, float sampleOffset = 0.1f)
+    {
+        Vector3 p0 = worldPos;
+        Vector3 p1 = worldPos + Vector3.right * sampleOffset;
+        Vector3 p2 = worldPos + Vector3.forward * sampleOffset;
+
+        p0.y = SampleHeightSmooth(p0, p);
+        p1.y = SampleHeightSmooth(p1, p);
+        p2.y = SampleHeightSmooth(p2, p);
+
+        Vector3 v1 = p1 - p0;
+        Vector3 v2 = p2 - p0;
+
+        return Vector3.Cross(v2, v1).normalized;
+    }
+
     // World-space Y depression from whirlpools at worldPos.
     // Matches the smooth-step falloff in WavesAndWhirlpools.hlsl.
     public static float SampleWhirlpoolDepth(Vector3 worldPos, WaveParams p)
@@ -65,4 +86,10 @@ public static class WaveUtils
     {
         return SampleWave(worldPos, p, multiplier) - SampleWhirlpoolDepth(worldPos, p);
     }
-}
+
+    public static Vector3 GetWhirlpoolPull(Vector3 worldPos, float meshScale, float radiusMultiplier = 1f)
+    {
+        if (WhirlpoolManager.Instance == null) return Vector3.zero;
+        return WhirlpoolManager.Instance.GetPullForceAt(worldPos, meshScale, radiusMultiplier);
+    }
+    }

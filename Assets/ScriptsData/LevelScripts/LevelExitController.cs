@@ -48,14 +48,12 @@ public class LevelExitController : MonoBehaviour
         if (boat == null || string.IsNullOrEmpty(sceneToLoad)) return;
         if (other.transform != boat) return;
 
-        // Disable boat controls while prompt is shown
         BoatMovement bm = LevelDataController.Instance?.GetBoatMovement();
-        if (bm != null) bm.controlsEnabled = false;
 
         PortalConfirmUI.Instance?.Show(
             "EXIT?",
             onConfirm: () => ConfirmExit(bm),
-            onCancel:  () => { if (bm != null) bm.controlsEnabled = true; }
+            onCancel:  () => { }
         );
     }
 

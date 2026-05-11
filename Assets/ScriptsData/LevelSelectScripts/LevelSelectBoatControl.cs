@@ -36,6 +36,7 @@ public class LevelSelectBoatControl : MonoBehaviour
 
     // ── Public API ─────────────────────────────────────────────────
     public bool ControlsFrozen   { get; set; }
+    public bool IsBlocked        => _blocked;
     public bool IsReversed       => _isReversed;
     public bool IsLeftPath       => _isLeftPath;
     public bool IsRightPath      => _isRightPath;
@@ -129,21 +130,25 @@ public class LevelSelectBoatControl : MonoBehaviour
         foreach (var hit in hits)
             if (hit.CompareTag("LevelSelectPathObstacle")) { _blocked = true; break; }
 
-        // Auto-advance
-        float dir = _isReversed ? -1f : 1f;
-        if (_blocked && dir > 0f)
+        // Advance progress — skip if junction has control or obstacle blocks forward movement
+        if (!ControlsFrozen)
         {
-            if (debugMovement) Debug.Log("[Boat] Blocked by obstacle");
-            return;
+            float dir = _isReversed ? -1f : 1f;
+            bool blockedForward = _blocked && dir > 0f;
+
+            if (!blockedForward)
+            {
+                if (debugMovement && _speed < 0.0001f)
+                    Debug.Log($"[Boat] Speed is near zero — container={_splineAnimate.Container?.name} speed={_speed}");
+
+                bool boosting = Input.GetKey(KeyCode.Space);
+                float frameSpeed = boosting ? _speed * boostMultiplier : _speed;
+                _progress = Mathf.Clamp01(_progress + dir * frameSpeed * Time.deltaTime);
+            }
+
+            // Always pin SplineAnimate to our controlled progress — prevents it running freely
+            _splineAnimate.NormalizedTime = _progress;
         }
-
-        if (debugMovement && _speed < 0.0001f)
-            Debug.Log($"[Boat] Speed is near zero — container={_splineAnimate.Container?.name} speed={_speed}");
-
-        bool boosting = Input.GetKey(KeyCode.Space);
-        float frameSpeed = boosting ? _speed * boostMultiplier : _speed;
-        _progress = Mathf.Clamp01(_progress + dir * frameSpeed * Time.deltaTime);
-        _splineAnimate.NormalizedTime = _progress;
     }
 
     // ── Junction interface ─────────────────────────────────────────
@@ -168,10 +173,11 @@ public class LevelSelectBoatControl : MonoBehaviour
         _isLeftPath    = isLeftPath;
         _isRightPath   = isRightPath;
 
-        // Play then immediately pause to force SplineAnimate to re-evaluate
-        // position with the new container — prevents stuck-after-transition.
+        // Play then pause to force SplineAnimate to re-evaluate position with
+        // the new container. Update drives position via NormalizedTime from here.
         _splineAnimate.Play();
         _splineAnimate.NormalizedTime = _progress;
+        _splineAnimate.Pause();
 
         // Entry at t=1 means travelling toward t=0, so mark as reversed.
         _isReversed = startT > 0.5f;
@@ -196,6 +202,12 @@ public class LevelSelectBoatControl : MonoBehaviour
         AttachContainer(segment);
         _progress = progress;
         _splineAnimate.NormalizedTime = _progress;
+
+        // Ensure rotation and reversal are initialized based on position
+        // Near t=1 means facing t=0 (reversed), near t=0 means facing t=1 (not reversed)
+        _isReversed = _progress > 0.5f;
+        _meshTargetRotation = _isReversed ? Quaternion.Euler(0f, 0f, 180f) : Quaternion.identity;
+        SnapMeshRotation(_meshTargetRotation);
     }
 
     public void SnapMeshRotation(Quaternion rotation)

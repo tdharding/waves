@@ -17,26 +17,13 @@ The Level Select scene requires a complex hand-placed river network of source Sp
 
 ---
 
-## Multi-World Scene Routing (prerequisite — implement first)
+## Multi-World Scene Routing (prerequisite — DONE)
 
-### `LevelSelectionCache.cs` — add 1 property
-```csharp
-public static string CurrentWorldScene { get; set; }
-```
+All three changes are already in the codebase:
 
-### `LevelSelectDataController.cs` — add 1 line to Awake()
-```csharp
-LevelSelectionCache.CurrentWorldScene = SceneManager.GetActiveScene().name;
-```
-
-### `LevelExitController.cs` — change 1 line in ConfirmExit() and ForceExit()
-```csharp
-SceneManager.LoadScene(
-    !string.IsNullOrEmpty(LevelSelectionCache.CurrentWorldScene)
-        ? LevelSelectionCache.CurrentWorldScene
-        : sceneToLoad   // fallback for direct-from-editor testing
-);
-```
+- `LevelSelectionCache.cs` — `CurrentWorldScene` property exists
+- `LevelSelectDataController.Awake()` — sets `CurrentWorldScene` on startup
+- `LevelExitController.ConfirmExit()` / `ForceExit()` — both use cache with `sceneToLoad` fallback
 
 **Result:** Every world scene routes exits back to itself automatically. Existing LevelSelect and all level prefabs unchanged. `sceneToLoad` field kept as safe fallback.
 
@@ -244,6 +231,7 @@ All steps wrapped in `Undo.IncrementCurrentGroup` — single Ctrl+Z removes ever
 5. **Arena nodes** — instantiate arena prefab (or update existing via `LevelSelectDesignerArenaTag` GUID); set `LevelSelectArenaController.gridData`; orient to path tangent
 6. **Shop nodes** — instantiate shop prefab at endpoint; TBD wiring
 7. **Wire _sourceSegments** — SerializedObject sets `_sourceSegments` list on SplineRiverManager and SplinePathStitcher (ordered by BranchDepth)
+8. **Wire SoulsOnBoatDisplayManager** — DONE. `DeploySoulsOnBoatDisplay()` finds the canvas, gets `SoulDisplaySlotManager`, stores it in `_data.soulDisplaySlotManager`, and wires `slotManager`+`iconParent` via SerializedObject. Generate also re-wires both fields.
 
 ---
 

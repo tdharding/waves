@@ -111,24 +111,7 @@ public class WhirlpoolManager : MonoBehaviour
         for (int i = 0; i < count; i++)
         {
             float wpWorldX, wpWorldZ, wpObjRadius;
-
-            if (_dataOverride || i >= _handles.Count)
-            {
-                Vector3 wpWorld = wavePlaneTransform != null
-                    ? wavePlaneTransform.TransformPoint(new Vector3(_shaderData[i].x, _shaderData[i].y, _shaderData[i].z))
-                    : new Vector3(_shaderData[i].x, 0f, -_shaderData[i].y);
-                wpWorldX    = wpWorld.x;
-                wpWorldZ    = wpWorld.z;
-                wpObjRadius = _shaderData[i].w;
-            }
-            else
-            {
-                if (_handles[i] == null) continue;
-                wpWorldX    = _handles[i].position.x;
-                wpWorldZ    = _handles[i].position.z;
-                float lossyScale = wavePlaneTransform != null ? wavePlaneTransform.lossyScale.x : 1f;
-                wpObjRadius = _handles[i].localScale.x / lossyScale;
-            }
+            GetWhirlpoolWorldData(i, out wpWorldX, out wpWorldZ, out wpObjRadius);
 
             float dx   = (worldPos.x - wpWorldX) / meshScale;
             float dz   = (worldPos.z - wpWorldZ) / meshScale;
@@ -142,4 +125,51 @@ public class WhirlpoolManager : MonoBehaviour
 
         return total * meshScale;
     }
-}
+
+    public Vector3 GetPullForceAt(Vector3 worldPos, float meshScale, float radiusMultiplier = 1f)
+    {
+        int count = _dataOverride ? _overrideCount : Mathf.Min(_handles.Count, MaxWhirlpools);
+        if (count == 0) return Vector3.zero;
+
+        Vector3 totalPull = Vector3.zero;
+        for (int i = 0; i < count; i++)
+        {
+            float wpWorldX, wpWorldZ, wpObjRadius;
+            GetWhirlpoolWorldData(i, out wpWorldX, out wpWorldZ, out wpObjRadius);
+
+            Vector3 toWhirlpool = new Vector3(wpWorldX - worldPos.x, 0f, wpWorldZ - worldPos.z);
+            float dist = toWhirlpool.magnitude;
+            float distInObjSpace = dist / meshScale;
+
+            float h = 1f - Mathf.Clamp01(distInObjSpace / Mathf.Max(wpObjRadius * radiusMultiplier, 0.0001f));
+            float ss = h * h * h * (h * (h * 6f - 15f) + 10f);
+            float falloff = ss * ss;
+
+            if (dist > 0.001f)
+            {
+                totalPull += (toWhirlpool / dist) * falloff;
+            }
+        }
+        return totalPull;
+    }
+
+    private void GetWhirlpoolWorldData(int i, out float wpWorldX, out float wpWorldZ, out float wpObjRadius)
+    {
+        if (_dataOverride || i >= _handles.Count)
+        {
+            Vector3 wpWorld = wavePlaneTransform != null
+                ? wavePlaneTransform.TransformPoint(new Vector3(_shaderData[i].x, _shaderData[i].y, _shaderData[i].z))
+                : new Vector3(_shaderData[i].x, 0f, -_shaderData[i].y);
+            wpWorldX = wpWorld.x;
+            wpWorldZ = wpWorld.z;
+            wpObjRadius = _shaderData[i].w;
+        }
+        else
+        {
+            wpWorldX = _handles[i].position.x;
+            wpWorldZ = _handles[i].position.z;
+            float lossyScale = wavePlaneTransform != null ? wavePlaneTransform.lossyScale.x : 1f;
+            wpObjRadius = _handles[i].localScale.x / lossyScale;
+        }
+    }
+    }

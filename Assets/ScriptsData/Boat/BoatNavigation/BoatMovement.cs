@@ -34,22 +34,37 @@ public class BoatMovement : MonoBehaviour
     [Header("Sonar Slow")]
     public float sonarSpeedMultiplier = 0.5f;
 
+    [Header("Ability Wheel Slow")]
+    public float abilityWheelSpeedMultiplier = 0.25f;
+
+    [Header("Catapult Slow")]
+    public float catapultSpeedMultiplier = 0.45f;
+
     [Header("Engine Audio")]
     public AudioSource boatEngineAudio;
     public float turnPitchAmount = 0.2f;
     public float speedPitchAmount = 0.25f;
     private float basePitch = 1f;
 
+    [Header("Physics Settings")]
+    public float slopeSpeedMultiplier = 2f;
+    public float whirlpoolPullForce = 7.33f;
+    public float whirlpoolPullRadiusMultiplier = 2.75f;
+
     [HideInInspector] public bool controlsEnabled = false;
 
-    private CharacterController controller;
+    private Rigidbody rb;
     private float fixedY;
     private float currentSpeed;
     private Transform waterTransform;
+    private Material waterMaterial;
 
     // External control flags
     private bool boosting = false;
     private bool sonarSlow = false;
+    private bool abilityWheelSlow = false;
+    private bool catapultActiveSlow = false;
+    private bool steeringBlocked = false;
 
     // --------------------------------------------------
     // UNITY
@@ -57,8 +72,14 @@ public class BoatMovement : MonoBehaviour
 
     void Start()
     {
-        controller = GetComponent<CharacterController>();
+        rb = GetComponent<Rigidbody>();
         waterTransform = LevelDataController.Instance?.GetWaveTransform();
+        if (waterTransform != null)
+        {
+            var rend = waterTransform.GetComponent<Renderer>();
+            if (rend != null) waterMaterial = rend.sharedMaterial;
+        }
+        
         fixedY = waterTransform != null ? waterTransform.position.y : transform.position.y;
         currentSpeed = 0f;
 
@@ -69,86 +90,88 @@ public class BoatMovement : MonoBehaviour
         }
     }
 
-void FixedUpdate()
-{
-    if (controller == null || !controller.enabled)
-        return;
-
-    if (PauseManager.IsPaused)
-        return;
-
-    if (waterTransform != null)
-        fixedY = waterTransform.position.y;
-
-    if (!controlsEnabled)
+    void FixedUpdate()
     {
-        currentSpeed = Mathf.MoveTowards(
-            currentSpeed,
-            0f,
-            deceleration * Time.fixedDeltaTime
-        );
+        if (rb == null || !controlsEnabled)
+        {
+            if (rb != null)
+            {
+                currentSpeed = Mathf.MoveTowards(currentSpeed, 0f, deceleration * Time.fixedDeltaTime);
+                ApplyVelocity(transform.forward * currentSpeed);
+            }
+            StopEngineAudio();
+            return;
+        }
 
-        Vector3 move = transform.forward * currentSpeed;
-        controller.Move(move * Time.fixedDeltaTime);
+        if (PauseManager.IsPaused)
+            return;
 
-        Vector3 pos = transform.position;
-        pos.y = fixedY;
-        transform.position = pos;
+        if (waterTransform != null)
+            fixedY = waterTransform.position.y;
 
-        StopEngineAudio();
-        return;
+        HandleSteering();
+        HandleMovement();
+        ApplyWhirlpoolPull();
     }
 
-    HandleSteering();
-    HandleMovement();
+    private void ApplyVelocity(Vector3 move)
+    {
+        rb.linearVelocity = new Vector3(move.x, rb.linearVelocity.y, move.z);
+        Vector3 pos = rb.position;
+        pos.y = fixedY;
+        rb.position = pos;
+    }
 
-    // --- DEBUG ---
-   
-}
     // --------------------------------------------------
     // STEERING
     // --------------------------------------------------
-void HandleSteering()
-{
-    float targetInput = 0f;
-
-    if (Input.GetKey(KeyCode.LeftArrow))
-        targetInput = -1f;
-    else if (Input.GetKey(KeyCode.RightArrow))
-        targetInput = 1f;
-
-    // Accelerate toward target input
-    float accelRate = Mathf.Abs(targetInput) > Mathf.Abs(currentTurnInput)
-        ? turnAcceleration
-        : turnDeceleration;
-
-    currentTurnInput = Mathf.MoveTowards(
-        currentTurnInput,
-        targetInput,
-        accelRate * Time.fixedDeltaTime
-    );
-
-    if (Mathf.Approximately(currentTurnInput, 0f))
+    void HandleSteering()
     {
-        UpdateEnginePitch(0f, 1f);
-        return;
+        if (steeringBlocked)
+        {
+            currentTurnInput = Mathf.MoveTowards(currentTurnInput, 0f, turnDeceleration * Time.fixedDeltaTime);
+            return;
+        }
+
+        float targetInput = 0f;
+
+        if (Input.GetKey(KeyCode.LeftArrow))
+            targetInput = -1f;
+        else if (Input.GetKey(KeyCode.RightArrow))
+            targetInput = 1f;
+
+        // Accelerate toward target input
+        float accelRate = Mathf.Abs(targetInput) > Mathf.Abs(currentTurnInput)
+            ? turnAcceleration
+            : turnDeceleration;
+
+        currentTurnInput = Mathf.MoveTowards(
+            currentTurnInput,
+            targetInput,
+            accelRate * Time.fixedDeltaTime
+        );
+
+        if (Mathf.Approximately(currentTurnInput, 0f))
+        {
+            UpdateEnginePitch(0f, 1f);
+            return;
+        }
+
+        float turnMultiplier = 1f;
+
+        if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))
+            turnMultiplier = shiftTurnMultiplier;
+
+        float turn =
+            currentTurnInput *
+            maxTurnSpeed *
+            turnMultiplier *
+            Time.fixedDeltaTime;
+
+        rb.MoveRotation(rb.rotation * Quaternion.Euler(0f, turn, 0f));
+
+        UpdateEnginePitch(currentTurnInput, turnMultiplier);
     }
-
-    float turnMultiplier = 1f;
-
-    if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))
-        turnMultiplier = shiftTurnMultiplier;
-
-    float turn =
-        currentTurnInput *
-        maxTurnSpeed *
-        turnMultiplier *
-        Time.fixedDeltaTime;
-
-    transform.Rotate(0f, turn, 0f);
-
-    UpdateEnginePitch(currentTurnInput, turnMultiplier);
-}
 
 
     // --------------------------------------------------
@@ -163,6 +186,12 @@ void HandleSteering()
         if (sonarSlow)
             targetSpeed *= sonarSpeedMultiplier;
 
+        if (abilityWheelSlow)
+            targetSpeed *= abilityWheelSpeedMultiplier;
+
+        if (catapultActiveSlow)
+            targetSpeed *= catapultSpeedMultiplier;
+
         // Shift reduces boat speed
         bool shiftHeld = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
         if (shiftHeld)
@@ -173,6 +202,9 @@ void HandleSteering()
         if (whirlActive)
             targetSpeed *= whirlSpeedMultiplier;
 
+        // SLOPE ADJUSTMENT
+        float slopeModifier = CalculateSlopeModifier();
+        targetSpeed *= slopeModifier;
 
         currentSpeed = Mathf.MoveTowards(
             currentSpeed,
@@ -181,20 +213,39 @@ void HandleSteering()
         );
 
         Vector3 move = transform.forward * currentSpeed;
-        controller.Move(move * Time.fixedDeltaTime);
-
-        // Lock Y
-        Vector3 pos = transform.position;
-        pos.y = fixedY;
-        transform.position = pos;
+        ApplyVelocity(move);
 
         if (boatEngineAudio != null && !boatEngineAudio.isPlaying)
             boatEngineAudio.Play();
     }
 
-    // --------------------------------------------------
-    // AUDIO
-    // --------------------------------------------------
+    float CalculateSlopeModifier()
+    {
+        if (waterTransform == null || waterMaterial == null) return 1f;
+
+        var p = WaveUtils.ReadParams(waterTransform, waterMaterial);
+        Vector3 pos = transform.position;
+        
+        float hCenter = WaveUtils.SampleWaveSmooth(pos, p);
+        float hAhead  = WaveUtils.SampleWaveSmooth(pos + transform.forward * 0.1f, p);
+        
+        float slope = hAhead - hCenter;
+        // slope > 0 means going uphill -> reduce speed
+        // slope < 0 means going downhill -> increase speed
+        
+        return Mathf.Clamp(1f - (slope * slopeSpeedMultiplier), 0.5f, 2f);
+    }
+
+    void ApplyWhirlpoolPull()
+    {
+        if (waterTransform == null) return;
+        
+        Vector3 pull = WaveUtils.GetWhirlpoolPull(transform.position, waterTransform.localScale.x, whirlpoolPullRadiusMultiplier);
+        rb.AddForce(pull * whirlpoolPullForce, ForceMode.Acceleration);
+    }
+// --------------------------------------------------
+// AUDIO
+// --------------------------------------------------
 
     void UpdateEnginePitch(float steeringT, float turnMultiplier)
     {
@@ -240,10 +291,10 @@ void HandleSteering()
         boosting = value;
     }
 
-    public void SetSonarSlow(bool value)
-    {
-        sonarSlow = value;
-    }
+    public void SetSonarSlow(bool value)        => sonarSlow = value;
+    public void SetAbilityWheelSlow(bool value) => abilityWheelSlow = value;
+    public void SetCatapultSlow(bool value)     => catapultActiveSlow = value;
+    public void SetSteeringBlocked(bool value)  => steeringBlocked = value;
 
     public float Speed01
     {

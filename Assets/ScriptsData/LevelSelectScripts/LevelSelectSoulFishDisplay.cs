@@ -187,7 +187,7 @@ public class LevelSelectSoulFishDisplay : MonoBehaviour
     {
         if (gridData == null) return 0;
 
-        int total  = gridData.soulSpawnPoints?.Count ?? 0;
+        int total  = gridData.GetTotalSoulCount();
         int caught = GameProgressData.GetCaughtSoulIDs(gridData.levelID)?.Count ?? 0;
         return Mathf.Max(0, total - caught);
     }

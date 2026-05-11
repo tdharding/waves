@@ -165,6 +165,7 @@ public class SplineRiverJunctionNodeV2 : MonoBehaviour
     private void Update()
     {
         if (!_inZone || _boat == null || _transitioning) return;
+        if (_boat.IsBlocked) return;
 
         // Auto-return (e.g. coming back from a branch to the main river)
         if (_activeSide != null && _activeSide.autoReturn)

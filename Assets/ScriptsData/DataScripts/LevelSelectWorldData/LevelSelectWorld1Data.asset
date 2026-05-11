@@ -29,6 +29,10 @@ MonoBehaviour:
     positionXZ: {x: 60.77152, y: -44.226112}
     scale: 6.9
     height: 6.9
+  - id: ad947181-5f49-43ee-b116-5c64ff556f72
+    positionXZ: {x: 70.849365, y: -43.898617}
+    scale: 7.8
+    height: -2.1
   - id: 3bac5b98-b285-4e13-a01c-e39756b776c9
     positionXZ: {x: 106.37943, y: -20.171017}
     scale: 19.2
@@ -128,21 +132,9 @@ MonoBehaviour:
   - id: 0005e200-1a7e-4194-9333-0bfa94edbc76
     worldPosition: {x: -26.665953, y: 0, z: -7.5733404}
     type: 0
-  - id: ddea9eb2-95e8-4097-806e-1e0e66b8e9be
-    worldPosition: {x: 20.208778, y: 0, z: -12.789955}
-    type: 1
-  - id: 78f56dc3-50d7-4a57-ae93-ba231bbcacd4
-    worldPosition: {x: 21.279907, y: 4, z: -27.460625}
-    type: 0
-  - id: b436d86d-80d1-43d0-9f0b-82cd754bfbdd
-    worldPosition: {x: 39.68535, y: 4, z: -24.117432}
-    type: 0
-  - id: 509ce4f4-456e-4fad-8a53-37835865bbd5
-    worldPosition: {x: 50.043865, y: 5, z: -26.437416}
-    type: 2
   - id: db9eb3ab-3a90-468d-a907-26390f7804b8
     worldPosition: {x: 8.169483, y: 0, z: -11.228872}
-    type: 0
+    type: 1
   - id: 8945cb90-f416-4c58-b263-a011934526fd
     worldPosition: {x: 21.55626, y: 2, z: 6.8770084}
     type: 0
@@ -155,31 +147,88 @@ MonoBehaviour:
   - id: a38c84e7-5499-4f08-b9c2-7dfbb23acd89
     worldPosition: {x: 5.675522, y: 4, z: 50.63184}
     type: 2
-  - id: 77b296cd-96c7-42ae-958c-0601b93064f5
-    worldPosition: {x: 20.572104, y: 0, z: -17.860867}
-    type: 0
   - id: 0d478bba-7bce-4ad4-accd-d69fd650b10e
     worldPosition: {x: 8.514877, y: 0, z: -4.7919645}
     type: 0
   - id: 02a699c5-0a00-4bdb-bf1e-96b2a307cd63
     worldPosition: {x: 15.035568, y: 1, z: 1.042522}
-    type: 0
+    type: 1
   - id: 4b2d5e8b-41ca-4786-938d-a0b93f9f8120
     worldPosition: {x: 9.934925, y: 0, z: 5.2974486}
     type: 0
   - id: ac4ab5d1-055f-4e0e-ac8d-8b3d8117e4b4
     worldPosition: {x: -8.990281, y: 0, z: 0.68542373}
     type: 2
-  - id: c8c51a15-6b78-43e2-b4fa-180e1e7ef27d
-    worldPosition: {x: 37.355415, y: 4, z: -29.047419}
+  - id: d374c20f-927d-4ece-b05a-cd729e43dac5
+    worldPosition: {x: 53.176525, y: 0, z: -14.112084}
+    type: 1
+  - id: 00c48a9d-68ca-4bac-9f9c-cab40cd85561
+    worldPosition: {x: 58.141712, y: 0, z: -6.4472694}
     type: 0
+  - id: 6c808875-394e-4384-a078-0c2b8b7e8e2b
+    worldPosition: {x: 52.351772, y: 0, z: -1.6223212}
+    type: 2
+  - id: cafab691-da33-4bf9-b514-ffe42136c13c
+    worldPosition: {x: 53.31676, y: 0, z: -9.824734}
+    type: 0
+  - id: e1f05638-ddfe-4bb2-9b7b-68de9e60a628
+    worldPosition: {x: 81.11735, y: 0, z: -14.199532}
+    type: 0
+  - id: cf0f7a0f-9957-4b40-8dfe-29ed5d095ac8
+    worldPosition: {x: 67.56635, y: 0, z: -14.325923}
+    type: 1
+  - id: 56d55538-bc1e-43ad-bb68-1543c50063b1
+    worldPosition: {x: 67.3783, y: 0, z: -17.050394}
+    type: 0
+  - id: c8b3ef07-4bb9-456f-a059-d50c543ccd4e
+    worldPosition: {x: 67.20308, y: 1, z: -21.327356}
+    type: 0
+  - id: 5aa3ab22-fd2d-41ef-8ffb-736dd3b76277
+    worldPosition: {x: 81.60313, y: 2, z: -21.842794}
+    type: 0
+  - id: af0eff7b-19b3-414c-bf42-873c4dbc6587
+    worldPosition: {x: 81.70129, y: 3, z: -30.546272}
+    type: 2
+  - id: 5a3ad3b0-fe4a-4eb6-b051-618dbf1f91c8
+    worldPosition: {x: 23.345333, y: 0, z: -12.917975}
+    type: 1
+  - id: 5ab6bbd3-d329-4351-be2c-61f9d06f6e9e
+    worldPosition: {x: 22.54847, y: 0, z: -20.989744}
+    type: 0
+  - id: 1fae24f5-3d11-402d-98a0-413acb76c000
+    worldPosition: {x: 22.898037, y: 0, z: -28.486675}
+    type: 0
+  - id: d86057c2-d5d8-4d1e-8cf3-aca27df45463
+    worldPosition: {x: 48.88106, y: 0, z: -27.699081}
+    type: 0
+  - id: 6e80d699-9518-4038-9894-b1703af41238
+    worldPosition: {x: 51.243557, y: 0, z: -35.503807}
+    type: 2
+  - id: 42d269e4-b405-49ab-b6c3-741fe862ad7a
+    worldPosition: {x: 50.132816, y: 0, z: -41.786373}
+    type: 2
+  - id: 5d058a92-7de1-4d60-a333-9ee43bb4b704
+    worldPosition: {x: 46.585567, y: 0, z: -82.376656}
+    type: 0
+  - id: 49c1d47e-5de4-49fe-8b55-50311c8db4f0
+    worldPosition: {x: 71.332306, y: 1.4666667, z: -21.48381}
+    type: 1
+  - id: 1a51930f-a437-445c-a0d4-732805c861bf
+    worldPosition: {x: 70.96078, y: 0, z: -28.446825}
+    type: 0
+  - id: 96534931-abe4-4d47-80b1-94b5937fbf7e
+    worldPosition: {x: 70.64513, y: 0, z: -35.664974}
+    type: 3
   paths:
   - pathId: cb512902-99c4-4aa3-973b-d4a908cef861
     segmentId: MainRiver
     nodeIds:
     - 6c2c0bb8-0ed6-4a0c-a0c7-31ed04a6984b
+    - e1f05638-ddfe-4bb2-9b7b-68de9e60a628
+    - cf0f7a0f-9957-4b40-8dfe-29ed5d095ac8
     - 59214d0b-2605-484c-986e-6dbb5f2e6200
-    - ddea9eb2-95e8-4097-806e-1e0e66b8e9be
+    - d374c20f-927d-4ece-b05a-cd729e43dac5
+    - 5a3ad3b0-fe4a-4eb6-b051-618dbf1f91c8
     - db9eb3ab-3a90-468d-a907-26390f7804b8
     - ff60207e-a025-44dd-83d2-7a99e14cc11c
     - 0005e200-1a7e-4194-9333-0bfa94edbc76
@@ -194,24 +243,6 @@ MonoBehaviour:
     extrudeOnExit: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.27, g: 0.45396018, b: 0.9, a: 1}
-  - pathId: a8720131-18cc-4cae-b3f9-c706970745f3
-    segmentId: Branch_01
-    nodeIds:
-    - ddea9eb2-95e8-4097-806e-1e0e66b8e9be
-    - 77b296cd-96c7-42ae-958c-0601b93064f5
-    - 78f56dc3-50d7-4a57-ae93-ba231bbcacd4
-    - c8c51a15-6b78-43e2-b4fa-180e1e7ef27d
-    - b436d86d-80d1-43d0-9f0b-82cd754bfbdd
-    - 509ce4f4-456e-4fad-8a53-37835865bbd5
-    isLeftPath: 0
-    isRightPath: 1
-    segmentType: 1
-    riverName: Branch_01
-    leadsToArena: 1
-    arenaIsAtEnd: 1
-    extrudeOnExit: 0
-    arenaGridDataGuid: 
-    editorColor: {r: 0.8018868, g: 0.20097704, b: 0, a: 1}
   - pathId: d76a5911-edc8-4b81-bf5a-e916981c85a9
     segmentId: Branch_02
     nodeIds:
@@ -246,14 +277,87 @@ MonoBehaviour:
     extrudeOnExit: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.9, g: 0.27, b: 0.8218802, a: 1}
+  - pathId: 742e74b0-9db8-4d0e-9e9c-4444806e8f22
+    segmentId: Branch_04
+    nodeIds:
+    - d374c20f-927d-4ece-b05a-cd729e43dac5
+    - cafab691-da33-4bf9-b514-ffe42136c13c
+    - 00c48a9d-68ca-4bac-9f9c-cab40cd85561
+    - 6c808875-394e-4384-a078-0c2b8b7e8e2b
+    isLeftPath: 1
+    isRightPath: 0
+    segmentType: 1
+    riverName: Branch_04
+    leadsToArena: 1
+    arenaIsAtEnd: 1
+    extrudeOnExit: 0
+    arenaGridDataGuid: 
+    editorColor: {r: 0.27, g: 0.9, b: 0.79415953, a: 1}
+  - pathId: c564b862-98a6-4b38-8624-ec315e20d761
+    segmentId: Branch_05
+    nodeIds:
+    - cf0f7a0f-9957-4b40-8dfe-29ed5d095ac8
+    - 56d55538-bc1e-43ad-bb68-1543c50063b1
+    - c8b3ef07-4bb9-456f-a059-d50c543ccd4e
+    - 49c1d47e-5de4-49fe-8b55-50311c8db4f0
+    - 5aa3ab22-fd2d-41ef-8ffb-736dd3b76277
+    - af0eff7b-19b3-414c-bf42-873c4dbc6587
+    isLeftPath: 0
+    isRightPath: 1
+    segmentType: 1
+    riverName: Branch_05
+    leadsToArena: 1
+    arenaIsAtEnd: 1
+    extrudeOnExit: 0
+    arenaGridDataGuid: 
+    editorColor: {r: 0.9, g: 0.61019945, b: 0.27, a: 1}
+  - pathId: 5fad6cce-d3e3-4f4e-8cc7-d76df1527c7a
+    segmentId: Branch_06
+    nodeIds:
+    - 5a3ad3b0-fe4a-4eb6-b051-618dbf1f91c8
+    - 5ab6bbd3-d329-4351-be2c-61f9d06f6e9e
+    - 1fae24f5-3d11-402d-98a0-413acb76c000
+    - d86057c2-d5d8-4d1e-8cf3-aca27df45463
+    - 6e80d699-9518-4038-9894-b1703af41238
+    isLeftPath: 0
+    isRightPath: 1
+    segmentType: 1
+    riverName: Branch_06
+    leadsToArena: 1
+    arenaIsAtEnd: 1
+    extrudeOnExit: 0
+    arenaGridDataGuid: 
+    editorColor: {r: 0.4262395, g: 0.27, b: 0.9, a: 1}
+  - pathId: f4130742-bb83-462d-9ea8-702f38d425eb
+    segmentId: Branch_07
+    nodeIds:
+    - 42d269e4-b405-49ab-b6c3-741fe862ad7a
+    - 5d058a92-7de1-4d60-a333-9ee43bb4b704
+    isLeftPath: 0
+    isRightPath: 0
+    segmentType: 2
+    riverName: Branch_07
+    leadsToArena: 1
+    arenaIsAtEnd: 0
+    extrudeOnExit: 1
+    arenaGridDataGuid: 
+    editorColor: {r: 0.14844342, g: 0, b: 0.59748423, a: 1}
+  - pathId: 9478c785-69b7-4d72-b393-76fe99317392
+    segmentId: Branch_08
+    nodeIds:
+    - 49c1d47e-5de4-49fe-8b55-50311c8db4f0
+    - 1a51930f-a437-445c-a0d4-732805c861bf
+    - 96534931-abe4-4d47-80b1-94b5937fbf7e
+    isLeftPath: 1
+    isRightPath: 0
+    segmentType: 2
+    riverName: Branch_08
+    leadsToArena: 0
+    arenaIsAtEnd: 0
+    extrudeOnExit: 0
+    arenaGridDataGuid: 
+    editorColor: {r: 0.29772076, g: 0.9, b: 0.27, a: 1}
   junctions:
-  - junctionId: 85fda583-0c00-4577-af02-66b45d0fd909
-    nodeId: ddea9eb2-95e8-4097-806e-1e0e66b8e9be
-    pathIds:
-    - cb512902-99c4-4aa3-973b-d4a908cef861
-    - a8720131-18cc-4cae-b3f9-c706970745f3
-    riverPathId: cb512902-99c4-4aa3-973b-d4a908cef861
-    branchPathId: a8720131-18cc-4cae-b3f9-c706970745f3
   - junctionId: 0d671f13-d1c5-474b-bce9-6b44f87068f5
     nodeId: db9eb3ab-3a90-468d-a907-26390f7804b8
     pathIds:
@@ -268,36 +372,88 @@ MonoBehaviour:
     - 56a317bf-2a92-4de6-9c51-314bb88ca7fe
     riverPathId: d76a5911-edc8-4b81-bf5a-e916981c85a9
     branchPathId: 56a317bf-2a92-4de6-9c51-314bb88ca7fe
-  shops: []
+  - junctionId: a19fc2b9-b04e-4966-bce3-229ab00db78e
+    nodeId: d374c20f-927d-4ece-b05a-cd729e43dac5
+    pathIds:
+    - cb512902-99c4-4aa3-973b-d4a908cef861
+    - 742e74b0-9db8-4d0e-9e9c-4444806e8f22
+    riverPathId: cb512902-99c4-4aa3-973b-d4a908cef861
+    branchPathId: 742e74b0-9db8-4d0e-9e9c-4444806e8f22
+  - junctionId: 1a03ce86-336e-4a96-ac3f-abac092e141d
+    nodeId: cf0f7a0f-9957-4b40-8dfe-29ed5d095ac8
+    pathIds:
+    - cb512902-99c4-4aa3-973b-d4a908cef861
+    - c564b862-98a6-4b38-8624-ec315e20d761
+    riverPathId: cb512902-99c4-4aa3-973b-d4a908cef861
+    branchPathId: c564b862-98a6-4b38-8624-ec315e20d761
+  - junctionId: f910666f-4beb-412e-a549-c9c0cd44a5ff
+    nodeId: 5a3ad3b0-fe4a-4eb6-b051-618dbf1f91c8
+    pathIds:
+    - cb512902-99c4-4aa3-973b-d4a908cef861
+    - 5fad6cce-d3e3-4f4e-8cc7-d76df1527c7a
+    riverPathId: cb512902-99c4-4aa3-973b-d4a908cef861
+    branchPathId: 5fad6cce-d3e3-4f4e-8cc7-d76df1527c7a
+  - junctionId: 8ee7a097-1ef9-499b-bea0-9f7999aaabad
+    nodeId: 49c1d47e-5de4-49fe-8b55-50311c8db4f0
+    pathIds:
+    - c564b862-98a6-4b38-8624-ec315e20d761
+    - 9478c785-69b7-4d72-b393-76fe99317392
+    riverPathId: c564b862-98a6-4b38-8624-ec315e20d761
+    branchPathId: 9478c785-69b7-4d72-b393-76fe99317392
+  shops:
+  - nodeId: 96534931-abe4-4d47-80b1-94b5937fbf7e
+    pathId: 
+    pathT: 0
+    shopPrefabOverride: {fileID: 0}
   obstacles: []
   arenas:
-  - nodeId: 509ce4f4-456e-4fad-8a53-37835865bbd5
-    gridData: {fileID: 11400000, guid: 5bb1ed4e497dc3947b7a98d9a72bf57d, type: 2}
-    entranceIndex: 0
-    arenaPrefabOverride: {fileID: 0}
   - nodeId: a38c84e7-5499-4f08-b9c2-7dfbb23acd89
-    gridData: {fileID: 11400000, guid: e47ca983b56d67a4b82c9a93803e1bf5, type: 2}
+    gridData: {fileID: 11400000, guid: 15996f2eff601204fa34541b73f04fef, type: 2}
     entranceIndex: 0
     arenaPrefabOverride: {fileID: 0}
+    secondaryEntrances: []
   - nodeId: ac4ab5d1-055f-4e0e-ac8d-8b3d8117e4b4
     gridData: {fileID: 11400000, guid: 29ab7ebedcac2144b8db32a053b1b4e1, type: 2}
     entranceIndex: 0
     arenaPrefabOverride: {fileID: 0}
+    secondaryEntrances: []
+  - nodeId: 6c808875-394e-4384-a078-0c2b8b7e8e2b
+    gridData: {fileID: 11400000, guid: e47ca983b56d67a4b82c9a93803e1bf5, type: 2}
+    entranceIndex: 0
+    arenaPrefabOverride: {fileID: 0}
+    secondaryEntrances: []
+  - nodeId: af0eff7b-19b3-414c-bf42-873c4dbc6587
+    gridData: {fileID: 11400000, guid: 5bb1ed4e497dc3947b7a98d9a72bf57d, type: 2}
+    entranceIndex: 0
+    arenaPrefabOverride: {fileID: 0}
+    secondaryEntrances: []
+  - nodeId: c263bf85-af48-41ae-babb-1fdaede2ab7b
+    gridData: {fileID: 11400000, guid: 35a0967df88c24143aefb3b3e583c9b4, type: 2}
+    entranceIndex: 0
+    arenaPrefabOverride: {fileID: 0}
+    secondaryEntrances: []
+  - nodeId: 6e80d699-9518-4038-9894-b1703af41238
+    gridData: {fileID: 11400000, guid: 35a0967df88c24143aefb3b3e583c9b4, type: 2}
+    entranceIndex: 0
+    arenaPrefabOverride: {fileID: 0}
+    secondaryEntrances:
+    - nodeId: 42d269e4-b405-49ab-b6c3-741fe862ad7a
+      entranceIndex: 1
   junctionScriptObject: {fileID: 3543737601092306643, guid: cdc03d5a67a4c8a4ca447c17a1a65a6b, type: 3}
   junctionPrefab: {fileID: 3543737601092306643, guid: cdc03d5a67a4c8a4ca447c17a1a65a6b, type: 3}
   junctionRightFacingPrefab: {fileID: 1054175076011857233, guid: 08a0e3b54a9037545a500567ad11a7af, type: 3}
   junctionLeftFacingPrefab: {fileID: 1054175076011857233, guid: 4112896818a87814181c705d9fb75161, type: 3}
   arenaPrefab: {fileID: 6685816687890925279, guid: 1f8a1bc0973719f48851a1d2efa25504, type: 3}
   arenaEntrancePrefab: {fileID: 3190444306040296516, guid: fb37ce94a14f8f24a9a64d50b2d45a57, type: 3}
-  arenaRadius: 10
   obstaclePrefab: {fileID: 5547052044951733551, guid: 343705c9ba8011941978eabad3d8f143, type: 3}
   shopPrefab: {fileID: 5139625902506829726, guid: 4cf4b2f660ffe3a47a1134471c985525, type: 3}
   riverBlockPrefab: {fileID: 8220959671730015965, guid: 070f6a1ad10a0e34aa3247fe890bb1a4, type: 3}
   junctionGapPadding: 0
   splineInstantiateSpacing: 0.15
-  curveSubdivisions: 5
+  curveSubdivisions: 2
   branchStartOffset: 0.5
   arenaHeadOffset: 5
+  shopHeadOffset: 5
   landscapeTilePrefab: {fileID: 849136606222838744, guid: 78fcaaa5184a3c2448e4c351b4ed9e79, type: 3}
   landscapeTileSize: 41.62
   landscapeTilesX: 5
@@ -331,6 +487,10 @@ MonoBehaviour:
   pauseMenuPrefab: {fileID: 6766265105239688246, guid: 8789cad67eb9fa74592325b13b52c09d, type: 3}
   boatHUDPrefab: {fileID: 1594418580111063344, guid: 7cd1490137fabfd4592c5b30018d5f4c, type: 3}
   soulsOnBoatDisplayPrefab: {fileID: 119181983208249819, guid: c491e8905455bae4a9e9846dc5636c90, type: 3}
+  orbsCounterPrefab: {fileID: 6410123795611025558, guid: f7834076e3f155f479d6773e68cb88a6, type: 3}
+  musicIntro: {fileID: 8300000, guid: 1ff10eeae8633404da517dacc2021e9e, type: 3}
+  musicLoop: {fileID: 8300000, guid: 1ff10eeae8633404da517dacc2021e9e, type: 3}
+  musicController: {fileID: 0}
   canvasOriginX: 0
   canvasOriginZ: 0
   canvasUnitsPerPixel: 0.1

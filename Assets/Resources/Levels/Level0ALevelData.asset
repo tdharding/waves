@@ -36,11 +36,11 @@ MonoBehaviour:
     perimeterAngle: 0
     tierSlot: -1
     spawnRadius: 0.03
-    targetSegmentID: 
-    targetProgress: 0
-    targetIsTopPath: 0
-    targetIsBottomPath: 0
-  orbCellIndices: 
+    targetSegmentID: Branch_05_A
+    targetProgress: 0.9174951
+    targetIsLeftPath: 0
+    targetIsRightPath: 1
+  orbCellIndices: 0b0100002a0100004901000088010000a7010000e70100004602000067020000a8020000a9020000cb020000ed020000ee02000010030000f3020000f4020000d502000096020000770200005702000038020000
   waterLevelModifierCellIndices: 
   waveModifierCellIndices: 
   prefabPlacements:

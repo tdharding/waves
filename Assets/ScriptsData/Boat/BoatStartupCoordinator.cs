@@ -1,22 +1,20 @@
 using UnityEngine;
 using System.Collections;
 
-[RequireComponent(typeof(CharacterController))]
+[RequireComponent(typeof(Rigidbody))]
 public class BoatStartupCoordinator : MonoBehaviour
 {
     public BoatMovement boatMovement;
     public BoatColliderFollower colliderFollower;
 
-    private CharacterController controller;
+    private Rigidbody rb;
     private bool hasStarted = false;
 
     void Awake()
     {
-        controller = GetComponent<CharacterController>();
+        rb = GetComponent<Rigidbody>();
 
         // Hard disable everything immediately
-        controller.enabled = false;
-
         if (boatMovement != null)
             boatMovement.controlsEnabled = false;
 
@@ -39,10 +37,10 @@ public class BoatStartupCoordinator : MonoBehaviour
         // Let transforms & visuals settle
         yield return null;
 
-        // Enable CharacterController
-        controller.enabled = true;
+        // Ensure Rigidbody starts kinematic if we want it to wait? 
+        // Actually, movement script handles controlsEnabled.
 
-        // Wait one physics step for capsule sync
+        // Wait one physics step
         yield return new WaitForFixedUpdate();
 
         // Enable movement

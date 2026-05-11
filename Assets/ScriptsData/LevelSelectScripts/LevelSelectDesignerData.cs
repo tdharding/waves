@@ -73,12 +73,22 @@ public class LevelSelectDesignerData : ScriptableObject
     }
 
     [Serializable]
-    public class DesignerArena
+    public class DesignerArenaEntrance
     {
         public string nodeId;
-        public GridData gridData;
-        public int entranceIndex;
+        public int    entranceIndex;
+    }
+
+    [Serializable]
+    public class DesignerArena
+    {
+        public string     nodeId;
+        public GridData   gridData;
+        public int        entranceIndex;
         public GameObject arenaPrefabOverride;
+
+        // One entry per additional entrance beyond the primary (nodeId above)
+        public List<DesignerArenaEntrance> secondaryEntrances = new List<DesignerArenaEntrance>();
     }
 
     public List<LandscapeHillPoint> hillPoints = new();
@@ -97,7 +107,6 @@ public class LevelSelectDesignerData : ScriptableObject
     public GameObject junctionLeftFacingPrefab;  // visual: branch exits left  of travel direction
     public GameObject arenaPrefab;
     public GameObject arenaEntrancePrefab; // LEVELSELECTARENAENTRANCE — spawned per entrance
-    public float      arenaRadius = 10f;   // world-space radius used to position entrance children
     public GameObject obstaclePrefab;
     public GameObject shopPrefab;
     public GameObject riverBlockPrefab;
@@ -106,6 +115,7 @@ public class LevelSelectDesignerData : ScriptableObject
     public int        curveSubdivisions        = 5;
     public float      branchStartOffset        = 0.5f;
     public float      arenaHeadOffset          = 5f;
+    public float      shopHeadOffset           = 5f;
 
     // Landscape tile settings
     public GameObject landscapeTilePrefab;
@@ -149,9 +159,17 @@ public class LevelSelectDesignerData : ScriptableObject
     public GameObject pauseMenuPrefab;
     public GameObject boatHUDPrefab;
     public GameObject soulsOnBoatDisplayPrefab;
+    public GameObject orbsCounterPrefab;
+
+    // Music
+    public AudioClip musicIntro;
+    public AudioClip musicLoop;
+
+    // Scene-level music reference
+    public LevelSelectMusicController musicController;
 
     // Canvas state
-    public float canvasOriginX      = 0f;
+public float canvasOriginX      = 0f;
     public float canvasOriginZ      = 0f;
     public float canvasUnitsPerPixel = 0.1f;
     public float canvasWorldY        = 0f;

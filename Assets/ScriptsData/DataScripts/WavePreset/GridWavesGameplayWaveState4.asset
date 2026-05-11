@@ -31,7 +31,7 @@ MonoBehaviour:
     WhirlpoolAreaTwirlStrength: -1.75
     SoulFishTwirlStrength: 0.65
     WhirlpoolTaper: 0.668
-    WhirlpoolDarkRadiusMult: 1.006
+    WhirlpoolDarkRadiusMult: 1.62
     WhirlpoolDarkStrength: 1
     WhirlpoolFalloffPower: 0.1
     WaveStepRate: 4000

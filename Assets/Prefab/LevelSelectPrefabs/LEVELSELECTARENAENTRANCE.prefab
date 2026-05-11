@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1 &2237027678973429255
+--- !u!1 &1414362576885030770
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -8,67 +8,46 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 249249343642199235}
-  - component: {fileID: 545792202195363146}
-  - component: {fileID: 5400642395297704920}
+  - component: {fileID: 6350045063846692727}
+  - component: {fileID: 8614982346746777215}
   m_Layer: 0
-  m_Name: ENTERCOLLIDER
+  m_Name: EntranceDebug
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &249249343642199235
+--- !u!4 &6350045063846692727
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2237027678973429255}
+  m_GameObject: {fileID: 1414362576885030770}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.04, y: 6.59, z: -0.3}
+  m_LocalRotation: {x: 0.69189763, y: 0.14586869, z: 0.14586869, w: 0.69189763}
+  m_LocalPosition: {x: -0.01, y: 6.41, z: -0.07}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 5063597348671496469}
+  m_Father: {fileID: 3200962535003473596}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &545792202195363146
+--- !u!114 &8614982346746777215
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2237027678973429255}
+  m_GameObject: {fileID: 1414362576885030770}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7778e5eca8eb8134db06e9350a0cd72a, type: 3}
+  m_Script: {fileID: 11500000, guid: 4ac182e1ee4f2f24db6b7f7dcb463712, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LevelSelectClick
-  sceneToLoad: Waves1
-  gridData: {fileID: 0}
-  entranceIndex: -1
---- !u!135 &5400642395297704920
-SphereCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2237027678973429255}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 1
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Radius: 2.17
-  m_Center: {x: 0, y: 0, z: 0}
+  m_EditorClassIdentifier: Assembly-CSharp::LevelSelectEntranceDebug
+  worldPosition: {x: 2.5785987, y: -0.07000017, z: -5.8684773}
+  worldEuler: {x: -0, y: 0, z: 0}
+  localPosition: {x: -0.01, y: 6.41, z: -0.07}
+  localEuler: {x: 66.19002, y: 90, z: 90}
 --- !u!1 &3190444306040296516
 GameObject:
   m_ObjectHideFlags: 0
@@ -99,6 +78,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 5063597348671496469}
+  - {fileID: 6350045063846692727}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: -90, y: -23.81, z: 0}
 --- !u!1 &4180301691313738305
@@ -168,7 +148,7 @@ SphereCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Radius: 2.17
+  m_Radius: 2.87
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &5547569540523481649
 GameObject:
@@ -293,8 +273,6 @@ Transform:
   m_ConstrainProportionsScale: 1
   m_Children:
   - {fileID: 7370957715752544469}
-  - {fileID: 249249343642199235}
-  - {fileID: 6960913086366892661}
   m_Father: {fileID: 3200962535003473596}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &7044077058678499247
@@ -336,52 +314,6 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 7044077058678499247}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 595e87a0bef3b0644aea7d20ffba2e5a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LevelSelectArenaEntranceDirectionHint
-  gizmoColor: {r: 1, g: 0.5, b: 0.1, a: 1}
-  arrowLength: 3.81
---- !u!1 &7590296549083921373
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 6960913086366892661}
-  - component: {fileID: 718873882085812941}
-  m_Layer: 0
-  m_Name: BranchDirectionHint
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &6960913086366892661
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7590296549083921373}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0.6939199, y: 0.06076311, z: -0.046371613, w: 0.7159838}
-  m_LocalPosition: {x: -0.1, y: 9.75, z: -4.3}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 5063597348671496469}
-  m_LocalEulerAnglesHint: {x: 87.866, y: 37.46, z: 28.77}
---- !u!114 &718873882085812941
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7590296549083921373}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 595e87a0bef3b0644aea7d20ffba2e5a, type: 3}

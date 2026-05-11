@@ -19,7 +19,7 @@ public class SplineRiverManager : MonoBehaviour
     [SerializeField] private List<SplineContainer> _sourceSegments = new();
 
     [Header("Settings")]
-    [SerializeField] private float _extrudeSpeed = 1f;
+    [SerializeField] private float _extrudeSpeed = 1.5f;
     [SerializeField] private float _overshoot    = 0.05f;
     [SerializeField] private float _branchOvershoot = 0.5f;
 

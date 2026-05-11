@@ -31,7 +31,7 @@ MonoBehaviour:
     WhirlpoolAreaTwirlStrength: -1.75
     SoulFishTwirlStrength: 0.65
     WhirlpoolTaper: 0.668
-    WhirlpoolDarkRadiusMult: 1.006
+    WhirlpoolDarkRadiusMult: 1.33
     WhirlpoolDarkStrength: 1
     WhirlpoolFalloffPower: 0.1
     WaveStepRate: 4000
@@ -46,6 +46,7 @@ MonoBehaviour:
     DepthColour: {r: 1, g: 1, b: 1, a: 0}
     DistanceDepth: 0.75
     NormalTexture: {fileID: 2800000, guid: 51ac2df266ae63944938104912d2a50c, type: 3}
+    WaveCenter: {x: 0, y: 0, z: 0, w: 0}
   sonarEnabled: 1
   musicIntro: {fileID: 8300000, guid: ee88b1ab692ccab468e67044d4475ebd, type: 3}
   musicLoop: {fileID: 8300000, guid: ee88b1ab692ccab468e67044d4475ebd, type: 3}

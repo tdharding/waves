@@ -93,6 +93,19 @@ public class SoulSlot : MonoBehaviour
         Debug.Log($"[SoulSlot] Soul {identityToReturn} returned to boat.");
     }
 
+    /// <summary>
+    /// Clears the slot without returning the soul to inventory.
+    /// Used by the catapult when the soul is launched — it was already
+    /// removed from GameProgressData when placed into the slot.
+    /// </summary>
+    public void EjectSoul()
+    {
+        if (!filled) return;
+        int identity = occupantSoulIdentity;
+        ClearSlot();
+        onEmptied?.Invoke(identity);
+    }
+
     private void ClearSlot()
     {
         filled               = false;

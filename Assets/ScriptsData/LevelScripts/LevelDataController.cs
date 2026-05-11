@@ -54,6 +54,8 @@ public class LevelDataController : MonoBehaviour
     [Header("Fishing")]
     [SerializeField] private FishingController fishingController;
     public FishingController FishingController => fishingController;
+    [SerializeField] private bool enableVideoPlayback = true;
+    public bool EnableVideoPlayback => enableVideoPlayback;
 
     [Header("Debug")]
     [SerializeField] private bool showArenaBoundsDebug = false;
@@ -423,6 +425,8 @@ public class LevelDataController : MonoBehaviour
             }
 
             gameplayBoat.SetActive(true);
+
+            FindObjectOfType<BoatHUD>()?.SetBoatTransform(gameplayBoat.transform);
 
             // Re-resolve whirl direction sources now that the boat is active —
             // they use FindGameObjectWithTag("Boat") which fails while the boat is inactive.

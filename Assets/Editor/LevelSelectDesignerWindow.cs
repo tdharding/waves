@@ -37,7 +37,8 @@ public class LevelSelectDesignerWindow : EditorWindow
     private bool _foldObstacles   = true;
     private bool _foldStats       = false;
     private bool _foldSetup       = false;
-    private const float ARENA_CANVAS_RADIUS = 35f;
+    private const float ARENA_OUTER_RING_RADIUS = 4f;   // world-space outer arena ring
+    private const float ARENA_INNER_RING_RADIUS = 2f;   // world-space inner orbit ring
 
     // Draw mode
     private List<string> _drawingNodeIds = new();
@@ -74,11 +75,98 @@ public class LevelSelectDesignerWindow : EditorWindow
     private void EnsureGridDataCache()
     {
         if (_gridDataOptions != null) return;
-        _gridDataOptions = Resources.LoadAll<GridData>("Levels");
-        _gridDataLabels  = new string[_gridDataOptions.Length + 1];
+        RefreshGridDataCache();
+    }
+
+    private void RefreshGridDataCache()
+    {
+        var guids = AssetDatabase.FindAssets("", new[] { "Assets/Resources/Levels" });
+        var list  = new System.Collections.Generic.List<GridData>();
+        foreach (var guid in guids)
+        {
+            var asset = AssetDatabase.LoadAssetAtPath<GridData>(AssetDatabase.GUIDToAssetPath(guid));
+            if (asset != null) list.Add(asset);
+        }
+        _gridDataOptions   = list.ToArray();
+        _gridDataLabels    = new string[_gridDataOptions.Length + 1];
         _gridDataLabels[0] = "(none)";
         for (int i = 0; i < _gridDataOptions.Length; i++)
-            _gridDataLabels[i + 1] = _gridDataOptions[i].displayName;
+            _gridDataLabels[i + 1] = string.IsNullOrEmpty(_gridDataOptions[i].displayName)
+                ? _gridDataOptions[i].name
+                : _gridDataOptions[i].displayName;
+        Debug.Log($"[LevelSelectDesigner] GridData cache: {_gridDataOptions.Length} asset(s) found.");
+    }
+
+    // ── Secondary entrance helpers ─────────────────────────────────
+
+    private LevelSelectDesignerData.DesignerArena FindArenaForSecondaryNode(string nodeId)
+    {
+        foreach (var a in _data.arenas)
+            foreach (var e in a.secondaryEntrances)
+                if (e.nodeId == nodeId) return a;
+        return null;
+    }
+
+    private LevelSelectDesignerData.DesignerArenaEntrance FindSecondaryEntrance(string nodeId)
+    {
+        foreach (var a in _data.arenas)
+            foreach (var e in a.secondaryEntrances)
+                if (e.nodeId == nodeId) return e;
+        return null;
+    }
+
+    private bool IsSecondaryEntranceNode(string nodeId) => FindArenaForSecondaryNode(nodeId) != null;
+
+    private void SyncEntranceNodes(LevelSelectDesignerData.DesignerArena arena)
+    {
+        int entranceCount = arena.gridData?.entrances?.Count ?? 1;
+        int needed        = Mathf.Max(0, entranceCount - 1);
+
+        // Remove excess secondary nodes
+        while (arena.secondaryEntrances.Count > needed)
+        {
+            var last = arena.secondaryEntrances[arena.secondaryEntrances.Count - 1];
+            _data.nodes.RemoveAll(n => n.id == last.nodeId);
+            arena.secondaryEntrances.RemoveAt(arena.secondaryEntrances.Count - 1);
+        }
+
+        if (needed == 0) return;
+
+        var primary = _data.nodes.Find(n => n.id == arena.nodeId);
+        if (primary == null) return;
+
+        // Add missing secondary nodes, spread evenly around the orbit ring
+        while (arena.secondaryEntrances.Count < needed)
+        {
+            int   i     = arena.secondaryEntrances.Count;
+            float angle = ((i + 1) * 360f / (needed + 1)) * Mathf.Deg2Rad;
+            var offset  = new Vector3(
+                Mathf.Sin(angle) * ARENA_INNER_RING_RADIUS,
+                0f,
+                Mathf.Cos(angle) * ARENA_INNER_RING_RADIUS);
+
+            var newNode = new LevelSelectDesignerData.DesignerNode
+            {
+                id            = System.Guid.NewGuid().ToString(),
+                type          = LevelSelectDesignerData.NodeType.ArenaEnd,
+                worldPosition = primary.worldPosition + offset
+            };
+            _data.nodes.Add(newNode);
+
+            arena.secondaryEntrances.Add(new LevelSelectDesignerData.DesignerArenaEntrance
+            {
+                nodeId        = newNode.id,
+                entranceIndex = i + 1
+            });
+        }
+
+        EditorUtility.SetDirty(_data);
+    }
+
+    private string GetArenaPresetName(LevelSelectDesignerData.DesignerArena arena)
+    {
+        var profile = arena.gridData?.arenaProfile;
+        return profile != null ? profile.name : "None";
     }
 
     private GridData DrawGridDataPopup(string label, GridData current)
@@ -543,7 +631,7 @@ public class LevelSelectDesignerWindow : EditorWindow
                 if (arena.gridData != null)
                 {
                     EditorGUILayout.LabelField(arena.gridData.displayName, EditorStyles.whiteBoldLabel);
-                    EditorGUILayout.LabelField($"Entrances: {arena.gridData.entrances?.Count ?? 0}", EditorStyles.miniLabel);
+                    EditorGUILayout.LabelField($"Entrances: {arena.gridData.entrances?.Count ?? 0}  |  Profile: {GetArenaPresetName(arena)}", EditorStyles.miniLabel);
                 }
                 else
                 {
@@ -557,6 +645,7 @@ public class LevelSelectDesignerWindow : EditorWindow
                 if (EditorGUI.EndChangeCheck())
                 {
                     Undo.RecordObject(_data, "Edit Arena");
+                    SyncEntranceNodes(arena);
                     EditorUtility.SetDirty(_data);
                 }
 
@@ -621,13 +710,14 @@ public class LevelSelectDesignerWindow : EditorWindow
         if (arena.gridData != null)
         {
             EditorGUILayout.LabelField(
-                $"{arena.gridData.displayName}  |  {arena.gridData.entrances?.Count ?? 0} entrance(s)",
+                $"{arena.gridData.displayName}  |  {arena.gridData.entrances?.Count ?? 0} entrance(s)  |  Profile: {GetArenaPresetName(arena)}",
                 EditorStyles.miniLabel);
         }
 
         if (EditorGUI.EndChangeCheck())
         {
             Undo.RecordObject(_data, "Edit Arena");
+            SyncEntranceNodes(arena);
             _selectedEntranceIdx = -1;
             EditorUtility.SetDirty(_data);
         }
@@ -669,6 +759,27 @@ public class LevelSelectDesignerWindow : EditorWindow
                     arena.entranceIndex = i;
                     EditorUtility.SetDirty(_data);
                 }
+
+                // Angle from arena centre to this entrance
+                var   primNode = _data.nodes.Find(n => n.id == arena.nodeId);
+                float angle    = 0f;
+                bool  hasAngle = false;
+                if (i == 0)
+                {
+                    angle = GetArenaArrivalYAngle(arena); hasAngle = true;
+                }
+                else
+                {
+                    var sec = arena.secondaryEntrances.Find(s => s.entranceIndex == i);
+                    var sn  = sec != null ? _data.nodes.Find(n => n.id == sec.nodeId) : null;
+                    if (sn != null && primNode != null)
+                    {
+                        Vector3 d = sn.worldPosition - primNode.worldPosition; d.y = 0f;
+                        if (d.sqrMagnitude > 0.0001f) { angle = Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg; hasAngle = true; }
+                    }
+                }
+                if (hasAngle)
+                    EditorGUILayout.LabelField("Angle", $"{angle:F1}°", EditorStyles.miniLabel);
 
                 EditorGUILayout.EndVertical();
             }
@@ -716,8 +827,10 @@ public class LevelSelectDesignerWindow : EditorWindow
             "Boat HUD Prompts",     _data.boatHUDPrefab,             typeof(GameObject), false);
         _data.soulsOnBoatDisplayPrefab = (GameObject)EditorGUILayout.ObjectField(
             "Souls Display Bar UI", _data.soulsOnBoatDisplayPrefab,  typeof(GameObject), false);
+        _data.orbsCounterPrefab = (GameObject)EditorGUILayout.ObjectField(
+            "Orbs Counter UI",      _data.orbsCounterPrefab,         typeof(GameObject), false);
         if (EditorGUI.EndChangeCheck()) EditorUtility.SetDirty(_data);
-    }
+}
 
     private void DrawPrefabsSection()
     {
@@ -752,7 +865,6 @@ public class LevelSelectDesignerWindow : EditorWindow
         EditorGUILayout.LabelField("Arenas", EditorStyles.miniBoldLabel);
         _data.arenaPrefab         = (GameObject)EditorGUILayout.ObjectField("Arena Head",     _data.arenaPrefab,         typeof(GameObject), false);
         _data.arenaEntrancePrefab = (GameObject)EditorGUILayout.ObjectField("Arena Entrance", _data.arenaEntrancePrefab, typeof(GameObject), false);
-        _data.arenaRadius         = EditorGUILayout.FloatField("Arena Radius",                _data.arenaRadius);
 
         EditorGUILayout.Space(4);
         EditorGUILayout.LabelField("Obstacles & Shops", EditorStyles.miniBoldLabel);
@@ -766,6 +878,11 @@ public class LevelSelectDesignerWindow : EditorWindow
         EditorGUILayout.Space(4);
         EditorGUILayout.LabelField("Landscape", EditorStyles.miniBoldLabel);
         _data.landscapeTilePrefab = (GameObject)EditorGUILayout.ObjectField("Tile Prefab", _data.landscapeTilePrefab, typeof(GameObject), false);
+
+        EditorGUILayout.Space(4);
+        EditorGUILayout.LabelField("Music", EditorStyles.miniBoldLabel);
+        _data.musicIntro = (AudioClip)EditorGUILayout.ObjectField("Intro Clip", _data.musicIntro, typeof(AudioClip), false);
+        _data.musicLoop  = (AudioClip)EditorGUILayout.ObjectField("Loop Clip",  _data.musicLoop,  typeof(AudioClip), false);
 
         if (EditorGUI.EndChangeCheck()) EditorUtility.SetDirty(_data);
     }
@@ -814,6 +931,10 @@ public class LevelSelectDesignerWindow : EditorWindow
         DrawDeployRow("Camera Controller", _data.cameraController != null,
             () => { var f = UnityEngine.Object.FindObjectOfType<LevelSelectCameraController>(); if (f) _data.cameraController = f; },
             () => DeployCameraController());
+
+        DrawDeployRow("Music Controller", _data.musicController != null,
+            () => { var f = UnityEngine.Object.FindObjectOfType<LevelSelectMusicController>(); if (f) _data.musicController = f; },
+            () => DeployMusicController());
 
         // UI Script Objects
         EditorGUILayout.Space(4);
@@ -878,20 +999,29 @@ public class LevelSelectDesignerWindow : EditorWindow
             return;
         _data.soulsOnBoatDisplayManager = manager;
 
-        // Wire slotManager and iconParent from SoulsDisplayBarUI
+        // Cache the slot manager reference for WireAll
         var barUI = GameObject.Find("SoulsDisplayBarUI");
-        if (barUI == null) { Debug.LogWarning("[LevelSelectDesigner] SoulsDisplayBarUI not found — deploy UI Canvas first."); return; }
+        if (barUI != null)
+        {
+            _data.soulDisplaySlotManager = barUI.GetComponentInChildren<SoulDisplaySlotManager>();
+            EditorUtility.SetDirty(_data);
 
-        var slotManager = barUI.GetComponentInChildren<SoulDisplaySlotManager>();
-        var iconParent  = barUI.transform;
-
-        var so = new SerializedObject(manager);
-        var slotProp = so.FindProperty("slotManager");
-        var iconProp = so.FindProperty("iconParent");
-        if (slotProp != null) slotProp.objectReferenceValue = slotManager;
-        if (iconProp != null) iconProp.objectReferenceValue = iconParent;
-        so.ApplyModifiedProperties();
-        EditorUtility.SetDirty(manager);
+            if (_data.soulDisplaySlotManager != null && _data.soulsOnBoatDisplayManager != null)
+            {
+                var so       = new SerializedObject(_data.soulsOnBoatDisplayManager);
+                so.Update();
+                var slotProp = so.FindProperty("slotManager");
+                var iconProp = so.FindProperty("iconParent");
+                if (slotProp != null) slotProp.objectReferenceValue = _data.soulDisplaySlotManager;
+                if (iconProp != null) iconProp.objectReferenceValue = _data.soulDisplaySlotManager.transform;
+                so.ApplyModifiedProperties();
+                EditorUtility.SetDirty(_data.soulsOnBoatDisplayManager);
+            }
+        }
+        else
+        {
+            Debug.LogWarning("[LevelSelectDesigner] SoulsDisplayBarUI not found — wiring will run after canvas is deployed.");
+        }
     }
 
     private void DeployArenaSoulsWindow()
@@ -995,24 +1125,7 @@ public class LevelSelectDesignerWindow : EditorWindow
             }
         }
 
-        // Wire into SplineRiverManager
-        if (_data.riverManager != null)
-        {
-            // Direct assignment for immediate effect
-            _data.riverManager.SetupContainers(container, extrude, _data.barrierPrefab);
-
-            // Also persist via SerializedObject so values survive domain reload
-            var so = new SerializedObject(_data.riverManager);
-            so.Update();
-            var mc = so.FindProperty("_mainContainer");
-            var me = so.FindProperty("_mainExtrude");
-            var mb = so.FindProperty("_barrierPrefab");
-            if (mc != null) mc.objectReferenceValue = container;
-            if (me != null) me.objectReferenceValue = extrude;
-            if (mb != null && _data.barrierPrefab != null) mb.objectReferenceValue = _data.barrierPrefab;
-            so.ApplyModifiedProperties();
-            EditorUtility.SetDirty(_data.riverManager);
-        }
+        // Wiring handled by WireAllSceneObjects
     }
 
     private void DeployBoat()
@@ -1022,6 +1135,19 @@ public class LevelSelectDesignerWindow : EditorWindow
             _data.boatControl = c;
             EditorUtility.SetDirty(_data);
         }
+    }
+
+    private void DeployMusicController()
+    {
+        if (!DeployScriptOnly<LevelSelectMusicController>("LevelSelectMusicController", out var ctrl, null))
+            return;
+
+        var so = new SerializedObject(ctrl);
+        so.FindProperty("data").objectReferenceValue = _data;
+        so.ApplyModifiedProperties();
+
+        _data.musicController = ctrl;
+        EditorUtility.SetDirty(_data);
     }
 
     private void DeployPlayerBoat()
@@ -1082,15 +1208,7 @@ public class LevelSelectDesignerWindow : EditorWindow
         if (comp == null) comp = Undo.AddComponent<LevelSelectCameraController>(go);
         _data.cameraController = comp;
 
-        // Wire the CinemachineCamera from the prefab into the controller
-        var vcam = go.GetComponentInChildren<Unity.Cinemachine.CinemachineCamera>();
-        if (vcam != null && comp.cam == null)
-        {
-            var so = new SerializedObject(comp);
-            var prop = so.FindProperty("cam");
-            if (prop != null) { prop.objectReferenceValue = vcam; so.ApplyModifiedProperties(); }
-            EditorUtility.SetDirty(comp);
-        }
+        // Wiring handled by WireAllSceneObjects
     }
 
     private void DeployCinemachine()
@@ -1119,16 +1237,9 @@ public class LevelSelectDesignerWindow : EditorWindow
         var vcam = vcamGo.GetComponent<Unity.Cinemachine.CinemachineCamera>();
         if (vcam == null) vcam = Undo.AddComponent<Unity.Cinemachine.CinemachineCamera>(vcamGo);
 
-        // 3. Wire vcam into LevelSelectCameraController
-        if (_data.cameraController != null)
-        {
-            var so = new SerializedObject(_data.cameraController);
-            var prop = so.FindProperty("cam");
-            if (prop != null) { prop.objectReferenceValue = vcam; so.ApplyModifiedProperties(); }
-            EditorUtility.SetDirty(_data.cameraController);
-        }
+        // Wiring handled by WireAllSceneObjects
 
-        Debug.Log("[LevelSelectDesigner] Cinemachine deployed and wired.");
+        Debug.Log("[LevelSelectDesigner] Cinemachine deployed.");
     }
 
     private void DeployAllSceneObjects()
@@ -1136,37 +1247,15 @@ public class LevelSelectDesignerWindow : EditorWindow
         AutoFindAll();
         if (_data.segmentRegistry  == null) { if (DeployScriptOnly<RiverSegmentRegistry>("RiverSegmentRegistry",         out var c, null))              _data.segmentRegistry  = c; }
         if (_data.dataController   == null) { if (DeployScriptOnly<LevelSelectDataController>("LevelSelectDataController", out var c, _data.dataControllerPrefab)) _data.dataController = c; }
-        if (_data.boatPathManager  == null) { if (DeployScriptOnly<SplinePathStitcher>("BoatPathManager",                 out var c, null))              _data.boatPathManager  = c; }
-        if (_data.boatPathManager != null && _data.pathPrefab != null)
-        {
-            var so = new SerializedObject(_data.boatPathManager);
-            var pp = so.FindProperty("_pathPrefab");
-            if (pp != null && pp.objectReferenceValue == null) { pp.objectReferenceValue = _data.pathPrefab; so.ApplyModifiedProperties(); EditorUtility.SetDirty(_data.boatPathManager); }
-        }
-        if (_data.riverManager     == null) { if (DeployScriptOnly<SplineRiverManager>("SplineRiverManager",              out var c, null))              _data.riverManager     = c; }
+        if (_data.boatPathManager  == null) { if (DeployScriptOnly<SplinePathStitcher>("BoatPathManager",                out var c, null)) _data.boatPathManager = c; }
+        if (_data.riverManager     == null) { if (DeployScriptOnly<SplineRiverManager>("SplineRiverManager",             out var c, null)) _data.riverManager    = c; }
         DeployRiverExtrusion();
-        if (_data.riverManager != null && (_data.branchWaterExtrudePrefab != null || _data.barrierPrefab != null))
-        {
-            var so = new SerializedObject(_data.riverManager);
-            var bp = so.FindProperty("_branchPrefab");
-            var br = so.FindProperty("_barrierPrefab");
-            bool dirty = false;
-            if (bp != null && bp.objectReferenceValue == null && _data.branchWaterExtrudePrefab != null) { bp.objectReferenceValue = _data.branchWaterExtrudePrefab; dirty = true; }
-            if (br != null && br.objectReferenceValue == null && _data.barrierPrefab            != null) { br.objectReferenceValue = _data.barrierPrefab;            dirty = true; }
-            if (dirty) { so.ApplyModifiedProperties(); EditorUtility.SetDirty(_data.riverManager); }
-        }
-        if (_data.splineManager    == null) { if (DeployScriptOnly<LevelSelectSplineManager>("LevelSelectSplineManager",  out var c, null))              _data.splineManager    = c; }
-        if (_data.splineManager != null && _data.riverManager != null)
-        {
-            var so = new SerializedObject(_data.splineManager);
-            var pp = so.FindProperty("_riverManager");
-            if (pp != null && pp.objectReferenceValue == null) { pp.objectReferenceValue = _data.riverManager; so.ApplyModifiedProperties(); EditorUtility.SetDirty(_data.splineManager); }
-        }
+        if (_data.splineManager    == null) { if (DeployScriptOnly<LevelSelectSplineManager>("LevelSelectSplineManager", out var c, null)) _data.splineManager   = c; }
         if (_data.boatControl      == null) DeployBoat();
         var _playerBoatGo = GameObject.Find("PlayerBoat");
         if (_playerBoatGo == null || _playerBoatGo.transform.childCount == 0) DeployPlayerBoat();
         DeployCameraController();
-        if (_data.soulsOnBoatDisplayManager == null) DeploySoulsOnBoatDisplay();
+        if (_data.musicController == null) DeployMusicController();
         if (GameObject.Find("ArenaSoulsWindow") == null) DeployArenaSoulsWindow();
         // UI Canvas prefabs — only deploy if CANVAS parent prefab is assigned
         if (_data.canvasParentPrefab != null)
@@ -1180,9 +1269,13 @@ public class LevelSelectDesignerWindow : EditorWindow
             if (GameObject.Find("PauseMenuUI")       == null) DeployUIPrefab(_data.pauseMenuPrefab,          "PauseMenuUI");
             if (GameObject.Find("BoatHUDPrompts")    == null) DeployUIPrefab(_data.boatHUDPrefab,            "BoatHUDPrompts");
             if (GameObject.Find("SoulsDisplayBarUI") == null) DeployUIPrefab(_data.soulsOnBoatDisplayPrefab, "SoulsDisplayBarUI");
-        }
-        WirePauseMenuPanels();
-        EditorUtility.SetDirty(_data);
+            if (GameObject.Find("OrbsCounterUI")     == null) DeployUIPrefab(_data.orbsCounterPrefab,        "OrbsCounterUI");
+            }
+
+            // Deploy after SoulsDisplayBarUI exists so wiring can find it
+            if (_data.soulsOnBoatDisplayManager == null) DeploySoulsOnBoatDisplay();
+            WirePauseMenuPanels();
+EditorUtility.SetDirty(_data);
     }
 
     private void AutoFindAll()
@@ -1259,7 +1352,88 @@ public class LevelSelectDesignerWindow : EditorWindow
 
     private void WireAllSceneObjects()
     {
-        // Auto-fill defaultSegmentID on boat control from first main river path in data
+        // ── River extrusion → SplineRiverManager ──────────────────────────────
+        var riverExtrusionGO = GameObject.Find("RiverExtrusion");
+        if (riverExtrusionGO != null && _data.riverManager != null)
+        {
+            var mainHighway = riverExtrusionGO.transform.Find("MainHighway");
+            if (mainHighway != null)
+            {
+                var container = mainHighway.GetComponent<SplineContainer>();
+                var extrude   = mainHighway.GetComponent<SplineExtrude>();
+                _data.riverManager.SetupContainers(container, extrude, _data.barrierPrefab);
+                var so = new SerializedObject(_data.riverManager);
+                so.Update();
+                var mc = so.FindProperty("_mainContainer");
+                var me = so.FindProperty("_mainExtrude");
+                var mb = so.FindProperty("_barrierPrefab");
+                if (mc != null) mc.objectReferenceValue = container;
+                if (me != null) me.objectReferenceValue = extrude;
+                if (mb != null && _data.barrierPrefab != null) mb.objectReferenceValue = _data.barrierPrefab;
+                so.ApplyModifiedProperties();
+                EditorUtility.SetDirty(_data.riverManager);
+            }
+        }
+
+        // ── Branch + barrier prefabs → SplineRiverManager ────────────────────
+        if (_data.riverManager != null && (_data.branchWaterExtrudePrefab != null || _data.barrierPrefab != null))
+        {
+            var so = new SerializedObject(_data.riverManager);
+            so.Update();
+            var bp = so.FindProperty("_branchPrefab");
+            var br = so.FindProperty("_barrierPrefab");
+            bool dirty = false;
+            if (bp != null && bp.objectReferenceValue == null && _data.branchWaterExtrudePrefab != null) { bp.objectReferenceValue = _data.branchWaterExtrudePrefab; dirty = true; }
+            if (br != null && br.objectReferenceValue == null && _data.barrierPrefab            != null) { br.objectReferenceValue = _data.barrierPrefab;            dirty = true; }
+            if (dirty) { so.ApplyModifiedProperties(); EditorUtility.SetDirty(_data.riverManager); }
+        }
+
+        // ── Path prefab → SplinePathStitcher ──────────────────────────────────
+        if (_data.boatPathManager != null && _data.pathPrefab != null)
+        {
+            var so = new SerializedObject(_data.boatPathManager);
+            var pp = so.FindProperty("_pathPrefab");
+            if (pp != null && pp.objectReferenceValue == null) { pp.objectReferenceValue = _data.pathPrefab; so.ApplyModifiedProperties(); EditorUtility.SetDirty(_data.boatPathManager); }
+        }
+
+        // ── CinemachineCamera → LevelSelectCameraController ───────────────────
+        if (_data.cameraController != null)
+        {
+            var camGO = GameObject.Find("LevelSelectCamera");
+            var vcam  = camGO?.GetComponentInChildren<Unity.Cinemachine.CinemachineCamera>();
+            if (vcam != null)
+            {
+                var so   = new SerializedObject(_data.cameraController);
+                var prop = so.FindProperty("cam");
+                if (prop != null) { prop.objectReferenceValue = vcam; so.ApplyModifiedProperties(); EditorUtility.SetDirty(_data.cameraController); }
+            }
+        }
+
+        // ── SoulsOnBoatDisplayManager → slotManager + iconParent ─────────────
+        if (_data.soulsOnBoatDisplayManager != null)
+        {
+            // Re-find slot manager in case canvas was deployed after the script
+            if (_data.soulDisplaySlotManager == null)
+            {
+                var barUI = GameObject.Find("SoulsDisplayBarUI");
+                if (barUI != null) { _data.soulDisplaySlotManager = barUI.GetComponentInChildren<SoulDisplaySlotManager>(); EditorUtility.SetDirty(_data); }
+            }
+
+            if (_data.soulDisplaySlotManager != null)
+            {
+                var iconParent = _data.soulDisplaySlotManager.transform;
+                var so       = new SerializedObject(_data.soulsOnBoatDisplayManager);
+                so.Update();
+                var slotProp = so.FindProperty("slotManager");
+                var iconProp = so.FindProperty("iconParent");
+                if (slotProp != null) slotProp.objectReferenceValue = _data.soulDisplaySlotManager;
+                if (iconProp != null) iconProp.objectReferenceValue = iconParent;
+                so.ApplyModifiedProperties();
+                EditorUtility.SetDirty(_data.soulsOnBoatDisplayManager);
+            }
+        }
+
+        // ── Auto-fill defaultSegmentID on boat control from first main river path in data
         if (_data.boatControl != null && _data.paths.Count > 0)
         {
             var mainPath = _data.paths.Find(p => p.segmentType == LevelSelectDesignerData.SegmentType.MainRiver)
@@ -1293,15 +1467,6 @@ public class LevelSelectDesignerWindow : EditorWindow
             EditorUtility.SetDirty(_data.splineManager);
         }
 
-        // Wire SoulsOnBoatDisplayManager.slotManager → SoulDisplaySlotManager
-        if (_data.soulsOnBoatDisplayManager != null && _data.soulDisplaySlotManager != null)
-        {
-            var so = new SerializedObject(_data.soulsOnBoatDisplayManager);
-            var prop = so.FindProperty("slotManager");
-            if (prop != null) { prop.objectReferenceValue = _data.soulDisplaySlotManager; so.ApplyModifiedProperties(); }
-            EditorUtility.SetDirty(_data.soulsOnBoatDisplayManager);
-        }
-
         WirePauseMenuPanels();
 
         Debug.Log("[LevelSelectDesigner] Wire All complete.");
@@ -1316,6 +1481,7 @@ public class LevelSelectDesignerWindow : EditorWindow
         _data.curveSubdivisions  = EditorGUILayout.IntSlider("Curve Subdivisions", _data.curveSubdivisions, 1, 60);
         _data.branchStartOffset  = EditorGUILayout.Slider("Branch Start Offset", _data.branchStartOffset, -5f, 5f);
         _data.arenaHeadOffset    = EditorGUILayout.FloatField("Arena Head Offset", _data.arenaHeadOffset);
+        _data.shopHeadOffset     = EditorGUILayout.FloatField("Shop Head Offset", _data.shopHeadOffset);
         if (EditorGUI.EndChangeCheck()) EditorUtility.SetDirty(_data);
     }
 
@@ -1424,6 +1590,7 @@ public class LevelSelectDesignerWindow : EditorWindow
             Handles.BeginGUI();
             DrawLandscapeTilesOnCanvas();
             DrawPaths();
+            DrawArenaOrbitRings();
             DrawNodes();
             DrawObstacles();
             DrawArenaEntrances();
@@ -1755,6 +1922,7 @@ public class LevelSelectDesignerWindow : EditorWindow
                 editorColor = Color.HSVToRGB((_data.paths.Count * 0.618f) % 1f, 0.7f, 0.9f)
             };
             _data.paths.Add(path);
+            path.segmentType = InferBranchType(path.pathId, startNodeId);
         }
 
         // If this path starts at a junction node, record it as the branch on that junction
@@ -1820,6 +1988,21 @@ public class LevelSelectDesignerWindow : EditorWindow
             {
                 Undo.RecordObject(_data, "Move Node");
                 var np = CanvasToWorldPos(e.mousePosition - _dragOffset);
+
+                // Secondary entrance nodes constrained to inner ring — position IS the direction
+                var ownerArena = FindArenaForSecondaryNode(node.id);
+                if (ownerArena != null)
+                {
+                    var primary = _data.nodes.Find(n => n.id == ownerArena.nodeId);
+                    if (primary != null)
+                    {
+                        Vector3 dir = np - primary.worldPosition; dir.y = 0f;
+                        if (dir.sqrMagnitude < 0.0001f) dir = Vector3.forward;
+                        np   = primary.worldPosition + dir.normalized * ARENA_INNER_RING_RADIUS;
+                        np.y = primary.worldPosition.y;
+                    }
+                }
+
                 node.worldPosition = new Vector3(np.x, node.worldPosition.y, np.z);
                 EditorUtility.SetDirty(_data);
                 Repaint();
@@ -2113,12 +2296,70 @@ public class LevelSelectDesignerWindow : EditorWindow
                 Handles.color = selected ? Color.white : col;
                 Handles.DrawAAPolyLine(width, (Vector3)a, (Vector3)b);
 
-                // Direction arrow at midpoint
+                // Direction arrow at midpoint — tip at mid+dir, fins back toward mid
                 Vector2 mid  = (a + b) * 0.5f;
                 Vector2 dir  = (b - a).normalized * 7f;
                 Vector2 perp = new Vector2(-dir.y, dir.x) * 0.4f;
-                Handles.DrawAAPolyLine(width, (Vector3)mid, (Vector3)(mid + dir - perp));
-                Handles.DrawAAPolyLine(width, (Vector3)mid, (Vector3)(mid + dir + perp));
+                Handles.DrawAAPolyLine(width, (Vector3)(mid + dir), (Vector3)(mid - perp));
+                Handles.DrawAAPolyLine(width, (Vector3)(mid + dir), (Vector3)(mid + perp));
+            }
+        }
+    }
+
+    private float GetArenaArrivalYAngle(LevelSelectDesignerData.DesignerArena arena)
+    {
+        var branch = _data.paths.FirstOrDefault(p =>
+            p.leadsToArena &&
+            p.nodeIds.Count >= 2 &&
+            p.nodeIds[p.nodeIds.Count - 1] == arena.nodeId);
+        if (branch == null) return 0f;
+
+        Vector3 last = WorldPosOfNode(branch.nodeIds[branch.nodeIds.Count - 1]);
+        Vector3 prev = WorldPosOfNode(branch.nodeIds[branch.nodeIds.Count - 2]);
+        Vector3 dir  = last - prev; dir.y = 0f;
+        if (dir.sqrMagnitude < 0.0001f) return 0f;
+        return Quaternion.LookRotation(dir.normalized, Vector3.up).eulerAngles.y;
+    }
+
+    private void DrawArenaOrbitRings()
+    {
+        if (Event.current.type != EventType.Repaint) return;
+        foreach (var arena in _data.arenas)
+        {
+            var primary = _data.nodes.Find(n => n.id == arena.nodeId);
+            if (primary == null) continue;
+
+            float arrivalY = GetArenaArrivalYAngle(arena);
+
+            Vector2 center = WorldToCanvas(primary.worldPosition);
+            Handles.color = new Color(1f, 0.7f, 0.2f, 0.2f);
+            Handles.DrawWireDisc(center, Vector3.forward, ARENA_OUTER_RING_RADIUS * _zoom);
+            Handles.DrawWireDisc(center, Vector3.forward, ARENA_INNER_RING_RADIUS * _zoom);
+
+            // Line from arena centre to each secondary entrance orbit node
+            foreach (var sec in arena.secondaryEntrances)
+            {
+                var sn = _data.nodes.Find(n => n.id == sec.nodeId);
+                if (sn == null) continue;
+                Vector2 orbitCanvas = WorldToCanvas(sn.worldPosition);
+                Handles.color = new Color(0.2f, 0.9f, 1f, 0.6f);
+                Handles.DrawAAPolyLine(1.5f, (Vector3)center, (Vector3)orbitCanvas);
+            }
+
+            // Entrance 1 direction arrow — only when this arena is selected
+            if (arena.nodeId == _selectedArenaNodeId)
+            {
+                float a1rad    = arrivalY * Mathf.Deg2Rad;
+                var   a1inward = new Vector2(-Mathf.Sin(a1rad), Mathf.Cos(a1rad));
+                var   a1appr   = -a1inward;
+                Vector2 outer  = center + a1appr * ARENA_OUTER_RING_RADIUS * _zoom;
+                Vector2 inner  = center + a1appr * ARENA_INNER_RING_RADIUS * _zoom;
+                Vector2 back   = inner - a1inward * 6f;
+                Vector2 perp   = new Vector2(-a1inward.y, a1inward.x) * 4f;
+                Handles.color  = new Color(1f, 0.5f, 0.1f, 0.9f);
+                Handles.DrawAAPolyLine(2f, (Vector3)outer, (Vector3)inner);
+                Handles.DrawAAPolyLine(2f, (Vector3)inner, (Vector3)(back + perp));
+                Handles.DrawAAPolyLine(2f, (Vector3)inner, (Vector3)(back - perp));
             }
         }
     }
@@ -2148,13 +2389,28 @@ public class LevelSelectDesignerWindow : EditorWindow
                     break;
 
                 case LevelSelectDesignerData.NodeType.ArenaEnd:
-                    Handles.color = new Color(1f, 0.5f, 0.1f);
-                    Handles.DrawSolidDisc(pos, Vector3.forward, r + 3f);
-                    if (selected) { Handles.color = Color.white; Handles.DrawWireDisc(pos, Vector3.forward, r + 6f); }
-                    var arena = _data.arenas.Find(a => a.nodeId == node.id);
-                    Handles.color = Color.white;
-                    Handles.Label(new Vector3(pos.x + r + 4f, pos.y - 6f, 0),
-                        arena?.gridData != null ? arena.gridData.displayName : "ARENA", EditorStyles.miniLabel);
+                    var secEntrance = FindSecondaryEntrance(node.id);
+                    if (secEntrance != null)
+                    {
+                        // Secondary entrance node — smaller, cyan-tinted
+                        Handles.color = new Color(0.2f, 0.9f, 1f, 0.9f);
+                        Handles.DrawSolidDisc(pos, Vector3.forward, r + 1f);
+                        if (selected) { Handles.color = Color.white; Handles.DrawWireDisc(pos, Vector3.forward, r + 5f); }
+                        Handles.color = new Color(0.2f, 0.9f, 1f);
+                        Handles.Label(new Vector3(pos.x + r + 4f, pos.y - 6f, 0),
+                            $"Entrance {secEntrance.entranceIndex}", EditorStyles.miniLabel);
+                    }
+                    else
+                    {
+                        // Primary arena node
+                        Handles.color = new Color(1f, 0.5f, 0.1f);
+                        Handles.DrawSolidDisc(pos, Vector3.forward, r + 3f);
+                        if (selected) { Handles.color = Color.white; Handles.DrawWireDisc(pos, Vector3.forward, r + 6f); }
+                        var arena = _data.arenas.Find(a => a.nodeId == node.id);
+                        Handles.color = Color.white;
+                        Handles.Label(new Vector3(pos.x + r + 4f, pos.y - 6f, 0),
+                            arena?.gridData != null ? arena.gridData.displayName : "ARENA", EditorStyles.miniLabel);
+                    }
                     break;
 
                 case LevelSelectDesignerData.NodeType.ShopEnd:
@@ -2209,11 +2465,6 @@ public class LevelSelectDesignerWindow : EditorWindow
             Vector2 center          = WorldToCanvas(node.worldPosition);
             bool    isArenaSelected = arena.nodeId == _selectedArenaNodeId;
 
-            Handles.color = isArenaSelected
-                ? new Color(1f, 0.5f, 0.1f, 0.5f)
-                : new Color(1f, 0.5f, 0.1f, 0.15f);
-            Handles.DrawWireDisc(center, Vector3.forward, ARENA_CANVAS_RADIUS);
-
             // Draw one arrow per path that arrives at this arena
             var leadPaths = _data.paths
                 .Where(p => p.leadsToArena && p.nodeIds.Count >= 2
@@ -2227,21 +2478,22 @@ public class LevelSelectDesignerWindow : EditorWindow
                 var prevNode = _data.nodes.Find(n => n.id == path.nodeIds[path.nodeIds.Count - 2]);
                 if (lastNode == null || prevNode == null) continue;
 
-                Vector2 dir   = (WorldToCanvas(lastNode.worldPosition) - WorldToCanvas(prevNode.worldPosition)).normalized;
-                Vector2 tip   = center + dir * ARENA_CANVAS_RADIUS;
-                Vector2 inner = center + dir * (ARENA_CANVAS_RADIUS - 10f);
+                Vector2 inward   = (WorldToCanvas(lastNode.worldPosition) - WorldToCanvas(prevNode.worldPosition)).normalized;
+                Vector2 approach = -inward;
+                Vector2 outerPt  = center + approach * ARENA_OUTER_RING_RADIUS * _zoom;
+                Vector2 innerPt  = center + approach * ARENA_INNER_RING_RADIUS * _zoom;
 
                 Color col   = isArenaSelected ? new Color(1f, 0.6f, 0.1f) : new Color(0.9f, 0.7f, 0.3f, 0.7f);
                 float width = 1.5f;
 
                 Handles.color = col;
-                Handles.DrawAAPolyLine(width, (Vector3)inner, (Vector3)tip);
+                Handles.DrawAAPolyLine(width, (Vector3)outerPt, (Vector3)innerPt);
 
-                Vector2 perp = new Vector2(-dir.y, dir.x) * 4f;
-                Vector2 back = tip - dir * 7f;
-                Handles.DrawAAPolyLine(width, (Vector3)tip, (Vector3)(back + perp));
-                Handles.DrawAAPolyLine(width, (Vector3)tip, (Vector3)(back - perp));
-                Handles.DrawSolidDisc(tip, Vector3.forward, 4f);
+                Vector2 perp = new Vector2(-inward.y, inward.x) * 4f;
+                Vector2 back = innerPt - inward * 6f;
+                Handles.DrawAAPolyLine(width, (Vector3)innerPt, (Vector3)(back + perp));
+                Handles.DrawAAPolyLine(width, (Vector3)innerPt, (Vector3)(back - perp));
+                Handles.DrawSolidDisc(innerPt, Vector3.forward, 4f);
             }
         }
     }
@@ -2351,6 +2603,15 @@ public class LevelSelectDesignerWindow : EditorWindow
 
     private void DrawArenasList()
     {
+        EditorGUILayout.BeginHorizontal();
+        EditorGUILayout.LabelField($"{_gridDataOptions?.Length ?? 0} levels loaded", EditorStyles.miniLabel);
+        if (GUILayout.Button("↺", EditorStyles.miniButton, GUILayout.Width(22)))
+        {
+            _gridDataOptions = null;
+            RefreshGridDataCache();
+        }
+        EditorGUILayout.EndHorizontal();
+
         if (_data.arenas.Count == 0)
         {
             EditorGUILayout.LabelField("  (none)", EditorStyles.miniLabel);
@@ -2400,6 +2661,7 @@ public class LevelSelectDesignerWindow : EditorWindow
             {
                 Undo.RecordObject(_data, "Set Arena GridData");
                 arena.gridData = newGrid;
+                SyncEntranceNodes(arena);
                 EditorUtility.SetDirty(_data);
             }
         }
@@ -2854,6 +3116,19 @@ public class LevelSelectDesignerWindow : EditorWindow
         return path?.editorColor ?? Color.gray;
     }
 
+    private LevelSelectDesignerData.SegmentType InferBranchType(string newPathId, string startNodeId)
+    {
+        var parent = _data.paths.FirstOrDefault(p => p.pathId != newPathId && p.nodeIds.Contains(startNodeId));
+        if (parent == null) return LevelSelectDesignerData.SegmentType.MainRiver;
+        return parent.segmentType switch
+        {
+            LevelSelectDesignerData.SegmentType.MainRiver     => LevelSelectDesignerData.SegmentType.PrimaryBranch,
+            LevelSelectDesignerData.SegmentType.PrimaryBranch => LevelSelectDesignerData.SegmentType.Secondary,
+            LevelSelectDesignerData.SegmentType.Secondary     => LevelSelectDesignerData.SegmentType.Tertiary,
+            _                                                  => LevelSelectDesignerData.SegmentType.Tertiary,
+        };
+    }
+
     private string AutoSegmentId()
     {
         bool hasMain = _data.paths.Any(p => p.segmentType == LevelSelectDesignerData.SegmentType.MainRiver);
@@ -2905,7 +3180,113 @@ public class LevelSelectDesignerWindow : EditorWindow
 
         _correctedNodePositions.Clear();
         _junctionPerpDirections.Clear();
+        _arenaEntranceDirections.Clear();
+
         Debug.Log($"[LSD] effective junctions: {effectiveJunctions.Count} (explicit={_data.junctions.Count} auto-detected={effectiveJunctions.Count - _data.junctions.Count})");
+
+        // Pre-pass: calculate arena shifts and correct secondary entrance nodes.
+        // Secondary orbit nodes are shifted by the same vector the arena head moves (arrivalDir * offset).
+        foreach (var arena in _data.arenas)
+        {
+            var arenaNode = _data.nodes.Find(n => n.id == arena.nodeId);
+            if (arenaNode == null) continue;
+
+            // 1. Find arrival direction (same logic as GenerateArenas)
+            var branchPath = _data.paths.FirstOrDefault(p =>
+                p.leadsToArena &&
+                p.nodeIds.Count > 0 &&
+                p.nodeIds[p.nodeIds.Count - 1] == arena.nodeId);
+
+            Vector3 arrivalDir = Vector3.forward;
+            if (branchPath != null && branchPath.nodeIds.Count >= 2)
+            {
+                // Note: WorldPosOfNode is safe here as arenaNode is not in _correctedNodePositions yet.
+                Vector3 last = WorldPosOfNode(branchPath.nodeIds[branchPath.nodeIds.Count - 1]);
+                Vector3 prev = WorldPosOfNode(branchPath.nodeIds[branchPath.nodeIds.Count - 2]);
+                arrivalDir = (last - prev).normalized;
+            }
+            arrivalDir.y = 0f;
+            if (arrivalDir.sqrMagnitude < 0.0001f) arrivalDir = Vector3.forward;
+            arrivalDir.Normalize();
+
+            Vector3 shift = arrivalDir * _data.arenaHeadOffset;
+
+            // 2. Get radius from prefab or scene
+            GameObject headPrefab = arena.arenaPrefabOverride != null ? arena.arenaPrefabOverride : _data.arenaPrefab;
+            var existingArena = FindObjectsOfType<LevelSelectDesignerArenaTag>().FirstOrDefault(t => t.nodeId == arena.nodeId);
+            var gizmo = existingArena?.GetComponentInChildren<LevelSelectArenaRadiusGizmo>()
+                     ?? headPrefab?.GetComponentInChildren<LevelSelectArenaRadiusGizmo>();
+            float radius = gizmo != null ? gizmo.radius : 10f;
+
+            // 3. Process secondary nodes
+            foreach (var sec in arena.secondaryEntrances)
+            {
+                var sn = _data.nodes.Find(n => n.id == sec.nodeId);
+                if (sn == null) continue;
+
+                Vector3 dirToSec = sn.worldPosition - arenaNode.worldPosition; dirToSec.y = 0f;
+                if (dirToSec.sqrMagnitude < 0.0001f) dirToSec = Vector3.forward;
+                dirToSec.Normalize();
+
+                // Snap designer position to radius circle
+                sn.worldPosition = arenaNode.worldPosition + dirToSec * radius;
+
+                // Actual scene gate position is shifted by the same arrival offset
+                Vector3 actualGatePos = sn.worldPosition + shift;
+                _correctedNodePositions[sec.nodeId] = actualGatePos;
+
+                // Store direction INTO arena for tangent forcing
+                _arenaEntranceDirections[sec.nodeId] = -dirToSec;
+                }
+                }
+
+                // Pre-pass: calculate shop shifts
+                foreach (var shop in _data.shops)
+                {
+                if (string.IsNullOrEmpty(shop.nodeId)) continue;
+                var shopNode = _data.nodes.Find(n => n.id == shop.nodeId);
+                if (shopNode == null) continue;
+
+                var leadPath = _data.paths.FirstOrDefault(p =>
+                p.nodeIds.Count >= 2 &&
+                p.nodeIds[p.nodeIds.Count - 1] == shop.nodeId);
+
+                if (leadPath != null)
+                {
+                Vector3 last = WorldPosOfNode(leadPath.nodeIds[leadPath.nodeIds.Count - 1]);
+                Vector3 prev = WorldPosOfNode(leadPath.nodeIds[leadPath.nodeIds.Count - 2]);
+                Vector3 arrivalDir = (last - prev).normalized;
+                arrivalDir.y = 0f;
+                if (arrivalDir.sqrMagnitude < 0.0001f) arrivalDir = Vector3.forward;
+                arrivalDir.Normalize();
+
+                _correctedNodePositions[shop.nodeId] = shopNode.worldPosition + arrivalDir * _data.shopHeadOffset;
+                }
+                }
+
+                // Pre-pass: Tag paths connected to secondary nodes so they know if they are an Entrance or Exit.
+        var secondaryNodeIds = new HashSet<string>(
+            _data.arenas.SelectMany(a => a.secondaryEntrances).Select(e => e.nodeId));
+        
+        foreach (var path in _data.paths)
+        {
+            if (path.nodeIds.Count < 2) continue;
+            
+            // Path ENDS at secondary node -> Entrance (arena is at t=1)
+            if (secondaryNodeIds.Contains(path.nodeIds[path.nodeIds.Count - 1]))
+            {
+                path.leadsToArena = true;
+                path.arenaIsAtEnd = true;
+                EditorUtility.SetDirty(_data);
+            }
+            // Path STARTS at secondary node -> Exit (arena is at t=0)
+            else if (secondaryNodeIds.Contains(path.nodeIds[0]))
+            {
+                path.leadsToArena = true;
+                path.arenaIsAtEnd = false;
+                EditorUtility.SetDirty(_data);
+            }
+        }
 
         foreach (var path in _data.paths)
         {
@@ -2931,8 +3312,10 @@ public class LevelSelectDesignerWindow : EditorWindow
 
         GenerateObstacles(obstaclesGO);
         GenerateArenas();
+        GenerateShops();
 
         WireSourceSegments(generatedContainers);
+        WireAllSceneObjects();
 
         var stitcher = _data.boatPathManager;
         if (stitcher != null)
@@ -3379,6 +3762,15 @@ public class LevelSelectDesignerWindow : EditorWindow
                 branchEndPos.z + arrivalDir.z * _data.arenaHeadOffset);
             arenaGO.transform.rotation = Quaternion.Euler(0f, arrivalYAngle, 0f);
 
+            // ── Set gizmo north to canvas north (world -Z) ────────
+            var radiusGizmo = arenaGO.GetComponentInChildren<LevelSelectArenaRadiusGizmo>();
+            if (radiusGizmo != null)
+            {
+                Undo.RecordObject(radiusGizmo, "Set Gizmo North");
+                radiusGizmo.northOffset = 180f;
+                EditorUtility.SetDirty(radiusGizmo);
+            }
+
             // ── Wire GridData on controller ───────────────────────
             var ctrl = arenaGO.GetComponentInChildren<LevelSelectArenaController>();
             if (ctrl != null && arena.gridData != null)
@@ -3410,10 +3802,122 @@ public class LevelSelectDesignerWindow : EditorWindow
                 });
                 EditorUtility.SetDirty(ctrl);
             }
-        }
-    }
 
-    private void WireJunctionNodes(RiverSegmentID[] bakedSegments)
+            // ── Secondary entrances ───────────────────────────────────
+            foreach (var secEnt in arena.secondaryEntrances)
+            {
+                var secNode = _data.nodes.Find(n => n.id == secEnt.nodeId);
+                if (secNode == null || _data.arenaEntrancePrefab == null) continue;
+
+                // Canvas angle: direction from arena designer node to orbit node
+                Vector3 secDir3 = secNode.worldPosition - node.worldPosition; secDir3.y = 0f;
+                if (secDir3.sqrMagnitude < 0.0001f) secDir3 = Vector3.forward;
+                float canvasAngle = Mathf.Atan2(secDir3.x, secDir3.z) * Mathf.Rad2Deg;
+
+                // Trigger always lands at rotationY - 180° (same as primary entrance).
+                // To get trigger at canvasAngle: rotationY = canvasAngle + 180°
+                float secRotationY = canvasAngle + 180f;
+
+                var secEntGO = (GameObject)PrefabUtility.InstantiatePrefab(_data.arenaEntrancePrefab);
+                Undo.RegisterCreatedObjectUndo(secEntGO, "Generate Secondary Arena Entrance");
+                secEntGO.transform.SetParent(arenaGO.transform, false);
+                secEntGO.transform.localPosition = Vector3.zero;
+                secEntGO.transform.rotation = Quaternion.Euler(-90f, secRotationY, 0f);
+                secEntGO.name = $"Entrance_{secEnt.entranceIndex}";
+
+                if (ctrl != null)
+                {
+                    var secTrigger = secEntGO.GetComponentInChildren<LevelSelectEnter>();
+                    ctrl.portalLinks.Add(new LevelSelectArenaController.PortalLink
+                    {
+                        entranceIndex = secEnt.entranceIndex,
+                        trigger       = secTrigger
+                    });
+                    EditorUtility.SetDirty(ctrl);
+                }
+            }
+            }
+            }
+
+            private void GenerateShops()
+            {
+                var shopsParent = FindOrCreateParent("SHOPS");
+
+                foreach (var shop in _data.shops)
+                {
+                    GameObject prefab = shop.shopPrefabOverride != null
+                        ? shop.shopPrefabOverride : _data.shopPrefab;
+                    if (prefab == null) continue;
+
+                    Vector3    pos = Vector3.zero;
+                    Quaternion rot = Quaternion.identity;
+
+                    if (!string.IsNullOrEmpty(shop.nodeId))
+                    {
+                        var node = _data.nodes.Find(n => n.id == shop.nodeId);
+                        if (node == null) continue;
+                
+                        pos = WorldPosOfNode(shop.nodeId);
+
+                        // Find arrival tangent to orient the shop
+                        var leadPath = _data.paths.FirstOrDefault(p =>
+                            p.nodeIds.Count >= 2 &&
+                            p.nodeIds[p.nodeIds.Count - 1] == shop.nodeId);
+
+                        if (leadPath != null)
+                        {
+                            Vector3 last    = WorldPosOfNode(leadPath.nodeIds[leadPath.nodeIds.Count - 1]);
+                            Vector3 prev    = WorldPosOfNode(leadPath.nodeIds[leadPath.nodeIds.Count - 2]);
+                            Vector3 tangent = (last - prev).normalized;
+                            if (tangent != Vector3.zero)
+                                rot = Quaternion.LookRotation(tangent, Vector3.up);
+                        }
+                    }
+                    else if (!string.IsNullOrEmpty(shop.pathId))
+                    {
+                        Vector3? pathPos = GetWorldPosOnPath(shop.pathId, shop.pathT);
+                        if (!pathPos.HasValue) continue;
+                        pos = pathPos.Value;
+
+                        // Orientation from path tangent
+                        var     path      = _data.paths.Find(p => p.pathId == shop.pathId);
+                        var     positions = path.nodeIds.Select(id => (float3)WorldPosOfNode(id)).ToList();
+                        var     spline    = SplineSplitUtility.BuildSplineFromPositions(positions, TangentMode.AutoSmooth);
+                        float3  tangent   = spline.EvaluateTangent(shop.pathT);
+                        if (math.lengthsq(tangent) > 0.001f)
+                            rot = Quaternion.LookRotation(math.normalize(tangent), Vector3.up);
+                    }
+                    else continue;
+
+                    var shopGO = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+                    Undo.RegisterCreatedObjectUndo(shopGO, "Generate Shop");
+                    shopGO.transform.SetParent(shopsParent.transform, true);
+                    shopGO.transform.position = pos;
+                    shopGO.transform.rotation = rot;
+                    shopGO.name = $"Shop_{shop.nodeId ?? shop.pathId}";
+
+                    // ── Auto-wire Proximity Script ────────────────────────
+                    var proximityChild = shopGO.transform.Find("ProximityCollider");
+                    if (proximityChild != null)
+                    {
+                        var proximity = proximityChild.GetComponent<LevelSelectShopProximity>();
+                        if (proximity == null)
+                            proximity = Undo.AddComponent<LevelSelectShopProximity>(proximityChild.gameObject);
+
+                        if (proximity.shopCamera == null)
+                        {
+                            var camChild = shopGO.transform.Find("CinemachineCamera");
+                            if (camChild != null)
+                            {
+                                proximity.shopCamera = camChild.GetComponent<Unity.Cinemachine.CinemachineCamera>();
+                                EditorUtility.SetDirty(proximity);
+                            }
+                        }
+                    }
+                }
+            }
+
+            private void WireJunctionNodes(RiverSegmentID[] bakedSegments)
     {
         var sceneJunctions = FindObjectsOfType<SplineRiverJunctionNodeV2>();
 
@@ -3531,7 +4035,7 @@ public class LevelSelectDesignerWindow : EditorWindow
 
     private void ClearGeneratedObjects()
     {
-        foreach (var name in new[] { "MAINRIVERVISUALS", "RIVERBRANCHES", "RIVERJUNCTIONS", "RIVERGATEsobstacles", "ARENAS", "BoatPaths", "LANDSCAPETILES", "LEVELSELECT_SCRIPTS", "PlayerBoat", "CANVAS", "RiverExtrusion", "CAMERA" })
+        foreach (var name in new[] { "MAINRIVERVISUALS", "RIVERBRANCHES", "RIVERJUNCTIONS", "RIVERGATEsobstacles", "ARENAS", "SHOPS", "BoatPaths", "LANDSCAPETILES", "LEVELSELECT_SCRIPTS", "PlayerBoat", "CANVAS", "RiverExtrusion", "CAMERA" })
         {
             var go = GameObject.Find(name);
             if (go == null) continue;
@@ -3551,6 +4055,7 @@ public class LevelSelectDesignerWindow : EditorWindow
             _data.boatControl      = null;
             _data.cameraController      = null;
             _data.soulDisplaySlotManager = null;
+            _data.musicController        = null;
             EditorUtility.SetDirty(_data);
         }
     }
@@ -3586,13 +4091,12 @@ public class LevelSelectDesignerWindow : EditorWindow
 
         SetSplineFromPositions(container, positions);
 
-        if (!isJunctionStart || container.Splines.Count == 0) return;
-
+        if (container.Splines.Count == 0) return;
         var spline = container.Splines[0];
         if (spline.Count < 2) return;
 
-        // ── Trim the leading end by branchStartOffset ─────────────
-        if (_data.branchStartOffset > 0f)
+        // ── 1. Trim leading end (Junctions only) ──────────────────
+        if (isJunctionStart && _data.branchStartOffset > 0f)
         {
             SplineUtility.GetPointAtLinearDistance(spline, 0f, _data.branchStartOffset, out float T_start);
 
@@ -3619,24 +4123,51 @@ public class LevelSelectDesignerWindow : EditorWindow
             }
         }
 
-        // ── Force first knot tangent perpendicular to main river ──
-        // Convert the stored world-space perpendicular into the container's local space,
-        // preserve the existing tangent magnitude, then set Broken mode so it holds.
-        if (spline.Count > 0
-            && _junctionPerpDirections.TryGetValue(junctionNodeId, out var perpWorld))
+        // ── 2. Force start tangent (Junction or Arena Exit) ───────
+        string  startNodeId = path.nodeIds[0];
+        Vector3 forceDir    = Vector3.zero;
+        bool    forceStart  = false;
+
+        if (_junctionPerpDirections.TryGetValue(startNodeId, out var perp))
+        {
+            forceDir   = perp;
+            forceStart = true;
+        }
+        else if (_arenaEntranceDirections.TryGetValue(startNodeId, out var arenaDir))
+        {
+            // For an EXIT path (emanating), point AWAY from center
+            forceDir   = -arenaDir;
+            forceStart = true;
+        }
+
+        if (forceStart && spline.Count > 0)
         {
             var    knot      = spline[0];
-            float3 localPerp = container.transform.InverseTransformDirection(perpWorld);
+            float3 localForce = container.transform.InverseTransformDirection(forceDir);
             float  tanLen    = math.length(knot.TangentOut);
             if (tanLen < 0.0001f) tanLen = 0.333f;
 
-            knot.TangentOut = math.normalize(localPerp) * tanLen;
+            knot.TangentOut = math.normalize(localForce) * tanLen;
             spline.SetKnot(0, knot);
             spline.SetTangentMode(0, TangentMode.Broken);
         }
 
+        // ── 3. Force end tangent (Arena Entrance) ─────────────────
+        string endNodeId = path.nodeIds[path.nodeIds.Count - 1];
+        if (_arenaEntranceDirections.TryGetValue(endNodeId, out var entDir) && spline.Count > 0)
+        {
+            var    knot      = spline[spline.Count - 1];
+            float3 localForce = container.transform.InverseTransformDirection(entDir);
+            float  tanLen    = math.length(knot.TangentIn);
+            if (tanLen < 0.0001f) tanLen = 0.333f;
+
+            knot.TangentIn = math.normalize(localForce) * tanLen;
+            spline.SetKnot(spline.Count - 1, knot);
+            spline.SetTangentMode(spline.Count - 1, TangentMode.Broken);
+        }
+
         EditorUtility.SetDirty(container);
-    }
+        }
 
     // Actual smooth-spline world positions for junction nodes, populated during generation.
     // Overrides the raw stored position so branch splines start exactly where the main
@@ -3646,6 +4177,10 @@ public class LevelSelectDesignerWindow : EditorWindow
     // Perpendicular-to-main-river direction per junction node.
     // Used to force the branch's first segment to exit at 90° from the main river tangent.
     private readonly Dictionary<string, Vector3> _junctionPerpDirections = new();
+
+    // Direction INTO the arena per secondary entrance node.
+    // Used to align entrance/exit paths with the spawned gate prefabs.
+    private readonly Dictionary<string, Vector3> _arenaEntranceDirections = new();
 
     private Vector3 WorldPosOfNode(string nodeId)
     {
@@ -3685,6 +4220,8 @@ public class LevelSelectDesignerWindow : EditorWindow
 
             spline.Add(new BezierKnot(pos, -tanIn, tanOut, quaternion.identity), TangentMode.AutoSmooth);
         }
+
+        SplineSplitUtility.ZeroKnotRollAngles(spline);
 
         if (container.Splines.Count > 0)
             container.RemoveSplineAt(0);

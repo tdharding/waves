@@ -129,8 +129,8 @@ Material:
     - _ArenaBoatMaskInnerOpacity: 0
     - _ArenaBoatMaskOuterFeather: 13.76
     - _ArenaBoatMaskOuterOpacity: 0.8
-    - _ArenaBoatMaskOuterRadius: 0.3261858
-    - _ArenaBoatMaskRadius: 0.08569679
+    - _ArenaBoatMaskOuterRadius: 0.6808802
+    - _ArenaBoatMaskRadius: 0.30330074
     - _Blend: 0
     - _BlendModePreserveSpecular: 1
     - _BlendOp: 0

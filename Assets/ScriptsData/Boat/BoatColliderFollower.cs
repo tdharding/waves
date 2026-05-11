@@ -1,17 +1,17 @@
 using UnityEngine;
 
-[RequireComponent(typeof(CharacterController))]
+[RequireComponent(typeof(BoxCollider))]
 public class BoatColliderFollower : MonoBehaviour
 {
     public Transform visual; // Assign BoatVisual here
 
-    private CharacterController cc;
+    private BoxCollider col;
     private Vector3 initialCenter;
 
     void Start()
     {
-        cc = GetComponent<CharacterController>();
-        initialCenter = cc.center;
+        col = GetComponent<BoxCollider>();
+        initialCenter = col.center;
     }
 
     void LateUpdate()
@@ -23,6 +23,6 @@ public class BoatColliderFollower : MonoBehaviour
         Vector3 c = initialCenter;
         c.y += yOffset;
 
-        cc.center = c;
+        col.center = c;
     }
 }

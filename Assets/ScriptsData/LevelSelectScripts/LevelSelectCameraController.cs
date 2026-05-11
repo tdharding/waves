@@ -20,6 +20,8 @@ public class LevelSelectCameraController : MonoBehaviour
     public float pitchMin   = -60f;
     public float pitchMax   = 45f;
 
+    public bool IsControlEnabled { get; set; } = true;
+
     private float                        _currentFOV;
     private float                        _yaw;
     private float                        _pitch;
@@ -60,7 +62,7 @@ public class LevelSelectCameraController : MonoBehaviour
 
     private void Update()
     {
-        if (cam == null) return;
+        if (cam == null || !IsControlEnabled) return;
 
         // Scroll zoom
         float scroll = Input.GetAxis("Mouse ScrollWheel");
@@ -70,8 +72,8 @@ public class LevelSelectCameraController : MonoBehaviour
             ApplyZoom();
         }
 
-        // Middle mouse orbit
-        if (Input.GetMouseButton(2) && _boatTarget != null)
+        // Middle mouse or right-click orbit
+        if ((Input.GetMouseButton(2) || Input.GetMouseButton(1)) && _boatTarget != null)
         {
             _yaw   += Input.GetAxis("Mouse X") * orbitSpeed * Time.deltaTime;
             _pitch -= Input.GetAxis("Mouse Y") * orbitSpeed * Time.deltaTime;

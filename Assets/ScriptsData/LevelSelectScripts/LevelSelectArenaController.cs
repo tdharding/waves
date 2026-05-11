@@ -46,9 +46,13 @@ public class LevelSelectArenaController : MonoBehaviour
              "so you only need to set them here rather than on each individual trigger.")]
     public List<PortalLink> portalLinks = new List<PortalLink>();
 
+    [Header("Boat Spawning")]
+    [Tooltip("World units to offset the boat away from the entrance point when returning from a level.")]
+    [SerializeField] private float returnOffsetWorld = 3f;
+
     /// <summary>
     /// Called by SplinePathStitcher after baking. Assigns each portal link's arenaPath to the
-    /// baked SplineContainer whose spline passes nearest to the link's trigger.
+/// baked SplineContainer whose spline passes nearest to the link's trigger.
     /// </summary>
     public void AutoDetectPaths(List<SplineContainer> bakedContainers)
     {
@@ -140,11 +144,19 @@ public class LevelSelectArenaController : MonoBehaviour
                         Vector3 triggerLocal = link.arenaPath.transform.InverseTransformPoint(triggerWorld);
                         SplineUtility.GetNearestPoint(link.arenaPath.Spline,
                             (Unity.Mathematics.float3)triggerLocal, out _, out float t);
-                        returnProgress = t;
+                        
+                        // Apply offset away from arena (offset world units converted to parametric t)
+                        float length = link.arenaPath.CalculateLength();
+                        float tOffset = length > 0.1f ? returnOffsetWorld / length : 0.05f;
+
+                        if (segID.ArenaIsAtEnd)
+                            returnProgress = Mathf.Clamp01(t - tOffset);
+                        else
+                            returnProgress = Mathf.Clamp01(t + tOffset);
                     }
 
                     var entrance = gridData.entrances[link.entranceIndex];
-                    entrance.targetSegmentID    = segID.SegmentID;
+entrance.targetSegmentID    = segID.SegmentID;
                     entrance.targetProgress     = returnProgress;
                     entrance.targetIsLeftPath    = segID.IsLeftPath;
                     entrance.targetIsRightPath = segID.IsRightPath;

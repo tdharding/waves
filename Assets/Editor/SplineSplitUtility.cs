@@ -176,7 +176,24 @@ public static class SplineSplitUtility
 
             spline.Add(new BezierKnot(pos, -tanIn, tanOut, quaternion.identity), mode);
         }
+        ZeroKnotRollAngles(spline);
         return spline;
+    }
+
+    /// <summary>
+    /// Zeroes the Z (roll) euler component of every knot rotation in a spline.
+    /// Prevents AutoSmooth from introducing out-of-plane twist on flat river paths.
+    /// </summary>
+    public static void ZeroKnotRollAngles(Spline spline)
+    {
+        for (int i = 0; i < spline.Count; i++)
+        {
+            var     knot  = spline[i];
+            Vector3 euler = ((Quaternion)knot.Rotation).eulerAngles;
+            euler.z       = 0f;
+            knot.Rotation = (quaternion)Quaternion.Euler(euler);
+            spline.SetKnot(i, knot);
+        }
     }
 
     /// <summary>

@@ -90,6 +90,54 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!1 &1407606180585360249
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4394942460761428258}
+  - component: {fileID: 8358454990660195689}
+  m_Layer: 0
+  m_Name: ArenaRadius
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &4394942460761428258
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1407606180585360249}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.0060836407, y: -0.00000008940697, z: -2.3283064e-10, w: 0.9999815}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1246859573605417632}
+  m_LocalEulerAnglesHint: {x: 0.697, y: 0, z: 0}
+--- !u!114 &8358454990660195689
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1407606180585360249}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f246d8332d0796c4e9191980893afaab, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LevelSelectArenaRadiusGizmo
+  radius: 6.38
+  northOffset: 177.8
+  gizmoColor: {r: 0, g: 1, b: 1, a: 0.4}
+  debugAngles: No entrances found
 --- !u!1 &6685816687890925279
 GameObject:
   m_ObjectHideFlags: 0
@@ -122,6 +170,7 @@ Transform:
   m_ConstrainProportionsScale: 1
   m_Children:
   - {fileID: 2874339188781633458}
+  - {fileID: 4394942460761428258}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &2550857666029339508
@@ -148,6 +197,7 @@ MonoBehaviour:
   - entranceIndex: 0
     trigger: {fileID: 0}
     arenaPath: {fileID: 0}
+  returnOffsetWorld: 1
 --- !u!114 &8375635782020110089
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -229,6 +279,61 @@ SphereCollider:
   serializedVersion: 3
   m_Radius: 15.08
   m_Center: {x: -0.68, y: -1.7048537e-15, z: 0.0000007104859}
+--- !u!1 &8639363480971772360
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 9033456687488810042}
+  - component: {fileID: 1417547385571423172}
+  m_Layer: 0
+  m_Name: Collider
+  m_TagString: LevelSelectPathObstacle
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &9033456687488810042
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8639363480971772360}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2874339188781633458}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!136 &1417547385571423172
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8639363480971772360}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 7.36
+  m_Height: 44.9
+  m_Direction: 1
+  m_Center: {x: -0.18, y: -14.5, z: -0.1}
 --- !u!1001 &7270242942161119210
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -326,6 +431,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 4829727063417923672, guid: e1a73537d9899fe44b5231e5d2ba5ab7, type: 3}
       insertIndex: -1
       addedObject: {fileID: 8042173768314347680}
+    - targetCorrespondingSourceObject: {fileID: 4829727063417923672, guid: e1a73537d9899fe44b5231e5d2ba5ab7, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 9033456687488810042}
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: e1a73537d9899fe44b5231e5d2ba5ab7, type: 3}
 --- !u!4 &2874339188781633458 stripped

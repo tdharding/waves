@@ -28,7 +28,9 @@
       "Bash(git push *)",
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\tomdh\\\\Waves\" -Directory)",
       "Bash(Select-Object Name)",
-      "Bash(grep -E \"\\\\.prefab\\\\.meta|\\\\.prefab$\")"
+      "Bash(grep -E \"\\\\.prefab\\\\.meta|\\\\.prefab$\")",
+      "Bash(Select-String -Pattern \"SoulFishPoint\")",
+      "Bash(Select-String -Pattern -i \"soulfish\")"
     ]
   }
 }
