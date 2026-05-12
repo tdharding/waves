@@ -21,7 +21,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: CircularWaveDisplacementMat
-  m_Shader: {fileID: -6465566751694194690, guid: d4abee5a215295a4ea92888410707c0d, type: 3}
+  m_Shader: {fileID: -6465566751694194690, guid: 701ce6963b7a20e42bdc4c64a10cd5fd, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -29,7 +29,7 @@ Material:
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
-  m_CustomRenderQueue: 3032
+  m_CustomRenderQueue: -1
   stringTagMap: {}
   disabledShaderPasses:
   - MOTIONVECTORS
@@ -78,7 +78,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _NormalTexture:
-        m_Texture: {fileID: 2800000, guid: 51ac2df266ae63944938104912d2a50c, type: 3}
+        m_Texture: {fileID: 2800000, guid: b428682cdd9054e468cb9dc6758f697f, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _OcclusionMap:
@@ -105,6 +105,10 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _ZoneTexture:
+        m_Texture: {fileID: 2800000, guid: 529dd1144773d014bbec8416fbe5e207, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - unity_Lightmaps:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
@@ -123,7 +127,7 @@ Material:
     - _AddPrecomputedVelocity: 0
     - _AlphaClip: 0
     - _AlphaToMask: 0
-    - _ArenaRadius1: -4.54
+    - _ArenaRadius1: -2
     - _Blend: 0
     - _BlendModePreserveSpecular: 1
     - _BoatDither: -0.8
@@ -154,13 +158,13 @@ Material:
     - _Cutoff: 0.5
     - _DarkRingWave2Brightness: 0.22
     - _DarkRingWave2Contrast: 4.17
-    - _DepthFade: 1.4
-    - _DepthFadeLine: 4.11
-    - _DepthFadeStrength: 1.8
-    - _DepthTwirlStrength: 4.89
+    - _DepthFade: 2.49
+    - _DepthFadeLine: 5.55
+    - _DepthFadeStrength: -2.88
+    - _DepthTwirlStrength: 4.24
     - _DetailAlbedoMapScale: 1
     - _DetailNormalMapScale: 1
-    - _DistanceDepth: 0.87
+    - _DistanceDepth: 0.6
     - _Distance_Depth: 1
     - _DitherSize: 2.61
     - _DitherStrength: 1.43
@@ -170,16 +174,16 @@ Material:
     - _FoamAmount: 97.84
     - _FoamCutoff: 1.24
     - _FoamDepth: 4.32
-    - _FoamDepthFade: -0.25
-    - _FoamDistanceDepth: -0.37
-    - _FoamDitherSize: 3.09
+    - _FoamDepthFade: -0.58
+    - _FoamDistanceDepth: -3.18
+    - _FoamDitherSize: 1.08
     - _FoamFade: 1.06
-    - _FoamLine: 0.04
+    - _FoamLine: 0.06
     - _FoamScale: 4.45
     - _FoamSoftness: 4.33
     - _FoamSpeed: 0.2
     - _FoamStrength: -1.56
-    - _Frequency: 13
+    - _Frequency: 14.65
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
@@ -196,24 +200,25 @@ Material:
     - _Parallax: 0.005
     - _PeakRingWave1Brightness: -0.44
     - _PeakRingWave1Contrast: 0.83
-    - _PeakRingWave2Brightness: -0.6
+    - _PeakRingWave2Brightness: 17.29
     - _PeakRingWave2Contrast: -0.01
     - _PeakTroughSmoothStepFactor: 0.22
     - _QueueControl: 1
     - _QueueOffset: 32
     - _ReceiveShadows: 1
-    - _RippleDepth: 0.15
+    - _RippleDepth: 0.1
     - _ShadowStep: 0
     - _SmoothStepNormalDepthWave: 0.57
-    - _Smoothness: 0.063
+    - _Smoothness: 0
     - _SmoothnessTextureChannel: 0
     - _SonarBDimensionMultiply: 1
     - _SonarGDimensionMultiply: 0.5
     - _SonarRDimensionMultiply: 1.3
     - _SonarRadius: 1.87
-    - _Sonar_Radius: 0
+    - _Sonar_Radius: 1
     - _Sonar_Radius_Softness: 0
     - _SoulFishDistortion1: 10.82
+    - _SoulFishMaskStrength: 0.21
     - _SoulFishRadius1: 0.1
     - _SoulFishRadius10: 0.1
     - _SoulFishRadius2: 0.55
@@ -234,24 +239,24 @@ Material:
     - _SoulFishStrength7: 4.51
     - _SoulFishStrength8: 4.51
     - _SoulFishStrength9: 4.51
-    - _SoulFishTwirlStrength: 0.65
+    - _SoulFishTwirlStrength: 1.02
     - _SpecularHighlights: 1
-    - _Speed: 1.5
+    - _Speed: 0.43
     - _SrcBlend: 1
     - _SrcBlendAlpha: 1
-    - _Strength: 0.56
+    - _Strength: 0.61
     - _Surface: 0
     - _TimeNormal1: -0.001
     - _TimeNormal2: 0.01
-    - _Transparency: 0.993
+    - _Transparency: 1
     - _TroughBrightness: 0
-    - _TroughRingWave1Brightness: 16.2
+    - _TroughRingWave1Brightness: 0.06
     - _TroughRingWave1Contrast: 0.7
     - _TroughRingWave2Brightness: 1.8
     - _TroughRingWave2Contrast: 1.1
-    - _TwirlBaseStrength: 1.87
-    - _TwirlScale: 11.52
-    - _TwirlSlopeBoost: 1.18
+    - _TwirlBaseStrength: 3.44
+    - _TwirlScale: 6.98
+    - _TwirlSlopeBoost: 0.2
     - _TwirlSpeed: 1
     - _TwirlStrengthNormal: 0.28
     - _VoronoiFactor: 0
@@ -259,7 +264,7 @@ Material:
     - _WhirlpoolAreaTwirlStrength: -1.75
     - _WhirlpoolContrastBoost: 0
     - _WhirlpoolCount: 6.2
-    - _WhirlpoolDarkRadiusMult: 1.006
+    - _WhirlpoolDarkRadiusMult: 1.62
     - _WhirlpoolDarkStrength: 1
     - _WhirlpoolDepth: 16
     - _WhirlpoolFalloffPower: 0.1
@@ -269,25 +274,28 @@ Material:
     - _WorkflowMode: 1
     - _XRMotionVectorsPass: 1
     - _ZWrite: 1
+    - _ZoneNoiseStrength: 0.11
+    - _ZoneScrollSpeed: 0.14
+    - _ZoneTiling: 18.52
     - _boatedgemaskwidth: 0
     - _boatedgewavesharpness: 1.41
     - _depthcontrast1: 12.75
     - _depthstrenght: 0.03
     m_Colors:
     - _ArenaMask: {r: 0.08, g: 0, b: -0.2, a: 0}
-    - _BaseColor: {r: 0.7169812, g: 0.7169812, b: 0.7169812, a: 1}
-    - _BoatForward: {r: 0.9978511, g: 0.025253206, b: 0.060461655, a: 0}
-    - _BoatPosition: {r: 0.17535332, g: -0.27207705, b: -4.3836036, a: 0}
-    - _BoatRight: {r: 0.019743323, g: 0.7639815, b: -0.64493614, a: 0}
-    - _BoatSonarPosition: {r: 0.075539395, g: -0.000017397744, b: -4.3890553, a: 0}
+    - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    - _BoatForward: {r: 0.9242771, g: 0.19383666, b: -0.3288456, a: 0}
+    - _BoatPosition: {r: 0.7216152, g: -0.0739552, b: -1.4425441, a: 0}
+    - _BoatRight: {r: -0.20272943, g: -0.48067927, b: -0.8531403, a: 0}
+    - _BoatSonarPosition: {r: 0.62935865, g: 0, b: -1.4090893, a: 0}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _DeepColour: {r: 1, g: 0, b: 0, a: 1}
-    - _DepthColour: {r: 1, g: 1, b: 1, a: 0}
+    - _DepthColour: {r: 0.4528302, g: 0.41651833, b: 0.41651833, a: 0}
     - _DepthColour_1: {r: 0, g: 0, b: 0, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _FoamColor: {r: 0, g: 0, b: 0, a: 1}
     - _GridVector2: {r: 200, g: 200, b: 0, a: 0}
-    - _LightDirection: {r: -17.8, g: -188.5, b: -17.18, a: 0}
+    - _LightDirection: {r: -87.25, g: -186.88, b: 33.8, a: 0}
     - _Light_Direction: {r: 7.2, g: -7.15, b: 0.17, a: 0}
     - _MainColor: {r: 0, g: 0, b: 0, a: 1}
     - _NormalTiling: {r: 52.63, g: 1, b: 0, a: 0}
@@ -295,11 +303,11 @@ Material:
     - _ShadowColour: {r: 0, g: 0, b: 0, a: 1}
     - _SonarRadiusDimensions: {r: 0, g: 0, b: 0, a: 0}
     - _Sonar_Effect_Color: {r: 0, g: 0, b: 0, a: 0}
-    - _SoulFishPosition1: {r: 2.7687368, g: -46.060806, b: 3.9533675, a: 0}
+    - _SoulFishPosition1: {r: 99999, g: 99999, b: 99999, a: 0}
     - _SoulFishPosition10: {r: 99999, g: 99999, b: 99999, a: 0}
-    - _SoulFishPosition2: {r: -2.437514, g: -46.060806, b: -2.4778821, a: 0}
-    - _SoulFishPosition3: {r: -0.9062631, g: -46.060806, b: 4.5658674, a: 0}
-    - _SoulFishPosition4: {r: -3.6625137, g: -46.060806, b: 1.1971177, a: 0}
+    - _SoulFishPosition2: {r: 99999, g: 99999, b: 99999, a: 0}
+    - _SoulFishPosition3: {r: 99999, g: 99999, b: 99999, a: 0}
+    - _SoulFishPosition4: {r: 99999, g: 99999, b: 99999, a: 0}
     - _SoulFishPosition5: {r: 99999, g: 99999, b: 99999, a: 0}
     - _SoulFishPosition6: {r: 99999, g: 99999, b: 99999, a: 0}
     - _SoulFishPosition7: {r: 99999, g: 99999, b: 99999, a: 0}
@@ -309,7 +317,8 @@ Material:
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
     - _SurfaceColourTest1: {r: 0, g: 0.8023877, b: 1, a: 1}
     - _Tiling: {r: 20, g: 20, b: 0, a: 0}
-    - _WaveCenter: {r: 0, g: 0, b: 0, a: 0}
+    - _WaveCenter: {r: 0.05, g: 0.68, b: -0.08, a: 0}
     - _WaveCenter5: {r: 0.34, g: 0, b: 0, a: 0}
+    - _ZoneTiling: {r: 60, g: 60, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

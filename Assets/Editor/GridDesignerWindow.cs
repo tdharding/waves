@@ -82,7 +82,36 @@ public class GridDesignerWindow : EditorWindow
     bool drawCircle;
     bool drawOrb;
     bool drawSoul;
+    bool drawSoulArea;
+    bool drawSelect;
     bool drawWaterLevelModifier;
+
+    // Soul zone drawing state
+    int  _activeSoulZoneIndex = -1;
+    readonly List<int> _drawingNodes = new List<int>();
+    bool _isDrawingSoulArea;
+
+    // Select tool state
+    int  _selectedZoneIndex = -1;
+    int  _selectedNodeIndex = -1;
+    bool _isDraggingNode    = false;
+    int  _dragCurrentCell   = -1;
+
+    // Bridge mode state
+    bool        _isBridgeMode        = false;
+    int         _bridgeEndZoneIndex  = -1;
+    int         _bridgeEndNodeIndex  = -1;
+    readonly List<int> _bridgeNodes  = new List<int>();
+
+    static readonly Color[] ZonePalette =
+    {
+        new Color(1.0f, 0.55f, 0.0f),
+        new Color(0.2f, 0.8f, 1.0f),
+        new Color(0.6f, 1.0f, 0.3f),
+        new Color(1.0f, 0.3f, 0.7f),
+        new Color(0.9f, 0.9f, 0.2f),
+        new Color(0.5f, 0.3f, 1.0f),
+    };
     bool drawWaveModifier;
     int        activeTierIndex  = -1; // -1 = base layer
     List<bool> tierVisible      = new List<bool>();
@@ -186,19 +215,93 @@ public class GridDesignerWindow : EditorWindow
 
     void OnGUI()
     {
-        EditorGUILayout.HelpBox(
-            "GRID SEMANTICS\n\n" +
-            "■ Square  = Reality space\n" +
-            "● Circle  = Soul plane objects (non-soul)\n" +
-            "★ Soul    = Soul spawn point (assign SoulData below)\n" +
-            "→ Green   = Entrance portal",
-            MessageType.Info);
+        DrawToolbar();
 
         EditorGUILayout.BeginHorizontal();
         DrawLeftPanel();
         DrawPanelResizeHandle();
         DrawRightPanel();
         EditorGUILayout.EndHorizontal();
+    }
+
+    void DrawToolbar()
+    {
+        // ── Row 1: Level identity bar ────────────────────────────────────────
+        EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
+
+        string levelLabel = loadedData != null
+            ? $"  ▣  {(string.IsNullOrEmpty(loadedData.displayName) ? loadedData.name : loadedData.displayName)}  [{loadedData.levelID}]"
+            : "  ▣  No level loaded";
+
+        GUIStyle levelStyle = new GUIStyle(EditorStyles.boldLabel)
+            { normal = { textColor = loadedData != null ? new Color(0.6f, 1f, 0.6f) : new Color(1f, 0.5f, 0.5f) } };
+        GUILayout.Label(levelLabel, levelStyle);
+
+        GUILayout.FlexibleSpace();
+
+        // Load button
+        if (GUILayout.Button("Load…", EditorStyles.toolbarButton, GUILayout.Width(52)))
+        {
+            string path = EditorUtility.OpenFilePanel("Select GridData", "Assets", "asset");
+            if (!string.IsNullOrEmpty(path))
+            {
+                path = FileUtil.GetProjectRelativePath(path);
+                var data = AssetDatabase.LoadAssetAtPath<GridData>(path);
+                if (data != null) LoadGrid(data);
+            }
+        }
+
+        if (loadedData != null && GUILayout.Button("Save", EditorStyles.toolbarButton, GUILayout.Width(42)))
+            SaveGridInPlace();
+
+        EditorGUILayout.EndHorizontal();
+
+        // ── Row 2: Tool buttons ──────────────────────────────────────────────
+        EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
+
+        // Slot paint tools (■ / ●)
+        bool squarePaint = activeSlot > 0 && !drawCircle;
+        bool circlePaint = activeSlot > 0 && drawCircle;
+        SetToolbarButton("■ Square",  squarePaint, Color.white,                () => { drawCircle = false; drawOrb = drawSoul = drawSoulArea = drawSelect = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = drawDirectPrefab = false; if (activeSlot <= 0) activeSlot = 1; ClearSelectState(); });
+        SetToolbarButton("● Circle",  circlePaint, Color.white,                () => { drawCircle = true;  drawOrb = drawSoul = drawSoulArea = drawSelect = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = drawDirectPrefab = false; if (activeSlot <= 0) activeSlot = 1; ClearSelectState(); });
+
+        GUILayout.Space(6);
+
+        // Specialist tools
+        SetToolbarButton("⊕ Select",     drawSelect,            new Color(0.4f,0.8f,1f),   () => { activeSlot = -1; drawSelect = true; drawSoulArea = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false; });
+        SetToolbarButton("★ Soul",       drawSoulArea,          Color.yellow,              () => { activeSlot = -1; drawSoulArea = true; drawSelect = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false; ClearSelectState(); });
+        SetToolbarButton("◎ Orb",        drawOrb,               Color.white,               () => { activeSlot = -1; drawOrb = true; drawCircle = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = false; });
+        SetToolbarButton("▲▼ Water",     drawWaterLevelModifier, new Color(0.4f,0.8f,1f),  () => { activeSlot = -1; drawWaterLevelModifier = true; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaveModifier = drawWhirlpool = false; });
+        SetToolbarButton("〜 Wave",       drawWaveModifier,       new Color(0.6f,1f,0.6f),  () => { activeSlot = -1; drawWaveModifier = true; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWhirlpool = false; });
+        SetToolbarButton("〇 Whirlpool", drawWhirlpool,          new Color(0.7f,0.4f,1f),  () => { activeSlot = -1; drawWhirlpool = true; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = false; });
+        SetToolbarButton("✕ Eraser",    activeSlot == 0,        new Color(1f,0.5f,0.5f),  () => { activeSlot = 0; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = drawDirectPrefab = false; });
+
+        GUILayout.FlexibleSpace();
+
+        // Status hints
+        GUIStyle hint = new GUIStyle(EditorStyles.miniLabel) { normal = { textColor = Color.yellow } };
+        if (_isDrawingSoulArea)
+            GUILayout.Label("Click cells — click first to close loop — Enter to finish — Esc to cancel", hint);
+        else if (drawSelect && _selectedZoneIndex >= 0)
+        {
+            hint.normal.textColor = new Color(0.4f, 0.8f, 1f);
+            GUILayout.Label($"Zone {_selectedZoneIndex}  Node {_selectedNodeIndex + 1} — drag to move — Shift+click node to bridge — Esc to deselect", hint);
+        }
+        else if (drawSelect)
+        {
+            hint.normal.textColor = new Color(0.6f, 0.6f, 0.6f);
+            GUILayout.Label("Click a soul zone node to select it", hint);
+        }
+
+        EditorGUILayout.EndHorizontal();
+    }
+
+    void SetToolbarButton(string label, bool active, Color activeColor, System.Action onClick)
+    {
+        GUI.backgroundColor = active ? activeColor : Color.white;
+        if (GUILayout.Toggle(active, label, EditorStyles.toolbarButton) != active)
+            onClick();
+        GUI.backgroundColor = Color.white;
     }
 
     Vector2 _leftPanelScroll;
@@ -329,35 +432,6 @@ public class GridDesignerWindow : EditorWindow
         }
 
         EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Tools", EditorStyles.boldLabel);
-
-        GUI.backgroundColor = drawSoul ? Color.yellow : Color.white;
-        if (GUILayout.Button("★  Soul Spawn"))
-        { activeSlot = -1; drawSoul = true; drawCircle = drawOrb = drawWhirlpool = false; }
-        GUI.backgroundColor = Color.white;
-
-        if (GUILayout.Button("Orb Tool"))
-        { activeSlot = -1; drawOrb = true; drawCircle = drawSoul = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = false; }
-
-        GUI.backgroundColor = drawWaterLevelModifier ? new Color(0.4f, 0.8f, 1f) : Color.white;
-        if (GUILayout.Button("▲▼  Water Level Modifier"))
-        { activeSlot = -1; drawWaterLevelModifier = true; drawCircle = drawOrb = drawSoul = drawWaveModifier = drawWhirlpool = false; }
-        GUI.backgroundColor = Color.white;
-
-        GUI.backgroundColor = drawWaveModifier ? new Color(0.6f, 1f, 0.6f) : Color.white;
-        if (GUILayout.Button("〜  Wave Modifier"))
-        { activeSlot = -1; drawWaveModifier = true; drawCircle = drawOrb = drawSoul = drawWaterLevelModifier = drawWhirlpool = false; }
-        GUI.backgroundColor = Color.white;
-
-        GUI.backgroundColor = drawWhirlpool ? new Color(0.6f, 0.2f, 1f) : Color.white;
-        if (GUILayout.Button("〇  Whirlpool"))
-        { activeSlot = -1; drawWhirlpool = true; drawCircle = drawOrb = drawSoul = drawWaterLevelModifier = drawWaveModifier = false; }
-        GUI.backgroundColor = Color.white;
-
-        if (GUILayout.Button("Eraser"))
-        { activeSlot = 0; drawCircle = drawOrb = drawSoul = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = drawDirectPrefab = false; }
-
-        EditorGUILayout.Space();
         showPrefabLibrary = EditorGUILayout.Foldout(showPrefabLibrary, "Prefab Library", true, EditorStyles.foldoutHeader);
         if (showPrefabLibrary)
         {
@@ -434,7 +508,7 @@ public class GridDesignerWindow : EditorWindow
             DrawTimeTrialSection();
             DrawPrefabsSection();
             DrawStartRitualSection();
-            DrawSoulSpawnPointsSection();
+            DrawSoulZonesSection();
             DrawWhirlpoolsSection();
         }
 
@@ -600,13 +674,35 @@ public class GridDesignerWindow : EditorWindow
             return;
         }
 
-        if (drawSoul && loadedData != null)
+        if (drawSoulArea && loadedData != null)
         {
-            if (loadedData.soulSpawnPoints == null)
-                loadedData.soulSpawnPoints = new List<GridData.SoulSpawnPoint>();
-            int existing = loadedData.soulSpawnPoints.FindIndex(s => s.cellIndex == index);
-            if (existing >= 0) loadedData.soulSpawnPoints.RemoveAt(existing);
-            else loadedData.soulSpawnPoints.Add(new GridData.SoulSpawnPoint { cellIndex = index });
+            EnsureSoulZones();
+            if (_activeSoulZoneIndex < 0 || _activeSoulZoneIndex >= loadedData.soulZones.Count)
+            {
+                // No zone selected — create a new one and start drawing
+                PushUndoSnapshot();
+                var newZone = new GridData.SoulZone();
+                loadedData.soulZones.Add(newZone);
+                _activeSoulZoneIndex = loadedData.soulZones.Count - 1;
+                _drawingNodes.Clear();
+                _isDrawingSoulArea = true;
+            }
+
+            if (!_isDrawingSoulArea) return;
+
+            var zone = loadedData.soulZones[_activeSoulZoneIndex];
+
+            // Close loop: 3+ nodes and user clicks the first node again
+            if (_drawingNodes.Count >= 3 && index == _drawingNodes[0])
+            {
+                _drawingNodes.Add(index);
+                CommitDrawingNodes(zone);
+                return;
+            }
+
+            _drawingNodes.Add(index);
+            EditorUtility.SetDirty(loadedData);
+            Repaint();
             return;
         }
 
@@ -993,85 +1089,357 @@ public class GridDesignerWindow : EditorWindow
         }
     }
 
-    void DrawSoulSpawnPointsSection()
+    void ClearSelectState()
     {
-        if (loadedData.soulSpawnPoints == null) loadedData.soulSpawnPoints = new List<GridData.SoulSpawnPoint>();
+        _selectedZoneIndex = -1;
+        _selectedNodeIndex = -1;
+        _isDraggingNode    = false;
+        _dragCurrentCell   = -1;
+        CancelBridge();
+    }
 
-        int soulCount = loadedData.soulSpawnPoints.Count;
-        _showSoulSpawns = EditorGUILayout.Foldout(_showSoulSpawns,
-            $"Soul Spawn Points ({soulCount})", true, EditorStyles.foldoutHeader);
-        if (!_showSoulSpawns) return;
+    void CancelBridge()
+    {
+        _isBridgeMode       = false;
+        _bridgeEndZoneIndex = -1;
+        _bridgeEndNodeIndex = -1;
+        _bridgeNodes.Clear();
+    }
 
-        // Lazy-load all SoulData
-        EnsureSoulDataCache();
+    void ConnectNodes(int zoneIdx, int nodeA, int nodeB)
+    {
+        if (zoneIdx < 0 || zoneIdx >= loadedData.soulZones.Count) return;
+        var zone = loadedData.soulZones[zoneIdx];
+        if (zone.nodes == null || zone.nodes.Count < 2) return;
 
-        // Randomise wave presets button
-        if (GUILayout.Button("Randomise Soul Wave Presets"))
-            RandomiseSoulWavePresets();
+        int first = 0;
+        int last  = zone.nodes.Count - 1;
 
-        EditorGUILayout.Space(2);
+        bool isFirstAndLast = (nodeA == first && nodeB == last)
+                           || (nodeA == last  && nodeB == first);
 
-        if (soulCount == 0)
+        Undo.RecordObject(loadedData, "Connect Soul Zone Nodes");
+
+        if (isFirstAndLast)
         {
-            EditorGUILayout.LabelField("  (no soul spawn points placed on the grid)", EditorStyles.miniLabel);
-            return;
+            // Close the loop — append first cell at end (standard closed loop pattern)
+            // Remove existing closing node if already there to avoid double
+            if (zone.nodes[last] == zone.nodes[first])
+                zone.nodes.RemoveAt(last);
+            zone.nodes.Add(zone.nodes[0]);
+        }
+        else
+        {
+            // General case: remove nodes strictly between the two indices
+            int startIdx    = Mathf.Min(nodeA, nodeB);
+            int endIdx      = Mathf.Max(nodeA, nodeB);
+            int removeCount = endIdx - startIdx - 1;
+            if (removeCount > 0)
+            {
+                zone.nodes.RemoveRange(startIdx + 1, removeCount);
+                _selectedNodeIndex = startIdx;
+            }
         }
 
-        for (int i = 0; i < loadedData.soulSpawnPoints.Count; i++)
+        EditorUtility.SetDirty(loadedData);
+        Repaint();
+    }
+
+    bool FindNodeAtCell(int cellIndex, out int zoneIdx, out int nodeIdx)
+    {
+        if (loadedData?.soulZones == null) { zoneIdx = -1; nodeIdx = -1; return false; }
+        for (int zi = 0; zi < loadedData.soulZones.Count; zi++)
         {
-            var sp = loadedData.soulSpawnPoints[i];
-
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField($"Cell {sp.cellIndex}", GUILayout.Width(60));
-
-            // Build dropdown selection index
-            int currentSoulIdx = -1; // -1 = (none)
-            if (_allSoulData != null && sp.soulData != null)
+            var zone = loadedData.soulZones[zi];
+            if (zone.nodes == null) continue;
+            for (int ni = 0; ni < zone.nodes.Count; ni++)
             {
-                for (int s = 0; s < _allSoulData.Length; s++)
-                    if (_allSoulData[s] == sp.soulData) { currentSoulIdx = s; break; }
+                if (zone.nodes[ni] == cellIndex) { zoneIdx = zi; nodeIdx = ni; return true; }
             }
+        }
+        zoneIdx = -1; nodeIdx = -1; return false;
+    }
 
-            int popupSel = currentSoulIdx + 1; // +1 because index 0 = "(none)"
+    void CommitBridge()
+    {
+        if (!_isBridgeMode || _bridgeNodes.Count == 0) { CancelBridge(); return; }
+        if (_selectedZoneIndex < 0 || _bridgeEndZoneIndex != _selectedZoneIndex) { CancelBridge(); return; }
 
-            EditorGUI.BeginChangeCheck();
-            popupSel = EditorGUILayout.Popup(popupSel, _soulDropdownLabels);
-            if (EditorGUI.EndChangeCheck())
+        var zone = loadedData.soulZones[_selectedZoneIndex];
+        int startIdx = _selectedNodeIndex;
+        int endIdx   = _bridgeEndNodeIndex;
+
+        if (startIdx > endIdx) { int tmp = startIdx; startIdx = endIdx; endIdx = tmp; }
+
+        // Replace nodes between startIdx and endIdx with bridge cells
+        Undo.RecordObject(loadedData, "Bridge Soul Zone Nodes");
+        zone.nodes.RemoveRange(startIdx + 1, endIdx - startIdx - 1);
+        zone.nodes.InsertRange(startIdx + 1, _bridgeNodes);
+        EditorUtility.SetDirty(loadedData);
+        CancelBridge();
+        Repaint();
+    }
+
+    void EnsureSoulZones()
+    {
+        if (loadedData.soulZones == null)
+            loadedData.soulZones = new List<GridData.SoulZone>();
+
+        // Legacy migration: convert old soulSpawnPoints → soulZones on first access
+        if (loadedData.soulSpawnPoints != null && loadedData.soulSpawnPoints.Count > 0
+            && loadedData.soulZones.Count == 0)
+        {
+            foreach (var sp in loadedData.soulSpawnPoints)
             {
-                Undo.RecordObject(loadedData, "Assign Soul to Spawn Point");
-
-                // Unmark old soul
-                if (sp.soulData != null)
+                loadedData.soulZones.Add(new GridData.SoulZone
                 {
-                    Undo.RecordObject(sp.soulData, "Unallocate Soul");
-                    sp.soulData.allocated        = false;
-                    sp.soulData.allocatedToLevelID = "";
-                    EditorUtility.SetDirty(sp.soulData);
-                }
+                    nodes  = new List<int> { sp.cellIndex },
+                    souls  = sp.soulData != null ? new List<SoulData> { sp.soulData } : new List<SoulData>()
+                });
+            }
+            loadedData.soulSpawnPoints.Clear();
+            EditorUtility.SetDirty(loadedData);
+            Debug.Log($"[GridDesigner] Migrated {loadedData.soulZones.Count} legacy soul spawn point(s) to soulZones.");
+        }
+    }
 
-                // Assign new soul
-                SoulData newSoul = popupSel > 0 ? _allSoulData[popupSel - 1] : null;
-                sp.soulData = newSoul;
+    void CommitDrawingNodes(GridData.SoulZone zone)
+    {
+        if (_drawingNodes.Count > 0)
+        {
+            zone.nodes = new List<int>(_drawingNodes);
+            EditorUtility.SetDirty(loadedData);
+        }
+        _drawingNodes.Clear();
+        _isDrawingSoulArea = false;
+        Repaint();
+    }
 
-                if (newSoul != null)
-                {
-                    Undo.RecordObject(newSoul, "Allocate Soul");
-                    newSoul.allocated          = true;
-                    newSoul.allocatedToLevelID = loadedData.levelID;
-
-                    // Override wave preset to this level's gameplay preset
-                    if (loadedData.gameplayWavePreset != null)
-                        newSoul.associatedWavePreset = loadedData.gameplayWavePreset;
-
-                    EditorUtility.SetDirty(newSoul);
-                }
-
-                loadedData.soulSpawnPoints[i] = sp;
+    void CancelDrawingNodes()
+    {
+        // If zone was just created and has no nodes yet, remove it
+        if (_activeSoulZoneIndex >= 0 && _activeSoulZoneIndex < loadedData.soulZones.Count)
+        {
+            var zone = loadedData.soulZones[_activeSoulZoneIndex];
+            if (zone.nodes == null || zone.nodes.Count == 0)
+            {
+                loadedData.soulZones.RemoveAt(_activeSoulZoneIndex);
                 EditorUtility.SetDirty(loadedData);
-                _allSoulData = null; // refresh labels next frame
+            }
+        }
+        _drawingNodes.Clear();
+        _isDrawingSoulArea = false;
+        _activeSoulZoneIndex = -1;
+    }
+
+    void DrawSoulZonesSection()
+    {
+        EnsureSoulZones();
+        EnsureSoulDataCache();
+
+        int zoneCount = loadedData.soulZones.Count;
+        _showSoulSpawns = EditorGUILayout.Foldout(_showSoulSpawns,
+            $"Soul Zones ({zoneCount})", true, EditorStyles.foldoutHeader);
+        if (!_showSoulSpawns) return;
+
+        if (GUILayout.Button("+ Soul Area"))
+        {
+            PushUndoSnapshot();
+            var newZone = new GridData.SoulZone();
+            loadedData.soulZones.Add(newZone);
+            _activeSoulZoneIndex = loadedData.soulZones.Count - 1;
+            _drawingNodes.Clear();
+            _isDrawingSoulArea = true;
+            drawSoulArea       = true;
+            drawSoul = drawCircle = drawOrb = drawWhirlpool = false;
+            EditorUtility.SetDirty(loadedData);
+        }
+
+        if (GUILayout.Button("Auto-Assign Unallocated Souls"))
+            AutoAssignSouls();
+
+        if (_isDrawingSoulArea)
+        {
+            EditorGUILayout.HelpBox(
+                "Click cells to place nodes — click first node to close loop — Enter to finish open path — Esc to cancel",
+                MessageType.Info);
+        }
+
+        EditorGUILayout.Space(4);
+
+        int toDelete = -1;
+        for (int zi = 0; zi < loadedData.soulZones.Count; zi++)
+        {
+            var zone = loadedData.soulZones[zi];
+            Color zc = ZonePalette[zi % ZonePalette.Length];
+
+            bool isSelected = _activeSoulZoneIndex == zi;
+            GUI.backgroundColor = isSelected ? zc : Color.white;
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            GUI.backgroundColor = Color.white;
+
+            // Zone header row
+            EditorGUILayout.BeginHorizontal();
+            Color prev = GUI.contentColor;
+            GUI.contentColor = zc;
+            EditorGUILayout.LabelField($"● Zone {zi}", EditorStyles.boldLabel, GUILayout.Width(70));
+            GUI.contentColor = prev;
+            bool zoneIsClosed = zone.nodes != null && zone.nodes.Count >= 3
+                             && zone.nodes[zone.nodes.Count - 1] == zone.nodes[0];
+            string closedLabel = zoneIsClosed ? "● CLOSED" : "○ OPEN";
+            EditorGUILayout.LabelField($"{zone.nodes?.Count ?? 0} node(s)   {zone.souls?.Count ?? 0} soul(s)   {closedLabel}", GUILayout.ExpandWidth(true));
+
+            if (GUILayout.Button("Select", GUILayout.Width(52)))
+            {
+                _activeSoulZoneIndex = zi;
+                _isDrawingSoulArea   = false;
             }
 
+            GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
+            if (GUILayout.Button("✕", GUILayout.Width(22))) toDelete = zi;
+            GUI.backgroundColor = Color.white;
             EditorGUILayout.EndHorizontal();
+
+            if (isSelected)
+            {
+                EditorGUI.BeginChangeCheck();
+                float newRadius = EditorGUILayout.Slider("Radius", zone.radius, 0.5f, 30f);
+                int   newKnots  = EditorGUILayout.IntSlider("Knot Count", zone.knotCount, 3, 32);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    Undo.RecordObject(loadedData, "Edit Soul Zone");
+                    zone.radius     = newRadius;
+                    zone.knotCount  = newKnots;
+                    EditorUtility.SetDirty(loadedData);
+                }
+
+                // Souls list
+                EditorGUILayout.LabelField("Souls", EditorStyles.boldLabel);
+                if (zone.souls == null) zone.souls = new List<SoulData>();
+                int soulToRemove = -1;
+                for (int si = 0; si < zone.souls.Count; si++)
+                {
+                    EditorGUILayout.BeginHorizontal();
+                    int currentIdx = -1;
+                    if (_allSoulData != null && zone.souls[si] != null)
+                        for (int s = 0; s < _allSoulData.Length; s++)
+                            if (_allSoulData[s] == zone.souls[si]) { currentIdx = s; break; }
+
+                    int popupSel = currentIdx + 1;
+                    EditorGUI.BeginChangeCheck();
+                    popupSel = EditorGUILayout.Popup(popupSel, _soulDropdownLabels);
+                    if (EditorGUI.EndChangeCheck())
+                    {
+                        Undo.RecordObject(loadedData, "Assign Soul to Zone");
+                        if (zone.souls[si] != null)
+                        {
+                            Undo.RecordObject(zone.souls[si], "Unallocate Soul");
+                            zone.souls[si].allocated          = false;
+                            zone.souls[si].allocatedToLevelID = "";
+                            EditorUtility.SetDirty(zone.souls[si]);
+                        }
+                        SoulData newSoul = popupSel > 0 ? _allSoulData[popupSel - 1] : null;
+                        zone.souls[si] = newSoul;
+                        if (newSoul != null)
+                        {
+                            Undo.RecordObject(newSoul, "Allocate Soul");
+                            newSoul.allocated          = true;
+                            newSoul.allocatedToLevelID = loadedData.levelID;
+                            if (loadedData.gameplayWavePreset != null)
+                                newSoul.associatedWavePreset = loadedData.gameplayWavePreset;
+                            EditorUtility.SetDirty(newSoul);
+                        }
+                        EditorUtility.SetDirty(loadedData);
+                        _allSoulData = null;
+                    }
+
+                    GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
+                    if (GUILayout.Button("✕", GUILayout.Width(22))) soulToRemove = si;
+                    GUI.backgroundColor = Color.white;
+                    EditorGUILayout.EndHorizontal();
+                }
+
+                if (soulToRemove >= 0)
+                {
+                    Undo.RecordObject(loadedData, "Remove Soul from Zone");
+                    zone.souls.RemoveAt(soulToRemove);
+                    EditorUtility.SetDirty(loadedData);
+                }
+
+                if (GUILayout.Button("+ Add Soul"))
+                {
+                    Undo.RecordObject(loadedData, "Add Soul to Zone");
+                    if (zone.souls == null) zone.souls = new List<SoulData>();
+                    zone.souls.Add(null);
+                    EditorUtility.SetDirty(loadedData);
+                }
+
+                EditorGUILayout.Space(2);
+                bool isClosed = zone.nodes != null && zone.nodes.Count >= 3
+                             && zone.nodes[zone.nodes.Count - 1] == zone.nodes[0];
+                GUI.contentColor = isClosed ? Color.green : Color.yellow;
+                EditorGUILayout.LabelField(
+                    isClosed ? $"Nodes: {zone.nodes.Count}  ● CLOSED LOOP" : $"Nodes: {zone.nodes?.Count ?? 0}  ○ OPEN PATH",
+                    EditorStyles.miniLabel);
+                GUI.contentColor = Color.white;
+
+                // Selected node controls
+                if (_selectedZoneIndex == zi && _selectedNodeIndex >= 0
+                    && zone.nodes != null && _selectedNodeIndex < zone.nodes.Count)
+                {
+                    EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                    EditorGUILayout.LabelField($"Selected: Node {_selectedNodeIndex + 1} of {zone.nodes.Count}  (cell {zone.nodes[_selectedNodeIndex]})", EditorStyles.miniLabel);
+                    EditorGUILayout.BeginHorizontal();
+
+                    if (GUILayout.Button("Insert Before", GUILayout.Height(20)))
+                    {
+                        Undo.RecordObject(loadedData, "Insert Node Before");
+                        zone.nodes.Insert(_selectedNodeIndex, zone.nodes[_selectedNodeIndex]);
+                        EditorUtility.SetDirty(loadedData);
+                    }
+                    if (GUILayout.Button("Insert After", GUILayout.Height(20)))
+                    {
+                        Undo.RecordObject(loadedData, "Insert Node After");
+                        int insertIdx = _selectedNodeIndex + 1;
+                        int cellToInsert = insertIdx < zone.nodes.Count ? zone.nodes[insertIdx] : zone.nodes[_selectedNodeIndex];
+                        zone.nodes.Insert(insertIdx, cellToInsert);
+                        _selectedNodeIndex = insertIdx;
+                        EditorUtility.SetDirty(loadedData);
+                    }
+                    GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
+                    if (GUILayout.Button("Delete", GUILayout.Width(52), GUILayout.Height(20)))
+                    {
+                        Undo.RecordObject(loadedData, "Delete Node");
+                        zone.nodes.RemoveAt(_selectedNodeIndex);
+                        _selectedNodeIndex = Mathf.Clamp(_selectedNodeIndex - 1, -1, zone.nodes.Count - 1);
+                        EditorUtility.SetDirty(loadedData);
+                    }
+                    GUI.backgroundColor = Color.white;
+                    EditorGUILayout.EndHorizontal();
+
+                    EditorGUILayout.LabelField("Shift+click another node to connect directly", EditorStyles.miniLabel);
+                    EditorGUILayout.EndVertical();
+                }
+                if (GUILayout.Button("Redraw Nodes"))
+                {
+                    _drawingNodes.Clear();
+                    _isDrawingSoulArea   = true;
+                    drawSoulArea         = true;
+                    drawSoul = drawCircle = drawOrb = false;
+                }
+            }
+
+            EditorGUILayout.EndVertical();
+            EditorGUILayout.Space(2);
+        }
+
+        if (toDelete >= 0)
+        {
+            PushUndoSnapshot();
+            loadedData.soulZones.RemoveAt(toDelete);
+            if (_activeSoulZoneIndex == toDelete) _activeSoulZoneIndex = -1;
+            else if (_activeSoulZoneIndex > toDelete) _activeSoulZoneIndex--;
+            EditorUtility.SetDirty(loadedData);
         }
     }
 
@@ -1131,6 +1499,51 @@ public class GridDesignerWindow : EditorWindow
             loadedData.whirlpools.RemoveAt(toRemove);
             EditorUtility.SetDirty(loadedData);
         }
+    }
+
+    void AutoAssignSouls()
+    {
+        EnsureSoulDataCache();
+        if (_allSoulData == null || loadedData == null) return;
+
+        // Build queue of unallocated souls
+        var unallocated = new Queue<SoulData>();
+        foreach (var s in _allSoulData)
+            if (s != null && !s.allocated)
+                unallocated.Enqueue(s);
+
+        if (unallocated.Count == 0)
+        {
+            EditorUtility.DisplayDialog("Auto-Assign Souls", "No unallocated souls available.", "OK");
+            return;
+        }
+
+        int assigned = 0;
+        Undo.RecordObject(loadedData, "Auto-Assign Souls");
+
+        foreach (var zone in loadedData.soulZones)
+        {
+            if (zone.souls == null) zone.souls = new List<SoulData>();
+            for (int i = 0; i < zone.souls.Count; i++)
+            {
+                if (zone.souls[i] != null) continue; // already assigned
+                if (unallocated.Count == 0) break;
+
+                SoulData soul = unallocated.Dequeue();
+                Undo.RecordObject(soul, "Allocate Soul");
+                soul.allocated          = true;
+                soul.allocatedToLevelID = loadedData.levelID;
+                if (loadedData.gameplayWavePreset != null)
+                    soul.associatedWavePreset = loadedData.gameplayWavePreset;
+                EditorUtility.SetDirty(soul);
+                zone.souls[i] = soul;
+                assigned++;
+            }
+        }
+
+        EditorUtility.SetDirty(loadedData);
+        _allSoulData = null; // refresh dropdown labels
+        Debug.Log($"[GridDesigner] Auto-assigned {assigned} soul(s). {unallocated.Count} unallocated soul(s) remaining.");
     }
 
     void EnsureSoulDataCache()
@@ -1337,14 +1750,64 @@ public class GridDesignerWindow : EditorWindow
                         Handles.DrawSolidDisc(cell.center, Vector3.forward, CellSize * 0.3f);
                     }
 
-                    // Soul spawn
-                    if (loadedData?.soulSpawnPoints != null &&
-                        loadedData.soulSpawnPoints.Exists(s => s.cellIndex == index))
+                    // Soul zones — draw node markers and connecting lines
+                    if (loadedData?.soulZones != null)
                     {
-                        Handles.color = new Color(1f, 0.92f, 0.016f, baseAlpha);
-                        Handles.DrawSolidDisc(cell.center, Vector3.forward, CellSize * 0.38f);
-                        Handles.color = new Color(0f, 0f, 0f, baseAlpha);
-                        Handles.Label(cell.center - new Vector2(4f, 6f), "★");
+                        for (int zi = 0; zi < loadedData.soulZones.Count; zi++)
+                        {
+                            var zone = loadedData.soulZones[zi];
+                            if (zone.nodes == null) continue;
+                            Color zc = ZonePalette[zi % ZonePalette.Length];
+                            zc.a = baseAlpha;
+                            int nodeIdx = zone.nodes.IndexOf(index);
+                            if (nodeIdx >= 0)
+                            {
+                                Handles.color = zc;
+                                Handles.DrawSolidDisc(cell.center, Vector3.forward, CellSize * 0.38f);
+                                Handles.color = new Color(0f, 0f, 0f, baseAlpha);
+                                Handles.Label(cell.center - new Vector2(4f, 6f), $"Z{zi}");
+                            }
+                        }
+                    }
+                    // In-progress drawing nodes
+                    if (_isDrawingSoulArea && _drawingNodes.Contains(index))
+                    {
+                        Handles.color = new Color(1f, 1f, 1f, baseAlpha * 0.7f);
+                        Handles.DrawSolidDisc(cell.center, Vector3.forward, CellSize * 0.3f);
+                    }
+
+                    // Selected node highlight
+                    if (_selectedZoneIndex >= 0 && _selectedNodeIndex >= 0
+                        && _selectedZoneIndex < loadedData.soulZones.Count)
+                    {
+                        var selZone = loadedData.soulZones[_selectedZoneIndex];
+                        if (selZone.nodes != null && _selectedNodeIndex < selZone.nodes.Count
+                            && selZone.nodes[_selectedNodeIndex] == index)
+                        {
+                            Handles.color = Color.white;
+                            Handles.DrawWireDisc(cell.center, Vector3.forward, CellSize * 0.44f);
+                            Handles.DrawWireDisc(cell.center, Vector3.forward, CellSize * 0.38f);
+                        }
+                    }
+
+                    // Bridge mode — highlight endpoint and in-progress cells
+                    if (_isBridgeMode)
+                    {
+                        if (_bridgeEndZoneIndex >= 0 && _bridgeEndZoneIndex < loadedData.soulZones.Count)
+                        {
+                            var endZone = loadedData.soulZones[_bridgeEndZoneIndex];
+                            if (endZone.nodes != null && _bridgeEndNodeIndex < endZone.nodes.Count
+                                && endZone.nodes[_bridgeEndNodeIndex] == index)
+                            {
+                                Handles.color = new Color(0.4f, 0.8f, 1f, baseAlpha);
+                                Handles.DrawWireDisc(cell.center, Vector3.forward, CellSize * 0.44f);
+                            }
+                        }
+                        if (_bridgeNodes.Contains(index))
+                        {
+                            Handles.color = new Color(0.4f, 0.8f, 1f, baseAlpha * 0.6f);
+                            Handles.DrawSolidDisc(cell.center, Vector3.forward, CellSize * 0.28f);
+                        }
                     }
 
                     // Orb
@@ -1475,6 +1938,64 @@ public class GridDesignerWindow : EditorWindow
                 }
 
                 bool mouseOver = cell.Contains(e.mousePosition);
+
+                // ── Select tool handling ──────────────────────────────────
+                if (drawSelect && loadedData != null)
+                {
+                    if (e.type == EventType.MouseDown && mouseOver)
+                    {
+                        bool hasNode = FindNodeAtCell(index, out int zi, out int ni);
+
+                        if (hasNode)
+                        {
+                            // Shift+click another node in same zone → connect directly
+                            if (e.shift && _selectedZoneIndex == zi && _selectedNodeIndex >= 0 && ni != _selectedNodeIndex)
+                            {
+                                ConnectNodes(zi, _selectedNodeIndex, ni);
+                            }
+                            else
+                            {
+                                _selectedZoneIndex   = zi;
+                                _selectedNodeIndex   = ni;
+                                _activeSoulZoneIndex = zi;
+                                _isDraggingNode      = true;
+                                _dragCurrentCell     = index;
+                            }
+                        }
+                        else
+                        {
+                            // Click empty cell — deselect
+                            ClearSelectState();
+                        }
+                        e.Use();
+                        Repaint();
+                    }
+                    else if (e.type == EventType.MouseDrag && _isDraggingNode && mouseOver && index != _dragCurrentCell)
+                    {
+                        if (_selectedZoneIndex >= 0 && _selectedNodeIndex >= 0)
+                        {
+                            var zone = loadedData.soulZones[_selectedZoneIndex];
+                            if (_selectedNodeIndex < zone.nodes.Count)
+                            {
+                                Undo.RecordObject(loadedData, "Move Soul Zone Node");
+                                zone.nodes[_selectedNodeIndex] = index;
+                                _dragCurrentCell = index;
+                                EditorUtility.SetDirty(loadedData);
+                                Repaint();
+                            }
+                        }
+                        e.Use();
+                    }
+                    else if (e.type == EventType.MouseUp && _isDraggingNode)
+                    {
+                        _isDraggingNode  = false;
+                        _dragCurrentCell = -1;
+                        e.Use();
+                    }
+                }
+                // ── Paint tool handling ───────────────────────────────────
+                else
+                {
                 if (e.type == EventType.MouseDown && mouseOver)
                 {
                     PushUndoSnapshot();
@@ -1486,7 +2007,7 @@ public class GridDesignerWindow : EditorWindow
                 }
                 else if (e.type == EventType.MouseDrag && isDragging && mouseOver)
                 {
-                    if (index != lastDraggedCellIndex && !drawSoul)
+                    if (index != lastDraggedCellIndex && !drawSoul && !drawSoulArea)
                     {
                         ApplyToolToCell(index);
                         lastDraggedCellIndex = index;
@@ -1497,15 +2018,127 @@ public class GridDesignerWindow : EditorWindow
                 {
                     isDragging = false; lastDraggedCellIndex = -1;
                 }
+                }
 
                 EditorGUI.DrawRect(new Rect(cell.x, cell.y, CellSize, 1), Color.black);
                 EditorGUI.DrawRect(new Rect(cell.x, cell.y, 1, CellSize), Color.black);
             }
         }
 
+        // Soul zone connecting lines overlay (drawn after all cells so lines sit on top)
+        if (loadedData?.soulZones != null)
+        {
+            Handles.BeginGUI();
+            for (int zi = 0; zi < loadedData.soulZones.Count; zi++)
+            {
+                var zone = loadedData.soulZones[zi];
+                if (zone.nodes == null || zone.nodes.Count < 2) continue;
+                Color lc = ZonePalette[zi % ZonePalette.Length];
+                lc.a = 0.85f;
+                Handles.color = lc;
+                for (int ni = 0; ni < zone.nodes.Count - 1; ni++)
+                {
+                    Vector2 a = CellCenter(rect, zone.nodes[ni]);
+                    Vector2 b = CellCenter(rect, zone.nodes[ni + 1]);
+                    Handles.DrawLine(a, b, 3f);
+                }
+                // Close loop visual if last node == first node
+                if (zone.nodes[zone.nodes.Count - 1] == zone.nodes[0] && zone.nodes.Count >= 3)
+                {
+                    // Already drawn by the loop above since last segment closes it
+                }
+            }
+
+            // Bridge mode lines
+            if (_isBridgeMode && _selectedZoneIndex >= 0 && _bridgeNodes.Count >= 1)
+            {
+                Handles.color = new Color(0.4f, 0.8f, 1f, 0.8f);
+                var selZ = loadedData.soulZones[_selectedZoneIndex];
+                Vector2 startPt = CellCenter(rect, selZ.nodes[_selectedNodeIndex]);
+                var allBridge = new List<int> { selZ.nodes[_selectedNodeIndex] };
+                allBridge.AddRange(_bridgeNodes);
+                for (int bi = 0; bi < allBridge.Count - 1; bi++)
+                    Handles.DrawLine(CellCenter(rect, allBridge[bi]), CellCenter(rect, allBridge[bi + 1]), 1.5f);
+            }
+
+            // In-progress drawing lines
+            if (_isDrawingSoulArea && _drawingNodes.Count >= 2)
+            {
+                Handles.color = new Color(1f, 1f, 1f, 0.7f);
+                for (int ni = 0; ni < _drawingNodes.Count - 1; ni++)
+                {
+                    Vector2 a = CellCenter(rect, _drawingNodes[ni]);
+                    Vector2 b = CellCenter(rect, _drawingNodes[ni + 1]);
+                    Handles.DrawLine(a, b, 1.5f);
+                }
+            }
+            Handles.EndGUI();
+        }
+
+        // Select tool — Escape to deselect, Delete to remove selected node
+        if (drawSelect)
+        {
+            Event sk = Event.current;
+            if (sk.type == EventType.KeyDown)
+            {
+                if (sk.keyCode == KeyCode.Escape)
+                {
+                    ClearSelectState();
+                    sk.Use();
+                    Repaint();
+                }
+                else if ((sk.keyCode == KeyCode.Delete || sk.keyCode == KeyCode.Backspace)
+                         && _selectedZoneIndex >= 0 && _selectedNodeIndex >= 0
+                         && loadedData?.soulZones != null
+                         && _selectedZoneIndex < loadedData.soulZones.Count)
+                {
+                    var zone = loadedData.soulZones[_selectedZoneIndex];
+                    if (zone.nodes != null && _selectedNodeIndex < zone.nodes.Count)
+                    {
+                        Undo.RecordObject(loadedData, "Delete Soul Zone Node");
+                        zone.nodes.RemoveAt(_selectedNodeIndex);
+                        _selectedNodeIndex = Mathf.Clamp(_selectedNodeIndex - 1, -1, zone.nodes.Count - 1);
+                        EditorUtility.SetDirty(loadedData);
+                        sk.Use();
+                        Repaint();
+                    }
+                }
+            }
+        }
+
+        // Soul area draw mode — Enter to commit, Escape to cancel
+        if (_isDrawingSoulArea && loadedData != null)
+        {
+            Event ke = Event.current;
+            if (ke.type == EventType.KeyDown)
+            {
+                if (ke.keyCode == KeyCode.Return || ke.keyCode == KeyCode.KeypadEnter)
+                {
+                    if (_activeSoulZoneIndex >= 0 && _activeSoulZoneIndex < loadedData.soulZones.Count)
+                        CommitDrawingNodes(loadedData.soulZones[_activeSoulZoneIndex]);
+                    ke.Use();
+                    Repaint();
+                }
+                else if (ke.keyCode == KeyCode.Escape)
+                {
+                    CancelDrawingNodes();
+                    ke.Use();
+                    Repaint();
+                }
+            }
+        }
+
         // Portal perimeter overlay
         if (loadedData != null)
             DrawPortalOverlay(rect);
+    }
+
+    Vector2 CellCenter(Rect gridRect, int cellIndex)
+    {
+        int x = cellIndex % GridSize;
+        int y = cellIndex / GridSize;
+        return new Vector2(gridRect.x + x * CellSize + CellSize * 0.5f,
+                           gridRect.y + y * CellSize + CellSize * 0.5f);
     }
 
     void DrawPortalOverlay(Rect gridRect)
@@ -1569,7 +2202,7 @@ public class GridDesignerWindow : EditorWindow
         { PushUndoSnapshot(); loadedData.orbCellIndices?.Clear(); Repaint(); }
 
         if (GUILayout.Button("CLEAR SOULS") && loadedData != null)
-        { PushUndoSnapshot(); loadedData.soulSpawnPoints?.Clear(); Repaint(); }
+        { PushUndoSnapshot(); loadedData.soulSpawnPoints?.Clear(); loadedData.soulZones?.Clear(); _activeSoulZoneIndex = -1; Repaint(); }
 
         if (GUILayout.Button("UNDO")) UndoLastAction();
         EditorGUILayout.EndHorizontal();
@@ -1660,7 +2293,12 @@ public class GridDesignerWindow : EditorWindow
         loadedData = data;
         if (loadedData.orbCellIndices  == null) loadedData.orbCellIndices  = new List<int>();
         if (loadedData.soulSpawnPoints == null) loadedData.soulSpawnPoints = new List<GridData.SoulSpawnPoint>();
+        if (loadedData.soulZones       == null) loadedData.soulZones       = new List<GridData.SoulZone>();
         _allSoulData = null; // force re-scan on next draw
+        _activeSoulZoneIndex = -1;
+        _isDrawingSoulArea   = false;
+        _drawingNodes.Clear();
+        EnsureSoulZones(); // run legacy migration if needed
 
         squareGrid = (int[])loadedData.cells.Clone();
         circleGrid = loadedData.overlayCells != null
@@ -1676,7 +2314,8 @@ public class GridDesignerWindow : EditorWindow
             for (int i = 0; i < Mathf.Min(slotColors.Count, loadedData.slotColors.Count); i++)
                 slotColors[i] = loadedData.slotColors[i];
 
-        activeSlot = 0; drawCircle = drawSoul = false;
+        activeSlot = 0; drawCircle = drawSoul = drawSoulArea = false;
+        _isDrawingSoulArea = false; _drawingNodes.Clear();
     }
 
     void RefreshDiscoveredGrids()

@@ -12,8 +12,9 @@ public class AbilityWheelUI : MonoBehaviour
     public float spinSpeed = 12f;
 
     [Header("Notch Rotations")]
-    public float whirlRotation = 0f;
+    public float whirlRotation    = 0f;
     public float catapultRotation = 180f;
+    public float lureRotation     = 90f;
 
     public bool IsOpen { get; private set; }
 
@@ -55,20 +56,30 @@ public class AbilityWheelUI : MonoBehaviour
         toolManager.SetTool(_pendingTool);
     }
 
+    // Tool order: WhirlSucker(0°) → Lure(90°) → Catapult(180°)
+    static readonly BoatTool[] ToolOrder = { BoatTool.WhirlSucker, BoatTool.Lure, BoatTool.Catapult };
+
     public void CycleLeft()
     {
-        _pendingTool = _pendingTool == BoatTool.WhirlSucker ? BoatTool.Catapult : BoatTool.WhirlSucker;
+        int idx = System.Array.IndexOf(ToolOrder, _pendingTool);
+        _pendingTool = ToolOrder[(idx - 1 + ToolOrder.Length) % ToolOrder.Length];
         _targetZ = RotationForTool(_pendingTool);
     }
 
     public void CycleRight()
     {
-        _pendingTool = _pendingTool == BoatTool.WhirlSucker ? BoatTool.Catapult : BoatTool.WhirlSucker;
+        int idx = System.Array.IndexOf(ToolOrder, _pendingTool);
+        _pendingTool = ToolOrder[(idx + 1) % ToolOrder.Length];
         _targetZ = RotationForTool(_pendingTool);
     }
 
     private float RotationForTool(BoatTool tool)
     {
-        return tool == BoatTool.Catapult ? catapultRotation : whirlRotation;
+        switch (tool)
+        {
+            case BoatTool.Catapult: return catapultRotation;
+            case BoatTool.Lure:     return lureRotation;
+            default:                return whirlRotation;
+        }
     }
 }

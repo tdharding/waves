@@ -116,19 +116,27 @@ public class LevelDataController : MonoBehaviour
 
     private void ResolveGridData()
     {
+        Debug.LogWarning($"[LevelDataController] ResolveGridData started. Initial activeGridData: {(activeGridData != null ? activeGridData.levelID : "NULL")}. LevelSelectionCache.SelectedGridData: {(LevelSelectionCache.SelectedGridData != null ? LevelSelectionCache.SelectedGridData.levelID : "NULL")}");
+
         activeGridData = LevelSelectionCache.SelectedGridData;
 
-#if UNITY_EDITOR
+    #if UNITY_EDITOR
         // Save Data Monitor can pre-select a level via EditorPrefs
         const string key = "SaveDataMonitor_OverrideLevel";
         string overridePath = UnityEditor.EditorPrefs.GetString(key, "");
+        Debug.LogWarning($"[LevelDataController] Checking SaveDataMonitor override. Path in EditorPrefs: '{(string.IsNullOrEmpty(overridePath) ? "(empty)" : overridePath)}'");
+
         if (!string.IsNullOrEmpty(overridePath))
         {
             var overrideData = UnityEditor.AssetDatabase.LoadAssetAtPath<GridData>(overridePath);
             if (overrideData != null)
             {
                 activeGridData = overrideData;
-                Debug.Log($"[LevelDataController] Override level from Save Data Monitor: '{overrideData.levelID}'");
+                Debug.LogWarning($"[LevelDataController] SUCCESS: Overrode level from Save Data Monitor: '{overrideData.levelID}' (Path: {overridePath})");
+            }
+            else
+            {
+                Debug.LogError($"[LevelDataController] ERROR: Failed to load GridData at path: '{overridePath}'. AssetDatabase.LoadAssetAtPath returned null.");
             }
             UnityEditor.EditorPrefs.DeleteKey(key);
         }
@@ -418,10 +426,16 @@ public class LevelDataController : MonoBehaviour
             // Distribute SoulBoat reference to all consumers
             if (soulBoatTransform != null)
             {
-                FindObjectOfType<SoulShoalController>()?.SetSoulBoat(soulBoatTransform);
+                foreach (var shoal in FindObjectsOfType<SoulShoalController>())
+                    shoal.SetSoulBoat(soulBoatTransform);
                 FindObjectOfType<SonarGridController>()?.SetSoulBoat(soulBoatTransform);
                 FindObjectOfType<SonarUIMapController>()?.SetSoulBoat(soulBoatTransform);
                 FindObjectOfType<SonarCameraFollow>()?.BeginTracking(soulBoatTransform);
+
+                // Wire lure controller from soul boat to the boat control router
+                var lureController = soulBoatTransform.GetComponentInChildren<LureController>();
+                if (lureController != null)
+                    FindObjectOfType<BoatControlRouter>()?.SetLureController(lureController);
             }
 
             gameplayBoat.SetActive(true);

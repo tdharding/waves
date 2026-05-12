@@ -25,6 +25,7 @@ public class WaveMaterialController : MonoBehaviour
         public float WhirlpoolTwirlStrength;
         public float WhirlpoolAreaTwirlStrength;
         public float SoulFishTwirlStrength;
+        public float SoulFishMaskStrength;
 
         public float WhirlpoolTaper;
         public float WhirlpoolDarkRadiusMult;
@@ -100,6 +101,7 @@ public Renderer mapWaveRenderer;
         waveMaterial.SetFloat("_WhirlpoolTwirlStrength",     state.WhirlpoolTwirlStrength);
         waveMaterial.SetFloat("_WhirlpoolAreaTwirlStrength", state.WhirlpoolAreaTwirlStrength);
         waveMaterial.SetFloat("_SoulFishTwirlStrength",      state.SoulFishTwirlStrength);
+        waveMaterial.SetFloat("_SoulFishMaskStrength",       state.SoulFishMaskStrength);
 
         waveMaterial.SetFloat("_WhirlpoolTaper",         state.WhirlpoolTaper);
         waveMaterial.SetFloat("_WhirlpoolDarkRadiusMult",state.WhirlpoolDarkRadiusMult);
@@ -161,6 +163,7 @@ public Renderer mapWaveRenderer;
         float curWhirlpoolTwirl     = waveMaterial.GetFloat("_WhirlpoolTwirlStrength");
         float curWhirlpoolAreaTwirl = waveMaterial.GetFloat("_WhirlpoolAreaTwirlStrength");
         float curSoulFishTwirl      = waveMaterial.GetFloat("_SoulFishTwirlStrength");
+        float curSoulFishMaskStrength = waveMaterial.GetFloat("_SoulFishMaskStrength");
 
         float curWhirlpoolTaper     = waveMaterial.GetFloat("_WhirlpoolTaper");
         float curDarkRadiusMult     = waveMaterial.GetFloat("_WhirlpoolDarkRadiusMult");
@@ -202,6 +205,7 @@ public Renderer mapWaveRenderer;
         float whirlpoolTwirlRate     = (targetState.WhirlpoolTwirlStrength     - curWhirlpoolTwirl)     / duration;
         float whirlpoolAreaTwirlRate = (targetState.WhirlpoolAreaTwirlStrength - curWhirlpoolAreaTwirl) / duration;
         float soulFishTwirlRate      = (targetState.SoulFishTwirlStrength      - curSoulFishTwirl)      / duration;
+        float soulFishMaskStrengthRate = (targetState.SoulFishMaskStrength - curSoulFishMaskStrength) / duration;
 
         float whirlpoolTaperRate  = (targetState.WhirlpoolTaper          - curWhirlpoolTaper) / duration;
         float darkRadiusMultRate  = (targetState.WhirlpoolDarkRadiusMult - curDarkRadiusMult)  / duration;
@@ -242,6 +246,7 @@ public Renderer mapWaveRenderer;
             curWhirlpoolTwirl     += whirlpoolTwirlRate     * Time.deltaTime;
             curWhirlpoolAreaTwirl += whirlpoolAreaTwirlRate * Time.deltaTime;
             curSoulFishTwirl      += soulFishTwirlRate      * Time.deltaTime;
+            curSoulFishMaskStrength += soulFishMaskStrengthRate * Time.deltaTime;
 
             curWhirlpoolTaper += whirlpoolTaperRate * Time.deltaTime;
             curDarkRadiusMult += darkRadiusMultRate * Time.deltaTime;
@@ -281,6 +286,7 @@ public Renderer mapWaveRenderer;
             waveMaterial.SetFloat("_WhirlpoolTwirlStrength",     curWhirlpoolTwirl);
             waveMaterial.SetFloat("_WhirlpoolAreaTwirlStrength", curWhirlpoolAreaTwirl);
             waveMaterial.SetFloat("_SoulFishTwirlStrength",      curSoulFishTwirl);
+            waveMaterial.SetFloat("_SoulFishMaskStrength",       curSoulFishMaskStrength);
 
             waveMaterial.SetFloat("_WhirlpoolTaper",          curWhirlpoolTaper);
             waveMaterial.SetFloat("_WhirlpoolDarkRadiusMult", curDarkRadiusMult);

@@ -2,9 +2,9 @@ using UnityEngine;
 using TMPro;
 using System.Collections;
 
-public class OrbsOfOmalonCounter : MonoBehaviour
+public class OrbCollectCounter : MonoBehaviour
 {
-    public static OrbsOfOmalonCounter Instance { get; private set; }
+    public static OrbCollectCounter Instance { get; private set; }
 
     [Header("References")]
     [SerializeField] private TMP_Text counterText;
@@ -48,7 +48,7 @@ public class OrbsOfOmalonCounter : MonoBehaviour
             Instance.UpdateText();
             Instance.ShowBriefly();
         }
-        Debug.Log($"[OrbsOfOmalonCounter] Orbs collected: {_collectedCount}");
+        Debug.Log($"[OrbCollectCounter] Orbs collected: {_collectedCount}");
     }
 
     public void SetForceVisible(bool visible)

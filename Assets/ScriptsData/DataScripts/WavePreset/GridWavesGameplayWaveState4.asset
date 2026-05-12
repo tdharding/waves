@@ -19,9 +19,9 @@ MonoBehaviour:
     Smoothness: 0
     Transparency: 1
     Strength: 0.61
-    TroughRingWave1Brightness: 85.35
-    PeakRingWave2Brightness: 4.99
-    TwirlBaseStrength: 3.52
+    TroughRingWave1Brightness: 0.06
+    PeakRingWave2Brightness: 17.29
+    TwirlBaseStrength: 3.44
     TwirlSlopeBoost: 0.2
     TwirlScale: 6.98
     DepthTwirlStrength: 4.24
@@ -29,7 +29,8 @@ MonoBehaviour:
     DepthFadeLine: 5.55
     WhirlpoolTwirlStrength: 4.33
     WhirlpoolAreaTwirlStrength: -1.75
-    SoulFishTwirlStrength: 0.65
+    SoulFishTwirlStrength: 1.02
+    SoulFishMaskStrength: 0
     WhirlpoolTaper: 0.668
     WhirlpoolDarkRadiusMult: 1.62
     WhirlpoolDarkStrength: 1
@@ -42,9 +43,9 @@ MonoBehaviour:
     FoamDepthFade: -0.58
     FoamColor: {r: 0, g: 0, b: 0, a: 1}
     FoamLine: 0.06
-    DepthFade: 1.33
+    DepthFade: 2.49
     DepthColour: {r: 0.4528302, g: 0.41651833, b: 0.41651833, a: 0}
-    DistanceDepth: 0.45
+    DistanceDepth: 0.6
     NormalTexture: {fileID: 2800000, guid: b428682cdd9054e468cb9dc6758f697f, type: 3}
     WaveCenter: {x: 0.05, y: 0.68, z: -0.08, w: 0}
   sonarEnabled: 1

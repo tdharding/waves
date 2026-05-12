@@ -66,9 +66,9 @@ public class LevelSelectShopProximity : MonoBehaviour
             _mainController.IsControlEnabled = false;
         }
 
-        if (OrbsOfOmalonCounter.Instance != null)
+        if (OrbCollectCounter.Instance != null)
         {
-            OrbsOfOmalonCounter.Instance.SetForceVisible(true);
+            OrbCollectCounter.Instance.SetForceVisible(true);
         }
         }
 
@@ -88,9 +88,9 @@ public class LevelSelectShopProximity : MonoBehaviour
             _mainController.IsControlEnabled = true;
         }
 
-        if (OrbsOfOmalonCounter.Instance != null)
+        if (OrbCollectCounter.Instance != null)
         {
-            OrbsOfOmalonCounter.Instance.SetForceVisible(false);
+            OrbCollectCounter.Instance.SetForceVisible(false);
         }
         }
 

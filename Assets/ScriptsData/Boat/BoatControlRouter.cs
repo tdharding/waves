@@ -11,8 +11,14 @@ public class BoatControlRouter : MonoBehaviour
     public AbilityWheelUI abilityWheel;
     public BoatToolManager toolManager;
     public CatapultController catapult;
+    public LureController lureController;
 
     private bool spaceWasPressedAfterSonar = false;
+
+    public void SetLureController(LureController controller)
+    {
+        lureController = controller;
+    }
 
     void Update()
     {
@@ -42,6 +48,24 @@ public class BoatControlRouter : MonoBehaviour
             spaceWasPressedAfterSonar = false;
 
             if (spaceDown) catapult.Fire();
+            return;
+        }
+
+        // --- LURE TOOL ---
+        if (toolManager.CurrentTool == BoatTool.Lure)
+        {
+            catapult.CancelArm();
+            bool sonarForLure = sonar != null && sonar.IsSonarActive;
+
+            boatMovement.SetBoosting(false);
+            boatMovement.SetSonarSlow(sonarForLure);
+
+            if (sonarForLure && spaceDown && lureController != null)
+                lureController.DropLure();
+
+            if (fishing.IsFishingActive)
+                fishing.SetFishingActive(false);
+
             return;
         }
 

@@ -30,6 +30,6 @@ void WavePeaksTroughs_float(
     // Multiply together — peaks and troughs are independent, mid-wave stays neutral
     Brightness = troughBright * peakBright;
 
-    // SoulFish brightens the output directly as a multiplicative boost
+    // SoulFishMask arrives pre-scaled by _SoulFishMaskStrength from SoulFishWaveMask
     Brightness *= (1.0 + SoulFishMask);
 }

@@ -33,6 +33,12 @@ public class WaveEffectsLiveTuner : EditorWindow
     // Peaks & Troughs
     [SerializeField] float troughBrightness = 0.5f;
     [SerializeField] float peakBrightness   = 1.5f;
+    [SerializeField] float     soulFishMaskStrength = 1f;
+    [SerializeField] float     soulFishRadius       = 2f;
+    [SerializeField] Vector2   zoneTiling           = new Vector2(0.5f, 0.5f);
+    [SerializeField] float     zoneScrollSpeed      = 0.05f;
+    [SerializeField] float     zoneNoiseStrength    = 0.3f;
+    [SerializeField] Texture2D zoneTexture          = null;
 
     // Twirl
     [SerializeField] float twirlBaseStrength = 0.5f;
@@ -297,8 +303,35 @@ public class WaveEffectsLiveTuner : EditorWindow
 
     void DrawPeaksTroughs()
     {
-        troughBrightness = EditorGUILayout.FloatField("Trough Brightness", troughBrightness);
-        peakBrightness   = EditorGUILayout.FloatField("Peak Brightness",   peakBrightness);
+        troughBrightness     = EditorGUILayout.FloatField("Trough Brightness",       troughBrightness);
+        peakBrightness       = EditorGUILayout.FloatField("Peak Brightness",         peakBrightness);
+
+        EditorGUILayout.Space(4);
+        EditorGUILayout.LabelField("Soul Fish Zone", EditorStyles.boldLabel);
+        soulFishMaskStrength = EditorGUILayout.FloatField("Mask Strength",           soulFishMaskStrength);
+        soulFishRadius       = EditorGUILayout.FloatField("Radius",                  soulFishRadius);
+        zoneTiling           = EditorGUILayout.Vector2Field("Zone Tiling",            zoneTiling);
+        zoneScrollSpeed      = EditorGUILayout.FloatField("Scroll Speed",            zoneScrollSpeed);
+        zoneNoiseStrength    = EditorGUILayout.Slider(    "Noise Strength",          zoneNoiseStrength, 0f, 1f);
+        zoneTexture          = (Texture2D)EditorGUILayout.ObjectField("Zone Texture", zoneTexture, typeof(Texture2D), false);
+
+        EditorGUILayout.Space(2);
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Log Baked State"))
+        {
+            var linker = FindObjectOfType<SoulFishWaveLinker>();
+            if (linker != null) linker.LogBakedState();
+            else Debug.LogWarning("[WaveEffectsLiveTuner] SoulFishWaveLinker not found.");
+        }
+        if (GUILayout.Button("Rebake Soul Fish Mask"))
+        {
+            if (waveMaterial)
+            {
+                ApplyToMaterial();
+                SoulFishWaveLinker.BakeToMaterial(waveMaterial);
+            }
+        }
+        EditorGUILayout.EndHorizontal();
     }
 
     void DrawTwirl()
@@ -536,6 +569,12 @@ public class WaveEffectsLiveTuner : EditorWindow
 
         waveMaterial.SetFloat("_TroughRingWave1Brightness", troughBrightness);
         waveMaterial.SetFloat("_PeakRingWave2Brightness",   peakBrightness);
+        waveMaterial.SetFloat("_SoulFishMaskStrength",      soulFishMaskStrength);
+        waveMaterial.SetFloat("_SoulFishRadius",            soulFishRadius);
+        waveMaterial.SetVector("_ZoneTiling",              zoneTiling);
+        waveMaterial.SetFloat("_ZoneScrollSpeed",          zoneScrollSpeed);
+        waveMaterial.SetFloat("_ZoneNoiseStrength",        zoneNoiseStrength);
+        if (zoneTexture != null) waveMaterial.SetTexture("_ZoneTexture", zoneTexture);
 
         waveMaterial.SetFloat("_TwirlBaseStrength", twirlBaseStrength);
         waveMaterial.SetFloat("_TwirlSlopeBoost",  twirlSlopeBoost);
@@ -600,6 +639,7 @@ public class WaveEffectsLiveTuner : EditorWindow
         baseColor             = s.BaseColor;
         troughBrightness       = s.TroughRingWave1Brightness;
         peakBrightness         = s.PeakRingWave2Brightness;
+        soulFishMaskStrength    = s.SoulFishMaskStrength;
         twirlBaseStrength = s.TwirlBaseStrength;
         twirlSlopeBoost   = s.TwirlSlopeBoost;
         twirlScale        = s.TwirlScale;

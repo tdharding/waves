@@ -5,7 +5,6 @@ using UnityEngine.Splines;
 public class SoulShoalController : MonoBehaviour
 {
     [Header("Refs")]
-    public GameObject boat;
     public SplineContainer splineContainer;
     public FishingController fishingController;
 
@@ -19,23 +18,51 @@ public class SoulShoalController : MonoBehaviour
     public bool IsActive  { get; private set; }
     public bool CanFish   { get; private set; }
 
-    private readonly List<Transform> fishList = new List<Transform>();
+    // Accessible by LevelSpawner to wire up reality proxies after spawning
+    public IReadOnlyList<Transform> FishList => _fishList;
+
+    private readonly List<Transform> _fishList = new List<Transform>();
     private List<Vector3> _nodePositions = new List<Vector3>();
+    private Transform _boat;
     private bool _wasActive;
+    private bool _fishSpawned;
+
+    // Called by LevelDataController once the soul boat is spawned
+    public void SetSoulBoat(Transform boat)
+    {
+        _boat = boat;
+        foreach (var f in _fishList)
+            if (f != null) f.GetComponent<SoulFishProximityAudio>()?.Init(_boat);
+    }
 
     // Called by LevelSpawner before Start() to pass zone node world positions
     public void InitZone(List<Vector3> nodePositions)
     {
         _nodePositions = nodePositions;
+        
+        if (_nodePositions != null && _nodePositions.Count > 0)
+        {
+            SoulFishWaveLinker.RegisterZone(_nodePositions);
+            SoulFishMapLinker.RegisterZone(_nodePositions);
+        }
     }
 
-    // Called by LevelSpawner to set per-fish soul identity before spawning
-    // zoneIndex and soulIndex used to build unique linkIDs
+    void OnDestroy()
+    {
+        if (_nodePositions != null && _nodePositions.Count > 0)
+        {
+            SoulFishWaveLinker.UnregisterZone(_nodePositions);
+            SoulFishMapLinker.UnregisterZone(_nodePositions);
+        }
+    }
+
+    // Called by LevelSpawner to instantiate fish meshes for each soul in the zone
     public void SpawnFish(List<GridData.SoulZone> zones, int zoneIndex, string levelID)
     {
         if (fishMeshPrefab == null || splineContainer == null) return;
 
         var zone = zones[zoneIndex];
+        if (zone.souls == null) return;
 
         for (int i = 0; i < zone.souls.Count; i++)
         {
@@ -50,50 +77,81 @@ public class SoulShoalController : MonoBehaviour
                 continue;
             }
 
+            // Deactivate prefab root before instantiating so Awake/OnEnable are deferred
+            // until SplineContainer and other refs are fully assigned.
+            fishMeshPrefab.SetActive(false);
             GameObject fish = Instantiate(fishMeshPrefab, splineContainer.transform);
+            fishMeshPrefab.SetActive(true);
 
-            // Assign spline
             var splineAnimate = fish.GetComponent<SplineAnimate>();
             if (splineAnimate != null)
-                splineAnimate.Container = splineContainer;
+            {
+                splineAnimate.Container   = splineContainer;
+                splineAnimate.StartOffset = (float)i / zone.souls.Count;
+            }
 
-            // Wire fishing behaviour
             var fishingBehaviour = fish.GetComponent<FishFishingBehaviour>();
             if (fishingBehaviour != null)
                 fishingBehaviour.fishing = fishingController;
 
-            // Per-fish identity label
+            // Stamp per-fish identity so FishFishingBehaviour reads the correct soul
             var label = fish.GetComponent<LinkIdentityLabel>() ?? fish.AddComponent<LinkIdentityLabel>();
             label.SetLabel(linkID, "SoulFish");
             label.soulDataIdentity = soulData.soulDataIdentity;
 
-            // Per-fish proximity audio
-            fish.GetComponent<SoulFishProximityAudio>()?.Init(boat != null ? boat.transform : null);
-
-            fishList.Add(fish.transform);
-
-            Debug.Log($"[SoulShoalController] Spawned fish — zone {zoneIndex}, soul {i}, linkID {linkID}.");
+            fish.SetActive(true);
+            _fishList.Add(fish.transform);
         }
+
+        _fishSpawned = true;
+    }
+
+    // ---------------------------------------------------------
+    void Start()
+    {
+        // Resolve boat from fishing controller (spawned after fish, so deferred to Start)
+        if (_boat == null && fishingController != null && fishingController.dummyBoatTarget != null)
+            _boat = fishingController.dummyBoatTarget;
+
+        // Init per-fish proximity audio now that boat is resolved
+        foreach (var f in _fishList)
+        {
+            if (f == null) continue;
+            f.GetComponent<SoulFishProximityAudio>()?.Init(_boat);
+        }
+
+        IsActive  = _fishList.Count > 0;
+        _wasActive = IsActive;
     }
 
     // ---------------------------------------------------------
     void Update()
     {
-        if (boat == null) return;
+        if (!_fishSpawned) return;
+
+        // Refresh boat ref lazily if it wasn't ready at Start
+        if (_boat == null && fishingController != null && fishingController.dummyBoatTarget != null)
+            _boat = fishingController.dummyBoatTarget;
 
         int alive = 0;
-        for (int i = 0; i < fishList.Count; i++)
-            if (fishList[i] != null) alive++;
+        for (int i = 0; i < _fishList.Count; i++)
+            if (_fishList[i] != null) alive++;
 
-        bool shoalEmpty = alive == 0;
         _wasActive = IsActive;
-        IsActive   = !shoalEmpty;
+        IsActive   = alive > 0;
 
-        float d = (_nodePositions.Count > 0)
-            ? ClosestDistance(boat.transform.position, _nodePositions)
-            : Vector3.Distance(boat.transform.position, transform.position);
+        if (_boat != null)
+        {
+            float d = (_nodePositions.Count > 0)
+                ? ClosestDistance(_boat.position, _nodePositions)
+                : Vector3.Distance(_boat.position, transform.position);
 
-        CanFish = !shoalEmpty && d <= fishingDistance;
+            CanFish = IsActive && d <= fishingDistance;
+        }
+        else
+        {
+            CanFish = false;
+        }
 
         if (_wasActive && !IsActive)
             OnShoalDepleted();
@@ -102,8 +160,7 @@ public class SoulShoalController : MonoBehaviour
     // ---------------------------------------------------------
     void OnShoalDepleted()
     {
-        // Stub — wired up in the map-link review pass.
-        // Per-fish wave/map unregistration is already handled by SoulFishWaveReference.OnDisable().
+        SoulFishWaveLinker.UnregisterZone(_nodePositions);
         Debug.Log($"[SoulShoalController] Shoal depleted: {gameObject.name}");
     }
 

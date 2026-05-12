@@ -9,8 +9,8 @@ public class FishFishingBehaviour : MonoBehaviour
     public SplineAnimate splineAnimate;
 
     [Header("Attraction")]
-    public float basePullSpeed = 1f;
-    public float maxPullSpeed = 6f;
+    public float basePullSpeed    = 0f;
+    public float maxPullSpeed     = 0.8f;
     public float pullAcceleration = 0.1f;
 
     [Header("Attraction Glow")]
@@ -31,6 +31,8 @@ public class FishFishingBehaviour : MonoBehaviour
     [HideInInspector] public FishingController fishing;
     private Transform whirlTarget;
     private SoulWhirlDirection whirlDirection;
+
+    public bool IsBeingAttracted => fishingActive && hasCachedSplinePos;
 
     private bool fishingActive;
     private bool hasCachedSplinePos;
@@ -114,6 +116,13 @@ public class FishFishingBehaviour : MonoBehaviour
     }
 
     public void OnFishingStopped() => fishingActive = false;
+
+    public void TriggerReturnToSpline()
+    {
+        cachedSplinePosition = transform.position;
+        hasCachedSplinePos   = true;
+        currentPullSpeed     = 0f;
+    }
 
     void Update()
     {

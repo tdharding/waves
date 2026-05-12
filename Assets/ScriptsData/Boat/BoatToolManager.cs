@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public enum BoatTool { WhirlSucker, Catapult }
+public enum BoatTool { WhirlSucker, Catapult, Lure }
 
 public class BoatToolManager : MonoBehaviour
 {
@@ -8,6 +8,7 @@ public class BoatToolManager : MonoBehaviour
     public GameObject boatCatapultRoot;
     public GameObject crossMastRoot;
     public BoatMovement boatMovement;
+    public LureController lureController;
 
     public BoatTool CurrentTool { get; private set; } = BoatTool.WhirlSucker;
 
@@ -21,6 +22,7 @@ public class BoatToolManager : MonoBehaviour
         if (tool == CurrentTool) return;
         CurrentTool = tool;
         ApplyTool(tool);
+        Debug.Log($"[BoatToolManager] Tool selected: {tool}");
     }
 
     private void ApplyTool(BoatTool tool)
@@ -35,5 +37,8 @@ public class BoatToolManager : MonoBehaviour
 
         if (boatMovement != null)
             boatMovement.SetCatapultSlow(catapultActive);
+
+        if (lureController != null)
+            lureController.enabled = (tool == BoatTool.Lure);
     }
 }

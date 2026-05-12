@@ -1,6 +1,8 @@
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
+using UnityEngine.Splines;
+using Unity.Mathematics;
 
 public class LevelSpawner : MonoBehaviour
 {
@@ -11,6 +13,9 @@ public class LevelSpawner : MonoBehaviour
 
     [Header("Soul → Reality Proxy Prefab")]
     [SerializeField] GameObject soulToRealityProxyPrefab;
+
+    [Header("Soul Fish Zone")]
+    [SerializeField] GameObject soulFishContainerPrefab;
 
     [Header("Orbs of Omalon")]
     [SerializeField] GameObject orbPrefab;
@@ -472,101 +477,242 @@ public class LevelSpawner : MonoBehaviour
 
     private void SpawnSoulFish(Vector3 origin, float tileX, float tileZ)
     {
-        if (activeGridData.soulSpawnPoints == null || activeGridData.soulSpawnPoints.Count == 0) return;
+        if (activeGridData.soulZones == null || activeGridData.soulZones.Count == 0) return;
+
+        if (soulFishContainerPrefab == null)
+        {
+            Debug.LogWarning("[LevelSpawner] soulFishContainerPrefab not assigned — soul fish not spawned.");
+            return;
+        }
 
         var    linkingController = FindObjectOfType<SoulFishLinkingController>();
         string levelID           = activeGridData.levelID;
 
-        for (int i = 0; i < activeGridData.soulSpawnPoints.Count; i++)
+        for (int zoneIndex = 0; zoneIndex < activeGridData.soulZones.Count; zoneIndex++)
         {
-            var spawnPoint = activeGridData.soulSpawnPoints[i];
-            int cellIndex  = spawnPoint.cellIndex;
+            var zone = activeGridData.soulZones[zoneIndex];
+            if (zone.nodes == null || zone.nodes.Count == 0) continue;
+            if (zone.souls == null || zone.souls.Count == 0) continue;
 
-            // Skip if already caught
-            if (GameProgressData.IsSoulCaught(levelID, cellIndex))
+            // Stamp home level on all souls in zone
+            foreach (var s in zone.souls)
+                if (s != null) s.homeLevelID = levelID;
+
+            // Convert node cell indices → world positions
+            var nodeWorldPositions = new List<Vector3>(zone.nodes.Count);
+            foreach (int nodeCell in zone.nodes)
+                nodeWorldPositions.Add(CellToWorldPos(nodeCell, origin, tileX, tileZ));
+
+            // Detect closed loop: 3+ nodes and last == first
+            bool isClosedLoop = zone.nodes.Count >= 3
+                             && zone.nodes[zone.nodes.Count - 1] == zone.nodes[0];
+
+            // Generate spline knots
+            List<Vector3> splineKnots;
+            bool closedSpline;
+            SplineAnimate.LoopMode loopMode;
+
+            if (zone.nodes.Count == 1)
             {
-                Debug.Log($"[LevelSpawner] Soul at cell {cellIndex} already caught — skipping.");
+                splineKnots  = GenerateSingleNodeKnots(nodeWorldPositions[0], zone.radius, zone.knotCount);
+                closedSpline = true;
+                loopMode     = SplineAnimate.LoopMode.Loop;
+            }
+            else if (isClosedLoop)
+            {
+                var loopNodes = new List<Vector3>(nodeWorldPositions);
+                loopNodes.RemoveAt(loopNodes.Count - 1); // strip duplicate last node
+                splineKnots  = GenerateClosedLoopKnots(loopNodes, zone.knotCount);
+                closedSpline = true;
+                loopMode     = SplineAnimate.LoopMode.Loop;
+            }
+            else
+            {
+                splineKnots  = GenerateOpenPathKnots(nodeWorldPositions, zone.knotCount);
+                closedSpline = false;
+                loopMode     = SplineAnimate.LoopMode.PingPong;
+            }
+
+            // Spawn shoal container at first node
+            Quaternion containerRot = soulSpawnParent.rotation;
+            if (applyMinus90XRotation) containerRot *= Quaternion.Euler(-90f, 0f, 0f);
+
+            GameObject containerInstance = Instantiate(
+                soulFishContainerPrefab, nodeWorldPositions[0], containerRot, soulSpawnParent);
+
+            // Container-level identity label (zone-level, not registered individually)
+            var containerLabel = containerInstance.GetComponent<LinkIdentityLabel>();
+            if (containerLabel != null)
+                containerLabel.SetLabel(zoneIndex * 100, "SoulFishZone");
+
+            // Find SplineContainer in hierarchy
+            var splineContainer = containerInstance.GetComponentInChildren<SplineContainer>(true);
+            if (splineContainer == null)
+            {
+                Debug.LogWarning($"[LevelSpawner] No SplineContainer in soulFishContainerPrefab for zone {zoneIndex}.");
                 continue;
             }
 
-            // Soul data comes directly from the spawn point
-            SoulData soul = spawnPoint.soulData;
-            if (soul == null)
+            // Inject generated knots
+            InjectSplineKnots(splineContainer, splineKnots, closedSpline);
+
+            // Configure SplineAnimate loop mode on any already-present animate components
+            foreach (var sa in containerInstance.GetComponentsInChildren<SplineAnimate>(true))
+                sa.Loop = loopMode;
+
+            // Register zone node positions as the static wave mask area
+            SoulFishWaveLinker.RegisterZone(nodeWorldPositions, isClosedLoop);
+
+            // Configure SoulShoalController
+            var shoal = containerInstance.GetComponent<SoulShoalController>();
+            if (shoal != null)
             {
-                Debug.LogWarning($"[LevelSpawner] No SoulData assigned to spawn point {i} (cell {cellIndex}) " +
-                                 $"in '{levelID}'. Assign one in the Grid Designer.");
-                continue;
+                shoal.splineContainer   = splineContainer;
+                shoal.fishingController = fishingController;
+                shoal.InitZone(nodeWorldPositions);
+                shoal.SpawnFish(activeGridData.soulZones, zoneIndex, levelID);
             }
 
-            // Stamp home level at runtime
-            soul.homeLevelID = levelID;
-
-            int identityToAssign = soul.soulDataIdentity;
-
-            // Resolve fish prefab from the soul
-            GameObject fishPrefab = soul.fishPrefab;
-            if (fishPrefab == null)
+            // Register each spawned fish with linking controller + spawn reality proxies
+            if (shoal != null)
             {
-                Debug.LogWarning($"[LevelSpawner] SoulData '{soul.name}' (identity {identityToAssign}) has no fishPrefab assigned.");
-                continue;
-            }
-
-            // Cell index → world position
-            int cellX    = cellIndex % GridData.GridSize;
-            int cellY    = cellIndex / GridData.GridSize;
-            int flippedY = GridData.GridSize - 1 - cellY;
-
-            Vector3 soulPos = new Vector3(
-                origin.x + cellX    * tileX + tileX * 0.5f,
-                soulSpawnParent.position.y,
-                origin.z + flippedY * tileZ + tileZ * 0.5f
-            );
-
-            Quaternion soulRot = soulSpawnParent.rotation;
-            if (applyMinus90XRotation) soulRot *= Quaternion.Euler(-90f, 0f, 0f);
-
-            GameObject soulInstance = Instantiate(fishPrefab, soulPos, soulRot, soulSpawnParent);
-
-            // Stamp passport
-            var fishLabel = soulInstance.GetComponent<LinkIdentityLabel>();
-            if (fishLabel != null)
-            {
-                fishLabel.SetLabel(cellIndex, "SoulFish");
-                fishLabel.soulDataIdentity = identityToAssign;
-
-                if (linkingController != null)
-                    linkingController.RegisterSoulFish(fishLabel.linkID, soulInstance.transform);
-            }
-
-            // Connect fishing behaviour + spawn reality proxy
-            var fishes = soulInstance.GetComponentsInChildren<FishFishingBehaviour>(true);
-            foreach (var fish in fishes)
-            {
-                fish.fishing = fishingController;
-
-                if (soulToRealityProxyPrefab)
+                foreach (var fishTransform in shoal.FishList)
                 {
-                    Vector3    realityPos = new Vector3(fish.transform.position.x, spawnParent.position.y, fish.transform.position.z);
-                    Quaternion realityRot = spawnParent.rotation;
-                    if (applyMinus90XRotation) realityRot *= Quaternion.Euler(-90f, 0f, 0f);
+                    if (fishTransform == null) continue;
 
-                    GameObject proxy      = Instantiate(soulToRealityProxyPrefab, realityPos, realityRot, spawnParent);
-                    var        proxyLabel = proxy.GetComponent<LinkIdentityLabel>();
+                    var fishLabel = fishTransform.GetComponent<LinkIdentityLabel>();
+                    if (fishLabel == null) continue;
 
-                    if (proxyLabel != null)
+                    if (linkingController != null)
+                        linkingController.RegisterSoulFish(fishLabel.linkID, fishTransform);
+
+                    if (soulToRealityProxyPrefab != null)
                     {
-                        proxyLabel.SetLabel(cellIndex, "RealityProxy");
-                        proxyLabel.soulDataIdentity = identityToAssign;
+                        Vector3    realityPos = new Vector3(fishTransform.position.x, spawnParent.position.y, fishTransform.position.z);
+                        Quaternion realityRot = spawnParent.rotation;
+                        if (applyMinus90XRotation) realityRot *= Quaternion.Euler(-90f, 0f, 0f);
 
-                        var follow = proxy.GetComponent<SoulFishRealityProxyFollow>();
-                        if (follow != null && linkingController != null)
-                            linkingController.RegisterRealityProxy(proxyLabel.linkID, follow);
+                        GameObject proxy      = Instantiate(soulToRealityProxyPrefab, realityPos, realityRot, spawnParent);
+                        var        proxyLabel = proxy.GetComponent<LinkIdentityLabel>();
+
+                        if (proxyLabel != null)
+                        {
+                            proxyLabel.SetLabel(fishLabel.linkID, "RealityProxy");
+                            proxyLabel.soulDataIdentity = fishLabel.soulDataIdentity;
+
+                            var follow = proxy.GetComponent<SoulFishRealityProxyFollow>();
+                            if (follow != null && linkingController != null)
+                                linkingController.RegisterRealityProxy(proxyLabel.linkID, follow);
+                        }
                     }
                 }
             }
 
-            Debug.Log($"[LevelSpawner] Soul fish spawned — cell {cellIndex}, identity {identityToAssign}.");
+            Debug.Log($"[LevelSpawner] Zone {zoneIndex} spawned — {zone.nodes.Count} node(s), {zone.souls.Count} soul(s), closed={isClosedLoop}.");
         }
+    }
+
+    // =====================================================
+    // SPLINE KNOT GENERATION HELPERS
+    // =====================================================
+
+    private Vector3 CellToWorldPos(int cellIndex, Vector3 origin, float tileX, float tileZ)
+    {
+        int cellX    = cellIndex % GridData.GridSize;
+        int cellY    = cellIndex / GridData.GridSize;
+        int flippedY = GridData.GridSize - 1 - cellY;
+        return new Vector3(
+            origin.x + cellX    * tileX + tileX * 0.5f,
+            soulSpawnParent.position.y,
+            origin.z + flippedY * tileZ + tileZ * 0.5f);
+    }
+
+    private List<Vector3> GenerateSingleNodeKnots(Vector3 center, float radius, int count)
+    {
+        var knots = new List<Vector3>(count);
+        for (int i = 0; i < count; i++)
+            knots.Add(center + UnityEngine.Random.insideUnitSphere * radius);
+        return knots;
+    }
+
+    private List<Vector3> GenerateOpenPathKnots(List<Vector3> nodes, int count)
+    {
+        // Build out-and-back route: A→B→…→N→…→B→A
+        var route = new List<Vector3>(nodes);
+        for (int i = nodes.Count - 2; i >= 0; i--)
+            route.Add(nodes[i]);
+        return DistributeAlongPath(route, count, false);
+    }
+
+    private List<Vector3> GenerateClosedLoopKnots(List<Vector3> nodes, int count)
+    {
+        return DistributeAlongPath(nodes, count, true);
+    }
+
+    private List<Vector3> DistributeAlongPath(List<Vector3> path, int count, bool wrapToClose)
+    {
+        if (path.Count == 0 || count == 0) return new List<Vector3>();
+        if (path.Count == 1)
+        {
+            var single = new List<Vector3>(count);
+            for (int i = 0; i < count; i++) single.Add(path[0]);
+            return single;
+        }
+
+        // Build segment list
+        var segments = new List<(Vector3 a, Vector3 b, float len)>();
+        float totalLength = 0f;
+        for (int i = 0; i < path.Count - 1; i++)
+        {
+            float len = Vector3.Distance(path[i], path[i + 1]);
+            segments.Add((path[i], path[i + 1], len));
+            totalLength += len;
+        }
+        if (wrapToClose)
+        {
+            float len = Vector3.Distance(path[path.Count - 1], path[0]);
+            segments.Add((path[path.Count - 1], path[0], len));
+            totalLength += len;
+        }
+
+        float spacing = totalLength / count;
+        var result = new List<Vector3>(count);
+
+        for (int i = 0; i < count; i++)
+        {
+            float target      = i * spacing;
+            float accumulated = 0f;
+            Vector3 point     = path[0];
+
+            foreach (var seg in segments)
+            {
+                if (accumulated + seg.len >= target || Mathf.Approximately(accumulated + seg.len, target))
+                {
+                    float t = seg.len > 0f ? (target - accumulated) / seg.len : 0f;
+                    point = Vector3.Lerp(seg.a, seg.b, Mathf.Clamp01(t));
+                    break;
+                }
+                accumulated += seg.len;
+            }
+
+            result.Add(point);
+        }
+
+        return result;
+    }
+
+    private void InjectSplineKnots(SplineContainer container, List<Vector3> worldPositions, bool closed)
+    {
+        var spline = container.Spline;
+        spline.Clear();
+
+        foreach (var worldPos in worldPositions)
+        {
+            float3 localPos = container.transform.InverseTransformPoint(worldPos);
+            spline.Add(new BezierKnot(localPos), TangentMode.AutoSmooth);
+        }
+
+        spline.Closed = closed;
     }
 
     // =====================================================

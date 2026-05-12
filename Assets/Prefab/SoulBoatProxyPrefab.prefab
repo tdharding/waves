@@ -447,8 +447,9 @@ GameObject:
   - component: {fileID: 2866702849974731213}
   - component: {fileID: 2183236323860633410}
   - component: {fileID: 8860985850735741233}
+  - component: {fileID: 5899623439458055419}
   m_Layer: 11
-  m_Name: SoulStartPoint
+  m_Name: SoulBoatProxyPrefab
   m_TagString: SoulStartPoint
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -468,6 +469,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 4301494627709339014}
+  - {fileID: 6840503806045142322}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 186.55}
 --- !u!114 &8881901468660808473
@@ -576,6 +578,30 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 183ae72e845bd69488ed594b1aeab2a1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NetAnimationEventReceiver
+--- !u!114 &5899623439458055419
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7197165120358527805}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2c96c4896a4c3345926aa726558eb6d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LureController
+  lurePrefab: {fileID: 7921194161308416616, guid: 81f92b81fa119244aa3d6b28a04347a9, type: 3}
+  maxLures: 1
+  duration: 10
+  sinkSpeed: 0.82
+  sinkDistance: 0.45
+  finalSinkDistance: 4
+  attractionRadius: 1
+  orbitRadius: 0.31
+  orbitSpeed: 0.46
+  moveTowardSpeed: 0.34
+  dropPoint: {fileID: 6840503806045142322}
+  showGizmoPreview: 1
 --- !u!1 &7605346136046915350
 GameObject:
   m_ObjectHideFlags: 0
@@ -608,6 +634,37 @@ Transform:
   - {fileID: 1019447195283612938}
   m_Father: {fileID: 4694382682077071328}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &7668802740928842514
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6840503806045142322}
+  m_Layer: 0
+  m_Name: LUREDROPPOINT
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6840503806045142322
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7668802740928842514}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
+  m_LocalPosition: {x: 0, y: 0, z: -0.008}
+  m_LocalScale: {x: 4.19, y: 4.19, z: 4.19}
+  m_ConstrainProportionsScale: 1
+  m_Children: []
+  m_Father: {fileID: 1456460570554597403}
+  m_LocalEulerAnglesHint: {x: 90, y: 0, z: 0}
 --- !u!1 &8045766413696470316
 GameObject:
   m_ObjectHideFlags: 0

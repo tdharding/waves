@@ -7,7 +7,7 @@ private void OnTriggerEnter(Collider other)
     if (!other.CompareTag("BoatPrefab"))
         return;
 
-    OrbsOfOmalonCounter.AddOrb(); // ← add this
+    OrbCollectCounter.AddOrb(); // ← add this
 Destroy(transform.parent.gameObject);
 }
 }

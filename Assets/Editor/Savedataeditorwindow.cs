@@ -71,7 +71,7 @@ public class SaveDataEditorWindow : EditorWindow
     // Open / Enable / Disable
     // ─────────────────────────────────────────────
 
-    [MenuItem("Tools/Save Data Monitor #5")]
+    [MenuItem("Tools/Save Data Monitor")]
     public static void Open()
     {
         var window = GetWindow<SaveDataEditorWindow>("Save Data Monitor");
@@ -337,14 +337,18 @@ public class SaveDataEditorWindow : EditorWindow
         {
             string path = AssetDatabase.GetAssetPath(levelData);
             EditorPrefs.SetString("SaveDataMonitor_OverrideLevel", path);
-            Debug.Log($"[SaveDataMonitor] Override level set: '{levelData.levelID}'");
+            Debug.LogWarning($"[SaveDataMonitor] SETTING OVERRIDE: Level '{levelData.levelID}', Path: '{path}'");
+        }
+        else
+        {
+            Debug.LogWarning("[SaveDataMonitor] LaunchScene called with NULL levelData. No override set.");
         }
 
         if (waveOverride != null)
         {
             string path = AssetDatabase.GetAssetPath(waveOverride);
             EditorPrefs.SetString("SaveDataMonitor_OverrideWavePreset", path);
-            Debug.Log($"[SaveDataMonitor] Override wave preset set: '{waveOverride.name}'");
+            Debug.LogWarning($"[SaveDataMonitor] SETTING OVERRIDE: WavePreset '{waveOverride.name}', Path: '{path}'");
         }
 
         // Open the scene then enter play mode

@@ -23,6 +23,7 @@ static readonly int RadiusID = Shader.PropertyToID("_SoulFishMarkerRadius");
 
 
     static readonly List<Transform> activeFish = new List<Transform>();
+    static readonly List<List<Vector3>> activeZones = new List<List<Vector3>>();
 
     readonly Vector4[] positionBuffer = new Vector4[MAX_POINTS];
     readonly Vector3[] gizmoPositions = new Vector3[MAX_POINTS];
@@ -61,6 +62,7 @@ static readonly int RadiusID = Shader.PropertyToID("_SoulFishMarkerRadius");
             Instance = null;
 
         activeFish.Clear();
+        activeZones.Clear();
     }
 
     // ─────────────────────────────────────────
@@ -81,6 +83,20 @@ static readonly int RadiusID = Shader.PropertyToID("_SoulFishMarkerRadius");
         Instance?.BakePositionsOnce();
     }
 
+    public static void RegisterZone(List<Vector3> nodes)
+    {
+        if (activeZones.Contains(nodes)) return;
+        activeZones.Add(nodes);
+        Instance?.BakePositionsOnce();
+    }
+
+    public static void UnregisterZone(List<Vector3> nodes)
+    {
+        if (!activeZones.Contains(nodes)) return;
+        activeZones.Remove(nodes);
+        Instance?.BakePositionsOnce();
+    }
+
     // ─────────────────────────────────────────
     // BAKE
     // ─────────────────────────────────────────
@@ -93,7 +109,7 @@ static readonly int RadiusID = Shader.PropertyToID("_SoulFishMarkerRadius");
         if (!mapMaterialInstance) return;
 
 
-mapMaterialInstance.SetFloat(RadiusID, soulFishMapRadius);
+    mapMaterialInstance.SetFloat(RadiusID, soulFishMapRadius);
         // Push map bounds to HLSL regardless of MapProjection state
         // so _MapCenter and _MapSize are always correct
         Bounds b = mapRenderer.bounds;
@@ -109,22 +125,37 @@ mapMaterialInstance.SetFloat(RadiusID, soulFishMapRadius);
             return;
         }
 
-        int count = Mathf.Min(activeFish.Count, MAX_POINTS);
+        List<Vector4> packedPoints = new List<Vector4>();
+
+        // 1. Pack Zones
+        foreach (var zone in activeZones)
+        {
+            if (packedPoints.Count >= MAX_POINTS) break;
+            for (int i = 0; i < zone.Count; i++)
+            {
+                if (packedPoints.Count >= MAX_POINTS) break;
+                Vector3 mapPos = MapProjection.WorldToMap(zone[i]);
+                bool isLast = (i == zone.Count - 1);
+                packedPoints.Add(new Vector4(mapPos.x, mapPos.y, mapPos.z, isLast ? 1f : 2f));
+            }
+        }
+
+        // 2. Pack Fish
+        foreach (var fish in activeFish)
+        {
+            if (packedPoints.Count >= MAX_POINTS) break;
+            if (fish == null) continue;
+            Vector3 mapPos = MapProjection.WorldToMap(fish.position);
+            packedPoints.Add(new Vector4(mapPos.x, mapPos.y, mapPos.z, 1f));
+        }
+
+        int count = packedPoints.Count;
         gizmoCount = 0;
 
         for (int i = 0; i < count; i++)
         {
-            if (activeFish[i] == null)
-            {
-                positionBuffer[i] = OffMapPosition;
-                continue;
-            }
-
-            // Convert fish world position to map surface world position
-            Vector3 mapPos = MapProjection.WorldToMap(activeFish[i].position);
-
-            positionBuffer[i] = new Vector4(mapPos.x, mapPos.y, mapPos.z, 1f);
-            gizmoPositions[gizmoCount++] = mapPos;
+            positionBuffer[i] = packedPoints[i];
+            gizmoPositions[gizmoCount++] = new Vector3(packedPoints[i].x, packedPoints[i].y, packedPoints[i].z);
         }
 
         for (int i = count; i < MAX_POINTS; i++)
