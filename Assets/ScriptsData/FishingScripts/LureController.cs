@@ -1,10 +1,10 @@
 using UnityEngine;
+using System;
 
 public class LureController : MonoBehaviour
 {
     [Header("Lure")]
     public GameObject lurePrefab;
-    public int        maxLures          = 1;
 
     [Header("Timing")]
     public float duration               = 10f;
@@ -29,18 +29,47 @@ public class LureController : MonoBehaviour
     [Header("Debug")]
     public bool showGizmoPreview = true;
 
+    public event Action OnLuresExhausted;
+
+    private int _maxLures = 3;
+    private int _lureStock = 0;
     private int _activeLureCount = 0;
+    private GameObject _boatLureRoot;
+
+    public bool HasLureAvailable => _lureStock > 0;
+
+    public void InitStock(int amount)
+    {
+        _maxLures  = amount;
+        _lureStock = amount;
+        _activeLureCount = 0;
+    }
+
+    public void SetBoatLureRoot(GameObject root) => _boatLureRoot = root;
+
+    void Awake()
+    {
+        _lureStock = _maxLures;
+    }
 
     void OnEnable()
     {
         _activeLureCount = 0;
     }
 
-    public bool CanDrop => true;
-
     public void DropLure()
     {
-        if (!CanDrop || lurePrefab == null) return;
+        if (lurePrefab == null)
+        {
+            Debug.LogWarning("[LureController] DropLure called but lurePrefab is null.");
+            return;
+        }
+
+        if (_lureStock <= 0)
+        {
+            Debug.LogWarning($"[LureController] DropLure blocked — stock empty (0/{_maxLures}).");
+            return;
+        }
 
         Transform spawnFrom = dropPoint != null ? dropPoint : transform;
         GameObject lureGO   = Instantiate(lurePrefab, spawnFrom.position, spawnFrom.rotation);
@@ -59,14 +88,22 @@ public class LureController : MonoBehaviour
             behaviour.OnLureExpired    += OnLureExpired;
         }
 
+        _lureStock--;
         _activeLureCount++;
-        Debug.Log($"[LureController] Lure dropped at {spawnFrom.position}. Active: {_activeLureCount}/{maxLures}");
+        Debug.Log($"[LureController] Lure dropped at {spawnFrom.position}. Stock remaining: {_lureStock}/{_maxLures}. Active in water: {_activeLureCount}");
+
+        if (_lureStock <= 0)
+        {
+            Debug.Log("[LureController] All lures used — lure tool exhausted.");
+            if (_boatLureRoot != null) _boatLureRoot.SetActive(false);
+            OnLuresExhausted?.Invoke();
+        }
     }
 
     void OnLureExpired()
     {
         _activeLureCount = Mathf.Max(0, _activeLureCount - 1);
-        Debug.Log($"[LureController] Lure expired. Active: {_activeLureCount}/{maxLures}");
+        Debug.Log($"[LureController] Lure expired. Stock: {_lureStock}/{_maxLures}. Still active in water: {_activeLureCount}");
     }
 
 #if UNITY_EDITOR

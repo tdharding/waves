@@ -57,11 +57,18 @@ public class BoatControlRouter : MonoBehaviour
             catapult.CancelArm();
             bool sonarForLure = sonar != null && sonar.IsSonarActive;
 
-            boatMovement.SetBoosting(false);
-            boatMovement.SetSonarSlow(sonarForLure);
-
-            if (sonarForLure && spaceDown && lureController != null)
-                lureController.DropLure();
+            if (sonarForLure)
+            {
+                boatMovement.SetBoosting(false);
+                boatMovement.SetSonarSlow(true);
+                if (spaceDown && lureController != null)
+                    lureController.DropLure();
+            }
+            else
+            {
+                boatMovement.SetSonarSlow(false);
+                boatMovement.SetBoosting(spaceHeld);
+            }
 
             if (fishing.IsFishingActive)
                 fishing.SetFishingActive(false);

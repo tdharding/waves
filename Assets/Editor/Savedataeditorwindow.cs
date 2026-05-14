@@ -1,6 +1,6 @@
 // SaveDataEditorWindow.cs
 // Place this file anywhere inside an Editor/ folder in your project.
-// Open via: Tools > Save Data Monitor
+// Open via: Tools > GameTesterTool
 
 #if UNITY_EDITOR
 using UnityEngine;
@@ -20,12 +20,18 @@ public class SaveDataEditorWindow : EditorWindow
     private const double ConfirmTimeout = 3.0;
 
     private bool _showPreSession    = true;
+    private bool _showToolUnlocks  = true;
     private bool _showLauncher     = true;
     private bool _showBoat         = true;
     private bool _showSouls        = true;
     private bool _showLevels       = true;
     private bool _showCaughtSouls  = true;
     private bool _showObstacles    = true;
+
+    // Tool unlock state (mirrored into BoatToolManager statics)
+    private bool _unlockWhirl    = true;
+    private bool _unlockCatapult = true;
+    private bool _unlockLure     = true;
 
     // Scene launcher
     private GridData[]  _allGridData;
@@ -63,24 +69,31 @@ public class SaveDataEditorWindow : EditorWindow
     // EditorPrefs keys
     // ─────────────────────────────────────────────
 
-    private const string PrefScene      = "SaveDataMonitor_SceneName";
-    private const string PrefGridData   = "SaveDataMonitor_GridDataName";
-    private const string PrefWavePreset = "SaveDataMonitor_WavePresetName";
+    private const string PrefScene           = "SaveDataMonitor_SceneName";
+    private const string PrefGridData        = "SaveDataMonitor_GridDataName";
+    private const string PrefWavePreset      = "SaveDataMonitor_WavePresetName";
+    private const string PrefUnlockWhirl     = "SaveDataMonitor_UnlockWhirl";
+    private const string PrefUnlockCatapult  = "SaveDataMonitor_UnlockCatapult";
+    private const string PrefUnlockLure      = "SaveDataMonitor_UnlockLure";
 
     // ─────────────────────────────────────────────
     // Open / Enable / Disable
     // ─────────────────────────────────────────────
 
-    [MenuItem("Tools/Save Data Monitor")]
+    [MenuItem("Tools/GameTesterTool")]
     public static void Open()
     {
-        var window = GetWindow<SaveDataEditorWindow>("Save Data Monitor");
+        var window = GetWindow<SaveDataEditorWindow>("GameTesterTool");
         window.minSize = new Vector2(380, 500);
     }
 
     private void OnEnable()
     {
-        // Restore selections — indices are resolved after lists are populated in DrawSceneLauncherSection
+        _unlockWhirl    = EditorPrefs.GetBool(PrefUnlockWhirl,    true);
+        _unlockCatapult = EditorPrefs.GetBool(PrefUnlockCatapult, true);
+        _unlockLure     = EditorPrefs.GetBool(PrefUnlockLure,     true);
+
+        ApplyToolUnlocksToStatics();
     }
 
     private void OnDisable()
@@ -93,6 +106,10 @@ public class SaveDataEditorWindow : EditorWindow
 
         if (_wavePresetNames != null && _selectedWavePresetIndex < _wavePresetNames.Length)
             EditorPrefs.SetString(PrefWavePreset, _wavePresetNames[_selectedWavePresetIndex]);
+
+        EditorPrefs.SetBool(PrefUnlockWhirl,    _unlockWhirl);
+        EditorPrefs.SetBool(PrefUnlockCatapult, _unlockCatapult);
+        EditorPrefs.SetBool(PrefUnlockLure,     _unlockLure);
     }
 
     // ─────────────────────────────────────────────
@@ -123,7 +140,7 @@ public class SaveDataEditorWindow : EditorWindow
 
         // Toolbar
         EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
-        GUILayout.Label("Save Data Monitor", _headerStyle, GUILayout.ExpandWidth(true));
+        GUILayout.Label("GameTesterTool", _headerStyle, GUILayout.ExpandWidth(true));
 
         _autoRefresh = GUILayout.Toggle(_autoRefresh, "Auto-Refresh", EditorStyles.toolbarButton, GUILayout.Width(90));
 
@@ -142,6 +159,7 @@ public class SaveDataEditorWindow : EditorWindow
         _scroll = EditorGUILayout.BeginScrollView(_scroll);
 
         DrawPreSessionSection();
+        DrawToolUnlocksSection();
         DrawSceneLauncherSection();
         DrawBoatSection();
         DrawSoulsSection();
@@ -193,6 +211,35 @@ public class SaveDataEditorWindow : EditorWindow
             InjectRandomSouls(_soulsToInject);
 
         EditorGUILayout.Space(6);
+    }
+
+    private void DrawToolUnlocksSection()
+    {
+        _showToolUnlocks = DrawSectionHeader("🔧  Tool Unlocks", _showToolUnlocks);
+        if (!_showToolUnlocks) return;
+
+        EditorGUI.BeginChangeCheck();
+
+        _unlockWhirl    = EditorGUILayout.ToggleLeft(" Whirl Sucker", _unlockWhirl);
+        _unlockCatapult = EditorGUILayout.ToggleLeft(" Catapult",     _unlockCatapult);
+        _unlockLure     = EditorGUILayout.ToggleLeft(" Lure",         _unlockLure);
+
+        if (EditorGUI.EndChangeCheck())
+        {
+            EditorPrefs.SetBool(PrefUnlockWhirl,    _unlockWhirl);
+            EditorPrefs.SetBool(PrefUnlockCatapult, _unlockCatapult);
+            EditorPrefs.SetBool(PrefUnlockLure,     _unlockLure);
+            ApplyToolUnlocksToStatics();
+        }
+
+        EditorGUILayout.Space(6);
+    }
+
+    private void ApplyToolUnlocksToStatics()
+    {
+        BoatToolManager.EditorOverrideWhirl    = _unlockWhirl;
+        BoatToolManager.EditorOverrideCatapult = _unlockCatapult;
+        BoatToolManager.EditorOverrideLure     = _unlockLure;
     }
 
     private void DrawSceneLauncherSection()

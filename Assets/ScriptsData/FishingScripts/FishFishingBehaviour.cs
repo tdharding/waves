@@ -32,7 +32,7 @@ public class FishFishingBehaviour : MonoBehaviour
     private Transform whirlTarget;
     private SoulWhirlDirection whirlDirection;
 
-    public bool IsBeingAttracted => fishingActive && hasCachedSplinePos;
+    public bool IsBeingAttracted => fishingActive && IsEligibleForAttraction();
 
     private bool fishingActive;
     private bool hasCachedSplinePos;
@@ -42,6 +42,7 @@ public class FishFishingBehaviour : MonoBehaviour
     private Vector3 cachedDefaultScale;
 
     private LinkIdentityLabel identity;
+    private LureAttractable _lureAttractable;
 
     void Awake()
     {
@@ -52,6 +53,7 @@ public class FishFishingBehaviour : MonoBehaviour
         
         // Ensure we grab the identity label from the parent (the spawned container)
         identity = GetComponentInParent<LinkIdentityLabel>();
+        _lureAttractable = GetComponent<LureAttractable>();
 
         meshRenderer = GetComponentInChildren<MeshRenderer>();
 
@@ -200,6 +202,13 @@ public class FishFishingBehaviour : MonoBehaviour
     void ReturnToSpline()
     {
         if (!hasCachedSplinePos) return;
+
+        // If a lure is active and attractable is handling it, we step aside
+        if (_lureAttractable != null && _lureAttractable.CurrentState == LureAttractable.State.Attracted)
+        {
+            hasCachedSplinePos = false;
+            return;
+        }
 
         transform.position = Vector3.MoveTowards(transform.position, cachedSplinePosition, Time.deltaTime / returnSnapTime);
         transform.localScale = Vector3.MoveTowards(transform.localScale, cachedDefaultScale, Time.deltaTime / returnSnapTime);

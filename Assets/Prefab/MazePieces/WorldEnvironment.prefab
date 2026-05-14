@@ -9,7 +9,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 7325450983092443721}
-  - component: {fileID: 9191461027389006752}
   m_Layer: 0
   m_Name: THEENDING1
   m_TagString: Untagged
@@ -32,22 +31,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 3185189738595526092}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &9191461027389006752
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 819870905560662536}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 23f9f223fe2de864e87e6344740f0cc7, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LevelCompleteProximityCheck
-  boat: {fileID: 0}
-  radius: 0.5
-  sceneToLoad: TheEndingScene
-  drawGizmo: 0
 --- !u!1 &1451694476323645582
 GameObject:
   m_ObjectHideFlags: 0
@@ -121,14 +104,14 @@ Light:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2607170918518599267}
   m_Enabled: 1
-  serializedVersion: 11
+  serializedVersion: 12
   m_Type: 2
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 0.5
   m_Range: 0.7
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
-  m_CookieSize: 10
+  m_CookieSize2D: {x: 10, y: 10}
   m_Shadows:
     m_Type: 0
     m_Resolution: -1
@@ -248,14 +231,14 @@ Light:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 7468776764504719840}
   m_Enabled: 1
-  serializedVersion: 11
+  serializedVersion: 12
   m_Type: 2
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 0.25
   m_Range: 2.27
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
-  m_CookieSize: 10
+  m_CookieSize2D: {x: 10, y: 10}
   m_Shadows:
     m_Type: 0
     m_Resolution: -1

@@ -801,9 +801,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BoatToolManager
   boatCatapultRoot: {fileID: 1763102282}
+  boatLureRoot: {fileID: 235585931}
   crossMastRoot: {fileID: 1763102284}
   boatMovement: {fileID: 393963684}
   lureController: {fileID: 0}
+  whirlUnlocked: 1
+  catapultUnlocked: 1
+  lureUnlocked: 1
+  amountOfLures: 3
 --- !u!1 &206506679
 GameObject:
   m_ObjectHideFlags: 0
@@ -1205,6 +1210,11 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1977048180}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &235585931 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 5300319154672728179, guid: 61b9c37b814b41a4db673b54cadaf7e6, type: 3}
+  m_PrefabInstance: {fileID: 1763102281}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &244877676
 GameObject:
   m_ObjectHideFlags: 0
@@ -1477,38 +1487,6 @@ PrefabInstance:
       propertyPath: m_AnchoredPosition.y
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 764741412757649322, guid: 7cd1490137fabfd4592c5b30018d5f4c, type: 3}
-      propertyPath: m_AnchorMax.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 764741412757649322, guid: 7cd1490137fabfd4592c5b30018d5f4c, type: 3}
-      propertyPath: m_AnchorMin.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 764741412757649322, guid: 7cd1490137fabfd4592c5b30018d5f4c, type: 3}
-      propertyPath: m_AnchoredPosition.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 764741412757649322, guid: 7cd1490137fabfd4592c5b30018d5f4c, type: 3}
-      propertyPath: m_AnchoredPosition.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 836986439753543653, guid: 7cd1490137fabfd4592c5b30018d5f4c, type: 3}
-      propertyPath: m_AnchorMax.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 836986439753543653, guid: 7cd1490137fabfd4592c5b30018d5f4c, type: 3}
-      propertyPath: m_AnchorMin.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 836986439753543653, guid: 7cd1490137fabfd4592c5b30018d5f4c, type: 3}
-      propertyPath: m_AnchoredPosition.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 836986439753543653, guid: 7cd1490137fabfd4592c5b30018d5f4c, type: 3}
-      propertyPath: m_AnchoredPosition.y
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 1594418580111063344, guid: 7cd1490137fabfd4592c5b30018d5f4c, type: 3}
       propertyPath: m_Name
       value: BoatHUDPrompts
@@ -1526,22 +1504,6 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1746553349309095140, guid: 7cd1490137fabfd4592c5b30018d5f4c, type: 3}
-      propertyPath: m_AnchoredPosition.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2041234293754240991, guid: 7cd1490137fabfd4592c5b30018d5f4c, type: 3}
-      propertyPath: m_AnchorMax.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2041234293754240991, guid: 7cd1490137fabfd4592c5b30018d5f4c, type: 3}
-      propertyPath: m_AnchorMin.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2041234293754240991, guid: 7cd1490137fabfd4592c5b30018d5f4c, type: 3}
-      propertyPath: m_AnchoredPosition.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2041234293754240991, guid: 7cd1490137fabfd4592c5b30018d5f4c, type: 3}
       propertyPath: m_AnchoredPosition.y
       value: 0
       objectReference: {fileID: 0}
@@ -1623,38 +1585,6 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6859218042206548805, guid: 7cd1490137fabfd4592c5b30018d5f4c, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6925886266789071904, guid: 7cd1490137fabfd4592c5b30018d5f4c, type: 3}
-      propertyPath: m_AnchorMax.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6925886266789071904, guid: 7cd1490137fabfd4592c5b30018d5f4c, type: 3}
-      propertyPath: m_AnchorMin.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6925886266789071904, guid: 7cd1490137fabfd4592c5b30018d5f4c, type: 3}
-      propertyPath: m_AnchoredPosition.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6925886266789071904, guid: 7cd1490137fabfd4592c5b30018d5f4c, type: 3}
-      propertyPath: m_AnchoredPosition.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7990629275443493192, guid: 7cd1490137fabfd4592c5b30018d5f4c, type: 3}
-      propertyPath: m_AnchorMax.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7990629275443493192, guid: 7cd1490137fabfd4592c5b30018d5f4c, type: 3}
-      propertyPath: m_AnchorMin.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7990629275443493192, guid: 7cd1490137fabfd4592c5b30018d5f4c, type: 3}
-      propertyPath: m_AnchoredPosition.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7990629275443493192, guid: 7cd1490137fabfd4592c5b30018d5f4c, type: 3}
-      propertyPath: m_AnchoredPosition.y
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
@@ -7422,6 +7352,11 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!224 &1358258781 stripped
+RectTransform:
+  m_CorrespondingSourceObject: {fileID: 7512879500336511226, guid: 1a0a1fc2b08856641ae0b9b30aa7a018, type: 3}
+  m_PrefabInstance: {fileID: 3542353993219285496}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1370744862
 GameObject:
   m_ObjectHideFlags: 0
@@ -8156,8 +8091,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1456262588}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.11547023, y: 0.8640988, z: -0.43204916, w: -0.23094055}
-  m_LocalPosition: {x: 4.4905953, y: 11.999995, z: 7.8}
+  m_LocalRotation: {x: 0.029693127, y: 0.00097111776, z: -0.000028848259, w: 0.9995586}
+  m_LocalPosition: {x: 0.0005953834, y: 1.5035247, z: -4.7685847}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -10822,6 +10757,11 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1029293246}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!224 &1952185448 stripped
+RectTransform:
+  m_CorrespondingSourceObject: {fileID: 8411024325383896945, guid: 1a0a1fc2b08856641ae0b9b30aa7a018, type: 3}
+  m_PrefabInstance: {fileID: 3542353993219285496}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1953491842
 GameObject:
   m_ObjectHideFlags: 0
@@ -12143,15 +12083,11 @@ MonoBehaviour:
   toolManager: {fileID: 199139971}
   boatMovement: {fileID: 393963684}
   visualRoot: {fileID: 1618841413}
-  wheelRect: {fileID: 2133977611}
-  spinSpeed: 12
-  whirlRotation: 0
-  catapultRotation: -90
---- !u!224 &2133977611 stripped
-RectTransform:
-  m_CorrespondingSourceObject: {fileID: 6670122252086309751, guid: 1a0a1fc2b08856641ae0b9b30aa7a018, type: 3}
-  m_PrefabInstance: {fileID: 3542353993219285496}
-  m_PrefabAsset: {fileID: 0}
+  nobPrefab: {fileID: 374089432217262214, guid: 31dae2593a3655745af3c876baa40b66, type: 3}
+  edgeWheelVisPrefab: {fileID: 5238975070523536817, guid: d3964fe1ba087224eb683242fb3a15ac, type: 3}
+  edgeWheelVisContainer: {fileID: 1358258781}
+  pointerRect: {fileID: 1952185448}
+  spinSpeed: 5
 --- !u!1 &2137995846
 GameObject:
   m_ObjectHideFlags: 0
@@ -12933,25 +12869,9 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1452479525}
     m_Modifications:
-    - target: {fileID: 2552635522379590054, guid: 1a0a1fc2b08856641ae0b9b30aa7a018, type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 5496185873431314533, guid: 1a0a1fc2b08856641ae0b9b30aa7a018, type: 3}
       propertyPath: m_Name
       value: TOOLSWHEEL
-      objectReference: {fileID: 0}
-    - target: {fileID: 6670122252086309751, guid: 1a0a1fc2b08856641ae0b9b30aa7a018, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 6670122252086309751, guid: 1a0a1fc2b08856641ae0b9b30aa7a018, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6670122252086309751, guid: 1a0a1fc2b08856641ae0b9b30aa7a018, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 8933805211233203303, guid: 1a0a1fc2b08856641ae0b9b30aa7a018, type: 3}
       propertyPath: m_Pivot.x

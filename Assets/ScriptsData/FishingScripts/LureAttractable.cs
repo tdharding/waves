@@ -18,8 +18,9 @@ public class LureAttractable : MonoBehaviour
     private Vector3              _returnTarget;
     private float                _returnNormalizedTime;
 
-    enum State { Free, Attracted, Returning }
-    State _state = State.Free;
+    public enum State { Free, Attracted, Returning }
+    public State CurrentState => _state;
+    private State _state = State.Free;
 
     void Awake()
     {
@@ -38,24 +39,42 @@ public class LureAttractable : MonoBehaviour
             return;
         }
 
-        // Find nearest active lure in range
+        // Find nearest active lure. 
+        // If already attracted, we stick to our current target as long as it's active.
         LureBehaviour nearest = null;
         float nearestDist     = float.MaxValue;
-        foreach (var lure in LureBehaviour.ActiveLures)
+
+        if (_state == State.Attracted && _targetLure != null && LureBehaviour.ActiveLures.Contains(_targetLure))
         {
-            if (lure == null) continue;
-            float d = Vector3.Distance(transform.position, lure.transform.position);
-            if (d <= lure.attractionRadius && d < nearestDist)
+            nearest     = _targetLure;
+            nearestDist = Vector3.Distance(transform.position, nearest.transform.position);
+        }
+        else
+        {
+            foreach (var lure in LureBehaviour.ActiveLures)
             {
-                nearestDist = d;
-                nearest     = lure;
+                if (lure == null) continue;
+                float d = Vector3.Distance(transform.position, lure.transform.position);
+                if (d <= lure.attractionRadius && d < nearestDist)
+                {
+                    nearestDist = d;
+                    nearest     = lure;
+                }
             }
         }
 
         if (nearest != null)
         {
-            if (_splineAnimate != null && _splineAnimate.IsPlaying)
-                _splineAnimate.Pause();
+            if (_state != State.Attracted)
+            {
+                Debug.Log($"[LureAttractable] {name} ATTRACTED to {nearest.name} — dist: {nearestDist:F2}, active lures: {LureBehaviour.ActiveLures.Count}");
+
+                if (_splineAnimate != null && _splineAnimate.IsPlaying)
+                {
+                    _splineAnimate.Pause();
+                    Debug.Log($"[LureAttractable] {name} LEFT SPLINE at NormalizedTime={_splineAnimate.NormalizedTime:F4}, worldPos={transform.position}");
+                }
+            }
 
             _targetLure = nearest;
             _state      = State.Attracted;
@@ -84,6 +103,24 @@ public class LureAttractable : MonoBehaviour
         }
         else if (_state == State.Returning)
         {
+            // Before heading back to spline, check if any active lure exists (no radius filter)
+            LureBehaviour nearestAny = null;
+            float nearestAnyDist = float.MaxValue;
+            foreach (var lure in LureBehaviour.ActiveLures)
+            {
+                if (lure == null) continue;
+                float d = Vector3.Distance(transform.position, lure.transform.position);
+                if (d < nearestAnyDist) { nearestAnyDist = d; nearestAny = lure; }
+            }
+
+            if (nearestAny != null)
+            {
+                Debug.Log($"[LureAttractable] {name} REDIRECTED to lure {nearestAny.name} instead of returning to spline — dist: {nearestAnyDist:F2}");
+                _targetLure = nearestAny;
+                _state      = State.Attracted;
+            }
+            else
+            {
             float dist = Vector3.Distance(transform.position, _returnTarget);
             transform.position = Vector3.MoveTowards(transform.position, _returnTarget, returnSpeed * Time.deltaTime);
 
@@ -96,10 +133,21 @@ public class LureAttractable : MonoBehaviour
             {
                 if (_splineAnimate != null)
                 {
-                    _splineAnimate.NormalizedTime = _returnNormalizedTime;
+                    Vector3 splineEvalPos = _splineAnimate.Container.transform.TransformPoint(
+                        (Vector3)SplineUtility.EvaluatePosition(_splineAnimate.Container.Spline, _returnNormalizedTime));
+
+                    Debug.Log($"[LureAttractable] {name} SNAP TO SPLINE — soulPos={transform.position}, splineEvalAtT={splineEvalPos}, t={_returnNormalizedTime:F4}, snapDelta={Vector3.Distance(transform.position, splineEvalPos):F4}");
+
+                    // Account for SplineAnimate.StartOffset which is added to NormalizedTime during evaluation
+                    float adjustedTime = _returnNormalizedTime - _splineAnimate.StartOffset;
+                    _splineAnimate.NormalizedTime = Mathf.Repeat(adjustedTime, 1f);
+
+                    // Set position immediately to prevent 1-frame jump
+                    transform.position = splineEvalPos;
                     _splineAnimate.Play();
-                }
+                    }
                 _state = State.Free;
+            }
             }
         }
     }
@@ -121,6 +169,8 @@ public class LureAttractable : MonoBehaviour
             _returnNormalizedTime = t;
             _returnTarget = _splineAnimate.Container.transform
                                 .TransformPoint((Vector3)nearestLocal);
+
+            Debug.Log($"[LureAttractable] {name} BEGIN RETURN — currentPos={transform.position}, nearestSplineWorldPos={_returnTarget}, t={_returnNormalizedTime:F4}, distToTarget={Vector3.Distance(transform.position, _returnTarget):F2}");
         }
         else
         {

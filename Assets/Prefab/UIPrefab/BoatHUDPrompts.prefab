@@ -51,7 +51,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BoatHUD
   boatTransform: {fileID: 0}
-  screenOffset: {x: 0, y: 80}
+  screenOffset: {x: 0, y: -23.2}
 --- !u!1 &6937354140517302731
 GameObject:
   m_ObjectHideFlags: 0
@@ -467,6 +467,18 @@ PrefabInstance:
       value: 100
       objectReference: {fileID: 0}
     - target: {fileID: 7032177605510786090, guid: a04efed9520fc96438a13f3c63c513ef, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.4
+      objectReference: {fileID: 0}
+    - target: {fileID: 7032177605510786090, guid: a04efed9520fc96438a13f3c63c513ef, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.4
+      objectReference: {fileID: 0}
+    - target: {fileID: 7032177605510786090, guid: a04efed9520fc96438a13f3c63c513ef, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.4
+      objectReference: {fileID: 0}
+    - target: {fileID: 7032177605510786090, guid: a04efed9520fc96438a13f3c63c513ef, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
       objectReference: {fileID: 0}
@@ -513,6 +525,10 @@ PrefabInstance:
     - target: {fileID: 7032177605510786090, guid: a04efed9520fc96438a13f3c63c513ef, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7032177605510786090, guid: a04efed9520fc96438a13f3c63c513ef, type: 3}
+      propertyPath: m_ConstrainProportionsScale
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8421378690119419904, guid: a04efed9520fc96438a13f3c63c513ef, type: 3}
       propertyPath: m_Name

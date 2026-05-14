@@ -82,7 +82,7 @@ public class FishingController : MonoBehaviour
         if (LevelSoulTracker.Instance != null)
             LevelSoulTracker.Instance.AddSoulToBoat(fishLabel.linkID, fishLabel.soulDataIdentity);
 
-        sonar?.DeactivateSonar();
+        // sonar?.DeactivateSonar();
     }
 
     // --------------------------------------------------

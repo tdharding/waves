@@ -432,10 +432,13 @@ public class LevelDataController : MonoBehaviour
                 FindObjectOfType<SonarUIMapController>()?.SetSoulBoat(soulBoatTransform);
                 FindObjectOfType<SonarCameraFollow>()?.BeginTracking(soulBoatTransform);
 
-                // Wire lure controller from soul boat to the boat control router
+                // Wire lure controller from soul boat to the boat control router and tool manager
                 var lureController = soulBoatTransform.GetComponentInChildren<LureController>();
                 if (lureController != null)
+                {
                     FindObjectOfType<BoatControlRouter>()?.SetLureController(lureController);
+                    FindObjectOfType<BoatToolManager>()?.SetLureController(lureController);
+                }
             }
 
             gameplayBoat.SetActive(true);
