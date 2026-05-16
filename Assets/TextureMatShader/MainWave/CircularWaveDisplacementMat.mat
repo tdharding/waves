@@ -66,7 +66,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _LatticeCamRend:
-        m_Texture: {fileID: 8400000, guid: b6b6e440e15c2d442b54a4c4f6291221, type: 2}
+        m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MainTex:
@@ -215,10 +215,10 @@ Material:
     - _SonarGDimensionMultiply: 0.5
     - _SonarRDimensionMultiply: 1.3
     - _SonarRadius: 1.87
-    - _Sonar_Radius: 0
+    - _Sonar_Radius: 1
     - _Sonar_Radius_Softness: 0
     - _SoulFishDistortion1: 10.82
-    - _SoulFishMaskStrength: 0.21
+    - _SoulFishMaskStrength: 0
     - _SoulFishRadius1: 0.1
     - _SoulFishRadius10: 0.1
     - _SoulFishRadius2: 0.55
@@ -274,8 +274,8 @@ Material:
     - _WorkflowMode: 1
     - _XRMotionVectorsPass: 1
     - _ZWrite: 1
-    - _ZoneNoiseStrength: 0.11
-    - _ZoneScrollSpeed: 0.14
+    - _ZoneNoiseStrength: 0.3
+    - _ZoneScrollSpeed: 0.05
     - _ZoneTiling: 18.52
     - _boatedgemaskwidth: 0
     - _boatedgewavesharpness: 1.41
@@ -284,10 +284,10 @@ Material:
     m_Colors:
     - _ArenaMask: {r: 0.08, g: 0, b: -0.2, a: 0}
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
-    - _BoatForward: {r: -0.0061155697, g: 0.0957775, b: -0.99538434, a: 0}
-    - _BoatPosition: {r: 1.5121994, g: 0.27149472, b: -0.36902073, a: 0}
-    - _BoatRight: {r: -0.9883171, g: 0.15101549, b: 0.020603105, a: 0}
-    - _BoatSonarPosition: {r: 1.5134063, g: 0, b: -0.2694907, a: 0}
+    - _BoatForward: {r: -0.51980734, g: -0.7224761, b: -0.4558828, a: 0}
+    - _BoatPosition: {r: -0.81883746, g: -0.15047084, b: -1.1301633, a: 0}
+    - _BoatRight: {r: -0.7636052, g: 0.15368056, b: 0.6271285, a: 0}
+    - _BoatSonarPosition: {r: -0.7664218, g: 0, b: -1.0849817, a: 0}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _DeepColour: {r: 1, g: 0, b: 0, a: 1}
     - _DepthColour: {r: 0.4528302, g: 0.41651833, b: 0.41651833, a: 0}
@@ -319,6 +319,6 @@ Material:
     - _Tiling: {r: 20, g: 20, b: 0, a: 0}
     - _WaveCenter: {r: 0.05, g: 0.68, b: -0.08, a: 0}
     - _WaveCenter5: {r: 0.34, g: 0, b: 0, a: 0}
-    - _ZoneTiling: {r: 60, g: 60, b: 0, a: 0}
+    - _ZoneTiling: {r: 0.5, g: 0.5, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

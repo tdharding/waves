@@ -41,6 +41,9 @@ public class LevelDataController : MonoBehaviour
     [SerializeField] private SoulFishWaveLinker soulFishWaveLinker;
     [SerializeField] private SoulFishMapLinker soulFishMapLinker;
 
+    [Header("Sonar")]
+    [SerializeField] private SonarController sonarController;
+
     [Header("Enemies")]
     private GameObject spawnedSnake;
 
@@ -443,6 +446,7 @@ public class LevelDataController : MonoBehaviour
 
             gameplayBoat.SetActive(true);
 
+            sonarController?.SetBoat(gameplayBoat.transform);
             FindObjectOfType<BoatHUD>()?.SetBoatTransform(gameplayBoat.transform);
 
             // Re-resolve whirl direction sources now that the boat is active —

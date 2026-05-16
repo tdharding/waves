@@ -11,6 +11,11 @@ public class SonarController : MonoBehaviour
     [SerializeField] Material             material;
     [SerializeField] Transform            boatTransform;
 
+    [Header("Wave Mask")]
+    [SerializeField] Transform waterTransform;
+    [SerializeField] Material  waterMaterial;
+    [SerializeField] float     waveMaskBias = 0.05f;
+
     [Header("Pulse Origins")]
     [SerializeField] List<Transform> pulseOrigins = new List<Transform>();
 
@@ -20,33 +25,78 @@ public class SonarController : MonoBehaviour
     [SerializeField] float displaceStrength     = 0.5f;
     [SerializeField] float displaceRadiusOffset = 0f;
 
-    static readonly int GridOffsetID = Shader.PropertyToID("_GridOffset");
+    [Header("Debug")]
+    [SerializeField] bool debugLog = false;
 
     MaterialPropertyBlock _hBlock;
     MaterialPropertyBlock _vBlock;
+    MaterialPropertyBlock _xBlock;
     readonly Vector4[]    _originBuffer = new Vector4[MaxOrigins];
+
+    float _debugTimer;
+
+    static readonly int WaveOriginID  = Shader.PropertyToID("_WaveOrigin");
+    static readonly int WaveFreqID    = Shader.PropertyToID("_WaveFrequency");
+    static readonly int WaveSpeedID   = Shader.PropertyToID("_WaveSpeed");
+    static readonly int WaveRippleID  = Shader.PropertyToID("_WaveRipple");
+    static readonly int WaveScaleID   = Shader.PropertyToID("_WaveMeshScale");
+    static readonly int WaveBiasID    = Shader.PropertyToID("_WaveMaskBias");
+
+    public void SetBoat(Transform boat) => boatTransform = boat;
 
     void OnEnable()
     {
         _hBlock = new MaterialPropertyBlock();
         _vBlock = new MaterialPropertyBlock();
+        _xBlock = new MaterialPropertyBlock();
     }
 
     void Update()
     {
-        FollowBoat();
+        if (generator != null && boatTransform != null)
+            generator.SnapTiles(boatTransform.position);
+
         int count = PackOrigins();
+
+        if (waterTransform != null && waterMaterial != null)
+        {
+            WaveUtils.WaveParams wp = WaveUtils.ReadParams(waterTransform, waterMaterial);
+            PushWaveParams(_hBlock, wp);
+            PushWaveParams(_vBlock, wp);
+            PushWaveParams(_xBlock, wp);
+
+            if (debugLog)
+            {
+                _debugTimer += Time.deltaTime;
+                if (_debugTimer >= 1f)
+                {
+                    _debugTimer = 0f;
+                    Debug.Log($"[SonarController] WaveParams — origin:{wp.origin} freq:{wp.frequency} speed:{wp.speed} ripple:{wp.ripple} scale:{wp.meshScale} bias:{waveMaskBias}");
+                }
+            }
+        }
+        else if (debugLog)
+        {
+            _debugTimer += Time.deltaTime;
+            if (_debugTimer >= 1f)
+            {
+                _debugTimer = 0f;
+                Debug.LogWarning($"[SonarController] Wave mask not pushing — waterTransform:{(waterTransform == null ? "NULL" : "OK")} waterMaterial:{(waterMaterial == null ? "NULL" : "OK")}");
+            }
+        }
+
         PushToMaterial(count);
         PushToRenderers(count);
     }
 
-    void FollowBoat()
+    void PushWaveParams(MaterialPropertyBlock block, WaveUtils.WaveParams wp)
     {
-        if (boatTransform == null || generator == null) return;
-        Vector3 pos = generator.transform.position;
-        pos.x = boatTransform.position.x;
-        pos.z = boatTransform.position.z;
-        generator.transform.position = pos;
+        block.SetVector(WaveOriginID, new Vector4(wp.origin.x, wp.origin.y, wp.origin.z, 0f));
+        block.SetFloat(WaveFreqID,   wp.frequency);
+        block.SetFloat(WaveSpeedID,  wp.speed);
+        block.SetFloat(WaveRippleID, wp.ripple);
+        block.SetFloat(WaveScaleID,  wp.meshScale);
+        block.SetFloat(WaveBiasID,   waveMaskBias);
     }
 
     int PackOrigins()
@@ -72,8 +122,6 @@ public class SonarController : MonoBehaviour
         material.SetFloat(SonarPlaneGenerator.DisplaceStrengthID,     displaceStrength);
         material.SetFloat(SonarPlaneGenerator.DisplaceRadiusOffsetID, displaceRadiusOffset);
 
-        // Keep shader GridDensity and GridWorldScale locked to generator values
-        // so scroll speed always matches the grid pattern frequency
         if (generator != null)
         {
             material.SetFloat(SonarPlaneGenerator.GridDensityShaderID, generator.GridDensity);
@@ -85,19 +133,23 @@ public class SonarController : MonoBehaviour
     {
         if (generator == null) return;
 
-        float scale = generator.GridWorldScale;
-        float bx    = boatTransform != null ? boatTransform.position.x * scale : 0f;
-        float bz    = boatTransform != null ? boatTransform.position.z * scale : 0f;
+        float dens = (float)generator.GridDensity;
 
         SetPulseProperties(_hBlock, count);
         SetPulseProperties(_vBlock, count);
-        _hBlock.SetVector(GridOffsetID, new Vector2(bx, bz));
-        _vBlock.SetVector(GridOffsetID, new Vector2(bx, 0f));
+        SetPulseProperties(_xBlock, count);
+        _hBlock.SetFloat(SonarPlaneGenerator.GridDensityShaderID, dens);
+        _vBlock.SetFloat(SonarPlaneGenerator.GridDensityShaderID, dens);
+        _xBlock.SetFloat(SonarPlaneGenerator.GridDensityShaderID, dens);
 
         foreach (Renderer r in generator.GetComponentsInChildren<Renderer>())
         {
             if (r == null) continue;
-            r.SetPropertyBlock(r.gameObject.name.StartsWith("Horizontal") ? _hBlock : _vBlock);
+            string name = r.gameObject.name;
+            MaterialPropertyBlock block = name.StartsWith("Horizontal")    ? _hBlock
+                                        : name.StartsWith("CrossVertical") ? _xBlock
+                                        : _vBlock;
+            r.SetPropertyBlock(block);
         }
     }
 

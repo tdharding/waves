@@ -398,6 +398,10 @@ public class SaveDataEditorWindow : EditorWindow
             Debug.LogWarning($"[SaveDataMonitor] SETTING OVERRIDE: WavePreset '{waveOverride.name}', Path: '{path}'");
         }
 
+        WavePreset presetForTuner = waveOverride ?? levelData?.gameplayWavePreset;
+        if (presetForTuner != null)
+            WaveEffectsLiveTuner.InstallPreset(presetForTuner);
+
         // Open the scene then enter play mode
         string scenePath = null;
         foreach (var s in UnityEditor.EditorBuildSettings.scenes)

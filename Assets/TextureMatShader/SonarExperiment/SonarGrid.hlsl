@@ -44,7 +44,7 @@ void SonarGrid_float(
 )
 {
     // ── grid lines ────────────────────────────────────────────────────────────
-    float2 scaled      = frac(UV * GridDensity - GridOffset);
+    float2 scaled      = frac(UV * GridDensity + GridOffset);
     float2 distToEdge  = min(scaled, 1.0 - scaled);
     float  nearestLine = min(distToEdge.x, distToEdge.y);
 
@@ -83,7 +83,7 @@ void SonarGrid_half(
     out half Alpha
 )
 {
-    half2 scaled      = frac(UV * GridDensity - GridOffset);
+    half2 scaled      = frac(UV * GridDensity + GridOffset);
     half2 distToEdge  = min(scaled, 1.0h - scaled);
     half  nearestLine = min(distToEdge.x, distToEdge.y);
 

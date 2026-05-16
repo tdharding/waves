@@ -149,7 +149,9 @@ public class SoulFishWaveLinker : MonoBehaviour
                 Gizmos.DrawLine(pos, next);
             }
 
+#if UNITY_EDITOR
             UnityEditor.Handles.Label(pos + Vector3.up * 0.5f, $"[{i}] w={packed[i].w}");
+#endif
         }
     }
 

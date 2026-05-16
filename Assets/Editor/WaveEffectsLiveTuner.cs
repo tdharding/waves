@@ -165,6 +165,26 @@ public class WaveEffectsLiveTuner : EditorWindow
         }
     }
 
+    // Called by SaveDataEditorWindow before entering play mode so the tuner
+    // reflects the same preset the scene is about to use.
+    public static void InstallPreset(WavePreset preset)
+    {
+        if (preset == null) return;
+
+        // Persist so RestoreFromPrefs picks it up if the window re-opens
+        EditorPrefs.SetString(PrefPreset,
+            AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(preset)));
+
+        // If the window is already open, update it directly
+        if (HasOpenInstances<WaveEffectsLiveTuner>())
+        {
+            var win = GetWindow<WaveEffectsLiveTuner>("Wave Effects Tuner", false);
+            win.activePreset = preset;
+            win.LoadFromPreset(preset);
+            win.Repaint();
+        }
+    }
+
     void SaveToPrefs()
     {
         if (waveMaterial)

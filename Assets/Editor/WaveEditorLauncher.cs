@@ -16,12 +16,14 @@ public static class WaveEditorLauncher
         var win2 = EditorWindow.GetWindow<GridDesignerWindow>("Grid Designer", typeof(SaveDataEditorWindow));
         var win3 = EditorWindow.GetWindow<LevelSelectDesignerWindow>("Level Select Designer", typeof(SaveDataEditorWindow));
         var win4 = EditorWindow.GetWindow<WaveEffectsLiveTuner>("Wave Tuner", typeof(SaveDataEditorWindow));
+        var win5 = EditorWindow.GetWindow<SonarGridEditorWindow>("Sonar Grid Editor", typeof(SaveDataEditorWindow));
 
         // Show all of them
         win1.Show();
         win2.Show();
         win3.Show();
         win4.Show();
+        win5.Show();
 
         // Focus the first one to start the view there
         win1.Focus();
