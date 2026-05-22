@@ -53,23 +53,21 @@ public class SonarCompassDetection : MonoBehaviour
 
     bool IsFacingAnyFish()
     {
-        GameObject[] fish = GameObject.FindGameObjectsWithTag("SoulFishRealityPoint");
+        var fish = SoulFishMapLinker.ActiveFish;
+        if (fish == null || fish.Count == 0) return false;
 
         Vector3 boatForward = boatTransform.forward;
-        Vector3 boatPos = boatTransform.position;
+        Vector3 boatPos     = boatTransform.position;
+        float   radiusSq    = detectionRadius * detectionRadius;
 
-        for (int i = 0; i < fish.Length; i++)
+        for (int i = 0; i < fish.Count; i++)
         {
-            Vector3 toFishVec = fish[i].transform.position - boatPos;
+            if (fish[i] == null) continue;
 
-            // Proximity check (boolean gate)
-            if (toFishVec.sqrMagnitude > detectionRadius * detectionRadius)
-                continue;
+            Vector3 toFish = fish[i].position - boatPos;
+            if (toFish.sqrMagnitude > radiusSq) continue;
 
-            Vector3 toFishDir = toFishVec.normalized;
-            float dot = Vector3.Dot(boatForward, toFishDir);
-
-            if (dot > facingDotThreshold)
+            if (Vector3.Dot(boatForward, toFish.normalized) > facingDotThreshold)
                 return true;
         }
 

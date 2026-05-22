@@ -47,14 +47,6 @@ public class SonarUIMapController : MonoBehaviour
 
     // --------------------------------------------------
 
-    /// <summary>
-    /// Set the SoulBoat transform directly. Called from LevelDataController after SpawnSoulBoat().
-    /// </summary>
-    public void SetSoulBoat(Transform soulBoat)
-    {
-        sonarBoat = soulBoat;
-    }
-
     private bool TryResolveSonarBoat()
     {
         return sonarBoat != null;

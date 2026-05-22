@@ -37,6 +37,9 @@ public class CatapultController : MonoBehaviour
     public float obstacleCheckRadius = 0.45f;
     public string[] collidableTags = { "MazeWalls", "LowHMazeWall", "TallHMazeWall", "LowSpikeTrap", "BadGuySnake" };
 
+    [Header("Debug")]
+    public bool showDebugGizmos = true;
+
     [Header("Projectile Wave Sampling")]
     public float extraYOffset = 0.01f;
     public float heightMultiplier = 1f;
@@ -191,6 +194,7 @@ public class CatapultController : MonoBehaviour
 #if UNITY_EDITOR
     private void OnDrawGizmos()
     {
+        if (!showDebugGizmos) return;
         Vector3 origin   = launchPoint != null ? launchPoint.position : transform.position;
         Vector3 worldDir = transform.TransformDirection(fireDirectionLocal.normalized);
         Vector3 right    = Vector3.Cross(worldDir, Vector3.up).normalized;
@@ -227,6 +231,18 @@ public class CatapultController : MonoBehaviour
         UnityEditor.Handles.Label(peak + Vector3.up * 0.2f, $"Peak +{arcPeakHeight}m");
         UnityEditor.Handles.color = Color.yellow;
         UnityEditor.Handles.Label(landing + Vector3.up * 0.2f, $"{throwDistance}m");
+
+        // Obstacle check radius — shown at launch, peak, and landing
+        Gizmos.color = new Color(1f, 0.4f, 0f, 0.25f);
+        Gizmos.DrawSphere(origin,  obstacleCheckRadius);
+        Gizmos.DrawSphere(peak,    obstacleCheckRadius);
+        Gizmos.DrawSphere(landing, obstacleCheckRadius);
+        Gizmos.color = new Color(1f, 0.4f, 0f, 1f);
+        Gizmos.DrawWireSphere(origin,  obstacleCheckRadius);
+        Gizmos.DrawWireSphere(peak,    obstacleCheckRadius);
+        Gizmos.DrawWireSphere(landing, obstacleCheckRadius);
+        UnityEditor.Handles.color = new Color(1f, 0.4f, 0f, 1f);
+        UnityEditor.Handles.Label(landing + Vector3.up * (obstacleCheckRadius + 0.25f), $"r={obstacleCheckRadius}");
     }
 #endif
 }

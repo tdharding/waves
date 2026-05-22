@@ -5,8 +5,7 @@ using System.Collections.Generic;
 public class FishingController : MonoBehaviour
 {
     [Header("Refs")]
-    [Tooltip("Dummy boat target in soul plane (mirrors real boat movement)")]
-    public Transform dummyBoatTarget;
+    public Transform boatTransform;
 
     [Header("Sonar")]
     public SonarSystemController sonar;
@@ -27,7 +26,16 @@ public class FishingController : MonoBehaviour
 
     [Header("Visual FX")]
     [SerializeField] private WhirlFXController whirlFX;
+    [SerializeField] private SoulWhirlDirection soulWhirlDirection;
+    [SerializeField] private SecondWhirlChain secondWhirlChain;
     [SerializeField] private BoatCameraZoom cameraZoom;
+
+    [Header("Whirl Shader")]
+    [SerializeField] private float pinchStrengthMin = 0f;
+    [SerializeField] private float pinchStrengthMax = 1.5f;
+    [SerializeField] private float whirlRadiusMin   = 0f;
+    [SerializeField] private float whirlRadiusMax   = 6f;
+    [SerializeField] private float whirlShaderTransitionSpeed = 3f;
 
     [Header("Souls Visuals")]
     [Tooltip("The parent object containing the static soul models on the boat")]
@@ -113,6 +121,8 @@ public class FishingController : MonoBehaviour
             // Deploy is initiated via whirlFX.Deploy() externally
             // Fish are only notified once WhirlFX fires OnDeployNetComplete
             cameraZoom?.SetWhirlZoom(true);
+            soulWhirlDirection?.SetFishingActive(true, pinchStrengthMin, pinchStrengthMax, whirlRadiusMin, whirlRadiusMax, whirlShaderTransitionSpeed);
+            secondWhirlChain?.SetActive(true);
 
             for (int i = 0; i < registeredFish.Count; i++)
                 if (registeredFish[i] != null)
@@ -122,6 +132,8 @@ public class FishingController : MonoBehaviour
         {
             whirlFX?.Retract();
             cameraZoom?.SetWhirlZoom(false);
+            soulWhirlDirection?.SetFishingActive(false, pinchStrengthMin, pinchStrengthMax, whirlRadiusMin, whirlRadiusMax, whirlShaderTransitionSpeed);
+            secondWhirlChain?.SetActive(false);
 
             for (int i = 0; i < registeredFish.Count; i++)
                 if (registeredFish[i] != null)
@@ -175,6 +187,7 @@ public class FishingController : MonoBehaviour
     // --------------------------------------------------
 
     public void SetWhirlFX(WhirlFXController fx) => whirlFX = fx;
+    public void SetSoulWhirlDirection(SoulWhirlDirection swd) => soulWhirlDirection = swd;
 
     void OnDisable()
     {

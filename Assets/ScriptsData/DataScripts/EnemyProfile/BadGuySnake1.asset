@@ -13,4 +13,4 @@ MonoBehaviour:
   m_Name: BadGuySnake1
   m_EditorClassIdentifier: Assembly-CSharp::EnemyProfile
   prefab: {fileID: 8941178421646824244, guid: f48dbcef25199b14097f20ec67bb7b48, type: 3}
-  spawnOnVisit: 1
+  spawnOnVisit: 0

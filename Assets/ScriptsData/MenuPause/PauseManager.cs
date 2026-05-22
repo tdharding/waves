@@ -3,6 +3,7 @@ using UnityEngine.SceneManagement;
 
 public class PauseManager : MonoBehaviour
 {
+    public static PauseManager Instance { get; private set; }
     public static bool IsPaused { get; private set; }
 
     [Header("UI")]
@@ -15,6 +16,11 @@ public class PauseManager : MonoBehaviour
     [Header("Debug / Playtest")]
     [Tooltip("When enabled, losing window focus will NOT force the pause menu")]
     public bool playtestMode = false;
+
+    void Awake()
+    {
+        Instance = this;
+    }
 
     void Start()
     {
@@ -31,24 +37,6 @@ public class PauseManager : MonoBehaviour
         if (!playtestMode && !Application.isFocused && !IsPaused)
             PauseGame();
     }
-
-    // ---------------------------------------------------------
-    // PUBLIC BUTTONS / UI EVENTS
-    // ---------------------------------------------------------
-
-    public void OnResumeButtonPressed()
-    {
-        ResumeGame();
-
-        // Force fullscreen back on
-        if (Screen.fullScreenMode != FullScreenMode.ExclusiveFullScreen &&
-            Screen.fullScreenMode != FullScreenMode.FullScreenWindow)
-        {
-            Screen.fullScreenMode = FullScreenMode.FullScreenWindow;
-            Screen.fullScreen = true;
-        }
-    }
-
 
     // ---------------------------------------------------------
     // CORE PAUSE LOGIC
@@ -80,13 +68,6 @@ public class PauseManager : MonoBehaviour
 
 
     }
-
-public void OnNewGameButtonPressed()
-{
-    Time.timeScale = 1f;
-    AudioListener.pause = false;
-    SceneManager.LoadScene("MainMenu"); // this one can stay, or also be serialized
-}
 
 public void QuitGame()
 {

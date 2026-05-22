@@ -31,7 +31,6 @@ public class SonarPlaneGeneratorEditor : Editor
 
         var gen = (SonarPlaneGenerator)target;
 
-        // ── grid type slot ────────────────────────────────────────────────────
         Section("Grid Type");
         EditorGUILayout.PropertyField(_gridType, new GUIContent("Sonar Grid Type"));
         EditorGUILayout.Space(2);
@@ -43,28 +42,24 @@ public class SonarPlaneGeneratorEditor : Editor
         }
         else
         {
-            // read-only stat summary
             var prevBg = GUI.backgroundColor;
             GUI.backgroundColor = PanelColour;
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
             GUI.backgroundColor = prevBg;
 
-            int  tilesAxis = gt.TilesPerAxis;
-            int  perLevel  = tilesAxis * tilesAxis;
-            int  hTotal    = perLevel * gt.hLevels;
-            int  vTotal    = gt.spawnVertical      ? hTotal : 0;
-            int  xTotal    = gt.spawnCrossVertical ? hTotal : 0;
+            int poolSize = gen.Columns * gen.Rows * gen.Levels;
+            int vTotal   = gt.spawnVertical      ? poolSize : 0;
+            int xTotal   = gt.spawnCrossVertical ? poolSize : 0;
 
-            EditorGUILayout.LabelField($"Tiles per axis   {tilesAxis}  ×  {gt.hLevels} levels", _statStyle);
-            EditorGUILayout.LabelField($"Renderers  H:{hTotal}  V:{vTotal}  X:{xTotal}  =  {hTotal + vTotal + xTotal}", _statStyle);
-            EditorGUILayout.LabelField($"Cell {gt.cellSize:F2}u   Density {gt.gridDensity}   Subs {gt.subdivisions}", _statStyle);
+            EditorGUILayout.LabelField($"Formation   {gen.Columns} cols × {gen.Rows} rows × {gen.Levels} levels", _statStyle);
+            EditorGUILayout.LabelField($"Cell size   {gen.CellSize:F3}u  (set by SonarController)", _statStyle);
+            EditorGUILayout.LabelField($"Renderers   H:{poolSize}  V:{vTotal}  X:{xTotal}  =  {poolSize + vTotal + xTotal}", _statStyle);
 
             EditorGUILayout.EndVertical();
         }
 
         EditorGUILayout.Space(6);
 
-        // ── buttons ───────────────────────────────────────────────────────────
         var prevCol = GUI.color;
         GUI.color = AccentColour;
 
@@ -76,6 +71,15 @@ public class SonarPlaneGeneratorEditor : Editor
             gen.Generate();
             EditorUtility.SetDirty(gen);
         }
+
+        GUI.color = new Color(1f, 0.4f, 0.4f, 1f);
+        if (GUILayout.Button("Clear Tiles", GUILayout.Height(28), GUILayout.Width(90)))
+        {
+            Undo.RecordObject(gen, "Clear Sonar Tiles");
+            gen.Clear();
+            EditorUtility.SetDirty(gen);
+        }
+        GUI.color = AccentColour;
 
         if (GUILayout.Button("Open Grid Editor", GUILayout.Height(28), GUILayout.Width(130)))
         {

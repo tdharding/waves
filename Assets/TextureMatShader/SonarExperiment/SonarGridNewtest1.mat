@@ -51,24 +51,28 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _DisplaceRadiusOffset: -2.59
-    - _DisplaceStrength: 8.3
-    - _GridDensity: 3
-    - _GridWorldScale: 3
-    - _LineWidth: 0.05
-    - _PulseRadius: 1.78
-    - _PulseWidth: 3.04
+    - _DisplaceRadiusOffset: 0.3
+    - _DisplaceStrength: 0.2
+    - _GridDensity: 5
+    - _GridWorldScale: 7.541478
+    - _LineWidth: 0.008
+    - _PinchStrength: 0
+    - _PulseRadius: 0.2
+    - _PulseWidth: 0.78
     - _QueueControl: 0
     - _QueueOffset: 0
-    - _SpaceBaseAlpha: 0.2
+    - _SoulFishAlpha: 0.31
+    - _SpaceBaseAlpha: 0.33
     - _WaveFrequency: 0
     - _WaveMaskBias: 0
     - _WaveMeshScale: 0
     - _WaveOrigin: 0
     - _WaveRipple: 0
     - _WaveSpeed: 0
+    - _WhirlRadius: 0
     m_Colors:
     - _GridOffset: {r: -1.1216216, g: 2.6324322, b: 0, a: 0}
+    - _MouthWorldPos: {r: -0.8467502, g: -0.18444693, b: -1.7282574, a: 0}
     - _PulseOrigin: {r: -5.58, g: -47.5, b: 2.3, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

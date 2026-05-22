@@ -25,7 +25,12 @@ public class WaveMaterialController : MonoBehaviour
         public float WhirlpoolTwirlStrength;
         public float WhirlpoolAreaTwirlStrength;
         public float SoulFishTwirlStrength;
-        public float SoulFishMaskStrength;
+        public float     SoulFishMaskStrength;
+        public float     SoulFishRadius;
+        public Vector2   ZoneTiling;
+        public float     ZoneScrollSpeed;
+        public float     ZoneNoiseStrength;
+        public Texture2D ZoneTexture;
 
         public float WhirlpoolTaper;
         public float WhirlpoolDarkRadiusMult;
@@ -102,6 +107,10 @@ public Renderer mapWaveRenderer;
         waveMaterial.SetFloat("_WhirlpoolAreaTwirlStrength", state.WhirlpoolAreaTwirlStrength);
         waveMaterial.SetFloat("_SoulFishTwirlStrength",      state.SoulFishTwirlStrength);
         waveMaterial.SetFloat("_SoulFishMaskStrength",       state.SoulFishMaskStrength);
+        waveMaterial.SetVector("_ZoneTiling",               state.ZoneTiling);
+        waveMaterial.SetFloat("_ZoneScrollSpeed",           state.ZoneScrollSpeed);
+        waveMaterial.SetFloat("_ZoneNoiseStrength",         state.ZoneNoiseStrength);
+        if (state.ZoneTexture) waveMaterial.SetTexture("_ZoneTexture", state.ZoneTexture);
 
         waveMaterial.SetFloat("_WhirlpoolTaper",         state.WhirlpoolTaper);
         waveMaterial.SetFloat("_WhirlpoolDarkRadiusMult",state.WhirlpoolDarkRadiusMult);
@@ -164,6 +173,9 @@ public Renderer mapWaveRenderer;
         float curWhirlpoolAreaTwirl = waveMaterial.GetFloat("_WhirlpoolAreaTwirlStrength");
         float curSoulFishTwirl      = waveMaterial.GetFloat("_SoulFishTwirlStrength");
         float curSoulFishMaskStrength = waveMaterial.GetFloat("_SoulFishMaskStrength");
+        Vector2 curZoneTiling       = waveMaterial.GetVector("_ZoneTiling");
+        float curZoneScrollSpeed    = waveMaterial.GetFloat("_ZoneScrollSpeed");
+        float curZoneNoiseStrength  = waveMaterial.GetFloat("_ZoneNoiseStrength");
 
         float curWhirlpoolTaper     = waveMaterial.GetFloat("_WhirlpoolTaper");
         float curDarkRadiusMult     = waveMaterial.GetFloat("_WhirlpoolDarkRadiusMult");
@@ -206,6 +218,9 @@ public Renderer mapWaveRenderer;
         float whirlpoolAreaTwirlRate = (targetState.WhirlpoolAreaTwirlStrength - curWhirlpoolAreaTwirl) / duration;
         float soulFishTwirlRate      = (targetState.SoulFishTwirlStrength      - curSoulFishTwirl)      / duration;
         float soulFishMaskStrengthRate = (targetState.SoulFishMaskStrength - curSoulFishMaskStrength) / duration;
+        Vector2 zoneTilingRate       = (targetState.ZoneTiling       - curZoneTiling)       / duration;
+        float zoneScrollSpeedRate    = (targetState.ZoneScrollSpeed   - curZoneScrollSpeed)   / duration;
+        float zoneNoiseStrengthRate  = (targetState.ZoneNoiseStrength - curZoneNoiseStrength) / duration;
 
         float whirlpoolTaperRate  = (targetState.WhirlpoolTaper          - curWhirlpoolTaper) / duration;
         float darkRadiusMultRate  = (targetState.WhirlpoolDarkRadiusMult - curDarkRadiusMult)  / duration;
@@ -247,6 +262,9 @@ public Renderer mapWaveRenderer;
             curWhirlpoolAreaTwirl += whirlpoolAreaTwirlRate * Time.deltaTime;
             curSoulFishTwirl      += soulFishTwirlRate      * Time.deltaTime;
             curSoulFishMaskStrength += soulFishMaskStrengthRate * Time.deltaTime;
+            curZoneTiling           += zoneTilingRate           * Time.deltaTime;
+            curZoneScrollSpeed      += zoneScrollSpeedRate      * Time.deltaTime;
+            curZoneNoiseStrength    += zoneNoiseStrengthRate    * Time.deltaTime;
 
             curWhirlpoolTaper += whirlpoolTaperRate * Time.deltaTime;
             curDarkRadiusMult += darkRadiusMultRate * Time.deltaTime;
@@ -287,6 +305,9 @@ public Renderer mapWaveRenderer;
             waveMaterial.SetFloat("_WhirlpoolAreaTwirlStrength", curWhirlpoolAreaTwirl);
             waveMaterial.SetFloat("_SoulFishTwirlStrength",      curSoulFishTwirl);
             waveMaterial.SetFloat("_SoulFishMaskStrength",       curSoulFishMaskStrength);
+            waveMaterial.SetVector("_ZoneTiling",               curZoneTiling);
+            waveMaterial.SetFloat("_ZoneScrollSpeed",           curZoneScrollSpeed);
+            waveMaterial.SetFloat("_ZoneNoiseStrength",         curZoneNoiseStrength);
 
             waveMaterial.SetFloat("_WhirlpoolTaper",          curWhirlpoolTaper);
             waveMaterial.SetFloat("_WhirlpoolDarkRadiusMult", curDarkRadiusMult);

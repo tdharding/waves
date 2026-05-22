@@ -11,11 +11,21 @@ public class SonarPlaneGenerator : MonoBehaviour
 
     public SonarGridType GridType => gridType;
 
-    // ── public API (delegates to gridType) ────────────────────────────────────
-    public int   GridDensity    => gridType != null ? gridType.GridDensity    : 1;
-    public float PlaneSize      => gridType != null ? gridType.PlaneSize      : 2f;
-    public float GridWorldScale => gridType != null ? gridType.GridWorldScale : 0.5f;
-    public int   TilesPerAxis   => gridType != null ? gridType.TilesPerAxis   : 5;
+    // ── runtime values set by SonarController ─────────────────────────────────
+    float _cellSize      = 2f;
+    float _levelSpacing  = 1f;
+    float _waveSurfaceY  = 0f;
+
+    // ── public API ────────────────────────────────────────────────────────────
+    public int   Columns      => gridType != null ? gridType.columns    : 1;
+    public int   Rows         => gridType != null ? gridType.rows       : 1;
+    public int   Levels       => gridType != null ? gridType.levels     : 1;
+    public int   GridDensity  => gridType != null ? gridType.GridDensity : 1;
+    public float GridWorldScale => gridType != null ? gridType.GridWorldScale(_cellSize) : 0.5f;
+    public float CellSize     => _cellSize;
+
+    float LevelSpacing => _levelSpacing;
+    float StackTopY    => _waveSurfaceY + (gridType != null ? gridType.surfaceDepthOffset : -0.5f);
 
     public static readonly int PulseOriginsID         = Shader.PropertyToID("_PulseOrigins");
     public static readonly int PulseOriginCountID     = Shader.PropertyToID("_PulseOriginCount");
@@ -29,8 +39,17 @@ public class SonarPlaneGenerator : MonoBehaviour
     readonly List<Transform> _hTiles = new List<Transform>();
     readonly List<Transform> _vTiles = new List<Transform>();
     readonly List<Transform> _xTiles = new List<Transform>();
-    Vector3Int _currentCell = new Vector3Int(int.MinValue, 0, int.MinValue);
     Mesh _sharedMesh;
+
+    // ── configure (called by SonarController) ─────────────────────────────────
+
+    public void Configure(float cellSize, float levelSpacing, float waveSurfaceY)
+    {
+        _cellSize     = Mathf.Max(0.01f, cellSize);
+        _levelSpacing = Mathf.Max(0.01f, levelSpacing);
+        _waveSurfaceY = waveSurfaceY;
+        Generate();
+    }
 
     // ── lifecycle ─────────────────────────────────────────────────────────────
 
@@ -56,15 +75,15 @@ public class SonarPlaneGenerator : MonoBehaviour
     {
         if (gridType == null) return;
         Clear();
-        _sharedMesh = BuildMesh(gridType.subdivisions, gridType.cellSize);
-        int t        = TilesPerAxis;
-        int poolSize = t * t * gridType.hLevels;
+        _sharedMesh = BuildMesh(gridType.subdivisions, _cellSize);
+
+        int poolSize = Columns * Rows * Levels;
         SpawnPool("Horizontal",    poolSize, Quaternion.identity,           _hTiles);
         if (gridType.spawnVertical)
             SpawnPool("Vertical",      poolSize, Quaternion.Euler(90f, 0f, 0f), _vTiles);
         if (gridType.spawnCrossVertical)
             SpawnPool("CrossVertical", poolSize, Quaternion.Euler(0f, 0f, 90f), _xTiles);
-        _currentCell = new Vector3Int(int.MinValue, 0, int.MinValue);
+        PlaceTiles();
     }
 
     [ContextMenu("Clear Tiles")]
@@ -91,35 +110,32 @@ public class SonarPlaneGenerator : MonoBehaviour
         }
     }
 
-    // ── snapping ──────────────────────────────────────────────────────────────
+    // ── static placement ──────────────────────────────────────────────────────
 
-    public void SnapTiles(Vector3 boatWorldPos)
+    void PlaceTiles()
     {
         if (gridType == null) return;
 
-        Vector3Int cell = new Vector3Int(
-            Mathf.RoundToInt(boatWorldPos.x / gridType.cellSize),
-            0,
-            Mathf.RoundToInt(boatWorldPos.z / gridType.cellSize)
-        );
-        if (cell == _currentCell) return;
-        _currentCell = cell;
-
-        int   n       = TilesPerAxis;
-        int   half    = n / 2;
-        float halfLev = (gridType.hLevels - 1) * gridType.hLevelSpacing * 0.5f;
+        int   cols     = Columns;
+        int   rowCount = Rows;
+        float cs       = _cellSize;
+        float halfX    = (cols     - 1) * cs * 0.5f;
+        float halfZ    = (rowCount - 1) * cs * 0.5f;
+        float topY     = StackTopY;
+        Vector3 org    = transform.position;
 
         int hIdx = 0, vIdx = 0, xIdx = 0;
-        for (int lev = 0; lev < gridType.hLevels; lev++)
+        for (int lev = 0; lev < Levels; lev++)
         {
-            float y = gridType.horizontalY - halfLev + lev * gridType.hLevelSpacing;
-            for (int x = 0; x < n; x++)
+            float y = topY - lev * LevelSpacing;
+            for (int col = 0; col < cols; col++)
             {
-                for (int z = 0; z < n; z++, hIdx++, vIdx++, xIdx++)
+                for (int row = 0; row < rowCount; row++, hIdx++, vIdx++, xIdx++)
                 {
                     var pos = new Vector3(
-                        (cell.x + x - half) * gridType.cellSize, y,
-                        (cell.z + z - half) * gridType.cellSize);
+                        org.x - halfX + col * cs,
+                        y,
+                        org.z - halfZ + row * cs);
                     if (hIdx < _hTiles.Count) _hTiles[hIdx].position = pos;
                     if (vIdx < _vTiles.Count) _vTiles[vIdx].position = pos;
                     if (xIdx < _xTiles.Count) _xTiles[xIdx].position = pos;
@@ -132,12 +148,12 @@ public class SonarPlaneGenerator : MonoBehaviour
 
     static Mesh BuildMesh(int subs, float size)
     {
-        int rows   = subs + 1;
-        var verts  = new Vector3[rows * rows];
-        var uvs    = new Vector2[rows * rows];
-        var tris   = new int[subs * subs * 6];
-        float cell = size / subs;
-        float half = size * 0.5f;
+        int   rows  = subs + 1;
+        var   verts = new Vector3[rows * rows];
+        var   uvs   = new Vector2[rows * rows];
+        var   tris  = new int[subs * subs * 6];
+        float cell  = size / subs;
+        float half  = size * 0.5f;
 
         for (int j = 0; j < rows; j++)
             for (int i = 0; i < rows; i++)
@@ -171,41 +187,37 @@ public class SonarPlaneGenerator : MonoBehaviour
 #if UNITY_EDITOR
     void OnDrawGizmosSelected()
     {
-        if (gridType == null || _currentCell.x == int.MinValue) return;
+        if (gridType == null) return;
 
-        int   n       = TilesPerAxis;
-        int   half    = n / 2;
-        float halfLev = (gridType.hLevels - 1) * gridType.hLevelSpacing * 0.5f;
+        int   cols     = Columns;
+        int   rowCount = Rows;
+        float cs       = _cellSize;
+        float halfX    = (cols     - 1) * cs * 0.5f;
+        float halfZ    = (rowCount - 1) * cs * 0.5f;
+        float topY     = StackTopY;
+        Vector3 org    = transform.position;
 
-        for (int x = 0; x < n; x++)
+        for (int col = 0; col < cols; col++)
         {
-            for (int z = 0; z < n; z++)
+            for (int row = 0; row < rowCount; row++)
             {
-                int cx = _currentCell.x + x - half;
-                int cz = _currentCell.z + z - half;
-
-                Gizmos.color = new Color(0f, 1f, 1f, 0.15f);
-                for (int lev = 0; lev < gridType.hLevels; lev++)
+                for (int lev = 0; lev < Levels; lev++)
                 {
-                    float y = gridType.horizontalY - halfLev + lev * gridType.hLevelSpacing;
-                    Gizmos.DrawWireCube(
-                        new Vector3(cx * gridType.cellSize, y, cz * gridType.cellSize),
-                        new Vector3(gridType.cellSize, 0f, gridType.cellSize));
-                }
+                    float   y   = topY - lev * LevelSpacing;
+                    Vector3 pos = new Vector3(org.x - halfX + col * cs, y, org.z - halfZ + row * cs);
 
-                for (int lev = 0; lev < gridType.hLevels; lev++)
-                {
-                    float y   = gridType.horizontalY - halfLev + lev * gridType.hLevelSpacing;
-                    var   pos = new Vector3(cx * gridType.cellSize, y, cz * gridType.cellSize);
+                    Gizmos.color = new Color(0f, 1f, 1f, 0.15f);
+                    Gizmos.DrawWireCube(pos, new Vector3(cs, 0f, cs));
+
                     if (gridType.spawnVertical)
                     {
                         Gizmos.color = new Color(0f, 0.8f, 1f, 0.1f);
-                        Gizmos.DrawWireCube(pos, new Vector3(gridType.cellSize, gridType.cellSize, 0f));
+                        Gizmos.DrawWireCube(pos, new Vector3(cs, cs, 0f));
                     }
                     if (gridType.spawnCrossVertical)
                     {
                         Gizmos.color = new Color(0f, 0.6f, 1f, 0.08f);
-                        Gizmos.DrawWireCube(pos, new Vector3(0f, gridType.cellSize, gridType.cellSize));
+                        Gizmos.DrawWireCube(pos, new Vector3(0f, cs, cs));
                     }
                 }
             }

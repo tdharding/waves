@@ -11,9 +11,6 @@ public class LevelSpawner : MonoBehaviour
     public static bool ForceDisableSnake = false;
 #endif
 
-    [Header("Soul → Reality Proxy Prefab")]
-    [SerializeField] GameObject soulToRealityProxyPrefab;
-
     [Header("Soul Fish Zone")]
     [SerializeField] GameObject soulFishContainerPrefab;
 
@@ -52,11 +49,6 @@ public class LevelSpawner : MonoBehaviour
     [Header("FX")]
     [SerializeField] private WhirlFXController whirlFX;
     [SerializeField] private WhirlpoolManager  whirlpoolManager;
-
-    [Header("Soul Boat")]
-    [Tooltip("The SoulBoat prefab spawned at the chosen entrance. " +
-             "Distinct from ArenaEntrance.soulPrefab (that is the soul-plane door).")]
-    [SerializeField] private GameObject soulBoatPrefab;
 
     public bool mazeSpawned;
     bool mazeRotated;
@@ -109,17 +101,13 @@ public class LevelSpawner : MonoBehaviour
         if (activeGridData.orbCellIndices == null)
             activeGridData.orbCellIndices = new List<int>();
 
-        EnsurePrefabSlotsFromGrid();
-
         Bounds  b      = referencePlane.bounds;
         cachedArenaBounds = b;
         float   tileX  = b.size.x / GridData.GridSize;
         float   tileZ  = b.size.z / GridData.GridSize;
         Vector3 origin = b.min;
 
-        List<GameObject> prefabs = activeGridData.prefabs ?? new List<GameObject>();
-
-        // ── Reality Layer ──
+        // ── Reality Layer — orbs / water / wave modifiers ──
         for (int y = 0; y < GridData.GridSize; y++)
         {
             int flippedY = GridData.GridSize - 1 - y;
@@ -127,7 +115,6 @@ public class LevelSpawner : MonoBehaviour
             for (int x = 0; x < GridData.GridSize; x++)
             {
                 int index = flippedY * GridData.GridSize + x;
-                int cell  = activeGridData.cells[index];
 
                 Vector3 pos = new Vector3(
                     origin.x + x * tileX + tileX * 0.5f,
@@ -137,9 +124,6 @@ public class LevelSpawner : MonoBehaviour
 
                 Quaternion rot = spawnParent.rotation;
                 if (applyMinus90XRotation) rot *= Quaternion.Euler(-90f, 0f, 0f);
-
-                if (cell > 0 && cell <= prefabs.Count && prefabs[cell - 1] != null)
-                    Instantiate(prefabs[cell - 1], pos, rot, spawnParent);
 
                 if (activeGridData.orbCellIndices.Contains(index) && orbPrefab)
                     Instantiate(orbPrefab, pos, rot, spawnParent);
@@ -154,38 +138,16 @@ public class LevelSpawner : MonoBehaviour
             }
         }
 
-        // ── Soul Plane — overlay objects (non-soul) + start/finish ──
-        if (activeGridData.overlayCells != null && soulSpawnParent)
-        {
-            for (int y = 0; y < GridData.GridSize; y++)
-            {
-                int flippedY = GridData.GridSize - 1 - y;
-
-                for (int x = 0; x < GridData.GridSize; x++)
-                {
-                    int index = flippedY * GridData.GridSize + x;
-                    int cell  = activeGridData.overlayCells[index];
-
-                    Vector3 soulPos = new Vector3(
-                        origin.x + x * tileX + tileX * 0.5f,
-                        soulSpawnParent.position.y,
-                        origin.z + y * tileZ + tileZ * 0.5f
-                    );
-
-                    Quaternion soulRot = soulSpawnParent.rotation;
-                    if (applyMinus90XRotation) soulRot *= Quaternion.Euler(-90f, 0f, 0f);
-
-                    // Non-soul overlay objects
-                    if (cell > 0 && cell <= prefabs.Count && prefabs[cell - 1] != null)
-                        Instantiate(prefabs[cell - 1], soulPos, soulRot, soulSpawnParent);
-                }
-            }
-        }
-
         // ── Arena Portals (Entrances & Exits) ──
         SpawnArenaPortals();
 
         // ── Direct Prefab Placements (base layer) ──
+        var   baselineMarker   = activeArenaProfile?.outerWallsPrefab?.GetComponentInChildren<BaselineMarker>();
+        float baselineY        = baselineMarker?.height ?? spawnParent.position.y;
+        Quaternion baselineRot = baselineMarker != null
+            ? Quaternion.LookRotation(baselineMarker.transform.forward, Vector3.up)
+            : Quaternion.identity;
+
         if (activeGridData.prefabPlacements != null)
         {
             foreach (var pp in activeGridData.prefabPlacements)
@@ -195,14 +157,37 @@ public class LevelSpawner : MonoBehaviour
                 int cellY    = pp.cellIndex / GridData.GridSize;
                 int flippedY = GridData.GridSize - 1 - cellY;
                 Transform par = (pp.isCircle && soulSpawnParent) ? soulSpawnParent : spawnParent;
+                float spawnY  = pp.isWorldSpaceProp ? baselineY : par.position.y;
                 Vector3 pos   = new Vector3(
                     origin.x + cellX    * tileX + tileX * 0.5f,
-                    par.position.y,
+                    spawnY,
                     origin.z + flippedY * tileZ + tileZ * 0.5f
                 );
-                Quaternion rot = par.rotation;
-                if (applyMinus90XRotation) rot *= Quaternion.Euler(-90f, 0f, 0f);
-                Instantiate(pp.prefab, pos, rot, par);
+                if (pp.isWorldSpaceProp)
+                {
+                    // Apply the same XZ flip that spawnParent will receive post-spawn
+                    Vector3 worldPos = pos;
+                    if (applyPostSpawnY180Rotation)
+                    {
+                        float cx = spawnParent.position.x + postSpawnPositionOffset.x;
+                        float cz = spawnParent.position.z + postSpawnPositionOffset.z;
+                        worldPos.x = 2f * cx - worldPos.x;
+                        worldPos.z = 2f * cz - worldPos.z;
+                    }
+                    else
+                    {
+                        worldPos.x += postSpawnPositionOffset.x;
+                        worldPos.z += postSpawnPositionOffset.z;
+                    }
+                    bool align = pp.prefab.GetComponentInChildren<PrefabBaselineAlignment>() != null;
+                    Instantiate(pp.prefab, worldPos, align ? baselineRot : Quaternion.identity, null);
+                }
+                else
+                {
+                    Quaternion rot = par.rotation;
+                    if (applyMinus90XRotation) rot *= Quaternion.Euler(-90f, 0f, 0f);
+                    Instantiate(pp.prefab, pos, rot, par);
+                }
             }
         }
 
@@ -212,7 +197,6 @@ public class LevelSpawner : MonoBehaviour
             for (int ti = 0; ti < activeGridData.tiers.Count; ti++)
             {
                 var tier = activeGridData.tiers[ti];
-                if (tier.cells == null) continue;
                 float[] offsets = tierConfig?.offsets;
                 float yOff = (offsets != null && tier.yOffsetSlot < offsets.Length)
                     ? offsets[tier.yOffsetSlot] : tier.yOffset;
@@ -223,7 +207,6 @@ public class LevelSpawner : MonoBehaviour
                     for (int x = 0; x < GridData.GridSize; x++)
                     {
                         int index = flippedY * GridData.GridSize + x;
-                        int cell  = tier.cells[index];
                         Vector3 pos = new Vector3(
                             origin.x + x * tileX + tileX * 0.5f,
                             spawnParent.position.y + yOff,
@@ -231,9 +214,6 @@ public class LevelSpawner : MonoBehaviour
                         );
                         Quaternion rot = spawnParent.rotation;
                         if (applyMinus90XRotation) rot *= Quaternion.Euler(-90f, 0f, 0f);
-
-                        if (cell > 0 && cell <= prefabs.Count && prefabs[cell - 1] != null)
-                            Instantiate(prefabs[cell - 1], pos, rot, spawnParent);
 
                         if (tier.waterLevelModifierCellIndices != null &&
                             tier.waterLevelModifierCellIndices.Contains(index) && waterLevelModifierPrefab)
@@ -270,7 +250,7 @@ public class LevelSpawner : MonoBehaviour
             }
         }
 
-        // ── Soul Fish — explicit spawn points ──
+        // ── Soul Fish — spawned before offset/rotation so they move with spawnParent ──
         SpawnSoulFish(origin, tileX, tileZ);
 
         if (!mazeRotated)
@@ -427,50 +407,6 @@ public class LevelSpawner : MonoBehaviour
     // SOUL BOAT SPAWN
     // =====================================================
 
-    /// <summary>
-    /// Spawns the SoulBoat at the given world position, wires fishing and whirl FX,
-    /// and returns the spawned instance so LevelDataController can distribute its Transform.
-    /// </summary>
-    public GameObject SpawnSoulBoat(Vector3 realityPos, float facingAngle)
-    {
-        if (soulBoatPrefab == null)
-        {
-            Debug.LogWarning("[LevelSpawner] No soulBoatPrefab assigned — SoulBoat not spawned.");
-            return null;
-        }
-        if (soulSpawnParent == null)
-        {
-            Debug.LogWarning("[LevelSpawner] No soulSpawnParent assigned — SoulBoat not spawned.");
-            return null;
-        }
-
-        // Mirror the same rotation convention used for all soul-plane objects in SpawnMaze:
-        // start from the soul parent's current world rotation (includes post-spawn Y180),
-        // add the facing angle, then apply the -90° X correction if the scene uses it.
-        Vector3    soulPos = new Vector3(realityPos.x, soulSpawnParent.position.y, realityPos.z);
-        Quaternion soulRot = soulSpawnParent.rotation * Quaternion.Euler(0f, facingAngle, 0f);
-        if (applyMinus90XRotation) soulRot *= Quaternion.Euler(-90f, 0f, 0f);
-
-        GameObject soulBoat = Instantiate(soulBoatPrefab, soulPos, soulRot, soulSpawnParent);
-
-        if (fishingController != null)
-        {
-            fishingController.dummyBoatTarget = soulBoat.transform;
-            fishingController.SetWhirlFX(whirlFX);
-        }
-
-        if (whirlFX != null)
-        {
-            var animator = soulBoat.GetComponentInChildren<Animator>(true);
-            whirlFX.SetNetAnimator(animator);
-            whirlFX.SetFishingController(fishingController);
-            soulBoat.GetComponentInChildren<NetAnimationEventReceiver>(true)?.SetWhirlFX(whirlFX);
-            whirlFX.SetTargetRenderers(soulBoat.GetComponentsInChildren<SkinnedMeshRenderer>(true));
-        }
-
-        return soulBoat;
-    }
-
     // =====================================================
     // SOUL FISH SPAWN
     // =====================================================
@@ -498,10 +434,15 @@ public class LevelSpawner : MonoBehaviour
             foreach (var s in zone.souls)
                 if (s != null) s.homeLevelID = levelID;
 
-            // Convert node cell indices → world positions
+            // Convert node cell indices → world positions (pre-rotation, for instantiation)
             var nodeWorldPositions = new List<Vector3>(zone.nodes.Count);
             foreach (int nodeCell in zone.nodes)
                 nodeWorldPositions.Add(CellToWorldPos(nodeCell, origin, tileX, tileZ));
+
+            // Pre-compute post-rotation positions for material mask registration
+            var nodeRegPositions = new List<Vector3>(nodeWorldPositions.Count);
+            foreach (var p in nodeWorldPositions)
+                nodeRegPositions.Add(ComputeFinalNodePos(p));
 
             // Detect closed loop: 3+ nodes and last == first
             bool isClosedLoop = zone.nodes.Count >= 3
@@ -522,23 +463,22 @@ public class LevelSpawner : MonoBehaviour
             {
                 var loopNodes = new List<Vector3>(nodeWorldPositions);
                 loopNodes.RemoveAt(loopNodes.Count - 1); // strip duplicate last node
-                splineKnots  = GenerateClosedLoopKnots(loopNodes, zone.knotCount);
+                splineKnots  = GenerateLoopingZoneKnots(loopNodes, zone.knotCount, zone.radius);
                 closedSpline = true;
                 loopMode     = SplineAnimate.LoopMode.Loop;
             }
             else
             {
-                splineKnots  = GenerateOpenPathKnots(nodeWorldPositions, zone.knotCount);
-                closedSpline = false;
-                loopMode     = SplineAnimate.LoopMode.PingPong;
+                splineKnots  = GenerateLoopingZoneKnots(nodeWorldPositions, zone.knotCount, zone.radius);
+                closedSpline = true;
+                loopMode     = SplineAnimate.LoopMode.Loop;
             }
 
-            // Spawn shoal container at first node
-            Quaternion containerRot = soulSpawnParent.rotation;
-            if (applyMinus90XRotation) containerRot *= Quaternion.Euler(-90f, 0f, 0f);
-
+            // Spawn shoal container at first node — reality layer.
+            // No -90° X: SplineContainer must stay axis-aligned so
+            // InverseTransformPoint maps world XZ → local XZ without distortion.
             GameObject containerInstance = Instantiate(
-                soulFishContainerPrefab, nodeWorldPositions[0], containerRot, soulSpawnParent);
+                soulFishContainerPrefab, nodeWorldPositions[0], spawnParent.rotation, spawnParent);
 
             // Container-level identity label (zone-level, not registered individually)
             var containerLabel = containerInstance.GetComponent<LinkIdentityLabel>();
@@ -560,8 +500,8 @@ public class LevelSpawner : MonoBehaviour
             foreach (var sa in containerInstance.GetComponentsInChildren<SplineAnimate>(true))
                 sa.Loop = loopMode;
 
-            // Register zone node positions as the static wave mask area
-            SoulFishWaveLinker.RegisterZone(nodeWorldPositions, isClosedLoop);
+            // Register post-rotation positions so the wave/map mask aligns with where fish actually swim
+            SoulFishWaveLinker.RegisterZone(nodeRegPositions, isClosedLoop);
 
             // Configure SoulShoalController
             var shoal = containerInstance.GetComponent<SoulShoalController>();
@@ -569,11 +509,11 @@ public class LevelSpawner : MonoBehaviour
             {
                 shoal.splineContainer   = splineContainer;
                 shoal.fishingController = fishingController;
-                shoal.InitZone(nodeWorldPositions);
+                shoal.InitZone(nodeRegPositions);
                 shoal.SpawnFish(activeGridData.soulZones, zoneIndex, levelID);
             }
 
-            // Register each spawned fish with linking controller + spawn reality proxies
+            // Register each spawned fish with the linking controller
             if (shoal != null)
             {
                 foreach (var fishTransform in shoal.FishList)
@@ -585,26 +525,6 @@ public class LevelSpawner : MonoBehaviour
 
                     if (linkingController != null)
                         linkingController.RegisterSoulFish(fishLabel.linkID, fishTransform);
-
-                    if (soulToRealityProxyPrefab != null)
-                    {
-                        Vector3    realityPos = new Vector3(fishTransform.position.x, spawnParent.position.y, fishTransform.position.z);
-                        Quaternion realityRot = spawnParent.rotation;
-                        if (applyMinus90XRotation) realityRot *= Quaternion.Euler(-90f, 0f, 0f);
-
-                        GameObject proxy      = Instantiate(soulToRealityProxyPrefab, realityPos, realityRot, spawnParent);
-                        var        proxyLabel = proxy.GetComponent<LinkIdentityLabel>();
-
-                        if (proxyLabel != null)
-                        {
-                            proxyLabel.SetLabel(fishLabel.linkID, "RealityProxy");
-                            proxyLabel.soulDataIdentity = fishLabel.soulDataIdentity;
-
-                            var follow = proxy.GetComponent<SoulFishRealityProxyFollow>();
-                            if (follow != null && linkingController != null)
-                                linkingController.RegisterRealityProxy(proxyLabel.linkID, follow);
-                        }
-                    }
                 }
             }
 
@@ -616,6 +536,22 @@ public class LevelSpawner : MonoBehaviour
     // SPLINE KNOT GENERATION HELPERS
     // =====================================================
 
+    // Returns where a node world position will be after postSpawnPositionOffset and the Y-180 rotation.
+    // Used to register soul fish zone positions with the material linkers before the transform is applied.
+    private Vector3 ComputeFinalNodePos(Vector3 nodeWorldPos)
+    {
+        if (!applyPostSpawnY180Rotation)
+            return nodeWorldPos + postSpawnPositionOffset;
+
+        // Pivot is spawnParent's position after the offset is applied.
+        // When the parent rotates, the child's local offset from the pivot is flipped on X and Z.
+        // The postSpawnPositionOffset cancels in the relative calculation, leaving just the
+        // original relative offset rotated 180° Y plus the new pivot.
+        Vector3 pivot = spawnParent.position + postSpawnPositionOffset;
+        Vector3 rel   = nodeWorldPos - spawnParent.position;
+        return pivot + new Vector3(-rel.x, rel.y, -rel.z);
+    }
+
     private Vector3 CellToWorldPos(int cellIndex, Vector3 origin, float tileX, float tileZ)
     {
         int cellX    = cellIndex % GridData.GridSize;
@@ -623,7 +559,7 @@ public class LevelSpawner : MonoBehaviour
         int flippedY = GridData.GridSize - 1 - cellY;
         return new Vector3(
             origin.x + cellX    * tileX + tileX * 0.5f,
-            soulSpawnParent.position.y,
+            spawnParent.position.y,
             origin.z + flippedY * tileZ + tileZ * 0.5f);
     }
 
@@ -631,22 +567,25 @@ public class LevelSpawner : MonoBehaviour
     {
         var knots = new List<Vector3>(count);
         for (int i = 0; i < count; i++)
-            knots.Add(center + UnityEngine.Random.insideUnitSphere * radius);
+        {
+            Vector2 circle = UnityEngine.Random.insideUnitCircle * radius;
+            knots.Add(new Vector3(center.x + circle.x, center.y, center.z + circle.y));
+        }
         return knots;
     }
 
-    private List<Vector3> GenerateOpenPathKnots(List<Vector3> nodes, int count)
+    // Distributes knots evenly around the node loop, then scatters each within radius on XZ.
+    // Used for both open-path and explicit closed-loop designer zones — all movement is circular.
+    private List<Vector3> GenerateLoopingZoneKnots(List<Vector3> nodes, int count, float scatter)
     {
-        // Build out-and-back route: A→B→…→N→…→B→A
-        var route = new List<Vector3>(nodes);
-        for (int i = nodes.Count - 2; i >= 0; i--)
-            route.Add(nodes[i]);
-        return DistributeAlongPath(route, count, false);
-    }
-
-    private List<Vector3> GenerateClosedLoopKnots(List<Vector3> nodes, int count)
-    {
-        return DistributeAlongPath(nodes, count, true);
+        var baseKnots = DistributeAlongPath(nodes, count, true);
+        var result    = new List<Vector3>(count);
+        foreach (var pt in baseKnots)
+        {
+            Vector2 offset = UnityEngine.Random.insideUnitCircle * scatter;
+            result.Add(new Vector3(pt.x + offset.x, pt.y, pt.z + offset.y));
+        }
+        return result;
     }
 
     private List<Vector3> DistributeAlongPath(List<Vector3> path, int count, bool wrapToClose)
@@ -718,18 +657,6 @@ public class LevelSpawner : MonoBehaviour
     // =====================================================
     // HELPERS
     // =====================================================
-
-    void EnsurePrefabSlotsFromGrid()
-    {
-        if (activeGridData == null) return;
-        int required = 0;
-        foreach (int c in activeGridData.cells) required = Mathf.Max(required, c);
-        if (activeGridData.overlayCells != null)
-            foreach (int c in activeGridData.overlayCells) required = Mathf.Max(required, c);
-        var prefabs = activeGridData.prefabs;
-        if (prefabs == null) { activeGridData.prefabs = new List<GameObject>(); prefabs = activeGridData.prefabs; }
-        while (prefabs.Count < required) prefabs.Add(null);
-    }
 
     public void RevealMaze()
     {

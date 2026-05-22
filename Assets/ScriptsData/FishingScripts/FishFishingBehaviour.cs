@@ -28,13 +28,20 @@ public class FishFishingBehaviour : MonoBehaviour
     [Header("Scale While Attracted")]
     public float minScale = 0.5f;
 
+    [Header("Wave Height")]
+    public float extraYOffset     = -0.5f;
+    public float heightMultiplier = 1f;
+    public float activeDistance   = 25f;
+
     [HideInInspector] public FishingController fishing;
     private Transform whirlTarget;
     private SoulWhirlDirection whirlDirection;
 
-    public bool IsBeingAttracted => fishingActive && IsEligibleForAttraction();
+    public bool IsBeingAttracted => fishingActive && !_travelingTube && IsEligibleForAttraction();
 
     private bool fishingActive;
+    private bool _travelingTube;
+    private bool _tubeReleased;
     private bool hasCachedSplinePos;
 
     private float currentPullSpeed;
@@ -42,7 +49,11 @@ public class FishFishingBehaviour : MonoBehaviour
     private Vector3 cachedDefaultScale;
 
     private LinkIdentityLabel identity;
-    private LureAttractable _lureAttractable;
+    private LureAttractable   _lureAttractable;
+
+    private Transform _waterTransform;
+    private Transform _boatRoot;
+    private Material  _waterMat;
 
     void Awake()
     {
@@ -50,9 +61,8 @@ public class FishFishingBehaviour : MonoBehaviour
             splineAnimate = GetComponent<SplineAnimate>();
 
         cachedDefaultScale = transform.localScale;
-        
-        // Ensure we grab the identity label from the parent (the spawned container)
-        identity = GetComponentInParent<LinkIdentityLabel>();
+
+        identity         = GetComponentInParent<LinkIdentityLabel>();
         _lureAttractable = GetComponent<LureAttractable>();
 
         meshRenderer = GetComponentInChildren<MeshRenderer>();
@@ -75,6 +85,15 @@ public class FishFishingBehaviour : MonoBehaviour
             if (glowMaterialIndex == -1)
                 Debug.LogError("FishFishingBehaviour: No material named 'FishGlow' found.", this);
         }
+    }
+
+    void Start()
+    {
+        if (LevelDataController.Instance == null) return;
+        _waterTransform = LevelDataController.Instance.GetWaveTransform();
+        _boatRoot       = LevelDataController.Instance.GetBoatRoot();
+        if (_waterTransform != null)
+            _waterMat = _waterTransform.GetComponent<MeshRenderer>().sharedMaterial;
     }
 
     void OnEnable()
@@ -117,7 +136,12 @@ public class FishFishingBehaviour : MonoBehaviour
         ResolveWhirlTarget();
     }
 
-    public void OnFishingStopped() => fishingActive = false;
+    public void OnFishingStopped()
+    {
+        fishingActive = false;
+        if (_travelingTube)
+            _tubeReleased = true;
+    }
 
     public void TriggerReturnToSpline()
     {
@@ -128,6 +152,8 @@ public class FishFishingBehaviour : MonoBehaviour
 
     void Update()
     {
+        if (_travelingTube) return;
+
         bool attracting = fishingActive && IsEligibleForAttraction();
         UpdateGlowFade(attracting);
 
@@ -148,13 +174,13 @@ public class FishFishingBehaviour : MonoBehaviour
 
     void ResolveWhirlTarget()
     {
-        if (fishing == null || fishing.dummyBoatTarget == null) return;
+        if (fishing == null || fishing.boatTransform == null) return;
 
-        foreach (Transform t in fishing.dummyBoatTarget.GetComponentsInChildren<Transform>(true))
+        foreach (Transform t in fishing.boatTransform.GetComponentsInChildren<Transform>(true))
         {
             if (t.CompareTag("SoulWhirl"))
             {
-                whirlTarget = t;
+                whirlTarget    = t;
                 whirlDirection = t.GetComponent<SoulWhirlDirection>();
                 break;
             }
@@ -163,33 +189,46 @@ public class FishFishingBehaviour : MonoBehaviour
 
     void AttractTowardsWhirl()
     {
-        if (whirlTarget == null) return;
+        if (whirlDirection == null) return;
+
+        Vector3 target = whirlDirection.MouthPosition;
 
         if (!hasCachedSplinePos)
         {
             cachedSplinePosition = transform.position;
-            hasCachedSplinePos = true;
-            currentPullSpeed = basePullSpeed;
+            hasCachedSplinePos   = true;
+            currentPullSpeed     = basePullSpeed;
             splineAnimate.Pause();
         }
 
-        currentPullSpeed = Mathf.Min(currentPullSpeed + pullAcceleration * Time.deltaTime, maxPullSpeed);
-        transform.position = Vector3.MoveTowards(transform.position, whirlTarget.position, currentPullSpeed * Time.deltaTime);
+        currentPullSpeed  = Mathf.Min(currentPullSpeed + pullAcceleration * Time.deltaTime, maxPullSpeed);
+        transform.position = Vector3.MoveTowards(transform.position, target, currentPullSpeed * Time.deltaTime);
 
-        float dist = Vector3.Distance(transform.position, whirlTarget.position);
-        float t = Mathf.InverseLerp(fishing.CurrentFishingRange, fishing.commitDistance, dist);
+        float dist = Vector3.Distance(transform.position, target);
+        float t    = Mathf.InverseLerp(fishing.CurrentFishingRange, whirlDirection.EntryRadius, dist);
         transform.localScale = cachedDefaultScale * Mathf.Lerp(1f, minScale, t);
 
-        // --- THE CAPTURE TRIGGER ---
-        if (dist <= fishing.commitDistance)
+        if (dist <= whirlDirection.EntryRadius)
         {
             if (identity != null)
             {
-                // RELAY: Hand the whole "Passport" to the FishingController
-                fishing.OnFishCaptured(identity);
-                
-                // Cleanup the physical fish
-                Destroy(identity.gameObject);
+                _travelingTube = true;
+                _tubeReleased  = false;
+                var capturedIdentity = identity;
+                StartCoroutine(whirlDirection.TravelAlongPath(
+                    transform,
+                    onCaptured: () =>
+                    {
+                        fishing.OnFishCaptured(capturedIdentity);
+                        Destroy(capturedIdentity.gameObject);
+                    },
+                    onReleased: () =>
+                    {
+                        _travelingTube = false;
+                        _tubeReleased  = false;
+                    },
+                    isReleased: () => _tubeReleased
+                ));
             }
             else
             {
@@ -199,18 +238,31 @@ public class FishFishingBehaviour : MonoBehaviour
         }
     }
 
+    void LateUpdate()
+    {
+        if (_travelingTube) return;
+        if (IsBeingAttracted) return;
+        if (_waterTransform == null || _boatRoot == null || _waterMat == null) return;
+        if ((_boatRoot.position - transform.position).sqrMagnitude > activeDistance * activeDistance) return;
+
+        var   p      = WaveUtils.ReadParams(_waterTransform, _waterMat);
+        float height = WaveUtils.SampleHeight(transform.position, p, heightMultiplier) + extraYOffset;
+        Vector3 pos  = transform.position;
+        pos.y        = p.origin.y + height;
+        transform.position = pos;
+    }
+
     void ReturnToSpline()
     {
         if (!hasCachedSplinePos) return;
 
-        // If a lure is active and attractable is handling it, we step aside
         if (_lureAttractable != null && _lureAttractable.CurrentState == LureAttractable.State.Attracted)
         {
             hasCachedSplinePos = false;
             return;
         }
 
-        transform.position = Vector3.MoveTowards(transform.position, cachedSplinePosition, Time.deltaTime / returnSnapTime);
+        transform.position   = Vector3.MoveTowards(transform.position, cachedSplinePosition, Time.deltaTime / returnSnapTime);
         transform.localScale = Vector3.MoveTowards(transform.localScale, cachedDefaultScale, Time.deltaTime / returnSnapTime);
 
         if (Vector3.Distance(transform.position, cachedSplinePosition) <= reattachDistance)

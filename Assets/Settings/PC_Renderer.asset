@@ -57,6 +57,48 @@ MonoBehaviour:
       restoreCamera: 1
       offset: {x: 0, y: 0, z: 0, w: 0}
       cameraFieldOfView: 60
+--- !u!114 &-7833884852205820185
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6b3d386ba5cd94485973aee1479b272e, type: 3}
+  m_Name: Explosions
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.RenderObjects
+  m_Active: 1
+  settings:
+    passTag: Explosions
+    Event: 500
+    filterSettings:
+      RenderQueueType: 1
+      LayerMask:
+        serializedVersion: 2
+        m_Bits: 8192
+      PassNames: []
+    overrideMaterial: {fileID: 2100000, guid: 009fb14dfae30684cb938e96bf4a3542, type: 2}
+    overrideMaterialPassIndex: 0
+    overrideShader: {fileID: 0}
+    overrideShaderPassIndex: 0
+    overrideMode: 1
+    overrideDepthState: 1
+    depthCompareFunction: 2
+    enableWrite: 1
+    stencilSettings:
+      overrideStencilState: 0
+      stencilReference: 0
+      stencilCompareFunction: 8
+      passOperation: 0
+      failOperation: 0
+      zFailOperation: 0
+    cameraSettings:
+      overrideCamera: 0
+      restoreCamera: 1
+      offset: {x: 0, y: 0, z: 0, w: 0}
+      cameraFieldOfView: 60
 --- !u!114 &-7010519820637803867
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -153,7 +195,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6b3d386ba5cd94485973aee1479b272e, type: 3}
   m_Name: SonarGrid
   m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.RenderObjects
-  m_Active: 1
+  m_Active: 0
   settings:
     passTag: SonarGrid
     Event: 500
@@ -270,14 +312,16 @@ MonoBehaviour:
   - {fileID: -1091044631912852561}
   - {fileID: -7882423734558799429}
   - {fileID: 7045297408391548026}
-  - {fileID: -5751457783749936023}
   - {fileID: 41624558190944302}
+  - {fileID: -5751457783749936023}
   - {fileID: 5753602923671503783}
   - {fileID: 1941874921933674720}
   - {fileID: -8872254583698201852}
   - {fileID: -1566571695612846054}
   - {fileID: -7010519820637803867}
-  m_RendererFeatureMap: ad6b866f10d7b46c0a60573e35a141e5afd3bc18b0d4dbf0bbc9835460019c927a8c2854aaecc56169fced429eb72eb02e60e7ac50e19300a7c3160c60e7d84fe09818f8f3ecf21a0463d69d766bdf841aa0d0c7576b42eaa56a0cd05da1b59e
+  - {fileID: 5348527109056812781}
+  - {fileID: -7833884852205820185}
+  m_RendererFeatureMap: ad6b866f10d7b46c0a60573e35a141e5afd3bc18b0d4dbf0bbc9835460019c927a8c2854aaecc5612e60e7ac50e1930069fced429eb72eb0a7c3160c60e7d84fe09818f8f3ecf21a0463d69d766bdf841aa0d0c7576b42eaa56a0cd05da1b59eedd6e06611c9394ae766f58c3b734893
   m_UseNativeRenderPass: 1
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
@@ -321,20 +365,20 @@ MonoBehaviour:
   m_Active: 1
   settings:
     passTag: SoulFish
-    Event: 500
+    Event: 1000
     filterSettings:
       RenderQueueType: 0
       LayerMask:
         serializedVersion: 2
         m_Bits: 2048
       PassNames: []
-    overrideMaterial: {fileID: 0}
+    overrideMaterial: {fileID: 2100000, guid: b4449ea3900b85c42b2cbbc495323892, type: 2}
     overrideMaterialPassIndex: 0
     overrideShader: {fileID: 0}
     overrideShaderPassIndex: 0
-    overrideMode: 1
-    overrideDepthState: 0
-    depthCompareFunction: 4
+    overrideMode: 0
+    overrideDepthState: 1
+    depthCompareFunction: 2
     enableWrite: 1
     stencilSettings:
       overrideStencilState: 0
@@ -377,6 +421,48 @@ MonoBehaviour:
     overrideMode: 0
     overrideDepthState: 1
     depthCompareFunction: 2
+    enableWrite: 1
+    stencilSettings:
+      overrideStencilState: 0
+      stencilReference: 0
+      stencilCompareFunction: 8
+      passOperation: 0
+      failOperation: 0
+      zFailOperation: 0
+    cameraSettings:
+      overrideCamera: 0
+      restoreCamera: 1
+      offset: {x: 0, y: 0, z: 0, w: 0}
+      cameraFieldOfView: 60
+--- !u!114 &5348527109056812781
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6b3d386ba5cd94485973aee1479b272e, type: 3}
+  m_Name: soulfishglow
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.RenderObjects
+  m_Active: 1
+  settings:
+    passTag: soulfishglow
+    Event: 500
+    filterSettings:
+      RenderQueueType: 1
+      LayerMask:
+        serializedVersion: 2
+        m_Bits: 512
+      PassNames: []
+    overrideMaterial: {fileID: 2100000, guid: 27ac49d01487ed340bfd14518616f1be, type: 2}
+    overrideMaterialPassIndex: 0
+    overrideShader: {fileID: 0}
+    overrideShaderPassIndex: 0
+    overrideMode: 1
+    overrideDepthState: 1
+    depthCompareFunction: 5
     enableWrite: 1
     stencilSettings:
       overrideStencilState: 0

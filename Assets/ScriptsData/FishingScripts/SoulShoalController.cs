@@ -110,8 +110,8 @@ public class SoulShoalController : MonoBehaviour
     void Start()
     {
         // Resolve boat from fishing controller (spawned after fish, so deferred to Start)
-        if (_boat == null && fishingController != null && fishingController.dummyBoatTarget != null)
-            _boat = fishingController.dummyBoatTarget;
+        if (_boat == null && fishingController != null && fishingController.boatTransform != null)
+            _boat = fishingController.boatTransform;
 
         // Init per-fish proximity audio now that boat is resolved
         foreach (var f in _fishList)
@@ -130,8 +130,8 @@ public class SoulShoalController : MonoBehaviour
         if (!_fishSpawned) return;
 
         // Refresh boat ref lazily if it wasn't ready at Start
-        if (_boat == null && fishingController != null && fishingController.dummyBoatTarget != null)
-            _boat = fishingController.dummyBoatTarget;
+        if (_boat == null && fishingController != null && fishingController.boatTransform != null)
+            _boat = fishingController.boatTransform;
 
         int alive = 0;
         for (int i = 0; i < _fishList.Count; i++)

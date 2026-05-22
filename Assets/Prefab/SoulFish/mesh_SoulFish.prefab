@@ -176,7 +176,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: b4449ea3900b85c42b2cbbc495323892, type: 2}
+  - {fileID: 2100000, guid: 440366389459a4344aab39f1fcda6347, type: 2}
   - {fileID: 2100000, guid: 635ce7670edf5ce4584a5511e3c4c1cf, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
@@ -238,12 +238,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FishFishingBehaviour
   splineAnimate: {fileID: 8433909322147317333}
   basePullSpeed: 0
-  maxPullSpeed: 0.8
-  pullAcceleration: 0.1
+  maxPullSpeed: 1
+  pullAcceleration: 0.2
   attractionMaterialFadeSpeed: 2
-  returnSnapTime: 2
+  returnSnapTime: 0.64
   reattachDistance: 0.01
   minScale: 0.5
+  extraYOffset: -0.5
+  heightMultiplier: 1
+  activeDistance: 25
   fishing: {fileID: 0}
 --- !u!210 &5888994491461129825
 SortingGroup:

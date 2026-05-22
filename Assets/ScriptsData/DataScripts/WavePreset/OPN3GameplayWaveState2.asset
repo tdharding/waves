@@ -13,44 +13,47 @@ MonoBehaviour:
   m_Name: OPN3GameplayWaveState2
   m_EditorClassIdentifier: Assembly-CSharp::WavePreset
   state:
-    Frequency: 12.85
-    Speed: 0.43
-    RippleDepth: 0.06
-    Smoothness: 0
-    Transparency: 1
-    Strength: 0.46
-    TroughRingWave1Brightness: 6.07
-    PeakRingWave2Brightness: 0.44
-    TwirlBaseStrength: 5.44
-    TwirlSlopeBoost: 0.69
-    TwirlScale: 15.9
-    DepthTwirlStrength: 4.89
-    DepthFadeStrength: 1.8
-    DepthFadeLine: 4.11
-    WhirlpoolTwirlStrength: 4.33
-    WhirlpoolAreaTwirlStrength: -1.75
-    SoulFishTwirlStrength: 0.65
-    WhirlpoolTaper: 0.668
-    WhirlpoolDarkRadiusMult: 1.33
-    WhirlpoolDarkStrength: 1
-    WhirlpoolFalloffPower: 0.1
-    WaveStepRate: 4000
-    BaseColor: {r: 0.7169812, g: 0.7169812, b: 0.7169812, a: 1}
-    LightDirection: {x: -6.23, y: -186.88, z: 33.8}
-    FoamDitherSize: 3.09
-    FoamDistanceDepth: -0.37
-    FoamDepthFade: -0.25
-    FoamColor: {r: 0, g: 0, b: 0, a: 1}
-    FoamLine: 0.04
-    DepthFade: 1.36
-    DepthColour: {r: 1, g: 1, b: 1, a: 0}
-    DistanceDepth: 0.75
-    NormalTexture: {fileID: 2800000, guid: 51ac2df266ae63944938104912d2a50c, type: 3}
+    Frequency: 1
+    Speed: 1
+    RippleDepth: 1
+    Smoothness: 0.5
+    Transparency: 0.5
+    Strength: 1
+    TroughRingWave1Brightness: 0.5
+    PeakRingWave2Brightness: 1.5
+    TwirlBaseStrength: 0.5
+    TwirlSlopeBoost: 1
+    TwirlScale: 1
+    DepthTwirlStrength: 1
+    DepthFadeStrength: 1
+    DepthFadeLine: 0
+    WhirlpoolTwirlStrength: 2
+    WhirlpoolAreaTwirlStrength: 1
+    SoulFishTwirlStrength: 1
+    SoulFishMaskStrength: 1
+    SoulFishRadius: 2
+    ZoneTiling: {x: 6, y: 6}
+    ZoneScrollSpeed: 0.05
+    ZoneNoiseStrength: 0.3
+    ZoneTexture: {fileID: 2800000, guid: 5738323306f97d741a560bf1e173f142, type: 3}
+    WhirlpoolTaper: 1
+    WhirlpoolDarkRadiusMult: 1.5
+    WhirlpoolDarkStrength: 0.6
+    WhirlpoolFalloffPower: 1
+    WaveStepRate: 10
+    BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    LightDirection: {x: 0, y: 1, z: 0}
+    FoamDitherSize: 1
+    FoamDistanceDepth: 0
+    FoamDepthFade: 0
+    FoamColor: {r: 1, g: 1, b: 1, a: 1}
+    FoamLine: 0.4
+    DepthFade: 3
+    DepthColour: {r: 0, g: 0, b: 0, a: 1}
+    DistanceDepth: 1
+    NormalTexture: {fileID: 0}
     WaveCenter: {x: 0, y: 0, z: 0, w: 0}
   sonarEnabled: 1
-  musicIntro: {fileID: 8300000, guid: ee88b1ab692ccab468e67044d4475ebd, type: 3}
-  musicLoop: {fileID: 8300000, guid: ee88b1ab692ccab468e67044d4475ebd, type: 3}
-  lights:
-  - color: {r: 1, g: 1, b: 1, a: 1}
-    intensity: 12.9
-    range: 8.56
+  musicIntro: {fileID: 0}
+  musicLoop: {fileID: 0}
+  lights: []

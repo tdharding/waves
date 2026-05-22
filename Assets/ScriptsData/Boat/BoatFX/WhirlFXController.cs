@@ -17,7 +17,7 @@ public class WhirlFXController : MonoBehaviour
 
     [Header("Animation")]
     [SerializeField] private Animator netAnimator;
-    private FishingController fishingController;
+    [SerializeField] private FishingController fishingController;
 
     private float currentAlpha;
     private float targetAlpha;

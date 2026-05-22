@@ -449,8 +449,8 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 0}
-        m_TargetAssemblyTypeName: PauseManager, Assembly-CSharp
+      - m_Target: {fileID: 7225461924289923228}
+        m_TargetAssemblyTypeName: PauseMenuUI, Assembly-CSharp
         m_MethodName: QuitGame
         m_Mode: 1
         m_Arguments:
@@ -3220,7 +3220,6 @@ GameObject:
   m_Component:
   - component: {fileID: 5532343787899602996}
   - component: {fileID: 7225461924289923228}
-  - component: {fileID: 3834119755723958594}
   m_Layer: 5
   m_Name: PausemenuUI
   m_TagString: Untagged
@@ -3268,21 +3267,6 @@ MonoBehaviour:
   aboutPanel: {fileID: 8156724076111407261}
   controlsPanel: {fileID: 4324593257414546522}
   settingsPanel: {fileID: 3997391306204983559}
---- !u!114 &3834119755723958594
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6766265105239688246}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e6eb159b121ff7c498a142800b0d2bc8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PauseManager
-  pauseMenu: {fileID: 6766265105239688246}
-  quitDestinationScene: MainMenu
-  playtestMode: 1
 --- !u!1 &6952387946919585428
 GameObject:
   m_ObjectHideFlags: 0
@@ -3982,8 +3966,8 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 3834119755723958594}
-        m_TargetAssemblyTypeName: PauseManager, Assembly-CSharp
+      - m_Target: {fileID: 7225461924289923228}
+        m_TargetAssemblyTypeName: PauseMenuUI, Assembly-CSharp
         m_MethodName: OnResumeButtonPressed
         m_Mode: 1
         m_Arguments:

@@ -33,3 +33,4 @@ void WaveSurfaceClip_float(
     // Negative when fragment is above the surface: fragment is discarded.
     ClipValue = waveHeight - WorldPos.y + WaveMaskBias;
 }
+

@@ -2,7 +2,7 @@ using UnityEngine;
 
 public class NetAnimationEventReceiver : MonoBehaviour
 {
-    private WhirlFXController whirlFX;
+    [SerializeField] private WhirlFXController whirlFX;
 
     public void SetWhirlFX(WhirlFXController fx) => whirlFX = fx;
 

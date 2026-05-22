@@ -205,7 +205,8 @@ public class GridData : ScriptableObject
     {
         public int        cellIndex;
         public GameObject prefab;
-        public bool       isCircle; // true = soul/overlay plane
+        public bool       isCircle;        // true = soul/overlay plane
+        public bool       isWorldSpaceProp; // true = statue/world prop — skips grid rotation, uses baseline height
     }
 
     public List<PrefabPlacement> prefabPlacements = new List<PrefabPlacement>();

@@ -120,13 +120,24 @@ public class GridDesignerWindow : EditorWindow
     float[] cachedTierYOffsets; // pulled from LevelSpawner in scene
 
     // ── Direct Prefab Library ──
+    enum PrefabLibraryTab { MazePieces, SetPieces, Statues }
+    PrefabLibraryTab              _prefabLibTab       = PrefabLibraryTab.MazePieces;
     string                        prefabFolderPath    = "Assets/Prefab/MazePieces";
     string                        iconsFolderPath     = "";
     List<GameObject>              scannedPrefabs      = new List<GameObject>();
     Dictionary<string, Texture2D> prefabIcons         = new Dictionary<string, Texture2D>();
     int                           selectedPrefabIndex = -1;
-    bool                          drawDirectPrefab    = false;
     Vector2                       prefabScrollPos;
+    List<GameObject>              scannedSetPiecesLib = new List<GameObject>();
+    int                           selectedSetPieceIndex = -1;
+    Vector2                       setpieceScrollPos;
+    const string StatuesPrefabsFolder = "Assets/Prefab/StatuesPrefabs";
+    List<GameObject>              scannedStatuesLib   = new List<GameObject>();
+    int                           selectedStatueIndex = -1;
+    Vector2                       statueScrollPos;
+    bool                          drawDirectPrefab    = false;
+    GameObject                    _activePlacementPrefab;
+    bool                          _activePlacementIsWorldSpaceProp = false;
     bool                          showPrefabLibrary   = true;
     bool isDragging;
     int  lastDraggedCellIndex = -1;
@@ -171,6 +182,8 @@ public class GridDesignerWindow : EditorWindow
         prefabFolderPath = EditorPrefs.GetString("GridDesigner_PrefabFolder", "Assets/Prefab/MazePieces");
         iconsFolderPath  = EditorPrefs.GetString("GridDesigner_IconsFolder",  "");
         ScanPrefabFolder();
+        ScanSetPiecesLib();
+        ScanStatuesLib();
         LoadPanelWidth();
     }
 
@@ -274,7 +287,7 @@ public class GridDesignerWindow : EditorWindow
         SetToolbarButton("▲▼ Water",     drawWaterLevelModifier, new Color(0.4f,0.8f,1f),  () => { activeSlot = -1; drawWaterLevelModifier = true; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaveModifier = drawWhirlpool = false; });
         SetToolbarButton("〜 Wave",       drawWaveModifier,       new Color(0.6f,1f,0.6f),  () => { activeSlot = -1; drawWaveModifier = true; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWhirlpool = false; });
         SetToolbarButton("〇 Whirlpool", drawWhirlpool,          new Color(0.7f,0.4f,1f),  () => { activeSlot = -1; drawWhirlpool = true; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = false; });
-        SetToolbarButton("✕ Eraser",    activeSlot == 0,        new Color(1f,0.5f,0.5f),  () => { activeSlot = 0; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = drawDirectPrefab = false; });
+        SetToolbarButton("✕ Eraser",    activeSlot == 0,        new Color(1f,0.5f,0.5f),  () => { activeSlot = 0; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = drawDirectPrefab = drawSelect = false; ClearSelectState(); });
 
         GUILayout.FlexibleSpace();
 
@@ -435,65 +448,148 @@ public class GridDesignerWindow : EditorWindow
         showPrefabLibrary = EditorGUILayout.Foldout(showPrefabLibrary, "Prefab Library", true, EditorStyles.foldoutHeader);
         if (showPrefabLibrary)
         {
-            // Prefabs folder
+            // ── Tab row ──────────────────────────────────────────────────
             EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField("Prefabs", GUILayout.Width(46));
-            string newPath = EditorGUILayout.TextField(prefabFolderPath);
-            if (newPath != prefabFolderPath) { prefabFolderPath = newPath; EditorPrefs.SetString("GridDesigner_PrefabFolder", prefabFolderPath); }
-            if (GUILayout.Button("…", GUILayout.Width(22)))
-            {
-                string sel = EditorUtility.OpenFolderPanel("Select Prefab Folder", prefabFolderPath, "");
-                if (!string.IsNullOrEmpty(sel)) { prefabFolderPath = FileUtil.GetProjectRelativePath(sel); EditorPrefs.SetString("GridDesigner_PrefabFolder", prefabFolderPath); ScanPrefabFolder(); }
-            }
+            if (GUILayout.Toggle(_prefabLibTab == PrefabLibraryTab.MazePieces, "Mazepieces", EditorStyles.miniButtonLeft))
+                _prefabLibTab = PrefabLibraryTab.MazePieces;
+            if (GUILayout.Toggle(_prefabLibTab == PrefabLibraryTab.SetPieces,  "Setpieces",  EditorStyles.miniButtonMid))
+                _prefabLibTab = PrefabLibraryTab.SetPieces;
+            if (GUILayout.Toggle(_prefabLibTab == PrefabLibraryTab.Statues,    "Statues",    EditorStyles.miniButtonRight))
+                _prefabLibTab = PrefabLibraryTab.Statues;
             EditorGUILayout.EndHorizontal();
 
-            // Icons folder
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField("Icons", GUILayout.Width(46));
-            string newIcons = EditorGUILayout.TextField(iconsFolderPath);
-            if (newIcons != iconsFolderPath) { iconsFolderPath = newIcons; EditorPrefs.SetString("GridDesigner_IconsFolder", iconsFolderPath); }
-            if (GUILayout.Button("…", GUILayout.Width(22)))
+            if (_prefabLibTab == PrefabLibraryTab.MazePieces)
             {
-                string sel = EditorUtility.OpenFolderPanel("Select Icons Folder", iconsFolderPath, "");
-                if (!string.IsNullOrEmpty(sel)) { iconsFolderPath = FileUtil.GetProjectRelativePath(sel); EditorPrefs.SetString("GridDesigner_IconsFolder", iconsFolderPath); ScanIcons(); }
-            }
-            if (GUILayout.Button("↺", GUILayout.Width(22))) ScanPrefabFolder();
-            EditorGUILayout.EndHorizontal();
-
-            if (scannedPrefabs.Count == 0)
-            {
-                EditorGUILayout.LabelField("  (no prefabs found)", EditorStyles.miniLabel);
-            }
-            else
-            {
-                const int IconSize = 32;
-                prefabScrollPos = EditorGUILayout.BeginScrollView(prefabScrollPos, GUILayout.Height(160));
-                for (int i = 0; i < scannedPrefabs.Count; i++)
+                // Folder + icons path
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.LabelField("Folder", GUILayout.Width(42));
+                string newPath = EditorGUILayout.TextField(prefabFolderPath);
+                if (newPath != prefabFolderPath) { prefabFolderPath = newPath; EditorPrefs.SetString("GridDesigner_PrefabFolder", prefabFolderPath); }
+                if (GUILayout.Button("…", GUILayout.Width(22)))
                 {
-                    bool isSelected = drawDirectPrefab && selectedPrefabIndex == i;
-                    GUI.backgroundColor = isSelected ? Color.yellow : Color.white;
-
-                    prefabIcons.TryGetValue(scannedPrefabs[i].name, out Texture2D icon);
-                    var content = icon != null
-                        ? new GUIContent(" " + scannedPrefabs[i].name, icon)
-                        : new GUIContent(scannedPrefabs[i].name);
-
-                    float btnHeight = icon != null ? IconSize + 4 : EditorGUIUtility.singleLineHeight + 2;
-                    if (GUILayout.Button(content, GUILayout.Height(btnHeight)))
-                    {
-                        selectedPrefabIndex = i;
-                        drawDirectPrefab    = true;
-                        activeSlot = -1;
-                        drawCircle = drawOrb = drawSoul =
-                        drawWaterLevelModifier = drawWaveModifier = false;
-                    }
-                    GUI.backgroundColor = Color.white;
+                    string sel = EditorUtility.OpenFolderPanel("Select MazePieces Folder", prefabFolderPath, "");
+                    if (!string.IsNullOrEmpty(sel)) { prefabFolderPath = FileUtil.GetProjectRelativePath(sel); EditorPrefs.SetString("GridDesigner_PrefabFolder", prefabFolderPath); ScanPrefabFolder(); }
                 }
-                EditorGUILayout.EndScrollView();
+                if (GUILayout.Button("↺", GUILayout.Width(22))) ScanPrefabFolder();
+                EditorGUILayout.EndHorizontal();
 
-                if (drawDirectPrefab && selectedPrefabIndex >= 0 && selectedPrefabIndex < scannedPrefabs.Count)
-                    EditorGUILayout.HelpBox($"Placing: {scannedPrefabs[selectedPrefabIndex].name}", MessageType.None);
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.LabelField("Icons", GUILayout.Width(42));
+                string newIcons = EditorGUILayout.TextField(iconsFolderPath);
+                if (newIcons != iconsFolderPath) { iconsFolderPath = newIcons; EditorPrefs.SetString("GridDesigner_IconsFolder", iconsFolderPath); }
+                if (GUILayout.Button("…", GUILayout.Width(22)))
+                {
+                    string sel = EditorUtility.OpenFolderPanel("Select Icons Folder", iconsFolderPath, "");
+                    if (!string.IsNullOrEmpty(sel)) { iconsFolderPath = FileUtil.GetProjectRelativePath(sel); EditorPrefs.SetString("GridDesigner_IconsFolder", iconsFolderPath); ScanIcons(); }
+                }
+                EditorGUILayout.EndHorizontal();
+
+                if (scannedPrefabs.Count == 0)
+                {
+                    EditorGUILayout.LabelField("  (no prefabs found)", EditorStyles.miniLabel);
+                }
+                else
+                {
+                    const int IconSize = 32;
+                    prefabScrollPos = EditorGUILayout.BeginScrollView(prefabScrollPos, GUILayout.Height(160));
+                    for (int i = 0; i < scannedPrefabs.Count; i++)
+                    {
+                        bool isSelected = drawDirectPrefab && _prefabLibTab == PrefabLibraryTab.MazePieces && selectedPrefabIndex == i;
+                        GUI.backgroundColor = isSelected ? Color.yellow : Color.white;
+                        prefabIcons.TryGetValue(scannedPrefabs[i].name, out Texture2D icon);
+                        var content = icon != null
+                            ? new GUIContent(" " + scannedPrefabs[i].name, icon)
+                            : new GUIContent(scannedPrefabs[i].name);
+                        float btnHeight = icon != null ? IconSize + 4 : EditorGUIUtility.singleLineHeight + 2;
+                        if (GUILayout.Button(content, GUILayout.Height(btnHeight)))
+                        {
+                            selectedPrefabIndex   = i;
+                            selectedSetPieceIndex = -1;
+                            selectedStatueIndex   = -1;
+                            _activePlacementPrefab = scannedPrefabs[i];
+                            _activePlacementIsWorldSpaceProp = false;
+                            drawDirectPrefab = true;
+                            activeSlot = -1;
+                            drawCircle = drawOrb = drawSoul = drawWaterLevelModifier = drawWaveModifier = false;
+                        }
+                        GUI.backgroundColor = Color.white;
+                    }
+                    EditorGUILayout.EndScrollView();
+                }
             }
+            else if (_prefabLibTab == PrefabLibraryTab.SetPieces)
+            {
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.LabelField("Folder", GUILayout.Width(42));
+                EditorGUILayout.LabelField(SetPiecesFolder, EditorStyles.miniLabel);
+                if (GUILayout.Button("↺", GUILayout.Width(22))) ScanSetPiecesLib();
+                EditorGUILayout.EndHorizontal();
+
+                if (scannedSetPiecesLib.Count == 0)
+                {
+                    EditorGUILayout.LabelField("  (no prefabs found)", EditorStyles.miniLabel);
+                }
+                else
+                {
+                    setpieceScrollPos = EditorGUILayout.BeginScrollView(setpieceScrollPos, GUILayout.Height(160));
+                    for (int i = 0; i < scannedSetPiecesLib.Count; i++)
+                    {
+                        bool isSelected = drawDirectPrefab && _prefabLibTab == PrefabLibraryTab.SetPieces && selectedSetPieceIndex == i;
+                        GUI.backgroundColor = isSelected ? Color.yellow : Color.white;
+                        if (GUILayout.Button(scannedSetPiecesLib[i].name))
+                        {
+                            selectedSetPieceIndex  = i;
+                            selectedPrefabIndex    = -1;
+                            selectedStatueIndex    = -1;
+                            _activePlacementPrefab = scannedSetPiecesLib[i];
+                            _activePlacementIsWorldSpaceProp = false;
+                            drawDirectPrefab = true;
+                            activeSlot = -1;
+                            drawCircle = drawOrb = drawSoul = drawWaterLevelModifier = drawWaveModifier = false;
+                        }
+                        GUI.backgroundColor = Color.white;
+                    }
+                    EditorGUILayout.EndScrollView();
+                }
+            }
+            else // Statues tab
+            {
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.LabelField("Folder", GUILayout.Width(42));
+                EditorGUILayout.LabelField(StatuesPrefabsFolder, EditorStyles.miniLabel);
+                if (GUILayout.Button("↺", GUILayout.Width(22))) ScanStatuesLib();
+                EditorGUILayout.EndHorizontal();
+
+                if (scannedStatuesLib.Count == 0)
+                {
+                    EditorGUILayout.LabelField("  (no prefabs found)", EditorStyles.miniLabel);
+                }
+                else
+                {
+                    statueScrollPos = EditorGUILayout.BeginScrollView(statueScrollPos, GUILayout.Height(160));
+                    for (int i = 0; i < scannedStatuesLib.Count; i++)
+                    {
+                        bool isSelected = drawDirectPrefab && _prefabLibTab == PrefabLibraryTab.Statues && selectedStatueIndex == i;
+                        GUI.backgroundColor = isSelected ? Color.yellow : Color.white;
+                        if (GUILayout.Button(scannedStatuesLib[i].name))
+                        {
+                            selectedStatueIndex    = i;
+                            selectedPrefabIndex    = -1;
+                            selectedSetPieceIndex  = -1;
+                            _activePlacementPrefab = scannedStatuesLib[i];
+                            _activePlacementIsWorldSpaceProp = true;
+                            drawDirectPrefab = true;
+                            activeSlot = -1;
+                            drawCircle = drawOrb = drawSoul = drawWaterLevelModifier = drawWaveModifier = false;
+                        }
+                        GUI.backgroundColor = Color.white;
+                    }
+                    EditorGUILayout.EndScrollView();
+                }
+            }
+
+            if (drawDirectPrefab && _activePlacementPrefab != null)
+                EditorGUILayout.HelpBox($"Placing: {_activePlacementPrefab.name}", MessageType.None);
         }
 
         EditorGUILayout.Space();
@@ -736,12 +832,17 @@ public class GridDesignerWindow : EditorWindow
             return;
         }
 
-        if (drawDirectPrefab && selectedPrefabIndex >= 0 && selectedPrefabIndex < scannedPrefabs.Count && loadedData != null)
+        if (drawDirectPrefab && _activePlacementPrefab != null && loadedData != null)
         {
-            var prefab     = scannedPrefabs[selectedPrefabIndex];
             var placements = GetActivePrefabPlacements();
             placements.RemoveAll(p => p.cellIndex == index);
-            placements.Add(new GridData.PrefabPlacement { cellIndex = index, prefab = prefab, isCircle = drawCircle });
+            placements.Add(new GridData.PrefabPlacement
+            {
+                cellIndex           = index,
+                prefab              = _activePlacementPrefab,
+                isCircle            = drawCircle,
+                isWorldSpaceProp    = _activePlacementIsWorldSpaceProp,
+            });
             return;
         }
 
@@ -973,35 +1074,6 @@ public class GridDesignerWindow : EditorWindow
         _showPrefabs = EditorGUILayout.Foldout(_showPrefabs, "Prefabs", true, EditorStyles.foldoutHeader);
         if (!_showPrefabs) return;
 
-        if (loadedData.prefabs == null) loadedData.prefabs = new List<GameObject>();
-
-        // Prefab slots list
-        EditorGUI.BeginChangeCheck();
-        EditorGUILayout.LabelField($"Prefab Slots ({loadedData.prefabs.Count})", EditorStyles.miniLabel);
-        for (int i = 0; i < loadedData.prefabs.Count; i++)
-        {
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField($"[{i + 1}]", GUILayout.Width(28));
-            loadedData.prefabs[i] = (GameObject)EditorGUILayout.ObjectField(
-                loadedData.prefabs[i], typeof(GameObject), false);
-            if (GUILayout.Button("✕", GUILayout.Width(22)))
-            {
-                Undo.RecordObject(loadedData, "Remove Prefab Slot");
-                loadedData.prefabs.RemoveAt(i);
-                EditorUtility.SetDirty(loadedData);
-                break;
-            }
-            EditorGUILayout.EndHorizontal();
-        }
-        if (GUILayout.Button("+ Add Prefab Slot"))
-        {
-            Undo.RecordObject(loadedData, "Add Prefab Slot");
-            loadedData.prefabs.Add(null);
-            EditorUtility.SetDirty(loadedData);
-        }
-        if (EditorGUI.EndChangeCheck())
-            EditorUtility.SetDirty(loadedData);
-
         EditorGUILayout.Space(2);
 
         // Sculpture Set Piece — ObjectField + dropdown picker from Assets/Prefab/SetPieces
@@ -1071,6 +1143,32 @@ public class GridDesignerWindow : EditorWindow
         _setPieceNames[0] = "(none)";
         for (int i = 0; i < _scannedSetPieces.Length; i++)
             _setPieceNames[i + 1] = _scannedSetPieces[i].name;
+    }
+
+    void ScanSetPiecesLib()
+    {
+        scannedSetPiecesLib.Clear();
+        selectedSetPieceIndex = -1;
+        string[] guids = AssetDatabase.FindAssets("t:Prefab", new[] { SetPiecesFolder });
+        foreach (string guid in guids)
+        {
+            var go = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(guid));
+            if (go != null) scannedSetPiecesLib.Add(go);
+        }
+        scannedSetPiecesLib.Sort((a, b) => string.Compare(a.name, b.name, System.StringComparison.Ordinal));
+    }
+
+    void ScanStatuesLib()
+    {
+        scannedStatuesLib.Clear();
+        selectedStatueIndex = -1;
+        string[] guids = AssetDatabase.FindAssets("t:Prefab", new[] { StatuesPrefabsFolder });
+        foreach (string guid in guids)
+        {
+            var go = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(guid));
+            if (go != null) scannedStatuesLib.Add(go);
+        }
+        scannedStatuesLib.Sort((a, b) => string.Compare(a.name, b.name, System.StringComparison.Ordinal));
     }
 
     void DrawStartRitualSection()
@@ -2025,10 +2123,41 @@ public class GridDesignerWindow : EditorWindow
             }
         }
 
-        // Soul zone connecting lines overlay (drawn after all cells so lines sit on top)
+        // Soul zone connecting lines + radius preview overlay (drawn after all cells so lines sit on top)
         if (loadedData?.soulZones != null)
         {
             Handles.BeginGUI();
+
+            // Radius scatter rings — drawn first so lines and dots sit on top
+            float pxPerUnit = GetPixelsPerWorldUnit();
+            if (pxPerUnit > 0f)
+            {
+                // Soul fish zone radii
+                for (int zi = 0; zi < loadedData.soulZones.Count; zi++)
+                {
+                    var zone = loadedData.soulZones[zi];
+                    if (zone.nodes == null || zone.nodes.Count == 0) continue;
+                    bool  isActive  = zi == _activeSoulZoneIndex;
+                    Color rc        = ZonePalette[zi % ZonePalette.Length];
+                    rc.a            = isActive ? 0.55f : 0.18f;
+                    Handles.color   = rc;
+                    float radiusPx  = zone.radius * pxPerUnit;
+                    foreach (int node in zone.nodes)
+                        Handles.DrawWireDisc(CellCenter(rect, node), Vector3.forward, radiusPx, 2f);
+                }
+
+                // Whirlpool radii
+                if (loadedData.whirlpools != null)
+                {
+                    foreach (var wp in loadedData.whirlpools)
+                    {
+                        Handles.color  = new Color(0.7f, 0.4f, 1f, 0.55f);
+                        float radiusPx = wp.radius * pxPerUnit;
+                        Handles.DrawWireDisc(CellCenter(rect, wp.cellIndex), Vector3.forward, radiusPx, 2f);
+                    }
+                }
+            }
+
             for (int zi = 0; zi < loadedData.soulZones.Count; zi++)
             {
                 var zone = loadedData.soulZones[zi];
@@ -2041,11 +2170,6 @@ public class GridDesignerWindow : EditorWindow
                     Vector2 a = CellCenter(rect, zone.nodes[ni]);
                     Vector2 b = CellCenter(rect, zone.nodes[ni + 1]);
                     Handles.DrawLine(a, b, 3f);
-                }
-                // Close loop visual if last node == first node
-                if (zone.nodes[zone.nodes.Count - 1] == zone.nodes[0] && zone.nodes.Count >= 3)
-                {
-                    // Already drawn by the loop above since last segment closes it
                 }
             }
 
@@ -2139,6 +2263,25 @@ public class GridDesignerWindow : EditorWindow
         int y = cellIndex / GridSize;
         return new Vector2(gridRect.x + x * CellSize + CellSize * 0.5f,
                            gridRect.y + y * CellSize + CellSize * 0.5f);
+    }
+
+    // Derives how many grid pixels equal one world unit, using the arena profile's
+    // reference plane prefab as the authority on real-world arena dimensions.
+    float GetPixelsPerWorldUnit()
+    {
+        var profile = loadedData?.arenaProfile;
+        if (profile == null || profile.arenaSizeReferencePlane == null) return -1f;
+
+        var mf = profile.arenaSizeReferencePlane.GetComponent<MeshFilter>()
+              ?? profile.arenaSizeReferencePlane.GetComponentInChildren<MeshFilter>();
+        if (mf == null || mf.sharedMesh == null) return -1f;
+
+        Vector3 localSize  = mf.sharedMesh.bounds.size;
+        Vector3 scale      = profile.arenaSizeReferencePlane.transform.localScale;
+        float   worldWidth = localSize.x * Mathf.Abs(scale.x);
+        if (worldWidth <= 0f) return -1f;
+
+        return (CellSize * GridSize) / worldWidth;
     }
 
     void DrawPortalOverlay(Rect gridRect)
@@ -2329,7 +2472,11 @@ public class GridDesignerWindow : EditorWindow
             if (d != null) discoveredGrids.Add(d);
         }
         discoveredGridNames = new string[discoveredGrids.Count];
-        for (int i = 0; i < discoveredGrids.Count; i++) discoveredGridNames[i] = discoveredGrids[i].name;
+        for (int i = 0; i < discoveredGrids.Count; i++)
+        {
+            var d = discoveredGrids[i];
+            discoveredGridNames[i] = string.IsNullOrEmpty(d.displayName) ? d.name : d.displayName;
+        }
         selectedDiscoveredGridIndex = Mathf.Clamp(selectedDiscoveredGridIndex, 0,
             Mathf.Max(0, discoveredGrids.Count - 1));
     }

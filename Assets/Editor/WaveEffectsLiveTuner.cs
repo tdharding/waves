@@ -15,7 +15,8 @@ public class WaveEffectsLiveTuner : EditorWindow
 
     [SerializeField] Material   waveMaterial;
     [SerializeField] WavePreset activePreset;
-    [SerializeField] bool       applyLive = true;
+    [SerializeField] bool       applyLive   = true;
+    bool tunerActive = false;  // not serialized — always starts inactive on open
 
     // Wave Motion
     [SerializeField] float   frequency    = 1f;
@@ -162,6 +163,7 @@ public class WaveEffectsLiveTuner : EditorWindow
             string path = AssetDatabase.GUIDToAssetPath(EditorPrefs.GetString(PrefPreset));
             if (!string.IsNullOrEmpty(path))
                 activePreset = AssetDatabase.LoadAssetAtPath<WavePreset>(path);
+            // Values are NOT loaded — press Load to apply a preset to the tuner
         }
     }
 
@@ -175,12 +177,11 @@ public class WaveEffectsLiveTuner : EditorWindow
         EditorPrefs.SetString(PrefPreset,
             AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(preset)));
 
-        // If the window is already open, update it directly
+        // If the window is already open, update the reference only — press Load to apply values
         if (HasOpenInstances<WaveEffectsLiveTuner>())
         {
             var win = GetWindow<WaveEffectsLiveTuner>("Wave Effects Tuner", false);
             win.activePreset = preset;
-            win.LoadFromPreset(preset);
             win.Repaint();
         }
     }
@@ -195,7 +196,7 @@ public class WaveEffectsLiveTuner : EditorWindow
 
     void LiveUpdate()
     {
-        if (!applyLive || !waveMaterial) return;
+        if (!tunerActive || !applyLive || !waveMaterial) return;
         ApplyToMaterial();
         ApplyToLights();
         ApplyTestWhirlpools();
@@ -266,7 +267,7 @@ public class WaveEffectsLiveTuner : EditorWindow
             {
                 activePreset = newPreset;
                 SaveToPrefs();
-                if (activePreset != null) LoadFromPreset(activePreset);
+                // Values are NOT loaded automatically — press Load to apply to the tuner
             }
         }
 
@@ -275,7 +276,7 @@ public class WaveEffectsLiveTuner : EditorWindow
         {
             using (new EditorGUI.DisabledScope(activePreset == null))
             {
-                if (GUILayout.Button("Load"))  LoadFromPreset(activePreset);
+                if (GUILayout.Button("Load"))  { LoadFromPreset(activePreset); tunerActive = true; }
                 if (GUILayout.Button("Save"))  SaveToActivePreset();
             }
             if (GUILayout.Button("Save as New")) ExportAsNewPreset();
@@ -283,6 +284,8 @@ public class WaveEffectsLiveTuner : EditorWindow
 
         if (activePreset == null)
             EditorGUILayout.HelpBox("Assign an Active Preset to enable Load and Save.", MessageType.None);
+        else if (!tunerActive)
+            EditorGUILayout.HelpBox("Tuner inactive — click Load to begin editing. No changes are being applied to the scene.", MessageType.Info);
     }
 
     // ── Section helper ────────────────────────────────────────────────────────
@@ -660,6 +663,11 @@ public class WaveEffectsLiveTuner : EditorWindow
         troughBrightness       = s.TroughRingWave1Brightness;
         peakBrightness         = s.PeakRingWave2Brightness;
         soulFishMaskStrength    = s.SoulFishMaskStrength;
+        soulFishRadius          = s.SoulFishRadius;
+        zoneTiling              = s.ZoneTiling;
+        zoneScrollSpeed         = s.ZoneScrollSpeed;
+        zoneNoiseStrength       = s.ZoneNoiseStrength;
+        if (s.ZoneTexture) zoneTexture = s.ZoneTexture;
         twirlBaseStrength = s.TwirlBaseStrength;
         twirlSlopeBoost   = s.TwirlSlopeBoost;
         twirlScale        = s.TwirlScale;
@@ -711,6 +719,12 @@ public class WaveEffectsLiveTuner : EditorWindow
             return;
         }
 
+        if (!EditorUtility.DisplayDialog(
+                "Save Wave Preset",
+                $"Overwrite '{activePreset.name}' with the current tuner values?\n\nThis cannot be undone from disk.",
+                "Save", "Cancel"))
+            return;
+
         Undo.RecordObject(activePreset, "Save Wave Preset");
         activePreset.state      = BuildState();
         activePreset.lights     = BuildLightEntries();
@@ -758,6 +772,12 @@ public class WaveEffectsLiveTuner : EditorWindow
         BaseColor                 = baseColor,
         TroughRingWave1Brightness = troughBrightness,
         PeakRingWave2Brightness   = peakBrightness,
+        SoulFishMaskStrength      = soulFishMaskStrength,
+        SoulFishRadius            = soulFishRadius,
+        ZoneTiling                = zoneTiling,
+        ZoneScrollSpeed           = zoneScrollSpeed,
+        ZoneNoiseStrength         = zoneNoiseStrength,
+        ZoneTexture               = zoneTexture,
         TwirlBaseStrength = twirlBaseStrength,
         TwirlSlopeBoost   = twirlSlopeBoost,
         TwirlScale        = twirlScale,

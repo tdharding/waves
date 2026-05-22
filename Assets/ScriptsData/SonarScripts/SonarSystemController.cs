@@ -26,6 +26,7 @@ public class SonarSystemController : MonoBehaviour
     [SerializeField] private string maxRingRadiusProperty = "_MaxRingRadius";
     [SerializeField] private string SonarRadius = "_Sonar_Radius";
     [SerializeField] private string rockSonarFactorProperty = "_RockSonarFactor";
+    [SerializeField] private string rockSonarRadiusProperty = "_SonarRadius";
     [SerializeField] private string ringEmphasisProperty = "_RingEmphasis1";
     [SerializeField] private string extraColourProperty = "_ExtraColour";
 
@@ -48,6 +49,7 @@ public class SonarSystemController : MonoBehaviour
     [SerializeField] private float sonarradiusTarget = 0.4f;
     [SerializeField] private float RocksRadiusSonar = 0.5f;
     [SerializeField] private float rockSonarMaskTarget = 1f;
+    [SerializeField] private float rockSonarRadiusTarget = 1.13f;
 
     [Header("Timing")]
     [SerializeField] private float revealDuration = 5f;
@@ -83,7 +85,10 @@ public class SonarSystemController : MonoBehaviour
             defaultFocusOffset = boatFollowVolume.FocusOffset;
 
         if (rockSonarMaterial != null)
-            rockSonarMaterial.SetFloat(rockSonarFactorProperty, 0f);
+        {
+            //rockSonarMaterial.SetFloat(rockSonarFactorProperty, 0f);
+            rockSonarMaterial.SetFloat(rockSonarRadiusProperty, 0f);
+        }
 
         if (arenafloorMaterial != null)
             arenaFloorOriginalColor = arenafloorMaterial.GetColor(BaseColorID);
@@ -183,15 +188,15 @@ public class SonarSystemController : MonoBehaviour
 
     private IEnumerator ShutdownRoutine()
     {
+        // Gameplay exits sonar immediately — visuals tween out separately
+        isSonarActive = false;
+
         if (currentSonarValue <= SONAR_EPSILON)
             SetSonarValue(0f);
         else
             yield return TweenRingRadius(currentSonarValue, 0f, tweenTime);
 
-        // Restore rock material to inspector-defined baseline
         ApplyRockMaterialBaseline();
-
-        isSonarActive = false;
         sonarRoutine = null;
     }
 
@@ -229,13 +234,14 @@ public class SonarSystemController : MonoBehaviour
             rockMaterial.SetColor(extraColourProperty,   Color.Lerp(baselineExtraColour,   extraColourTarget,       value));
         }
 
-  if (rockSonarMaterial != null)
-{
-    rockSonarMaterial.SetFloat(rockSonarFactorProperty, value * rockSonarMaskTarget);
-    statueMaterial.SetFloat(rockSonarFactorProperty, value * rockSonarMaskTarget);
-}
+        if (rockSonarMaterial != null)
+        {
+            //rockSonarMaterial.SetFloat(rockSonarFactorProperty,   value * rockSonarMaskTarget);
+            rockSonarMaterial.SetFloat(rockSonarRadiusProperty,   value * rockSonarRadiusTarget);
+            statueMaterial.SetFloat(rockSonarFactorProperty, value * rockSonarMaskTarget);
+        }
 
-if (waveplaneMaterial != null)
-    waveplaneMaterial.SetFloat(SonarRadius, value * sonarradiusTarget);
+        if (waveplaneMaterial != null)
+            waveplaneMaterial.SetFloat(SonarRadius, value * sonarradiusTarget);
     }
 }

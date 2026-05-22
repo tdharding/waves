@@ -24,5 +24,5 @@ public class WavePreset : ScriptableObject
         public Color color     = Color.white;
         public float intensity = 1f;
         public float range     = 10f;
-    }
+    } 
 }

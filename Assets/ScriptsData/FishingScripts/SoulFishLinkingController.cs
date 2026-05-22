@@ -1,96 +1,50 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// Central authority that links Soul Fish to Reality Proxies
-/// using a shared LinkIdentityLabel.linkID.
-/// 1-to-1 pairing only.
-/// </summary>
 public class SoulFishLinkingController : MonoBehaviour
 {
-    // Registries
     readonly Dictionary<int, Transform> soulFishByID = new();
-    readonly Dictionary<int, SoulFishRealityProxyFollow> proxyByID = new();
 
     // --------------------------------------------------
     // REGISTRATION API
     // --------------------------------------------------
-public void RegisterSoulFish(int id, Transform fishRoot)
-{
-    if (soulFishByID.ContainsKey(id))
+    public void RegisterSoulFish(int id, Transform fishRoot)
     {
-        Debug.LogWarning($"Duplicate SoulFish ID detected: {id}", fishRoot);
-        return;
-    }
-
-    Transform movingFish = FindTaggedFish(fishRoot);
-
-    if (movingFish == null)
-    {
-        Debug.LogError(
-            $"SoulFishLinkingController: No child tagged 'Fish' found for ID {id}",
-            fishRoot
-        );
-        return;
-    }
-
-    soulFishByID[id] = movingFish;
-    TryLink(id);
-}
-
-Transform FindTaggedFish(Transform root)
-{
-    foreach (Transform t in root.GetComponentsInChildren<Transform>(true))
-    {
-        if (t.CompareTag("Fish"))
-            return t;
-    }
-
-    return null;
-}
-
-    public void RegisterRealityProxy(int id, SoulFishRealityProxyFollow proxy)
-    {
-        if (proxyByID.ContainsKey(id))
+        if (soulFishByID.ContainsKey(id))
         {
-            Debug.LogWarning($"Duplicate RealityProxy ID detected: {id}", proxy);
+            Debug.LogWarning($"Duplicate SoulFish ID detected: {id}", fishRoot);
             return;
         }
 
-        proxyByID[id] = proxy;
-        TryLink(id);
-    }
+        Transform movingFish = FindTaggedFish(fishRoot);
 
-    // --------------------------------------------------
-    // LINK RESOLUTION
-    // --------------------------------------------------
-    void TryLink(int id)
-    {
-        if (!soulFishByID.TryGetValue(id, out var fish))
+        if (movingFish == null)
+        {
+            Debug.LogError(
+                $"SoulFishLinkingController: No child tagged 'Fish' found for ID {id}",
+                fishRoot
+            );
             return;
+        }
 
-        if (!proxyByID.TryGetValue(id, out var proxy))
-            return;
+        soulFishByID[id] = movingFish;
+    }
 
-        proxy.AssignFish(fish);
+    Transform FindTaggedFish(Transform root)
+    {
+        foreach (Transform t in root.GetComponentsInChildren<Transform>(true))
+        {
+            if (t.CompareTag("Fish"))
+                return t;
+        }
+        return null;
     }
 
     // --------------------------------------------------
-    // OPTIONAL CLEANUP (safe, but not required yet)
+    // CLEANUP
     // --------------------------------------------------
-public void UnregisterSoulFish(int id)
-{
-    soulFishByID.Remove(id);
-
-    if (proxyByID.TryGetValue(id, out var proxy))
+    public void UnregisterSoulFish(int id)
     {
-        proxy.OnFishDestroyed();
-        proxyByID.Remove(id);
-    }
-}
-
-    public void UnregisterRealityProxy(int id)
-    {
-        proxyByID.Remove(id);
+        soulFishByID.Remove(id);
     }
 }

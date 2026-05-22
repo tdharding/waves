@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Unity.Mathematics;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Splines;
 
@@ -37,6 +38,15 @@ public class LevelSelectDesignerWindow : EditorWindow
     private bool _foldObstacles   = true;
     private bool _foldStats       = false;
     private bool _foldSetup       = false;
+    private bool _foldConsole     = true;
+
+    // ── Debug console ─────────────────────────────────────────────
+    // (isError=true → red error, false → yellow warning, null msg → green ok)
+    private List<(bool isError, string msg, string pathId, string juncId)> _consoleEntries = new();
+    private bool _consoleHasErrors;
+
+    // ── Landscape canvas ──────────────────────────────────────────
+    private float _landscapeCanvasAlpha = 0.55f;
     private const float ARENA_OUTER_RING_RADIUS = 4f;   // world-space outer arena ring
     private const float ARENA_INNER_RING_RADIUS = 2f;   // world-space inner orbit ring
 
@@ -245,6 +255,9 @@ public class LevelSelectDesignerWindow : EditorWindow
     // ══════════════════════════════════════════════════════════════
     private void OnGUI()
     {
+        if (Event.current.type == EventType.Layout)
+            RunValidation();
+
         DrawToolbar();
 
         EditorGUILayout.BeginHorizontal(GUILayout.ExpandHeight(true));
@@ -444,6 +457,14 @@ public class LevelSelectDesignerWindow : EditorWindow
 
     private void DrawPathList()
     {
+        // ── River ID Cleanup ──────────────────────────────────────
+        var cleanupBg = GUI.backgroundColor;
+        GUI.backgroundColor = new Color(0.6f, 0.85f, 1f);
+        if (GUILayout.Button("River ID Cleanup", EditorStyles.miniButton, GUILayout.Height(20)))
+            RiverIdCleanup();
+        GUI.backgroundColor = cleanupBg;
+        EditorGUILayout.Space(2);
+
         EditorGUILayout.LabelField("Paths", EditorStyles.boldLabel);
 
         for (int i = 0; i < _data.paths.Count; i++)
@@ -517,9 +538,10 @@ public class LevelSelectDesignerWindow : EditorWindow
         path.isRightPath = EditorGUILayout.Toggle("Is Right Path",   path.isRightPath);
         path.editorColor  = EditorGUILayout.ColorField("Color",        path.editorColor);
         EditorGUILayout.Space(2);
-        path.leadsToArena  = EditorGUILayout.Toggle("Leads to Arena",  path.leadsToArena);
-        path.arenaIsAtEnd  = EditorGUILayout.Toggle("Arena at End",    path.arenaIsAtEnd);
-        path.extrudeOnExit = EditorGUILayout.Toggle("Extrude on Exit", path.extrudeOnExit);
+        path.leadsToArena          = EditorGUILayout.Toggle("Leads to Arena",        path.leadsToArena);
+        path.arenaIsAtEnd          = EditorGUILayout.Toggle("Arena at End",          path.arenaIsAtEnd);
+        path.extrudeOnExit         = EditorGUILayout.Toggle("Extrude on Exit",       path.extrudeOnExit);
+        path.tJunctionBidirectional = EditorGUILayout.Toggle("T-Junction Both Ways", path.tJunctionBidirectional);
 
         EditorGUILayout.LabelField($"Knots: {path.nodeIds.Count}", EditorStyles.miniLabel);
 
@@ -810,6 +832,8 @@ public class LevelSelectDesignerWindow : EditorWindow
             "Souls Display Mgr",  _data.soulsOnBoatDisplayScriptPrefab, typeof(GameObject), false);
         _data.arenaSoulsWindowPrefab = (GameObject)EditorGUILayout.ObjectField(
             "Arena Souls Window", _data.arenaSoulsWindowPrefab,         typeof(GameObject), false);
+        _data.pauseManagerScriptPrefab = (GameObject)EditorGUILayout.ObjectField(
+            "Pause Manager",      _data.pauseManagerScriptPrefab,       typeof(GameObject), false);
         if (EditorGUI.EndChangeCheck()) EditorUtility.SetDirty(_data);
     }
 
@@ -947,6 +971,10 @@ public class LevelSelectDesignerWindow : EditorWindow
             () => { },
             () => DeployArenaSoulsWindow());
 
+        DrawDeployRow("Pause Manager", _data.pauseManager != null,
+            () => TryFind<PauseManager>(v => _data.pauseManager = v),
+            () => DeployPauseManager());
+
         EditorGUILayout.Space(4);
 
 
@@ -1037,6 +1065,31 @@ public class LevelSelectDesignerWindow : EditorWindow
         var go = (GameObject)PrefabUtility.InstantiatePrefab(_data.arenaSoulsWindowPrefab, parent.transform);
         Undo.RegisterCreatedObjectUndo(go, "Deploy Arena Souls Window");
         go.name = "ArenaSoulsWindow";
+    }
+
+    private void DeployPauseManager()
+    {
+        if (_data.pauseManagerScriptPrefab == null)
+        {
+            Debug.LogWarning("[LevelSelectDesigner] Pause Manager prefab not assigned.");
+            return;
+        }
+        if (_data.pauseManager != null) return;
+        if (!DeployScriptOnly<PauseManager>("PauseManager_Script", out var manager, _data.pauseManagerScriptPrefab))
+            return;
+        _data.pauseManager = manager;
+        WirePauseManager();
+        EditorUtility.SetDirty(_data);
+    }
+
+    private void WirePauseManager()
+    {
+        if (_data.pauseManager == null) return;
+        if (_data.pauseMenuUI == null) TryFind<PauseMenuUI>(v => _data.pauseMenuUI = v);
+        if (_data.pauseMenuUI == null) return;
+        var so   = new SerializedObject(_data.pauseManager);
+        var prop = so.FindProperty("pauseMenu");
+        if (prop != null) { prop.objectReferenceValue = _data.pauseMenuUI.gameObject; so.ApplyModifiedProperties(); EditorUtility.SetDirty(_data.pauseManager); }
     }
 
     private bool DeployScriptOnly<T>(string goName, out T result, GameObject prefabOverride) where T : Component
@@ -1257,6 +1310,7 @@ public class LevelSelectDesignerWindow : EditorWindow
         DeployCameraController();
         if (_data.musicController == null) DeployMusicController();
         if (GameObject.Find("ArenaSoulsWindow") == null) DeployArenaSoulsWindow();
+        if (_data.pauseManager == null) DeployPauseManager();
         // UI Canvas prefabs — only deploy if CANVAS parent prefab is assigned
         if (_data.canvasParentPrefab != null)
         {
@@ -1291,6 +1345,7 @@ EditorUtility.SetDirty(_data);
         TryFind<LandscapeTool>(v             => _data.landscapeTool          = v);
         TryFind<SoulDisplaySlotManager>(v       => _data.soulDisplaySlotManager    = v);
         TryFind<PauseMenuUI>(v                  => _data.pauseMenuUI               = v);
+        TryFind<PauseManager>(v                 => _data.pauseManager              = v);
         TryFind<SoulsOnBoatDisplayManager>(v    => _data.soulsOnBoatDisplayManager = v);
         EditorUtility.SetDirty(_data);
     }
@@ -1468,6 +1523,7 @@ EditorUtility.SetDirty(_data);
         }
 
         WirePauseMenuPanels();
+        WirePauseManager();
 
         Debug.Log("[LevelSelectDesigner] Wire All complete.");
     }
@@ -1488,8 +1544,25 @@ EditorUtility.SetDirty(_data);
     private void DrawActionButtons()
     {
         EditorGUILayout.Space(6);
+
+        bool sceneOk  = IsValidLevelSelectScene();
+        bool dataOk   = !_consoleHasErrors;
+        bool canGenerate = sceneOk && dataOk;
+
+        if (!sceneOk)
+        {
+            var s = new GUIStyle(EditorStyles.miniLabel) { wordWrap = true, normal = { textColor = new Color(1f, 0.6f, 0.3f) } };
+            EditorGUILayout.LabelField("Scene must be a LevelSelectWorld scene to generate.", s);
+        }
+        else if (!dataOk)
+        {
+            var s = new GUIStyle(EditorStyles.miniLabel) { wordWrap = true, normal = { textColor = new Color(1f, 0.5f, 0.4f) } };
+            EditorGUILayout.LabelField("Fix console errors before generating.", s);
+        }
+
         var prevColor = GUI.backgroundColor;
-        GUI.backgroundColor = new Color(0.4f, 1f, 0.5f);
+        GUI.enabled = canGenerate;
+        GUI.backgroundColor = canGenerate ? new Color(0.4f, 1f, 0.5f) : Color.gray;
         if (GUILayout.Button("GENERATE", GUILayout.Height(30)))
         {
             PruneLooseNodes();
@@ -1503,6 +1576,7 @@ EditorUtility.SetDirty(_data);
             ClearGeneratedObjects();
             EditorApplication.delayCall += () => { if (_data != null) Generate(); };
         }
+        GUI.enabled = true;
 
         if (GUILayout.Button("Clear Generated", GUILayout.Height(24)))
         {
@@ -2543,6 +2617,181 @@ EditorUtility.SetDirty(_data);
     // ══════════════════════════════════════════════════════════════
     // RIGHT PANEL
     // ══════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════
+    // SCENE GUARD
+    // ══════════════════════════════════════════════════════════════
+    private static bool IsValidLevelSelectScene()
+    {
+        // Scene name must start with "LevelSelectWorld" — add new worlds here as needed
+        return EditorSceneManager.GetActiveScene().name.StartsWith("LevelSelectWorld");
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // VALIDATION / DEBUG CONSOLE
+    // ══════════════════════════════════════════════════════════════
+    private void RunValidation()
+    {
+        _consoleEntries.Clear();
+        _consoleHasErrors = false;
+        if (_data == null) return;
+
+        // 1. Duplicate segment IDs
+        var dupGroups = _data.paths
+            .Where(p => !string.IsNullOrEmpty(p.segmentId))
+            .GroupBy(p => p.segmentId)
+            .Where(g => g.Count() > 1);
+        foreach (var g in dupGroups)
+        {
+            _consoleEntries.Add((true,
+                $"Duplicate ID \"{g.Key}\" — {string.Join(", ", g.Select(p => p.segmentId))}",
+                g.First().pathId, null));
+            _consoleHasErrors = true;
+        }
+
+        // 2. Paths with fewer than 2 nodes
+        foreach (var p in _data.paths)
+        {
+            if (p.nodeIds.Count < 2)
+            {
+                _consoleEntries.Add((true,
+                    $"Path \"{(string.IsNullOrEmpty(p.segmentId) ? "(unnamed)" : p.segmentId)}\" has {p.nodeIds.Count} node(s) — needs 2+",
+                    p.pathId, null));
+                _consoleHasErrors = true;
+            }
+        }
+
+        // 3. Paths with no segment ID (warning only)
+        foreach (var p in _data.paths)
+        {
+            if (string.IsNullOrEmpty(p.segmentId))
+                _consoleEntries.Add((false, "A path has no Segment ID set", p.pathId, null));
+        }
+
+        // 4. Junctions where all connected paths share the same branch depth
+        //    → auto-assign will use fragile distance fallback instead of depth logic
+        foreach (var junc in _data.junctions)
+        {
+            var connected = _data.paths.Where(p => p.nodeIds.Contains(junc.nodeId)).ToList();
+            if (connected.Count < 2) continue;
+            var depths = connected.Select(p => (int)p.segmentType).Distinct().ToList();
+            if (depths.Count == 1)
+            {
+                var depthName = connected[0].segmentType.ToString();
+                _consoleEntries.Add((false,
+                    $"Junction at ({GetJunctionLabel(junc.nodeId)}): all paths are {depthName} — depth fallback active",
+                    null, junc.nodeId));
+            }
+        }
+
+        if (_consoleEntries.Count == 0)
+            _consoleEntries.Add((false, "No issues found", null, null));
+    }
+
+    private string GetJunctionLabel(string nodeId)
+    {
+        var n = _data?.nodes.Find(x => x.id == nodeId);
+        return n != null ? $"{n.worldPosition.x:F0},{n.worldPosition.z:F0}" : nodeId.Substring(0, 6);
+    }
+
+    private void DrawDebugConsole()
+    {
+        bool hasErrors = _consoleHasErrors;
+        int  errCount  = _consoleEntries.Count(e => e.isError);
+        string header  = hasErrors ? $"Console  ({errCount} error{(errCount == 1 ? "" : "s")})" : "Console";
+
+        var prevColor = GUI.color;
+        GUI.color = hasErrors ? new Color(1f, 0.5f, 0.4f) : Color.white;
+        _foldConsole = EditorGUILayout.Foldout(_foldConsole, header, true, EditorStyles.foldoutHeader);
+        GUI.color = prevColor;
+
+        if (!_foldConsole) return;
+
+        EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+        foreach (var (isError, msg, pathId, juncId) in _consoleEntries)
+        {
+            // "No issues" row is green; warnings yellow; errors red
+            bool isGreen = !isError && msg == "No issues found";
+            var  dotCol  = isGreen ? new Color(0.4f, 1f, 0.5f)
+                         : isError ? new Color(1f, 0.4f, 0.4f)
+                                   : new Color(1f, 0.85f, 0.3f);
+            string dot   = isGreen ? "✓" : isError ? "✕" : "!";
+
+            EditorGUILayout.BeginHorizontal();
+            var pc = GUI.color;
+            GUI.color = dotCol;
+            EditorGUILayout.LabelField(dot, GUILayout.Width(14));
+            GUI.color = pc;
+
+            bool clickable = pathId != null || juncId != null;
+            if (clickable)
+            {
+                if (GUILayout.Button(msg, EditorStyles.miniLabel))
+                {
+                    if (pathId  != null) _selectedPathId          = pathId;
+                    if (juncId  != null) _selectedJunctionNodeId  = juncId;
+                    Repaint();
+                }
+            }
+            else
+            {
+                EditorGUILayout.LabelField(msg, EditorStyles.miniLabel);
+            }
+            EditorGUILayout.EndHorizontal();
+        }
+        EditorGUILayout.EndVertical();
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // RIVER ID CLEANUP
+    // ══════════════════════════════════════════════════════════════
+    private void RiverIdCleanup()
+    {
+        Undo.RecordObject(_data, "River ID Cleanup");
+
+        // Fill any empty IDs first
+        int emptyIdx = 0;
+        foreach (var p in _data.paths)
+        {
+            if (!string.IsNullOrEmpty(p.segmentId)) continue;
+            bool hasMain = _data.paths.Any(x =>
+                x.segmentType == LevelSelectDesignerData.SegmentType.MainRiver &&
+                !string.IsNullOrEmpty(x.segmentId));
+            p.segmentId = hasMain ? $"Branch_{emptyIdx:00}" : $"Main_{emptyIdx:00}";
+            emptyIdx++;
+        }
+
+        // Resolve duplicates — first occurrence keeps name, subsequent get _A _B etc.
+        var grouped = _data.paths.GroupBy(p => p.segmentId).Where(g => g.Count() > 1);
+        foreach (var g in grouped)
+        {
+            int idx = 0;
+            foreach (var p in g.Skip(1))
+            {
+                p.segmentId = g.Key + "_" + (char)('A' + idx);
+                idx++;
+            }
+        }
+
+        EditorUtility.SetDirty(_data);
+        RunValidation();
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // JUNCTION DELETE
+    // ══════════════════════════════════════════════════════════════
+    private void DeleteJunctionNode(LevelSelectDesignerData.DesignerJunction junc)
+    {
+        Undo.RecordObject(_data, "Delete Junction");
+        var node = _data.nodes.Find(n => n.id == junc.nodeId);
+        if (node != null && node.type == LevelSelectDesignerData.NodeType.JunctionSplit)
+            node.type = LevelSelectDesignerData.NodeType.Waypoint;
+        _data.junctions.RemoveAll(j => j.nodeId == junc.nodeId);
+        if (_selectedJunctionNodeId == junc.nodeId)
+            _selectedJunctionNodeId = null;
+        EditorUtility.SetDirty(_data);
+        Repaint();
+    }
+
     private void DrawRightPanel()
     {
         Rect rightRect = EditorGUILayout.BeginVertical(GUILayout.Width(_rightPanelWidth), GUILayout.ExpandHeight(true));
@@ -2552,6 +2801,10 @@ EditorUtility.SetDirty(_data);
 
         if (_data != null)
         {
+            // ── Debug Console ─────────────────────────────────────
+            DrawDebugConsole();
+            EditorGUILayout.Space(2);
+
             // ── Setup (scene objects + prefabs) ───────────────────
             _foldSetup = EditorGUILayout.Foldout(_foldSetup, "Setup", true, EditorStyles.foldoutHeader);
             if (_foldSetup)
@@ -2800,6 +3053,18 @@ EditorUtility.SetDirty(_data);
                 EditorUtility.SetDirty(_data);
                 Repaint();
             }
+            var prevJuncBg = GUI.backgroundColor;
+            GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
+            if (GUILayout.Button(new GUIContent("✕", "Delete junction — resets node to Waypoint and removes junction record"),
+                    EditorStyles.miniButton, GUILayout.Width(22)))
+            {
+                DeleteJunctionNode(junc);
+                GUI.backgroundColor = prevJuncBg;
+                EditorGUILayout.EndHorizontal();
+                EditorGUILayout.EndVertical();
+                break;
+            }
+            GUI.backgroundColor = prevJuncBg;
             EditorGUILayout.EndHorizontal();
 
             // ── Two permanent assignment fields ───────────────────
@@ -3541,6 +3806,18 @@ EditorUtility.SetDirty(_data);
             var segId = go.AddComponent<RiverSegmentID>();
             ApplySegmentID(segId, path);
             segId.SetSegmentID(path.segmentId + (s < suffixes.Length ? suffixes[s] : $"_{s}"));
+
+            // For T-junction bidirectional paths, every segment except the last is a "left half"
+            // whose junction is at t=1 — it must extrude backward from the junction toward its start.
+            if (path.tJunctionBidirectional && s < segBounds.Count - 1)
+            {
+                var so2 = new SerializedObject(segId);
+                so2.Update();
+                so2.FindProperty("reverseExtrude").boolValue = true;
+                so2.ApplyModifiedProperties();
+                EditorUtility.SetDirty(segId);
+            }
+
             containers.Add(segContainer);
 
             // Create gap container after this segment (if not the last)
@@ -4056,6 +4333,7 @@ EditorUtility.SetDirty(_data);
             _data.cameraController      = null;
             _data.soulDisplaySlotManager = null;
             _data.musicController        = null;
+            _data.pauseManager           = null;
             EditorUtility.SetDirty(_data);
         }
     }
@@ -4414,6 +4692,11 @@ EditorUtility.SetDirty(_data);
         EditorGUILayout.Space(6);
         EditorGUILayout.LabelField("Landscape Tiles", EditorStyles.boldLabel);
 
+        // Canvas overlay alpha — window-only preference, not saved to data asset
+        EditorGUI.BeginChangeCheck();
+        _landscapeCanvasAlpha = EditorGUILayout.Slider("Canvas Alpha", _landscapeCanvasAlpha, 0f, 1f);
+        if (EditorGUI.EndChangeCheck()) Repaint();
+
         EditorGUI.BeginChangeCheck();
         _data.landscapeTileSize = EditorGUILayout.FloatField("Tile Size",  _data.landscapeTileSize);
         _data.landscapeTilesX   = EditorGUILayout.IntField("Tiles X",     _data.landscapeTilesX);
@@ -4541,8 +4824,9 @@ EditorUtility.SetDirty(_data);
         float ox   = _data.landscapeOffset.x;
         float oz   = _data.landscapeOffset.y;
 
-        var fillColor    = new Color(0.38f, 0.38f, 0.38f, 0.55f);
-        var outlineColor = new Color(0.55f, 0.55f, 0.55f, 0.8f);
+        float a          = _landscapeCanvasAlpha;
+        var fillColor    = new Color(0.38f, 0.38f, 0.38f, 0.55f * a);
+        var outlineColor = new Color(0.55f, 0.55f, 0.55f, 0.8f  * a);
 
         for (int col = 0; col < _data.landscapeTilesX; col++)
         {
@@ -4577,8 +4861,8 @@ EditorUtility.SetDirty(_data);
             // 0 = mid-grey, positive = white, negative = black
             float t          = Mathf.Clamp01((hp.height + 15f) / 30f); // -15..+15 → 0..1
             float brightness = Mathf.Lerp(0f, 1f, t);
-            var   fillCol    = new Color(brightness, brightness, brightness, 0.4f);
-            var   ringCol    = sel ? Color.yellow : new Color(brightness, brightness, brightness, 0.9f);
+            var   fillCol    = new Color(brightness, brightness, brightness, 0.4f * a);
+            var   ringCol    = sel ? Color.yellow : new Color(brightness, brightness, brightness, 0.9f * a);
 
             Handles.color = fillCol;
             Handles.DrawSolidDisc(new Vector3(cp.x, cp.y, 0), Vector3.forward, cr);

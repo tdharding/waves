@@ -12,13 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 27f8b39b0cbc4784a93d189b05a0ddd9, type: 3}
   m_Name: NewSonarGridType
   m_EditorClassIdentifier: Assembly-CSharp::SonarGridType
-  viewRadius: 4.11
-  cellSize: 1
-  gridDensity: 3
-  subdivisions: 4
-  horizontalY: 0.42
-  hLevels: 2
-  hLevelSpacing: 1
+  columns: 10
+  rows: 10
+  levels: 2
+  linesPerCell: 5
+  subdivisions: 10
+  surfaceDepthOffset: -0.5
   spawnVertical: 1
   spawnCrossVertical: 1
   planeMaterial: {fileID: 2100000, guid: f5385b10b106b4b43b1460ce3e6c2842, type: 2}

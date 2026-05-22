@@ -120,7 +120,7 @@ Material:
     - _QueueControl: 0
     - _QueueOffset: 0
     - _ReceiveShadows: 1
-    - _ShadowIntensity: 0.6
+    - _ShadowIntensity: 0.74
     - _Smoothness: 0.5
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
@@ -140,9 +140,10 @@ Material:
     - _RemapAlpha: {r: 4.36, g: -4.3, b: 0, a: 0}
     - _RemapAlpha2: {r: -6.8, g: 2.64, b: 0, a: 0}
     - _RemapAlpha_1: {r: -6.34, g: 1, b: 0, a: 0}
+    - _RemapRing1: {r: -0.73, g: -0.06, b: 0, a: 0}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
     - _TwirlCenter: {r: -0.76, g: 2.43, b: -9.85, a: 0}
-    - _Vector2: {r: -0.3, g: 0.21, b: 0, a: 0}
-    - _Vector2_1: {r: 3.22, g: -0.28, b: 0, a: 0}
+    - _Vector2: {r: -0.3, g: 0.69, b: 0, a: 0}
+    - _Vector2_1: {r: 3.22, g: -2.76, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

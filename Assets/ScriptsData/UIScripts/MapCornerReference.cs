@@ -25,6 +25,11 @@ public class MapCornerReference : MonoBehaviour
         return Vector3.LerpUnclamped(center, point, scalingOffset);
     }
 
+    void OnDestroy()
+    {
+        MapProjection.Reset();
+    }
+
     void OnDrawGizmos()
     {
         if (topLeft)     { Gizmos.color = Color.green;  Gizmos.DrawSphere(topLeft.position,     0.02f); }

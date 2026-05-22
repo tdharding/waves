@@ -11,13 +11,18 @@ public class SonarController : MonoBehaviour
     [SerializeField] Material             material;
     [SerializeField] Transform            boatTransform;
 
+    [Header("Grid Coverage")]
+    [SerializeField] float horizontalGridArea = 10f;
+    [SerializeField] float verticalGridArea   = 5f;
+
     [Header("Wave Mask")]
     [SerializeField] Transform waterTransform;
     [SerializeField] Material  waterMaterial;
-    [SerializeField] float     waveMaskBias = 0.05f;
+    [SerializeField] float     waveMaskBias    = 0.05f;
+    [SerializeField] float     maskOriginOffset = 0f;
 
-    [Header("Pulse Origins")]
-    [SerializeField] List<Transform> pulseOrigins = new List<Transform>();
+    [Header("Soul Fish Points")]
+    [SerializeField] float soulFishAlpha = 1f;
 
     [Header("Feathered Radius")]
     [SerializeField] float radius               = 5f;
@@ -35,6 +40,8 @@ public class SonarController : MonoBehaviour
 
     float _debugTimer;
 
+    static readonly int SoulFishAlphaID = Shader.PropertyToID("_SoulFishAlpha");
+
     static readonly int WaveOriginID  = Shader.PropertyToID("_WaveOrigin");
     static readonly int WaveFreqID    = Shader.PropertyToID("_WaveFrequency");
     static readonly int WaveSpeedID   = Shader.PropertyToID("_WaveSpeed");
@@ -49,13 +56,32 @@ public class SonarController : MonoBehaviour
         _hBlock = new MaterialPropertyBlock();
         _vBlock = new MaterialPropertyBlock();
         _xBlock = new MaterialPropertyBlock();
+        ConfigureGenerator();
+    }
+
+#if UNITY_EDITOR
+    void OnValidate()
+    {
+        UnityEditor.EditorApplication.delayCall += () =>
+        {
+            if (this != null) ConfigureGenerator();
+        };
+    }
+#endif
+
+    void ConfigureGenerator()
+    {
+        if (generator == null || generator.GridType == null) return;
+        var   gt           = generator.GridType;
+        int   maxAxis      = Mathf.Max(1, gt.columns, gt.rows);
+        float cellSize     = horizontalGridArea / maxAxis;
+        float levelSpacing = verticalGridArea   / Mathf.Max(1, gt.levels);
+        float surfaceY     = waterTransform != null ? waterTransform.position.y : 0f;
+        generator.Configure(cellSize, levelSpacing, surfaceY);
     }
 
     void Update()
     {
-        if (generator != null && boatTransform != null)
-            generator.SnapTiles(boatTransform.position);
-
         int count = PackOrigins();
 
         if (waterTransform != null && waterMaterial != null)
@@ -76,7 +102,7 @@ public class SonarController : MonoBehaviour
             }
         }
         else if (debugLog)
-        {
+{
             _debugTimer += Time.deltaTime;
             if (_debugTimer >= 1f)
             {
@@ -91,7 +117,7 @@ public class SonarController : MonoBehaviour
 
     void PushWaveParams(MaterialPropertyBlock block, WaveUtils.WaveParams wp)
     {
-        block.SetVector(WaveOriginID, new Vector4(wp.origin.x, wp.origin.y, wp.origin.z, 0f));
+        block.SetVector(WaveOriginID, new Vector4(wp.origin.x, wp.origin.y + maskOriginOffset, wp.origin.z, 0f));
         block.SetFloat(WaveFreqID,   wp.frequency);
         block.SetFloat(WaveSpeedID,  wp.speed);
         block.SetFloat(WaveRippleID, wp.ripple);
@@ -101,11 +127,15 @@ public class SonarController : MonoBehaviour
 
     int PackOrigins()
     {
+        var fish  = SoulFishMapLinker.ActiveFish;
         int count = 0;
-        foreach (Transform t in pulseOrigins)
+        if (fish != null)
         {
-            if (count >= MaxOrigins) break;
-            _originBuffer[count++] = t != null ? (Vector4)t.position : Vector4.zero;
+            for (int i = 0; i < fish.Count && count < MaxOrigins; i++)
+            {
+                if (fish[i] != null)
+                    _originBuffer[count++] = (Vector4)fish[i].position;
+            }
         }
         for (int i = count; i < MaxOrigins; i++)
             _originBuffer[i] = Vector4.zero;
@@ -121,12 +151,14 @@ public class SonarController : MonoBehaviour
         material.SetFloat(SonarPlaneGenerator.PulseWidthID,           feather);
         material.SetFloat(SonarPlaneGenerator.DisplaceStrengthID,     displaceStrength);
         material.SetFloat(SonarPlaneGenerator.DisplaceRadiusOffsetID, displaceRadiusOffset);
+        material.SetFloat(SoulFishAlphaID,                            soulFishAlpha);
 
         if (generator != null)
         {
             material.SetFloat(SonarPlaneGenerator.GridDensityShaderID, generator.GridDensity);
             material.SetFloat(SonarPlaneGenerator.GridWorldScaleID,    generator.GridWorldScale);
         }
+
     }
 
     void PushToRenderers(int count)
@@ -161,12 +193,15 @@ public class SonarController : MonoBehaviour
         block.SetFloat(SonarPlaneGenerator.PulseWidthID,           feather);
         block.SetFloat(SonarPlaneGenerator.DisplaceStrengthID,     displaceStrength);
         block.SetFloat(SonarPlaneGenerator.DisplaceRadiusOffsetID, displaceRadiusOffset);
+        block.SetFloat(SoulFishAlphaID,                            soulFishAlpha);
     }
 
 #if UNITY_EDITOR
     void OnDrawGizmos()
     {
-        foreach (Transform t in pulseOrigins)
+        var fish = SoulFishMapLinker.ActiveFish;
+        if (fish == null) return;
+        foreach (Transform t in fish)
         {
             if (t == null) continue;
             Gizmos.color = new Color(0f, 1f, 0.8f, 0.3f);

@@ -13,16 +13,16 @@ MonoBehaviour:
   m_Name: HolyGlitchWaves1
   m_EditorClassIdentifier: Assembly-CSharp::WavePreset
   state:
-    Frequency: 8
-    Speed: -0.12
+    Frequency: 5.11
+    Speed: 0.58
     RippleDepth: 0.09
     Smoothness: 0.057
     Transparency: 1
     Strength: 1.56
-    TroughRingWave1Brightness: 3.26
-    PeakRingWave2Brightness: 0.3
+    TroughRingWave1Brightness: 52.5
+    PeakRingWave2Brightness: 0.44
     TwirlBaseStrength: 7.73
-    TwirlSlopeBoost: 1.25
+    TwirlSlopeBoost: 0.34
     TwirlScale: 5.8
     DepthTwirlStrength: 3.65
     DepthFadeStrength: 4.8
@@ -30,26 +30,30 @@ MonoBehaviour:
     WhirlpoolTwirlStrength: 4.33
     WhirlpoolAreaTwirlStrength: -1.75
     SoulFishTwirlStrength: 0.65
+    SoulFishMaskStrength: 0
+    SoulFishRadius: 0
+    ZoneTiling: {x: 0, y: 0}
+    ZoneScrollSpeed: 0
+    ZoneNoiseStrength: 0
+    ZoneTexture: {fileID: 0}
     WhirlpoolTaper: 0.668
     WhirlpoolDarkRadiusMult: 1.006
     WhirlpoolDarkStrength: 1
     WhirlpoolFalloffPower: 0.1
-    WaveStepRate: 12.71
+    WaveStepRate: 7.99
     BaseColor: {r: 0.6509434, g: 0.6509434, b: 0.6509434, a: 1}
-    LightDirection: {x: -71.7, y: 298.06, z: 5.38}
-    FoamDitherSize: 3.1
-    FoamDistanceDepth: 0.19
-    FoamDepthFade: 0.85
-    FoamColor: {r: 1, g: 1, b: 1, a: 0.50980395}
-    FoamLine: 0.6029
-    DepthFade: -0.04
+    LightDirection: {x: -71.7, y: 1, z: 1}
+    FoamDitherSize: 2.6
+    FoamDistanceDepth: 0.47
+    FoamDepthFade: 0.66
+    FoamColor: {r: 0, g: 0, b: 0, a: 0.50980395}
+    FoamLine: 1.09
+    DepthFade: -0.05
     DepthColour: {r: 1, g: 1, b: 1, a: 0}
     DistanceDepth: 0.15
     NormalTexture: {fileID: 2800000, guid: 51ac2df266ae63944938104912d2a50c, type: 3}
+    WaveCenter: {x: 0, y: 0, z: 0, w: 0}
   sonarEnabled: 1
-  musicIntro: {fileID: 8300000, guid: 1db066ffcdfbf314d95fcbf7feb855a4, type: 3}
-  musicLoop: {fileID: 8300000, guid: 1db066ffcdfbf314d95fcbf7feb855a4, type: 3}
-  lights:
-  - color: {r: 1, g: 1, b: 1, a: 1}
-    intensity: 68.56
-    range: 10
+  musicIntro: {fileID: 8300000, guid: 93e3d3d2b7745dc49bcbd474b227be01, type: 3}
+  musicLoop: {fileID: 8300000, guid: 93e3d3d2b7745dc49bcbd474b227be01, type: 3}
+  lights: []

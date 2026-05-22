@@ -226,6 +226,52 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: -1120876939955257047, guid: 3a5d1bc5ad773fe478eff879b4b172bf, type: 3}
+--- !u!1 &7344576769798099020
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8433297673516012763}
+  - component: {fileID: 2175609904341177887}
+  m_Layer: 0
+  m_Name: BaseLineLevel
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8433297673516012763
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7344576769798099020}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 8738136368153661997}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2175609904341177887
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7344576769798099020}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b7acdab1d4756024984e27ed95d4e527, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BaselineMarker
+  height: 0.59
+  discRadius: 5.34
 --- !u!1 &7923946534364195739
 GameObject:
   m_ObjectHideFlags: 0
@@ -258,6 +304,7 @@ Transform:
   - {fileID: 4756219572200980}
   - {fileID: 5448074485093968467}
   - {fileID: 225852670218504838}
+  - {fileID: 8433297673516012763}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &8221556867707826547

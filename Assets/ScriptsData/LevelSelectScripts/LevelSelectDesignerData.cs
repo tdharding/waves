@@ -39,6 +39,7 @@ public class LevelSelectDesignerData : ScriptableObject
         public bool leadsToArena;
         public bool arenaIsAtEnd;
         public bool extrudeOnExit;
+        public bool tJunctionBidirectional;
         public string arenaGridDataGuid;
         public Color editorColor = Color.cyan;
     }

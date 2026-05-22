@@ -62,6 +62,13 @@ public class SplineRiverManager : MonoBehaviour
         public bool   ExitUnlocked;   // set by NotifyLevelExited or restored from save
         public string SegmentID;      // stable ID used for persistence
         public bool   ArenaIsAtEnd;   // true → arena at t=1, extrude backwards (1-t → 1)
+
+        // Multi-parent / bidirectional corridor support
+        public BranchTracker ParentAlt;     // second parent — fires if either Parent or ParentAlt reaches TriggerT
+        public BranchTracker ReverseSource; // when this higher-depth branch completes, fire this branch in reverse
+        public bool          ReverseExtrude; // set at fire time when triggered by ReverseSource
+        // T-junction bidirectional: this segment's junction is at t=1, always extrude from t=1 backward
+        public bool          AlwaysReverse;
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -180,8 +187,8 @@ public class SplineRiverManager : MonoBehaviour
             else
             {
                 if (col != null) col.enabled = true;
-                // For reversed extrusion (ArenaIsAtEnd), the visible front is at 1-currentT
-                float barrierT = (branch.ExtrudeOnExit && branch.ArenaIsAtEnd)
+                // For reversed extrusion the visible front is at 1-currentT
+                float barrierT = ((branch.ExtrudeOnExit && branch.ArenaIsAtEnd) || branch.AlwaysReverse)
                     ? 1f - branch.CurrentT
                     : branch.CurrentT;
                 Vector3 localPos = branch.Container.Spline.EvaluatePosition(barrierT);
@@ -219,7 +226,8 @@ private IEnumerator AnimateMainExtrude(float target)
             if (b.IsStarted) continue;
 
             float parentT = b.Parent == null ? _mainCurrentT : b.Parent.CurrentT;
-            bool parentReachedTrigger = parentT >= b.TriggerT;
+            bool parentReachedTrigger = parentT >= b.TriggerT
+                || (b.ParentAlt != null && b.ParentAlt.CurrentT >= b.TriggerT);
 
             bool previousInGroupFinished = true;
             if (i > 0)
@@ -234,8 +242,15 @@ private IEnumerator AnimateMainExtrude(float target)
 
             bool exitGatePassed = !b.ExtrudeOnExit || b.ExitUnlocked;
 
-            if (parentReachedTrigger && previousInGroupFinished && exitGatePassed)
+            // Reverse trigger: a higher-depth branch (e.g. Tertiary) has completed,
+            // firing this secondary from the other direction — bypasses exit gate and group ordering.
+            bool reverseReady = b.ReverseSource != null && b.ReverseSource.CurrentT >= 1f;
+
+            bool normalTrigger  = parentReachedTrigger && previousInGroupFinished && exitGatePassed;
+
+            if (normalTrigger || reverseReady)
             {
+                if (reverseReady && !b.ExitUnlocked) b.ReverseExtrude = true;
                 b.IsStarted = true;
                 if (immediate)
                 {
@@ -380,9 +395,8 @@ private IEnumerator AnimateMainExtrude(float target)
     // main river mesh when the branch fires, so it fills the gap without looking early.
     private static Vector2 ExtrudeRange(BranchTracker tracker)
     {
-        if (tracker.ExtrudeOnExit && tracker.ArenaIsAtEnd)
-            return new Vector2(1f - tracker.CurrentT, 1f);
-        return new Vector2(0f, tracker.CurrentT);
+        bool reverse = (tracker.ExtrudeOnExit && tracker.ArenaIsAtEnd) || tracker.ReverseExtrude || tracker.AlwaysReverse;
+        return reverse ? new Vector2(1f - tracker.CurrentT, 1f) : new Vector2(0f, tracker.CurrentT);
     }
 
     private void ApplyMainExtrude(float t)
@@ -510,10 +524,66 @@ private IEnumerator AnimateMainExtrude(float target)
         // curved splines, causing branches to fire before the visual tip reaches the junction.
         foreach (var branch in _branches)
         {
-            if (branch.Depth != 1) continue; // depth-2+ stay arc-length relative to parent for now
+            if (branch.Depth != 1) continue;
             float3 jLocal = _mainContainer.transform.InverseTransformPoint(branch.JunctionWorldPos);
             SplineUtility.GetNearestPoint(_mainContainer.Spline, jLocal, out _, out float parametricT);
             branch.TriggerT = Mathf.Clamp01(parametricT);
+        }
+
+        // Post-stitch: correct parent + TriggerT for depth-2+ branches via spatial proximity.
+        // Sorting by depth means all depth-(n-1) are fully accumulated before depth-n is seen,
+        // so lastTracker is the wrong parent and triggerT is always 1.0 without this pass.
+        // Also assigns ParentAlt when two depth-(n-1) branches converge at the same junction,
+        // enabling a Tertiary to fire when either of its parent Secondaries completes.
+        const float kAltParentThreshold = 2f; // world units — two paths ending this close are treated as convergent
+        foreach (var branch in _branches)
+        {
+            if (branch.Depth < 2) continue;
+
+            BranchTracker bestParent = null, altParent = null;
+            float bestDist = float.MaxValue, altDist = float.MaxValue;
+            float bestT    = 0f;
+
+            foreach (var candidate in _branches)
+            {
+                if (candidate.Depth != branch.Depth - 1) continue;
+                float3 jLocal = candidate.Container.transform.InverseTransformPoint(branch.JunctionWorldPos);
+                SplineUtility.GetNearestPoint(candidate.Container.Spline, jLocal, out _, out float nearT);
+                Vector3 nearWorld = candidate.Container.transform.TransformPoint(
+                    (Vector3)candidate.Container.Spline.EvaluatePosition(nearT));
+                float dist = Vector3.Distance(nearWorld, branch.JunctionWorldPos);
+                if (dist < bestDist)
+                {
+                    altDist = bestDist; altParent = bestParent;
+                    bestDist = dist;    bestParent = candidate; bestT = nearT;
+                }
+                else if (dist < altDist)
+                {
+                    altDist = dist; altParent = candidate;
+                }
+            }
+
+            if (bestParent != null)
+            {
+                branch.Parent   = bestParent;
+                branch.TriggerT = Mathf.Clamp01(bestT);
+                Debug.Log($"[SplineRiverManager] Depth-{branch.Depth} '{branch.SegmentID}' → parent='{bestParent.SegmentID}' TriggerT={bestT:F3} dist={bestDist:F2}");
+            }
+
+            if (altParent != null && altDist <= kAltParentThreshold)
+            {
+                branch.ParentAlt = altParent;
+                Debug.Log($"[SplineRiverManager] Depth-{branch.Depth} '{branch.SegmentID}' → parentAlt='{altParent.SegmentID}' dist={altDist:F2}");
+            }
+        }
+
+        // Wire ReverseSource: for any branch with a ParentAlt (a multi-parent Tertiary),
+        // set ReverseSource on both parents so each fires in reverse when the Tertiary completes.
+        foreach (var branch in _branches)
+        {
+            if (branch.ParentAlt == null) continue;
+            if (branch.Parent    != null && branch.Parent.ExtrudeOnExit)    branch.Parent.ReverseSource    = branch;
+            if (branch.ParentAlt != null && branch.ParentAlt.ExtrudeOnExit) branch.ParentAlt.ReverseSource = branch;
         }
 
         if (_mainExtrude != null) _mainExtrude.Rebuild();
@@ -540,11 +610,16 @@ private IEnumerator AnimateMainExtrude(float target)
         branchExtrude.Range = Vector2.zero;
 
         var srcID = source.GetComponent<RiverSegmentID>();
-        string segID = !string.IsNullOrEmpty(group) ? group
-                     : (srcID != null && !string.IsNullOrEmpty(srcID.SegmentID) ? srcID.SegmentID : source.name);
+        string segID = (srcID != null && !string.IsNullOrEmpty(srcID.SegmentID)) ? srcID.SegmentID
+                     : (!string.IsNullOrEmpty(group) ? group : source.name);
 
-        // Capture junction world pos before OffsetBranchStartKnot moves the first knot
-        Vector3 junctionWorld = source.transform.TransformPoint((Vector3)source.Spline[0].Position);
+        bool alwaysReverse = srcID != null && srcID.ReverseExtrude;
+
+        // For always-reverse segments the junction is at the END (t=1), not the start.
+        // Read from source before any offset is applied to newSpline.
+        Vector3 junctionWorld = alwaysReverse
+            ? source.transform.TransformPoint((Vector3)source.Spline[source.Spline.Count - 1].Position)
+            : source.transform.TransformPoint((Vector3)source.Spline[0].Position);
 
         var tracker = new BranchTracker
         {
@@ -560,6 +635,7 @@ private IEnumerator AnimateMainExtrude(float target)
             ExtrudeOnExit    = srcID != null && srcID.ExtrudeOnExit,
             ExitUnlocked     = false,
             ArenaIsAtEnd     = srcID != null && srcID.ArenaIsAtEnd,
+            AlwaysReverse    = alwaysReverse,
             JunctionWorldPos = junctionWorld,
         };
 
@@ -570,7 +646,12 @@ private IEnumerator AnimateMainExtrude(float target)
         branchContainer.AddSpline(newSpline);
 
         CopySplineData(source, newSpline, branchContainer);
-        OffsetBranchStartKnot(newSpline, branchContainer);
+        // Always-reverse: junction is at the end, so extend the end knot past the junction gap.
+        // Normal forward: extend the start knot back behind the junction gap.
+        if (alwaysReverse)
+            OffsetBranchEndKnot(newSpline, branchContainer);
+        else
+            OffsetBranchStartKnot(newSpline, branchContainer);
 
         float totalLen = newSpline.GetLength();
         tracker.NormalizedSpeed = totalLen > 0 ? _extrudeSpeed / totalLen : _extrudeSpeed;
@@ -601,6 +682,21 @@ private IEnumerator AnimateMainExtrude(float target)
         var knot = spline[0];
         knot.Position -= (float3)(localDir * _branchOvershoot);
         spline[0] = knot;
+    }
+
+    // Mirror of OffsetBranchStartKnot for always-reverse segments where the junction is at t=1.
+    // Extends the last knot forward past the junction gap so there's no visual hole at fire time.
+    private void OffsetBranchEndKnot(Spline spline, SplineContainer container)
+    {
+        if (spline.Count == 0) return;
+
+        float3  worldTangent = SplineUtility.EvaluateTangent(spline, 1f);
+        Vector3 worldDir     = math.normalize(worldTangent);
+        Vector3 localDir     = container.transform.InverseTransformDirection(worldDir);
+
+        var knot = spline[spline.Count - 1];
+        knot.Position += (float3)(localDir * _branchOvershoot);
+        spline[spline.Count - 1] = knot;
     }
 
     private void CopySplineData(

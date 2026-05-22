@@ -100,10 +100,53 @@ public class CatapultProjectile : MonoBehaviour
     private bool HitsObstacle(Vector3 pos)
     {
         Collider[] hits = Physics.OverlapSphere(pos, obstacleCheckRadius);
+
+        // Draw the check sphere for one frame in the Scene view
+        DrawDebugSphere(pos, obstacleCheckRadius, hits.Length > 0 ? Color.yellow : Color.green);
+
         foreach (Collider col in hits)
+        {
+            Debug.Log($"[CatapultProjectile] OverlapSphere hit: '{col.name}' tag='{col.tag}' at dist={Vector3.Distance(pos, col.bounds.center):F2}  (radius={obstacleCheckRadius})");
+
+            StatueDestruction statue = col.GetComponentInParent<StatueDestruction>();
+            if (statue != null)
+            {
+                Debug.Log($"[CatapultProjectile] STATUE HIT on '{col.name}' — triggering destruction.");
+                statue.Trigger(pos);
+                return true;
+            }
+
             foreach (string tag in collidableTags)
-                if (col.CompareTag(tag)) return true;
+            {
+                if (col.CompareTag(tag))
+                {
+                    Debug.Log($"[CatapultProjectile] OBSTACLE MATCH → tag '{tag}' on '{col.name}' — triggering hit.");
+                    return true;
+                }
+            }
+        }
+
         return false;
+    }
+
+    private static void DrawDebugSphere(Vector3 centre, float radius, Color colour)
+    {
+        // Approximates a wire sphere with three Debug.DrawLine circles
+        int segs = 16;
+        for (int i = 0; i < segs; i++)
+        {
+            float a0 = (float)i       / segs * Mathf.PI * 2f;
+            float a1 = (float)(i + 1) / segs * Mathf.PI * 2f;
+            // XZ ring
+            Debug.DrawLine(centre + new Vector3(Mathf.Cos(a0), 0, Mathf.Sin(a0)) * radius,
+                           centre + new Vector3(Mathf.Cos(a1), 0, Mathf.Sin(a1)) * radius, colour);
+            // XY ring
+            Debug.DrawLine(centre + new Vector3(Mathf.Cos(a0), Mathf.Sin(a0), 0) * radius,
+                           centre + new Vector3(Mathf.Cos(a1), Mathf.Sin(a1), 0) * radius, colour);
+            // YZ ring
+            Debug.DrawLine(centre + new Vector3(0, Mathf.Cos(a0), Mathf.Sin(a0)) * radius,
+                           centre + new Vector3(0, Mathf.Cos(a1), Mathf.Sin(a1)) * radius, colour);
+        }
     }
 
     private void OnObstacleHit()

@@ -13,43 +13,47 @@ MonoBehaviour:
   m_Name: HolyGlitchWaves2
   m_EditorClassIdentifier: Assembly-CSharp::WavePreset
   state:
-    Frequency: 5.11
-    Speed: 0.58
-    RippleDepth: 0.09
-    Smoothness: 0.057
+    Frequency: 4.61
+    Speed: 0.2
+    RippleDepth: -0.1
+    Smoothness: 0.253
     Transparency: 1
-    Strength: 1.56
-    TroughRingWave1Brightness: 52.5
-    PeakRingWave2Brightness: 0.44
-    TwirlBaseStrength: 7.73
-    TwirlSlopeBoost: 0.34
-    TwirlScale: 5.8
-    DepthTwirlStrength: 3.65
+    Strength: 0.55
+    TroughRingWave1Brightness: 18.04
+    PeakRingWave2Brightness: 5.4
+    TwirlBaseStrength: 7.84
+    TwirlSlopeBoost: 2.38
+    TwirlScale: 9
+    DepthTwirlStrength: 5.27
     DepthFadeStrength: 4.8
     DepthFadeLine: -1.2
     WhirlpoolTwirlStrength: 4.33
     WhirlpoolAreaTwirlStrength: -1.75
     SoulFishTwirlStrength: 0.65
+    SoulFishMaskStrength: 1.58
+    SoulFishRadius: 0.49
+    ZoneTiling: {x: 4, y: 4}
+    ZoneScrollSpeed: 0
+    ZoneNoiseStrength: 0
+    ZoneTexture: {fileID: 2800000, guid: 83f30fb8efbab6f4ea1bda55fb543486, type: 3}
     WhirlpoolTaper: 0.668
     WhirlpoolDarkRadiusMult: 1.006
     WhirlpoolDarkStrength: 1
     WhirlpoolFalloffPower: 0.1
-    WaveStepRate: 7.99
+    WaveStepRate: 8.5
     BaseColor: {r: 0.6509434, g: 0.6509434, b: 0.6509434, a: 1}
     LightDirection: {x: -71.7, y: 1, z: 1}
-    FoamDitherSize: 2.6
-    FoamDistanceDepth: 0.47
-    FoamDepthFade: 0.66
-    FoamColor: {r: 0, g: 0, b: 0, a: 0.50980395}
-    FoamLine: 1.09
+    FoamDitherSize: 2.57
+    FoamDistanceDepth: 0.42
+    FoamDepthFade: 0.79
+    FoamColor: {r: 0.70440245, g: 0.70440245, b: 0.70440245, a: 0.654902}
+    FoamLine: 1.02
     DepthFade: -0.05
     DepthColour: {r: 1, g: 1, b: 1, a: 0}
     DistanceDepth: 0.15
     NormalTexture: {fileID: 2800000, guid: 51ac2df266ae63944938104912d2a50c, type: 3}
+    WaveCenter: {x: 0, y: 0, z: 0, w: 0}
   sonarEnabled: 1
-  musicIntro: {fileID: 8300000, guid: 1db066ffcdfbf314d95fcbf7feb855a4, type: 3}
-  musicLoop: {fileID: 8300000, guid: 1db066ffcdfbf314d95fcbf7feb855a4, type: 3}
-  lights:
-  - color: {r: 1, g: 1, b: 1, a: 1}
-    intensity: 9.29
-    range: 10
+  musicIntro: {fileID: 8300000, guid: 93e3d3d2b7745dc49bcbd474b227be01, type: 3}
+  musicLoop: {fileID: 8300000, guid: 93e3d3d2b7745dc49bcbd474b227be01, type: 3}
+  lights: []

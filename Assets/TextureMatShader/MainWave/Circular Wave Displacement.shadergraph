@@ -2109,20 +2109,6 @@
         {
             "m_OutputSlot": {
                 "m_Node": {
-                    "m_Id": "36faa0d1f57949efa4af65d5fd24a542"
-                },
-                "m_SlotId": 3
-            },
-            "m_InputSlot": {
-                "m_Node": {
-                    "m_Id": "7e0019c9ae52432a9a447a035697176e"
-                },
-                "m_SlotId": 2
-            }
-        },
-        {
-            "m_OutputSlot": {
-                "m_Node": {
                     "m_Id": "3927ef5a7b8744c1a07c31149d13bd76"
                 },
                 "m_SlotId": 3
@@ -4120,6 +4106,20 @@
                     "m_Id": "36faa0d1f57949efa4af65d5fd24a542"
                 },
                 "m_SlotId": 0
+            }
+        },
+        {
+            "m_OutputSlot": {
+                "m_Node": {
+                    "m_Id": "adb411d6811a48d6a5f5486faa8d4daa"
+                },
+                "m_SlotId": 3
+            },
+            "m_InputSlot": {
+                "m_Node": {
+                    "m_Id": "7e0019c9ae52432a9a447a035697176e"
+                },
+                "m_SlotId": 2
             }
         },
         {
@@ -8366,8 +8366,8 @@
     "m_ObjectId": "12d50846b5854cccbdef063d59611b16",
     "m_Title": "Sonar affected area",
     "m_Position": {
-        "x": -1467.0001220703125,
-        "y": -841.0000610351563
+        "x": -1467.0,
+        "y": -841.0
     }
 }
 
@@ -15676,8 +15676,8 @@
         "m_Expanded": true,
         "m_Position": {
             "serializedVersion": "2",
-            "x": -4292.00048828125,
-            "y": -2784.000244140625,
+            "x": -4785.00048828125,
+            "y": -2518.000244140625,
             "width": 131.0,
             "height": 34.0
         }
@@ -17289,8 +17289,8 @@
     "m_ObjectId": "5914e0b4272e4bacaae099df1e6624c5",
     "m_Title": "Normals",
     "m_Position": {
-        "x": 198.9998779296875,
-        "y": 2762.000244140625
+        "x": 199.0,
+        "y": 2762.0
     }
 }
 
@@ -22503,8 +22503,8 @@
     "m_ObjectId": "7e23b7aed2b74c748443f8101979cd94",
     "m_Title": "BoatMovementFoam",
     "m_Position": {
-        "x": -3095.000244140625,
-        "y": 3727.000244140625
+        "x": -3095.0,
+        "y": 3727.0
     }
 }
 
@@ -26860,8 +26860,8 @@
     "m_ObjectId": "9e28bd37698c4d67a33e181d94dbe6f8",
     "m_Title": "boatwaveedgeemphasismask",
     "m_Position": {
-        "x": -4922.00048828125,
-        "y": 4420.00048828125
+        "x": -4922.0,
+        "y": 4420.0
     }
 }
 
@@ -28288,7 +28288,7 @@
     "m_Title": "Peaks Troughs Colour",
     "m_Position": {
         "x": -5934.0,
-        "y": -664.0
+        "y": -664.000244140625
     }
 }
 
@@ -28705,7 +28705,7 @@
     "m_Title": "BoatDirectionMask",
     "m_Position": {
         "x": -4589.0,
-        "y": 3671.000244140625
+        "y": 3671.0
     }
 }
 
@@ -33166,7 +33166,7 @@
     "m_Title": "Waves Vertex Displacement",
     "m_Position": {
         "x": -9272.0,
-        "y": -1649.0001220703125
+        "y": -1649.0
     }
 }
 
@@ -35673,7 +35673,7 @@
     "m_Title": "BoatRippleModulation",
     "m_Position": {
         "x": -5044.0,
-        "y": 3909.000244140625
+        "y": 3909.0
     }
 }
 
@@ -38461,7 +38461,7 @@
     "m_ObjectId": "eb7c88c7732d4158afdb1687103fd402",
     "m_Title": "Depth",
     "m_Position": {
-        "x": -1707.000244140625,
+        "x": -1707.0,
         "y": 3054.0
     }
 }

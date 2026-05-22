@@ -101,7 +101,7 @@ public class WhirlpoolManager : MonoBehaviour
     public void SetSwirl(float swirl) => globalSwirl = swirl;
 
     // Returns world-space Y depression at worldPos due to all active whirlpools.
-    // meshScale converts world-space offsets to object space for radius comparisons.
+// meshScale converts world-space offsets to object space for radius comparisons.
     public float SampleDepthAt(Vector3 worldPos, float meshScale)
     {
         int count = _dataOverride ? _overrideCount : Mathf.Min(_handles.Count, MaxWhirlpools);

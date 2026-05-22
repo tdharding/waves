@@ -15,6 +15,7 @@ public class LevelDataController : MonoBehaviour
     [Header("Wave System")]
     [SerializeField] private WaveMaterialController waveController;
     [SerializeField] private GameObject wavePlaneObject;
+    [SerializeField] private Transform  sonarGridParent;
 
     [Header("Gameplay Camera")]
     [SerializeField] private GameObject gameplayFollowCamera;
@@ -362,8 +363,6 @@ public class LevelDataController : MonoBehaviour
 
         if (gameplayBoat != null)
         {
-            Transform soulBoatTransform = null;
-
             if (levelSpawner.mazeSpawned && activeGridData != null)
             {
                 int selectedIndex = LevelSelectionCache.SelectedEntranceIndex;
@@ -409,16 +408,11 @@ public class LevelDataController : MonoBehaviour
                 }
                 else
                 {
-                    Debug.LogWarning($"[LDC] No entrance found — spawning soul boat at default position.");
+                    Debug.LogWarning($"[LDC] No entrance found — using default boat position.");
                 }
 
                 gameplayBoat.transform.position = spawnPos;
                 gameplayBoat.transform.rotation = Quaternion.Euler(0f, spawnAngle, 0f);
-
-                // Always spawn soul boat — fishing depends on it regardless of entrance config
-                GameObject soulBoat = levelSpawner.SpawnSoulBoat(spawnPos, spawnAngle);
-                soulBoatTransform = soulBoat != null ? soulBoat.transform : null;
-                Debug.Log($"[LDC] SoulBoat spawned: {(soulBoat != null ? soulBoat.name : "NULL")}");
             }
             else
             {
@@ -426,39 +420,14 @@ public class LevelDataController : MonoBehaviour
                                  $"gridData: {(activeGridData != null ? "OK" : "NULL")}");
             }
 
-            // Distribute SoulBoat reference to all consumers
-            if (soulBoatTransform != null)
-            {
-                foreach (var shoal in FindObjectsOfType<SoulShoalController>())
-                    shoal.SetSoulBoat(soulBoatTransform);
-                FindObjectOfType<SonarGridController>()?.SetSoulBoat(soulBoatTransform);
-                FindObjectOfType<SonarUIMapController>()?.SetSoulBoat(soulBoatTransform);
-                FindObjectOfType<SonarCameraFollow>()?.BeginTracking(soulBoatTransform);
-
-                // Wire lure controller from soul boat to the boat control router and tool manager
-                var lureController = soulBoatTransform.GetComponentInChildren<LureController>();
-                if (lureController != null)
-                {
-                    FindObjectOfType<BoatControlRouter>()?.SetLureController(lureController);
-                    FindObjectOfType<BoatToolManager>()?.SetLureController(lureController);
-                }
-            }
-
             gameplayBoat.SetActive(true);
 
             sonarController?.SetBoat(gameplayBoat.transform);
             FindObjectOfType<BoatHUD>()?.SetBoatTransform(gameplayBoat.transform);
 
-            // Re-resolve whirl direction sources now that the boat is active —
-            // they use FindGameObjectWithTag("Boat") which fails while the boat is inactive.
-            if (soulBoatTransform != null)
-                foreach (var whirl in soulBoatTransform.GetComponentsInChildren<SoulWhirlDirection>(true))
-                    whirl.ResolveDirectionSource();
-
             BoatStartupCoordinator coordinator = gameplayBoat.GetComponent<BoatStartupCoordinator>();
             coordinator.BeginStartup();
 
-            FindObjectOfType<SonarProxyBoat>()?.BeginTracking();
         }
     }
 
@@ -471,7 +440,8 @@ public class LevelDataController : MonoBehaviour
     // SHARED SCENE CONTEXT
     // =====================================================
 
-    public Transform GetWaveTransform() => wavePlaneObject != null ? wavePlaneObject.transform : null;
+    public Transform GetWaveTransform()    => wavePlaneObject != null ? wavePlaneObject.transform : null;
+    public Transform GetSonarGridParent() => sonarGridParent;
 
     public Transform GetBoatRoot() => gameplayBoat != null ? gameplayBoat.transform : null;
 

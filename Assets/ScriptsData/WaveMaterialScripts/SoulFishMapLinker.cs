@@ -25,6 +25,8 @@ static readonly int RadiusID = Shader.PropertyToID("_SoulFishMarkerRadius");
     static readonly List<Transform> activeFish = new List<Transform>();
     static readonly List<List<Vector3>> activeZones = new List<List<Vector3>>();
 
+    public static IReadOnlyList<Transform> ActiveFish => activeFish;
+
     readonly Vector4[] positionBuffer = new Vector4[MAX_POINTS];
     readonly Vector3[] gizmoPositions = new Vector3[MAX_POINTS];
     int gizmoCount = 0;

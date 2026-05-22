@@ -51,6 +51,8 @@ public class WaterLevelModifier : MonoBehaviour
         Debug.Log($"[WaterLevelModifier] Init — tier='{spawnedTierName}' floor={spawnedFloorLabel} slot={spawnedTierSlot} y={spawnedTierY}, raise={raiseAmount}, lower={lowerAmount}, hasAbove={hasAbove}, hasBelow={hasBelow}");
     }
 
+    private Transform sonarGridParent;
+
     private static readonly int ArenaMaskID = Shader.PropertyToID("_ArenaMask");
 
     private Transform wavePlane;
@@ -62,7 +64,8 @@ public class WaterLevelModifier : MonoBehaviour
 
     private void Start()
     {
-        wavePlane = LevelDataController.Instance?.GetWaveTransform();
+        wavePlane       = LevelDataController.Instance?.GetWaveTransform();
+        sonarGridParent = LevelDataController.Instance?.GetSonarGridParent();
 
         if (wavePlane != null)
         {
@@ -115,10 +118,12 @@ public class WaterLevelModifier : MonoBehaviour
         if (tweenRoutine != null)
             StopCoroutine(tweenRoutine);
 
-        tweenRoutine = StartCoroutine(TweenY(wavePlane.position.y, targetY));
+        float fromGridY = sonarGridParent != null ? sonarGridParent.position.y : 0f;
+        float toGridY   = fromGridY + (targetY - wavePlane.position.y);
+        tweenRoutine = StartCoroutine(TweenY(wavePlane.position.y, targetY, fromGridY, toGridY));
     }
 
-    private IEnumerator TweenY(float fromY, float toY)
+    private IEnumerator TweenY(float fromY, float toY, float fromGridY, float toGridY)
     {
         float elapsed = 0f;
 
@@ -146,6 +151,13 @@ public class WaterLevelModifier : MonoBehaviour
             if (waveMaterial != null)
                 waveMaterial.SetVector(ArenaMaskID, Vector4.Lerp(maskFrom, maskTo, t));
 
+            if (sonarGridParent != null)
+            {
+                Vector3 gp = sonarGridParent.position;
+                gp.y = Mathf.Lerp(fromGridY, toGridY, t);
+                sonarGridParent.position = gp;
+            }
+
             yield return null;
         }
 
@@ -155,6 +167,13 @@ public class WaterLevelModifier : MonoBehaviour
 
         if (waveMaterial != null)
             waveMaterial.SetVector(ArenaMaskID, maskTo);
+
+        if (sonarGridParent != null)
+        {
+            Vector3 gFinal = sonarGridParent.position;
+            gFinal.y = toGridY;
+            sonarGridParent.position = gFinal;
+        }
 
         tweenRoutine = null;
     }

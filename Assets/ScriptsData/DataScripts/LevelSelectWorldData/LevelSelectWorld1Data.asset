@@ -26,11 +26,11 @@ MonoBehaviour:
     scale: 1.4
     height: 6.9
   - id: 287d9bb7-99dc-4fe7-9108-640a6742e4f3
-    positionXZ: {x: 60.77152, y: -44.226112}
+    positionXZ: {x: 56.668884, y: -47.024925}
     scale: 6.9
     height: 6.9
   - id: ad947181-5f49-43ee-b116-5c64ff556f72
-    positionXZ: {x: 70.849365, y: -43.898617}
+    positionXZ: {x: 72.6007, y: -39.059017}
     scale: 7.8
     height: -2.1
   - id: 3bac5b98-b285-4e13-a01c-e39756b776c9
@@ -50,8 +50,8 @@ MonoBehaviour:
     scale: 19.2
     height: 15
   - id: 65a6e1b8-fc75-4df3-be19-1455a7358016
-    positionXZ: {x: 38.29551, y: 3.3429906}
-    scale: 10.8
+    positionXZ: {x: 35.871002, y: 4.8546124}
+    scale: 9.1
     height: 15
   - id: 69b3cec3-ee38-4a82-87bd-c0e581ea2c3f
     positionXZ: {x: 30.873186, y: 34.745136}
@@ -161,13 +161,10 @@ MonoBehaviour:
     type: 2
   - id: d374c20f-927d-4ece-b05a-cd729e43dac5
     worldPosition: {x: 53.176525, y: 0, z: -14.112084}
-    type: 1
-  - id: 00c48a9d-68ca-4bac-9f9c-cab40cd85561
-    worldPosition: {x: 58.141712, y: 0, z: -6.4472694}
     type: 0
-  - id: 6c808875-394e-4384-a078-0c2b8b7e8e2b
-    worldPosition: {x: 52.351772, y: 0, z: -1.6223212}
-    type: 2
+  - id: 00c48a9d-68ca-4bac-9f9c-cab40cd85561
+    worldPosition: {x: 58.25012, y: 0, z: -5.7968345}
+    type: 0
   - id: cafab691-da33-4bf9-b514-ffe42136c13c
     worldPosition: {x: 53.31676, y: 0, z: -9.824734}
     type: 0
@@ -181,13 +178,13 @@ MonoBehaviour:
     worldPosition: {x: 67.3783, y: 0, z: -17.050394}
     type: 0
   - id: c8b3ef07-4bb9-456f-a059-d50c543ccd4e
-    worldPosition: {x: 67.20308, y: 1, z: -21.327356}
+    worldPosition: {x: 67.20308, y: 1, z: -19.881338}
     type: 0
   - id: 5aa3ab22-fd2d-41ef-8ffb-736dd3b76277
-    worldPosition: {x: 81.60313, y: 2, z: -21.842794}
+    worldPosition: {x: 84.84936, y: 2, z: -20.454144}
     type: 0
   - id: af0eff7b-19b3-414c-bf42-873c4dbc6587
-    worldPosition: {x: 81.70129, y: 3, z: -30.546272}
+    worldPosition: {x: 83.3138, y: 3, z: -42.075714}
     type: 2
   - id: 5a3ad3b0-fe4a-4eb6-b051-618dbf1f91c8
     worldPosition: {x: 23.345333, y: 0, z: -12.917975}
@@ -205,27 +202,83 @@ MonoBehaviour:
     worldPosition: {x: 51.243557, y: 0, z: -35.503807}
     type: 2
   - id: 42d269e4-b405-49ab-b6c3-741fe862ad7a
-    worldPosition: {x: 50.132816, y: 0, z: -41.786373}
+    worldPosition: {x: 49.822876, y: 0, z: -41.723618}
     type: 2
-  - id: 5d058a92-7de1-4d60-a333-9ee43bb4b704
-    worldPosition: {x: 46.585567, y: 0, z: -82.376656}
-    type: 0
   - id: 49c1d47e-5de4-49fe-8b55-50311c8db4f0
-    worldPosition: {x: 71.332306, y: 1.4666667, z: -21.48381}
+    worldPosition: {x: 73.06753, y: 2, z: -20.134197}
     type: 1
   - id: 1a51930f-a437-445c-a0d4-732805c861bf
-    worldPosition: {x: 70.96078, y: 0, z: -28.446825}
+    worldPosition: {x: 73.081604, y: 0, z: -25.361986}
     type: 0
   - id: 96534931-abe4-4d47-80b1-94b5937fbf7e
-    worldPosition: {x: 70.64513, y: 0, z: -35.664974}
+    worldPosition: {x: 72.63649, y: 0, z: -30.811857}
     type: 3
+  - id: a20692ec-1fdb-42a3-bda4-533b3e4f6172
+    worldPosition: {x: 62.368835, y: 0, z: -14.359648}
+    type: 0
+  - id: 05115c23-cd1a-4b34-b462-c30d92f879d9
+    worldPosition: {x: 60.761635, y: 0, z: -34.42804}
+    type: 0
+  - id: 495ece6a-f678-4ad9-bccf-e696f9aeefbc
+    worldPosition: {x: 84.937416, y: 2.25, z: -30.539785}
+    type: 0
+  - id: 8db7cfd2-fcb6-4ed7-982d-5a19ff33e36b
+    worldPosition: {x: 73.37488, y: 0, z: -52.417374}
+    type: 2
+  - id: 74b27785-fd92-4dbd-b331-589395d4c398
+    worldPosition: {x: 74.79355, y: 0, z: -14.258514}
+    type: 0
+  - id: 2a79f7f9-fa39-46ca-a132-bb6039377a27
+    worldPosition: {x: 78.63649, y: 10, z: 1.120164}
+    type: 0
+  - id: 2b59983a-8423-450a-b424-59f9bc9e7974
+    worldPosition: {x: 75.865776, y: 20, z: 13.287247}
+    type: 0
+  - id: d0ee5128-8d55-48be-847a-aebbf68b16d6
+    worldPosition: {x: 65.86709, y: 20, z: 12.44398}
+    type: 2
+  - id: 17a62518-b5e6-4e7c-8d28-1213a2b9a7be
+    worldPosition: {x: 74.78158, y: 0, z: -9.360396}
+    type: 0
+  - id: dc19d5d2-2d00-4b43-a854-8d038e548ff7
+    worldPosition: {x: 74.42018, y: 7, z: -5.2645493}
+    type: 0
+  - id: 1efbbfc3-3907-423b-803d-510d6c112e10
+    worldPosition: {x: 73.37488, y: 0, z: -58.797375}
+    type: 2
+  - id: d4bf991a-9bd4-4932-9603-f4747318f0b1
+    worldPosition: {x: 74.788124, y: 0, z: -75.50144}
+    type: 0
+  - id: 370d0133-257c-4fca-81a6-13114c6ac7dc
+    worldPosition: {x: 74.631615, y: 0, z: -91.34751}
+    type: 1
+  - id: ada58e07-cd33-4c00-adf9-8c08aa0190c9
+    worldPosition: {x: 46.617348, y: 0, z: -72.21486}
+    type: 0
+  - id: cad53abd-844b-4385-acd8-68a3e9e7da40
+    worldPosition: {x: 43.897636, y: 0, z: -92.24701}
+    type: 0
+  - id: da74b6f0-a607-4b89-a5fb-7d65d87efbfd
+    worldPosition: {x: 51.437588, y: 0, z: 1.6261704}
+    type: 2
+  - id: dacea770-fa77-416e-a428-1b3dc63cb873
+    worldPosition: {x: 50.32569, y: 0, z: 7.908534}
+    type: 2
+  - id: 4e37035d-9d8b-4dd2-98db-5dc4b5ebd5e3
+    worldPosition: {x: 53.714115, y: 0, z: 33.93114}
+    type: 0
+  - id: 5e48d5e0-e6d9-4fe8-a282-aca37fdd72a8
+    worldPosition: {x: 40.067028, y: 3, z: 34.849846}
+    type: 1
   paths:
   - pathId: cb512902-99c4-4aa3-973b-d4a908cef861
     segmentId: MainRiver
     nodeIds:
     - 6c2c0bb8-0ed6-4a0c-a0c7-31ed04a6984b
     - e1f05638-ddfe-4bb2-9b7b-68de9e60a628
+    - 74b27785-fd92-4dbd-b331-589395d4c398
     - cf0f7a0f-9957-4b40-8dfe-29ed5d095ac8
+    - a20692ec-1fdb-42a3-bda4-533b3e4f6172
     - 59214d0b-2605-484c-986e-6dbb5f2e6200
     - d374c20f-927d-4ece-b05a-cd729e43dac5
     - 5a3ad3b0-fe4a-4eb6-b051-618dbf1f91c8
@@ -241,6 +294,7 @@ MonoBehaviour:
     leadsToArena: 0
     arenaIsAtEnd: 0
     extrudeOnExit: 0
+    tJunctionBidirectional: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.27, g: 0.45396018, b: 0.9, a: 1}
   - pathId: d76a5911-edc8-4b81-bf5a-e916981c85a9
@@ -251,6 +305,7 @@ MonoBehaviour:
     - 02a699c5-0a00-4bdb-bf1e-96b2a307cd63
     - 8945cb90-f416-4c58-b263-a011934526fd
     - 505618d7-fa11-42e5-9d1a-7cd7fc78e26b
+    - 5e48d5e0-e6d9-4fe8-a282-aca37fdd72a8
     - 11d430cb-05d9-43d4-98d2-a43ce70767f3
     - a38c84e7-5499-4f08-b9c2-7dfbb23acd89
     isLeftPath: 1
@@ -260,6 +315,7 @@ MonoBehaviour:
     leadsToArena: 1
     arenaIsAtEnd: 1
     extrudeOnExit: 0
+    tJunctionBidirectional: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.6379202, g: 0.9, b: 0.27, a: 1}
   - pathId: 56a317bf-2a92-4de6-9c51-314bb88ca7fe
@@ -275,6 +331,7 @@ MonoBehaviour:
     leadsToArena: 1
     arenaIsAtEnd: 1
     extrudeOnExit: 0
+    tJunctionBidirectional: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.9, g: 0.27, b: 0.8218802, a: 1}
   - pathId: 742e74b0-9db8-4d0e-9e9c-4444806e8f22
@@ -283,7 +340,7 @@ MonoBehaviour:
     - d374c20f-927d-4ece-b05a-cd729e43dac5
     - cafab691-da33-4bf9-b514-ffe42136c13c
     - 00c48a9d-68ca-4bac-9f9c-cab40cd85561
-    - 6c808875-394e-4384-a078-0c2b8b7e8e2b
+    - da74b6f0-a607-4b89-a5fb-7d65d87efbfd
     isLeftPath: 1
     isRightPath: 0
     segmentType: 1
@@ -291,6 +348,7 @@ MonoBehaviour:
     leadsToArena: 1
     arenaIsAtEnd: 1
     extrudeOnExit: 0
+    tJunctionBidirectional: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.27, g: 0.9, b: 0.79415953, a: 1}
   - pathId: c564b862-98a6-4b38-8624-ec315e20d761
@@ -301,6 +359,7 @@ MonoBehaviour:
     - c8b3ef07-4bb9-456f-a059-d50c543ccd4e
     - 49c1d47e-5de4-49fe-8b55-50311c8db4f0
     - 5aa3ab22-fd2d-41ef-8ffb-736dd3b76277
+    - 495ece6a-f678-4ad9-bccf-e696f9aeefbc
     - af0eff7b-19b3-414c-bf42-873c4dbc6587
     isLeftPath: 0
     isRightPath: 1
@@ -309,6 +368,7 @@ MonoBehaviour:
     leadsToArena: 1
     arenaIsAtEnd: 1
     extrudeOnExit: 0
+    tJunctionBidirectional: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.9, g: 0.61019945, b: 0.27, a: 1}
   - pathId: 5fad6cce-d3e3-4f4e-8cc7-d76df1527c7a
@@ -326,20 +386,23 @@ MonoBehaviour:
     leadsToArena: 1
     arenaIsAtEnd: 1
     extrudeOnExit: 0
+    tJunctionBidirectional: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.4262395, g: 0.27, b: 0.9, a: 1}
   - pathId: f4130742-bb83-462d-9ea8-702f38d425eb
     segmentId: Branch_07
     nodeIds:
     - 42d269e4-b405-49ab-b6c3-741fe862ad7a
-    - 5d058a92-7de1-4d60-a333-9ee43bb4b704
-    isLeftPath: 0
+    - ada58e07-cd33-4c00-adf9-8c08aa0190c9
+    - cad53abd-844b-4385-acd8-68a3e9e7da40
+    isLeftPath: 1
     isRightPath: 0
     segmentType: 2
     riverName: Branch_07
     leadsToArena: 1
     arenaIsAtEnd: 0
     extrudeOnExit: 1
+    tJunctionBidirectional: 1
     arenaGridDataGuid: 
     editorColor: {r: 0.14844342, g: 0, b: 0.59748423, a: 1}
   - pathId: 9478c785-69b7-4d72-b393-76fe99317392
@@ -355,8 +418,77 @@ MonoBehaviour:
     leadsToArena: 0
     arenaIsAtEnd: 0
     extrudeOnExit: 0
+    tJunctionBidirectional: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.29772076, g: 0.9, b: 0.27, a: 1}
+  - pathId: 6bb249e3-3441-4319-ab32-6a62310c93c7
+    segmentId: Branch_09
+    nodeIds:
+    - a20692ec-1fdb-42a3-bda4-533b3e4f6172
+    - 05115c23-cd1a-4b34-b462-c30d92f879d9
+    - 8db7cfd2-fcb6-4ed7-982d-5a19ff33e36b
+    isLeftPath: 0
+    isRightPath: 1
+    segmentType: 1
+    riverName: Branch_09
+    leadsToArena: 1
+    arenaIsAtEnd: 1
+    extrudeOnExit: 0
+    tJunctionBidirectional: 0
+    arenaGridDataGuid: 
+    editorColor: {r: 0.9, g: 0.27, b: 0.48168087, a: 1}
+  - pathId: bd5bfeb4-4f80-450e-8d0d-8bb510bfd605
+    segmentId: Branch_10
+    nodeIds:
+    - 74b27785-fd92-4dbd-b331-589395d4c398
+    - 17a62518-b5e6-4e7c-8d28-1213a2b9a7be
+    - dc19d5d2-2d00-4b43-a854-8d038e548ff7
+    - 2a79f7f9-fa39-46ca-a132-bb6039377a27
+    - 2b59983a-8423-450a-b424-59f9bc9e7974
+    - d0ee5128-8d55-48be-847a-aebbf68b16d6
+    isLeftPath: 1
+    isRightPath: 0
+    segmentType: 1
+    riverName: Branch_10
+    leadsToArena: 1
+    arenaIsAtEnd: 1
+    extrudeOnExit: 0
+    tJunctionBidirectional: 0
+    arenaGridDataGuid: 
+    editorColor: {r: 0.8496011, g: 0.9, b: 0.27, a: 1}
+  - pathId: db17090f-f193-4e5b-be2c-60b3da3f2080
+    segmentId: Branch_11
+    nodeIds:
+    - 1efbbfc3-3907-423b-803d-510d6c112e10
+    - d4bf991a-9bd4-4932-9603-f4747318f0b1
+    - d4bf991a-9bd4-4932-9603-f4747318f0b1
+    - 370d0133-257c-4fca-81a6-13114c6ac7dc
+    isLeftPath: 1
+    isRightPath: 0
+    segmentType: 2
+    riverName: Branch_11
+    leadsToArena: 1
+    arenaIsAtEnd: 0
+    extrudeOnExit: 1
+    tJunctionBidirectional: 0
+    arenaGridDataGuid: 
+    editorColor: {r: 0.76643884, g: 0.27, b: 0.9, a: 1}
+  - pathId: f12be29d-3255-4b71-9cd4-835d72370534
+    segmentId: Branch_12
+    nodeIds:
+    - dacea770-fa77-416e-a428-1b3dc63cb873
+    - 4e37035d-9d8b-4dd2-98db-5dc4b5ebd5e3
+    - 5e48d5e0-e6d9-4fe8-a282-aca37fdd72a8
+    isLeftPath: 1
+    isRightPath: 0
+    segmentType: 2
+    riverName: Branch_12
+    leadsToArena: 1
+    arenaIsAtEnd: 0
+    extrudeOnExit: 0
+    tJunctionBidirectional: 0
+    arenaGridDataGuid: 
+    editorColor: {r: 0.27, g: 0.9, b: 0.58247864, a: 1}
   junctions:
   - junctionId: 0d671f13-d1c5-474b-bce9-6b44f87068f5
     nodeId: db9eb3ab-3a90-468d-a907-26390f7804b8
@@ -400,6 +532,39 @@ MonoBehaviour:
     - 9478c785-69b7-4d72-b393-76fe99317392
     riverPathId: c564b862-98a6-4b38-8624-ec315e20d761
     branchPathId: 9478c785-69b7-4d72-b393-76fe99317392
+  - junctionId: baa3479d-025c-4790-bc2a-be604a5994f6
+    nodeId: a20692ec-1fdb-42a3-bda4-533b3e4f6172
+    pathIds:
+    - cb512902-99c4-4aa3-973b-d4a908cef861
+    - 6bb249e3-3441-4319-ab32-6a62310c93c7
+    riverPathId: cb512902-99c4-4aa3-973b-d4a908cef861
+    branchPathId: 6bb249e3-3441-4319-ab32-6a62310c93c7
+  - junctionId: 5895d0e8-30f9-430f-854b-d6034de29aa8
+    nodeId: 495ece6a-f678-4ad9-bccf-e696f9aeefbc
+    pathIds:
+    - c564b862-98a6-4b38-8624-ec315e20d761
+    riverPathId: c564b862-98a6-4b38-8624-ec315e20d761
+    branchPathId: 1359eb07-98f9-4df9-8c01-9ef8519b9283
+  - junctionId: 8e4e3115-f51c-478f-9e54-ca1ff9523d11
+    nodeId: 74b27785-fd92-4dbd-b331-589395d4c398
+    pathIds:
+    - cb512902-99c4-4aa3-973b-d4a908cef861
+    - bd5bfeb4-4f80-450e-8d0d-8bb510bfd605
+    riverPathId: cb512902-99c4-4aa3-973b-d4a908cef861
+    branchPathId: bd5bfeb4-4f80-450e-8d0d-8bb510bfd605
+  - junctionId: c4fe3e76-ed08-4c73-82f7-2d6240476009
+    nodeId: 370d0133-257c-4fca-81a6-13114c6ac7dc
+    pathIds:
+    - db17090f-f193-4e5b-be2c-60b3da3f2080
+    riverPathId: be2e63a3-d1c5-4005-a525-8b1abd5d9ce0
+    branchPathId: db17090f-f193-4e5b-be2c-60b3da3f2080
+  - junctionId: d8b39ca2-0110-4248-bf65-a338a7667153
+    nodeId: 5e48d5e0-e6d9-4fe8-a282-aca37fdd72a8
+    pathIds:
+    - d76a5911-edc8-4b81-bf5a-e916981c85a9
+    - f12be29d-3255-4b71-9cd4-835d72370534
+    riverPathId: d76a5911-edc8-4b81-bf5a-e916981c85a9
+    branchPathId: f12be29d-3255-4b71-9cd4-835d72370534
   shops:
   - nodeId: 96534931-abe4-4d47-80b1-94b5937fbf7e
     pathId: 
@@ -414,11 +579,6 @@ MonoBehaviour:
     secondaryEntrances: []
   - nodeId: ac4ab5d1-055f-4e0e-ac8d-8b3d8117e4b4
     gridData: {fileID: 11400000, guid: 29ab7ebedcac2144b8db32a053b1b4e1, type: 2}
-    entranceIndex: 0
-    arenaPrefabOverride: {fileID: 0}
-    secondaryEntrances: []
-  - nodeId: 6c808875-394e-4384-a078-0c2b8b7e8e2b
-    gridData: {fileID: 11400000, guid: e47ca983b56d67a4b82c9a93803e1bf5, type: 2}
     entranceIndex: 0
     arenaPrefabOverride: {fileID: 0}
     secondaryEntrances: []
@@ -438,6 +598,30 @@ MonoBehaviour:
     arenaPrefabOverride: {fileID: 0}
     secondaryEntrances:
     - nodeId: 42d269e4-b405-49ab-b6c3-741fe862ad7a
+      entranceIndex: 1
+  - nodeId: 3b471211-eecc-48cc-a078-442ff702ddb3
+    gridData: {fileID: 0}
+    entranceIndex: 0
+    arenaPrefabOverride: {fileID: 0}
+    secondaryEntrances: []
+  - nodeId: 8db7cfd2-fcb6-4ed7-982d-5a19ff33e36b
+    gridData: {fileID: 11400000, guid: 0775b34affa845a47af4af9f15dde459, type: 2}
+    entranceIndex: 0
+    arenaPrefabOverride: {fileID: 0}
+    secondaryEntrances:
+    - nodeId: 1efbbfc3-3907-423b-803d-510d6c112e10
+      entranceIndex: 1
+  - nodeId: d0ee5128-8d55-48be-847a-aebbf68b16d6
+    gridData: {fileID: 11400000, guid: aa6d73f345d54394aaa7eeebc7f71a36, type: 2}
+    entranceIndex: 0
+    arenaPrefabOverride: {fileID: 0}
+    secondaryEntrances: []
+  - nodeId: da74b6f0-a607-4b89-a5fb-7d65d87efbfd
+    gridData: {fileID: 11400000, guid: e47ca983b56d67a4b82c9a93803e1bf5, type: 2}
+    entranceIndex: 0
+    arenaPrefabOverride: {fileID: 0}
+    secondaryEntrances:
+    - nodeId: dacea770-fa77-416e-a428-1b3dc63cb873
       entranceIndex: 1
   junctionScriptObject: {fileID: 3543737601092306643, guid: cdc03d5a67a4c8a4ca447c17a1a65a6b, type: 3}
   junctionPrefab: {fileID: 3543737601092306643, guid: cdc03d5a67a4c8a4ca447c17a1a65a6b, type: 3}

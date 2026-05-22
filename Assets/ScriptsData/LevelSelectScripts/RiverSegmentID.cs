@@ -25,6 +25,10 @@ public class RiverSegmentID : MonoBehaviour
              "It waits until the player exits an arena (SplineRiverManager.NotifyLevelExited).")]
     [SerializeField] private bool extrudeOnExit = false;
 
+    [Tooltip("If true, this segment extrudes from its END knot (t=1) backward. " +
+             "Set automatically on the left-half of a T-junction bidirectional split.")]
+    [SerializeField] private bool reverseExtrude = false;
+
     [Header("Registry")]
     [Tooltip("If true, this segment will not register in RiverSegmentRegistry. " +
              "Set on visual source segments — only baked boat-path highways should be registered.")]
@@ -41,6 +45,7 @@ public class RiverSegmentID : MonoBehaviour
     public bool LeadsToArena     => leadsToArena;
     public bool ArenaIsAtEnd     => arenaIsAtEnd;
     public bool ExtrudeOnExit    => extrudeOnExit;
+    public bool ReverseExtrude   => reverseExtrude;
 
     private void OnEnable()
     {
