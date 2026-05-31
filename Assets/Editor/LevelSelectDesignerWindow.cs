@@ -18,12 +18,13 @@ public class LevelSelectDesignerWindow : EditorWindow
     private LevelSelectDesignerData _data;
 
     // ── Interaction state ─────────────────────────────────────────
-    private DesignerMode _mode = DesignerMode.Draw;
+    private DesignerMode _mode = DesignerMode.Select;
     private string _selectedPathId;
     private string _selectedNodeId;
     private string _selectedObstacleId;
     private string _selectedArenaNodeId;
     private string _selectedJunctionNodeId;
+    private string _selectedShopNodeId;
     private string _selectedHillPointId;
     private bool   _isDraggingHillPoint;
     private bool   _canvasFocused;
@@ -38,12 +39,23 @@ public class LevelSelectDesignerWindow : EditorWindow
     private bool _foldObstacles   = true;
     private bool _foldStats       = false;
     private bool _foldSetup       = false;
+
+    // ── Setup sub-foldouts ────────────────────────────────────────
+    private bool _foldSetupScripts   = false;
+    private bool _foldSetupUIScript  = false;
+    private bool _foldSetupUICanvas  = false;
+    private bool _foldSetupRiver     = false;
+    private bool _foldSetupJunctions = false;
+    private bool _foldSetupArenas    = false;
+    private bool _foldSetupObstacles = false;
+    private bool _foldSetupCore      = false;
     private bool _foldConsole     = true;
 
     // ── Debug console ─────────────────────────────────────────────
     // (isError=true → red error, false → yellow warning, null msg → green ok)
     private List<(bool isError, string msg, string pathId, string juncId)> _consoleEntries = new();
-    private bool _consoleHasErrors;
+    private bool   _consoleHasErrors;
+    private string _consoleStatusMsg;   // pinned action feedback line (save/restore etc.)
 
     // ── Landscape canvas ──────────────────────────────────────────
     private float _landscapeCanvasAlpha = 0.55f;
@@ -60,6 +72,10 @@ public class LevelSelectDesignerWindow : EditorWindow
     private bool   _isDraggingNode;
     private string _draggingNodeId;
     private Vector2 _dragOffset;
+
+    // Select mode obstacle drag
+    private bool   _isDraggingObstacle;
+    private string _draggingObstacleId;
 
     // ── Canvas view ───────────────────────────────────────────────
     private Vector2 _viewCenter   = Vector2.zero;
@@ -81,6 +97,11 @@ public class LevelSelectDesignerWindow : EditorWindow
     // ── GridData resource cache ───────────────────────────────────
     private GridData[] _gridDataOptions;
     private string[]   _gridDataLabels;
+
+    // ── Shop item prefab cache ────────────────────────────────────
+    private const string ShopItemsDir = "Assets/Prefab/SHOPITEMS";
+    private GameObject[] _shopItemOptions;
+    private string[]     _shopItemLabels;
 
     private void EnsureGridDataCache()
     {
@@ -187,6 +208,38 @@ public class LevelSelectDesignerWindow : EditorWindow
             if (_gridDataOptions[i] == current) { currentIdx = i + 1; break; }
         int selected = EditorGUILayout.Popup(label, currentIdx, _gridDataLabels);
         return selected == 0 ? null : _gridDataOptions[selected - 1];
+    }
+
+    private void EnsureShopItemCache()
+    {
+        if (_shopItemOptions != null) return;
+        RefreshShopItemCache();
+    }
+
+    private void RefreshShopItemCache()
+    {
+        var guids = AssetDatabase.FindAssets("t:Prefab", new[] { ShopItemsDir });
+        var list  = new System.Collections.Generic.List<GameObject>();
+        foreach (var guid in guids)
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(guid));
+            if (prefab != null) list.Add(prefab);
+        }
+        _shopItemOptions    = list.ToArray();
+        _shopItemLabels     = new string[_shopItemOptions.Length + 1];
+        _shopItemLabels[0]  = "(none)";
+        for (int i = 0; i < _shopItemOptions.Length; i++)
+            _shopItemLabels[i + 1] = _shopItemOptions[i].name;
+    }
+
+    private GameObject DrawShopItemPopup(string label, GameObject current)
+    {
+        EnsureShopItemCache();
+        int currentIdx = 0;
+        for (int i = 0; i < _shopItemOptions.Length; i++)
+            if (_shopItemOptions[i] == current) { currentIdx = i + 1; break; }
+        int selected = EditorGUILayout.Popup(label, currentIdx, _shopItemLabels);
+        return selected == 0 ? null : _shopItemOptions[selected - 1];
     }
     private bool    _isResizingLeft;
     private bool    _isResizingRight;
@@ -331,6 +384,14 @@ public class LevelSelectDesignerWindow : EditorWindow
         if (GUILayout.Button("New", EditorStyles.toolbarButton, GUILayout.Width(36)))
             CreateNewDataAsset();
 
+        if (GUILayout.Button("Load", EditorStyles.toolbarButton, GUILayout.Width(38)))
+            LoadDataAsset();
+
+        GUI.enabled = _data != null;
+        if (GUILayout.Button("Save As", EditorStyles.toolbarButton, GUILayout.Width(54)))
+            SaveAsDataAsset();
+        GUI.enabled = true;
+
         GUILayout.Space(12);
 
         string[] modeLabels = { "Draw", "Select", "Junction", "Arena", "Obstacle", "Shop", "Landscape" };
@@ -339,7 +400,9 @@ public class LevelSelectDesignerWindow : EditorWindow
         if (newMode != _mode)
         {
             _mode = newMode;
-            _isDrawing = false;
+            _isDrawing          = false;
+            _isDraggingObstacle = false;
+            _draggingObstacleId = null;
             _drawingNodeIds.Clear();
         }
 
@@ -362,6 +425,67 @@ public class LevelSelectDesignerWindow : EditorWindow
         AssetDatabase.CreateAsset(_data, path);
         AssetDatabase.SaveAssets();
         EditorPrefs.SetString(K_DataPath, path);
+    }
+
+    private void LoadDataAsset()
+    {
+        string absPath = EditorUtility.OpenFilePanel("Load Designer Data", "Assets", "asset");
+        if (string.IsNullOrEmpty(absPath)) return;
+
+        // Convert absolute OS path → relative project path
+        if (absPath.StartsWith(Application.dataPath))
+            absPath = "Assets" + absPath.Substring(Application.dataPath.Length);
+
+        var loaded = AssetDatabase.LoadAssetAtPath<LevelSelectDesignerData>(absPath);
+        if (loaded == null)
+        {
+            _consoleStatusMsg = $"Load failed — not a LevelSelectDesignerData asset: {absPath}";
+            Repaint();
+            return;
+        }
+
+        _data = loaded;
+        EditorPrefs.SetString(K_DataPath, absPath);
+        TryAutoFillPrefabs();
+        _consoleStatusMsg = $"Loaded → {absPath}";
+        Repaint();
+    }
+
+    private void SaveAsDataAsset()
+    {
+        if (_data == null) return;
+
+        string sourcePath = AssetDatabase.GetAssetPath(_data);
+        string defaultName = string.IsNullOrEmpty(sourcePath)
+            ? "LevelSelectDesignerData"
+            : System.IO.Path.GetFileNameWithoutExtension(sourcePath) + "_copy";
+        string defaultDir = string.IsNullOrEmpty(sourcePath) ? "Assets" : System.IO.Path.GetDirectoryName(sourcePath);
+
+        string destPath = EditorUtility.SaveFilePanelInProject(
+            "Save Designer Data As", defaultName, "asset", "Choose location", defaultDir);
+        if (string.IsNullOrEmpty(destPath)) return;
+
+        if (!string.IsNullOrEmpty(sourcePath))
+        {
+            AssetDatabase.CopyAsset(sourcePath, destPath);
+        }
+        else
+        {
+            AssetDatabase.CreateAsset(_data, destPath);
+        }
+
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+
+        var copy = AssetDatabase.LoadAssetAtPath<LevelSelectDesignerData>(destPath);
+        if (copy != null)
+        {
+            _data = copy;
+            EditorPrefs.SetString(K_DataPath, destPath);
+        }
+
+        _consoleStatusMsg = $"Saved as → {destPath}";
+        Repaint();
     }
 
     private const string PrefabDir = "Assets/Prefab/LevelSelectPrefabs";
@@ -391,6 +515,7 @@ public class LevelSelectDesignerWindow : EditorWindow
             if (_data.arenaPrefab     == null && name.Contains("arena"))      { _data.arenaPrefab     = prefab; dirty = true; }
             if (_data.obstaclePrefab  == null && (name.Contains("obstacle") || name.Contains("gate"))) { _data.obstaclePrefab = prefab; dirty = true; }
             if (_data.shopPrefab      == null && name.Contains("shop"))       { _data.shopPrefab      = prefab; dirty = true; }
+            if (_data.videoPlayerControllerPrefab == null && name.Contains("videosphere")) { _data.videoPlayerControllerPrefab = prefab; dirty = true; }
         }
 
         if (dirty) EditorUtility.SetDirty(_data);
@@ -443,6 +568,7 @@ public class LevelSelectDesignerWindow : EditorWindow
         DrawSelectedPathProps();
         DrawSelectedObstacleProps();
         DrawSelectedArenaProps();
+        DrawSelectedShopProps();
         DrawCanvasSettingsSection();
 
         if (_mode == DesignerMode.Landscape)
@@ -691,6 +817,7 @@ public class LevelSelectDesignerWindow : EditorWindow
         EditorGUI.BeginChangeCheck();
         obs.obstacleId     = EditorGUILayout.TextField("ID",           obs.obstacleId);
         obs.soulSlotCount  = EditorGUILayout.IntField("Soul Slots",    obs.soulSlotCount);
+        obs.hasVideoOrb    = EditorGUILayout.Toggle("Has Video Orb",   obs.hasVideoOrb);
         obs.obstaclePrefab = (GameObject)EditorGUILayout.ObjectField(
             "Prefab Override", obs.obstaclePrefab, typeof(GameObject), false);
 
@@ -808,6 +935,45 @@ public class LevelSelectDesignerWindow : EditorWindow
         }
     }
 
+    private void DrawSelectedShopProps()
+    {
+        if (string.IsNullOrEmpty(_selectedShopNodeId)) return;
+        var shop = _data.shops.Find(s => s.nodeId == _selectedShopNodeId);
+        if (shop == null) return;
+
+        // Ensure array is always 4 slots
+        if (shop.shopItems == null || shop.shopItems.Length != 4)
+        {
+            var resized = new GameObject[4];
+            if (shop.shopItems != null)
+                for (int i = 0; i < Mathf.Min(shop.shopItems.Length, 4); i++)
+                    resized[i] = shop.shopItems[i];
+            shop.shopItems = resized;
+            EditorUtility.SetDirty(_data);
+        }
+
+        EditorGUILayout.Space(6);
+        EditorGUILayout.LabelField("Shop Items", EditorStyles.boldLabel);
+
+        EditorGUI.BeginChangeCheck();
+        for (int i = 0; i < 4; i++)
+            shop.shopItems[i] = DrawShopItemPopup($"Slot {i + 1}", shop.shopItems[i]);
+        if (EditorGUI.EndChangeCheck())
+        {
+            Undo.RecordObject(_data, "Edit Shop Items");
+            EditorUtility.SetDirty(_data);
+        }
+
+        var prevBg = GUI.backgroundColor;
+        GUI.backgroundColor = new Color(0.5f, 0.7f, 1f);
+        if (GUILayout.Button("Refresh Item List", EditorStyles.miniButton))
+        {
+            _shopItemOptions = null;
+            EnsureShopItemCache();
+        }
+        GUI.backgroundColor = prevBg;
+    }
+
     private void DrawSceneRefsSection()
     {
         EditorGUILayout.Space(2);
@@ -823,8 +989,6 @@ public class LevelSelectDesignerWindow : EditorWindow
 
     private void DrawUIScriptPrefabsSection()
     {
-        EditorGUILayout.Space(6);
-        EditorGUILayout.LabelField("UI Script Prefabs", EditorStyles.boldLabel);
         EditorGUI.BeginChangeCheck();
         _data.cameraPrefab = (GameObject)EditorGUILayout.ObjectField(
             "Camera",             _data.cameraPrefab,              typeof(GameObject), false);
@@ -839,9 +1003,6 @@ public class LevelSelectDesignerWindow : EditorWindow
 
     private void DrawUICanvasPrefabsSection()
     {
-        EditorGUILayout.Space(6);
-        EditorGUILayout.LabelField("UI Canvas Prefabs", EditorStyles.boldLabel);
-
         EditorGUI.BeginChangeCheck();
         _data.canvasParentPrefab = (GameObject)EditorGUILayout.ObjectField(
             "CANVAS Parent",        _data.canvasParentPrefab,       typeof(GameObject), false);
@@ -854,68 +1015,234 @@ public class LevelSelectDesignerWindow : EditorWindow
         _data.orbsCounterPrefab = (GameObject)EditorGUILayout.ObjectField(
             "Orbs Counter UI",      _data.orbsCounterPrefab,         typeof(GameObject), false);
         if (EditorGUI.EndChangeCheck()) EditorUtility.SetDirty(_data);
-}
+    }
 
-    private void DrawPrefabsSection()
+    private void DrawRiverPrefabsSection()
     {
-        EditorGUILayout.Space(4);
         EditorGUI.BeginChangeCheck();
-
-        EditorGUILayout.LabelField("Core", EditorStyles.miniBoldLabel);
-        _data.dataControllerPrefab = (GameObject)EditorGUILayout.ObjectField(
-            "Data Controller", _data.dataControllerPrefab, typeof(GameObject), false);
-
-        EditorGUILayout.Space(4);
-        EditorGUILayout.LabelField("River", EditorStyles.miniBoldLabel);
         EditorGUILayout.BeginHorizontal();
-        EditorGUILayout.LabelField("Split Preset", GUILayout.Width(100));
+        EditorGUILayout.LabelField("Split Preset", GUILayout.Width(EditorGUIUtility.labelWidth));
         _splitPreset = (SplineSplitterPreset)EditorGUILayout.ObjectField(_splitPreset, typeof(SplineSplitterPreset), false);
         EditorGUILayout.EndHorizontal();
-        _data.pathPrefab                = (GameObject)EditorGUILayout.ObjectField("Path Prefab",         _data.pathPrefab,                typeof(GameObject), false);
-        _data.branchWaterExtrudePrefab  = (GameObject)EditorGUILayout.ObjectField("Branch Extrude",      _data.branchWaterExtrudePrefab,  typeof(GameObject), false);
-        _data.barrierPrefab             = (GameObject)EditorGUILayout.ObjectField("Barrier",              _data.barrierPrefab,             typeof(GameObject), false);
-        _data.riverBlockPrefab          = (GameObject)EditorGUILayout.ObjectField("Block",               _data.riverBlockPrefab,          typeof(GameObject), false);
-        _data.splineInstantiateSpacing = EditorGUILayout.FloatField("Block Spacing",                  _data.splineInstantiateSpacing);
+        _data.pathPrefab               = (GameObject)EditorGUILayout.ObjectField("Path Prefab",    _data.pathPrefab,               typeof(GameObject), false);
+        _data.branchWaterExtrudePrefab = (GameObject)EditorGUILayout.ObjectField("Branch Extrude", _data.branchWaterExtrudePrefab, typeof(GameObject), false);
+        _data.barrierPrefab            = (GameObject)EditorGUILayout.ObjectField("Barrier",         _data.barrierPrefab,            typeof(GameObject), false);
+        _data.riverBlockPrefab         = (GameObject)EditorGUILayout.ObjectField("Block",           _data.riverBlockPrefab,         typeof(GameObject), false);
+        _data.splineInstantiateSpacing = EditorGUILayout.FloatField("Block Spacing",                _data.splineInstantiateSpacing);
+        if (EditorGUI.EndChangeCheck()) EditorUtility.SetDirty(_data);
+    }
 
-        EditorGUILayout.Space(4);
-        EditorGUILayout.LabelField("Junctions", EditorStyles.miniBoldLabel);
-        _data.junctionScriptObject      = (GameObject)EditorGUILayout.ObjectField("Script Object",   _data.junctionScriptObject,      typeof(GameObject), false);
-        _data.junctionRightFacingPrefab = (GameObject)EditorGUILayout.ObjectField("Right Facing",    _data.junctionRightFacingPrefab, typeof(GameObject), false);
-        _data.junctionLeftFacingPrefab  = (GameObject)EditorGUILayout.ObjectField("Left Facing",     _data.junctionLeftFacingPrefab,  typeof(GameObject), false);
-        _data.junctionPrefab            = (GameObject)EditorGUILayout.ObjectField("Fallback",         _data.junctionPrefab,            typeof(GameObject), false);
-        _data.junctionGapPadding        = EditorGUILayout.FloatField("Gap Padding",                   _data.junctionGapPadding);
+    private void DrawJunctionPrefabsSection()
+    {
+        EditorGUI.BeginChangeCheck();
+        _data.junctionScriptObject      = (GameObject)EditorGUILayout.ObjectField("Script Object", _data.junctionScriptObject,      typeof(GameObject), false);
+        _data.junctionRightFacingPrefab = (GameObject)EditorGUILayout.ObjectField("Right Facing",  _data.junctionRightFacingPrefab, typeof(GameObject), false);
+        _data.junctionLeftFacingPrefab  = (GameObject)EditorGUILayout.ObjectField("Left Facing",   _data.junctionLeftFacingPrefab,  typeof(GameObject), false);
+        _data.junctionPrefab            = (GameObject)EditorGUILayout.ObjectField("Fallback",       _data.junctionPrefab,            typeof(GameObject), false);
+        _data.junctionGapPadding        = EditorGUILayout.FloatField("Gap Padding",                 _data.junctionGapPadding);
+        if (EditorGUI.EndChangeCheck()) EditorUtility.SetDirty(_data);
+    }
 
-        EditorGUILayout.Space(4);
-        EditorGUILayout.LabelField("Arenas", EditorStyles.miniBoldLabel);
+    private void DrawArenaPrefabsSection()
+    {
+        EditorGUI.BeginChangeCheck();
         _data.arenaPrefab         = (GameObject)EditorGUILayout.ObjectField("Arena Head",     _data.arenaPrefab,         typeof(GameObject), false);
         _data.arenaEntrancePrefab = (GameObject)EditorGUILayout.ObjectField("Arena Entrance", _data.arenaEntrancePrefab, typeof(GameObject), false);
+        if (EditorGUI.EndChangeCheck()) EditorUtility.SetDirty(_data);
+    }
 
-        EditorGUILayout.Space(4);
-        EditorGUILayout.LabelField("Obstacles & Shops", EditorStyles.miniBoldLabel);
+    private void DrawObstacleShopPrefabsSection()
+    {
+        EditorGUI.BeginChangeCheck();
         _data.obstaclePrefab = (GameObject)EditorGUILayout.ObjectField("Obstacle", _data.obstaclePrefab, typeof(GameObject), false);
         _data.shopPrefab     = (GameObject)EditorGUILayout.ObjectField("Shop",     _data.shopPrefab,     typeof(GameObject), false);
-
-        EditorGUILayout.Space(4);
-        EditorGUILayout.LabelField("Player", EditorStyles.miniBoldLabel);
-        _data.boatPrefab = (GameObject)EditorGUILayout.ObjectField("Boat", _data.boatPrefab, typeof(GameObject), false);
-
-        EditorGUILayout.Space(4);
-        EditorGUILayout.LabelField("Landscape", EditorStyles.miniBoldLabel);
-        _data.landscapeTilePrefab = (GameObject)EditorGUILayout.ObjectField("Tile Prefab", _data.landscapeTilePrefab, typeof(GameObject), false);
-
-        EditorGUILayout.Space(4);
-        EditorGUILayout.LabelField("Music", EditorStyles.miniBoldLabel);
-        _data.musicIntro = (AudioClip)EditorGUILayout.ObjectField("Intro Clip", _data.musicIntro, typeof(AudioClip), false);
-        _data.musicLoop  = (AudioClip)EditorGUILayout.ObjectField("Loop Clip",  _data.musicLoop,  typeof(AudioClip), false);
-
         if (EditorGUI.EndChangeCheck()) EditorUtility.SetDirty(_data);
+    }
+
+    private void DrawCorePrefabsSection()
+    {
+        EditorGUI.BeginChangeCheck();
+        _data.dataControllerPrefab        = (GameObject)EditorGUILayout.ObjectField("Data Controller",   _data.dataControllerPrefab,        typeof(GameObject), false);
+        _data.boatPrefab                  = (GameObject)EditorGUILayout.ObjectField("Boat",              _data.boatPrefab,                   typeof(GameObject), false);
+        _data.landscapeTilePrefab         = (GameObject)EditorGUILayout.ObjectField("Landscape Tile",    _data.landscapeTilePrefab,          typeof(GameObject), false);
+        _data.videoPlayerControllerPrefab = (GameObject)EditorGUILayout.ObjectField("Video Controller",  _data.videoPlayerControllerPrefab,  typeof(GameObject), false);
+        _data.musicIntro                  = (AudioClip)EditorGUILayout.ObjectField("Music Intro",        _data.musicIntro,                   typeof(AudioClip),  false);
+        _data.musicLoop                   = (AudioClip)EditorGUILayout.ObjectField("Music Loop",         _data.musicLoop,                    typeof(AudioClip),  false);
+        if (EditorGUI.EndChangeCheck()) EditorUtility.SetDirty(_data);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // SETUP SAVE / RESTORE
+    // ══════════════════════════════════════════════════════════════
+
+    [Serializable]
+    private class SetupSnapshot
+    {
+        [Serializable]
+        public class Entry { public string key; public string value; }
+        public List<Entry> entries = new List<Entry>();
+    }
+
+    private void SaveSetup()
+    {
+        if (_data == null) return;
+        var snap = new SetupSnapshot();
+
+        void AddObj(string key, UnityEngine.Object obj)
+        {
+            string path = obj != null ? AssetDatabase.GetAssetPath(obj) : "";
+            string guid = string.IsNullOrEmpty(path) ? "" : AssetDatabase.AssetPathToGUID(path);
+            snap.entries.Add(new SetupSnapshot.Entry { key = key, value = guid });
+        }
+        void AddFloat(string key, float v) =>
+            snap.entries.Add(new SetupSnapshot.Entry { key = key, value = v.ToString("R") });
+
+        // River
+        AddObj  ("splitPreset",                   _splitPreset);
+        AddObj  ("pathPrefab",                    _data.pathPrefab);
+        AddObj  ("branchWaterExtrudePrefab",      _data.branchWaterExtrudePrefab);
+        AddObj  ("barrierPrefab",                 _data.barrierPrefab);
+        AddObj  ("riverBlockPrefab",              _data.riverBlockPrefab);
+        AddFloat("splineInstantiateSpacing",      _data.splineInstantiateSpacing);
+        // Junctions
+        AddObj  ("junctionScriptObject",          _data.junctionScriptObject);
+        AddObj  ("junctionRightFacingPrefab",     _data.junctionRightFacingPrefab);
+        AddObj  ("junctionLeftFacingPrefab",      _data.junctionLeftFacingPrefab);
+        AddObj  ("junctionPrefab",                _data.junctionPrefab);
+        AddFloat("junctionGapPadding",            _data.junctionGapPadding);
+        // Arenas
+        AddObj  ("arenaPrefab",                   _data.arenaPrefab);
+        AddObj  ("arenaEntrancePrefab",           _data.arenaEntrancePrefab);
+        // Obstacles & Shop
+        AddObj  ("obstaclePrefab",                _data.obstaclePrefab);
+        AddObj  ("shopPrefab",                    _data.shopPrefab);
+        // UI Script Prefabs
+        AddObj  ("cameraPrefab",                  _data.cameraPrefab);
+        AddObj  ("soulsOnBoatDisplayScriptPrefab",_data.soulsOnBoatDisplayScriptPrefab);
+        AddObj  ("arenaSoulsWindowPrefab",        _data.arenaSoulsWindowPrefab);
+        AddObj  ("pauseManagerScriptPrefab",      _data.pauseManagerScriptPrefab);
+        // UI Canvas Prefabs
+        AddObj  ("canvasParentPrefab",            _data.canvasParentPrefab);
+        AddObj  ("pauseMenuPrefab",               _data.pauseMenuPrefab);
+        AddObj  ("boatHUDPrefab",                 _data.boatHUDPrefab);
+        AddObj  ("soulsOnBoatDisplayPrefab",      _data.soulsOnBoatDisplayPrefab);
+        AddObj  ("orbsCounterPrefab",             _data.orbsCounterPrefab);
+        // Core & World
+        AddObj  ("dataControllerPrefab",          _data.dataControllerPrefab);
+        AddObj  ("boatPrefab",                    _data.boatPrefab);
+        AddObj  ("landscapeTilePrefab",           _data.landscapeTilePrefab);
+        AddObj  ("musicIntro",                    _data.musicIntro);
+        AddObj  ("musicLoop",                     _data.musicLoop);
+
+        string json     = JsonUtility.ToJson(snap, true);
+        string dataPath = AssetDatabase.GetAssetPath(_data);
+        string dir      = System.IO.Path.GetDirectoryName(dataPath);
+        string baseName = System.IO.Path.GetFileNameWithoutExtension(dataPath);
+        string savePath = System.IO.Path.Combine(dir, baseName + "_SetupBackup.json");
+
+        System.IO.File.WriteAllText(savePath, json);
+        AssetDatabase.Refresh();
+        _consoleStatusMsg = $"Setup saved → {savePath}";
+        Repaint();
+    }
+
+    private void RestoreSetup()
+    {
+        if (_data == null) return;
+
+        string dataPath = AssetDatabase.GetAssetPath(_data);
+        string dir      = System.IO.Path.GetDirectoryName(dataPath);
+        string baseName = System.IO.Path.GetFileNameWithoutExtension(dataPath);
+        string savePath = System.IO.Path.Combine(dir, baseName + "_SetupBackup.json");
+
+        if (!System.IO.File.Exists(savePath))
+        {
+            Debug.LogWarning("[LevelSelectDesigner] No setup backup found — save one first.");
+            return;
+        }
+
+        var snap = JsonUtility.FromJson<SetupSnapshot>(System.IO.File.ReadAllText(savePath));
+
+        T LoadObj<T>(string key) where T : UnityEngine.Object
+        {
+            var e = snap.entries.Find(x => x.key == key);
+            if (e == null || string.IsNullOrEmpty(e.value)) return null;
+            string path = AssetDatabase.GUIDToAssetPath(e.value);
+            return string.IsNullOrEmpty(path) ? null : AssetDatabase.LoadAssetAtPath<T>(path);
+        }
+        float LoadFloat(string key, float fallback)
+        {
+            var e = snap.entries.Find(x => x.key == key);
+            return (e != null && float.TryParse(e.value, out float v)) ? v : fallback;
+        }
+
+        Undo.RecordObject(_data, "Restore Setup");
+
+        // River
+        _splitPreset                          = LoadObj<SplineSplitterPreset>("splitPreset");
+        _data.pathPrefab                      = LoadObj<GameObject>("pathPrefab");
+        _data.branchWaterExtrudePrefab        = LoadObj<GameObject>("branchWaterExtrudePrefab");
+        _data.barrierPrefab                   = LoadObj<GameObject>("barrierPrefab");
+        _data.riverBlockPrefab                = LoadObj<GameObject>("riverBlockPrefab");
+        _data.splineInstantiateSpacing        = LoadFloat("splineInstantiateSpacing", 0.15f);
+        // Junctions
+        _data.junctionScriptObject            = LoadObj<GameObject>("junctionScriptObject");
+        _data.junctionRightFacingPrefab       = LoadObj<GameObject>("junctionRightFacingPrefab");
+        _data.junctionLeftFacingPrefab        = LoadObj<GameObject>("junctionLeftFacingPrefab");
+        _data.junctionPrefab                  = LoadObj<GameObject>("junctionPrefab");
+        _data.junctionGapPadding              = LoadFloat("junctionGapPadding", 0f);
+        // Arenas
+        _data.arenaPrefab                     = LoadObj<GameObject>("arenaPrefab");
+        _data.arenaEntrancePrefab             = LoadObj<GameObject>("arenaEntrancePrefab");
+        // Obstacles & Shop
+        _data.obstaclePrefab                  = LoadObj<GameObject>("obstaclePrefab");
+        _data.shopPrefab                      = LoadObj<GameObject>("shopPrefab");
+        // UI Script Prefabs
+        _data.cameraPrefab                    = LoadObj<GameObject>("cameraPrefab");
+        _data.soulsOnBoatDisplayScriptPrefab  = LoadObj<GameObject>("soulsOnBoatDisplayScriptPrefab");
+        _data.arenaSoulsWindowPrefab          = LoadObj<GameObject>("arenaSoulsWindowPrefab");
+        _data.pauseManagerScriptPrefab        = LoadObj<GameObject>("pauseManagerScriptPrefab");
+        // UI Canvas Prefabs
+        _data.canvasParentPrefab              = LoadObj<GameObject>("canvasParentPrefab");
+        _data.pauseMenuPrefab                 = LoadObj<GameObject>("pauseMenuPrefab");
+        _data.boatHUDPrefab                   = LoadObj<GameObject>("boatHUDPrefab");
+        _data.soulsOnBoatDisplayPrefab        = LoadObj<GameObject>("soulsOnBoatDisplayPrefab");
+        _data.orbsCounterPrefab               = LoadObj<GameObject>("orbsCounterPrefab");
+        // Core & World
+        _data.dataControllerPrefab            = LoadObj<GameObject>("dataControllerPrefab");
+        _data.boatPrefab                      = LoadObj<GameObject>("boatPrefab");
+        _data.landscapeTilePrefab             = LoadObj<GameObject>("landscapeTilePrefab");
+        _data.musicIntro                      = LoadObj<AudioClip>("musicIntro");
+        _data.musicLoop                       = LoadObj<AudioClip>("musicLoop");
+
+        EditorUtility.SetDirty(_data);
+        _consoleStatusMsg = $"Setup restored from {savePath}";
+        Repaint();
+    }
+
+    // Draws a consistently-styled indented sub-foldout inside the Setup section.
+    private static void DrawSetupSubFoldout(ref bool state, string label, System.Action drawContent)
+    {
+        var prevBg = GUI.backgroundColor;
+        GUI.backgroundColor = new Color(0.28f, 0.28f, 0.28f, 1f);
+        EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+        GUI.backgroundColor = prevBg;
+
+        state = EditorGUILayout.Foldout(state, label, true, EditorStyles.foldoutHeader);
+        if (state)
+        {
+            EditorGUILayout.Space(2);
+            drawContent();
+            EditorGUILayout.Space(2);
+        }
+
+        EditorGUILayout.EndVertical();
+        EditorGUILayout.Space(1);
     }
 
     // ── Scene Deploy ──────────────────────────────────────────────
     private void DrawSceneDeploySection()
     {
-        EditorGUILayout.Space(6);
-        EditorGUILayout.LabelField("Level Select Script Objects", EditorStyles.boldLabel);
 
         DrawDeployRow("Segment Registry",  _data.segmentRegistry  != null,
             () => { var f = UnityEngine.Object.FindObjectOfType<RiverSegmentRegistry>();  if (f) _data.segmentRegistry  = f; },
@@ -952,6 +1279,10 @@ public class LevelSelectDesignerWindow : EditorWindow
             () => { },
             () => DeployPlayerBoat());
 
+        DrawDeployRow("Main Camera", Camera.main != null,
+            () => EnsureMainCamera(),
+            () => EnsureMainCamera());
+
         DrawDeployRow("Camera Controller", _data.cameraController != null,
             () => { var f = UnityEngine.Object.FindObjectOfType<LevelSelectCameraController>(); if (f) _data.cameraController = f; },
             () => DeployCameraController());
@@ -974,6 +1305,10 @@ public class LevelSelectDesignerWindow : EditorWindow
         DrawDeployRow("Pause Manager", _data.pauseManager != null,
             () => TryFind<PauseManager>(v => _data.pauseManager = v),
             () => DeployPauseManager());
+
+        DrawDeployRow("Video Controller", _data.videoPlayerController != null,
+            () => TryFind<VideoPlayerController>(v => { _data.videoPlayerController = v; EditorUtility.SetDirty(_data); }),
+            () => DeployVideoController());
 
         EditorGUILayout.Space(4);
 
@@ -1224,6 +1559,59 @@ public class LevelSelectDesignerWindow : EditorWindow
         boat.transform.SetParent(parent.transform, false);
     }
 
+    private void DeployVideoController()
+    {
+        if (_data.videoPlayerController != null) return;
+
+        var existing = UnityEngine.Object.FindObjectOfType<VideoPlayerController>();
+        if (existing != null)
+        {
+            _data.videoPlayerController = existing;
+            EditorUtility.SetDirty(_data);
+            return;
+        }
+
+        var prefab = _data.videoPlayerControllerPrefab;
+        if (prefab == null)
+        {
+            Debug.LogWarning("[LevelSelectDesigner] No VideoPlayerController prefab assigned — cannot deploy.");
+            return;
+        }
+
+        var parent = FindOrCreateParent("LEVELSELECT_SCRIPTS");
+        var go     = (GameObject)PrefabUtility.InstantiatePrefab(prefab, parent.transform);
+        Undo.RegisterCreatedObjectUndo(go, "Deploy Video Controller");
+        go.name = "VideoPlayerController";
+        _data.videoPlayerController = go.GetComponent<VideoPlayerController>();
+        EditorUtility.SetDirty(_data);
+    }
+
+    private void EnsureMainCamera()
+    {
+        if (Camera.main != null) return;
+
+        // Tag any existing camera "MainCamera"
+        var existing = UnityEngine.Object.FindObjectOfType<Camera>();
+        if (existing != null)
+        {
+            Undo.RecordObject(existing.gameObject, "Tag Main Camera");
+            existing.gameObject.tag = "MainCamera";
+            Debug.Log($"[LevelSelectDesigner] Tagged '{existing.name}' as MainCamera.");
+            EditorUtility.SetDirty(existing.gameObject);
+            return;
+        }
+
+        // No camera at all — create a minimal one
+        var parent = FindOrCreateParent("CAMERA");
+        var camGO  = new GameObject("MainCamera");
+        Undo.RegisterCreatedObjectUndo(camGO, "Create Main Camera");
+        camGO.tag = "MainCamera";
+        camGO.transform.SetParent(parent.transform, false);
+        Undo.AddComponent<Camera>(camGO);
+        Undo.AddComponent<AudioListener>(camGO);
+        Debug.Log("[LevelSelectDesigner] Created new Main Camera.");
+    }
+
     private void DeployCameraController()
     {
         var parent = FindOrCreateParent("CAMERA");
@@ -1298,6 +1686,8 @@ public class LevelSelectDesignerWindow : EditorWindow
     private void DeployAllSceneObjects()
     {
         AutoFindAll();
+        EnsureMainCamera();
+        if (_data.videoPlayerController == null) DeployVideoController();
         if (_data.segmentRegistry  == null) { if (DeployScriptOnly<RiverSegmentRegistry>("RiverSegmentRegistry",         out var c, null))              _data.segmentRegistry  = c; }
         if (_data.dataController   == null) { if (DeployScriptOnly<LevelSelectDataController>("LevelSelectDataController", out var c, _data.dataControllerPrefab)) _data.dataController = c; }
         if (_data.boatPathManager  == null) { if (DeployScriptOnly<SplinePathStitcher>("BoatPathManager",                out var c, null)) _data.boatPathManager = c; }
@@ -1347,6 +1737,7 @@ EditorUtility.SetDirty(_data);
         TryFind<PauseMenuUI>(v                  => _data.pauseMenuUI               = v);
         TryFind<PauseManager>(v                 => _data.pauseManager              = v);
         TryFind<SoulsOnBoatDisplayManager>(v    => _data.soulsOnBoatDisplayManager = v);
+        TryFind<VideoPlayerController>(v        => _data.videoPlayerController     = v);
         EditorUtility.SetDirty(_data);
     }
 
@@ -2031,6 +2422,7 @@ EditorUtility.SetDirty(_data);
                 _dragOffset         = e.mousePosition - (Vector2)WorldToCanvas(node.worldPosition);
                 _selectedPathId     = _data.paths.Find(p => p.nodeIds.Contains(nodeId))?.pathId;
                 _selectedArenaNodeId = node?.type == LevelSelectDesignerData.NodeType.ArenaEnd ? nodeId : null;
+                _selectedShopNodeId  = node?.type == LevelSelectDesignerData.NodeType.ShopEnd  ? nodeId : null;
                 _selectedEntranceIdx = -1;
                 Repaint();
                 e.Use();
@@ -2040,14 +2432,36 @@ EditorUtility.SetDirty(_data);
             string obsId = FindObstacleAtCanvas(e.mousePosition);
             if (obsId != null)
             {
-                _selectedObstacleId = obsId;
-                _selectedNodeId     = null;
+                _selectedObstacleId    = obsId;
+                _selectedNodeId        = null;
+                _selectedShopNodeId    = null;
+                _isDraggingObstacle    = true;
+                _draggingObstacleId    = obsId;
                 Repaint();
                 e.Use();
                 return;
             }
 
             string pathId = FindPathAtCanvas(e.mousePosition);
+            // If the clicked path has a shop node at either end, auto-select it
+            _selectedShopNodeId = null;
+            if (pathId != null)
+            {
+                var clickedPath = _data.paths.Find(p => p.pathId == pathId);
+                if (clickedPath != null)
+                {
+                    foreach (var nid in clickedPath.nodeIds)
+                    {
+                        var n = _data.nodes.Find(x => x.id == nid);
+                        if (n?.type == LevelSelectDesignerData.NodeType.ShopEnd &&
+                            _data.shops.Exists(s => s.nodeId == nid))
+                        {
+                            _selectedShopNodeId = nid;
+                            break;
+                        }
+                    }
+                }
+            }
             _selectedPathId     = pathId;
             _selectedNodeId     = null;
             _selectedObstacleId = null;
@@ -2088,6 +2502,29 @@ EditorUtility.SetDirty(_data);
         {
             _isDraggingNode = false;
             _draggingNodeId = null;
+        }
+
+        if (e.type == EventType.MouseDrag && _isDraggingObstacle)
+        {
+            var obs = _data.obstacles.Find(o => o.obstacleId == _draggingObstacleId);
+            if (obs != null)
+            {
+                var path = _data.paths.Find(p => p.pathId == obs.pathId);
+                if (path != null)
+                {
+                    Undo.RecordObject(_data, "Move Obstacle");
+                    obs.pathT = Mathf.Clamp01(FindTOnPath(path, e.mousePosition));
+                    EditorUtility.SetDirty(_data);
+                    Repaint();
+                }
+            }
+            e.Use();
+        }
+
+        if (e.type == EventType.MouseUp && _isDraggingObstacle)
+        {
+            _isDraggingObstacle = false;
+            _draggingObstacleId = null;
         }
 
         if (e.type == EventType.KeyDown && e.keyCode == KeyCode.Delete)
@@ -2330,14 +2767,25 @@ EditorUtility.SetDirty(_data);
 
         if (node.type == LevelSelectDesignerData.NodeType.ShopEnd)
         {
-            node.type = LevelSelectDesignerData.NodeType.Waypoint;
-            _data.shops.RemoveAll(s => s.nodeId == nodeId);
+            if (_selectedShopNodeId == nodeId)
+            {
+                // Second click on selected shop — remove it
+                node.type = LevelSelectDesignerData.NodeType.Waypoint;
+                _data.shops.RemoveAll(s => s.nodeId == nodeId);
+                _selectedShopNodeId = null;
+            }
+            else
+            {
+                // Click a different shop — select it
+                _selectedShopNodeId = nodeId;
+            }
         }
         else
         {
             node.type = LevelSelectDesignerData.NodeType.ShopEnd;
             if (!_data.shops.Exists(s => s.nodeId == nodeId))
                 _data.shops.Add(new LevelSelectDesignerData.DesignerShop { nodeId = nodeId });
+            _selectedShopNodeId = nodeId;
         }
 
         EditorUtility.SetDirty(_data);
@@ -2683,6 +3131,40 @@ EditorUtility.SetDirty(_data);
             }
         }
 
+        // 5. Multiple MainRiver paths
+        var mainRiverPaths = _data.paths
+            .Where(p => p.segmentType == LevelSelectDesignerData.SegmentType.MainRiver)
+            .ToList();
+        if (mainRiverPaths.Count > 1)
+        {
+            foreach (var p in mainRiverPaths)
+            {
+                _consoleEntries.Add((true,
+                    $"Multiple MainRiver paths — \"{(string.IsNullOrEmpty(p.segmentId) ? "(unnamed)" : p.segmentId)}\" is also MainRiver",
+                    p.pathId, null));
+            }
+            _consoleHasErrors = true;
+        }
+
+        // 6. No MainRiver path at all
+        if (_data.paths.Count > 0 && mainRiverPaths.Count == 0)
+        {
+            _consoleEntries.Add((false,
+                "No path is typed MainRiver — one path should be the main trunk",
+                null, null));
+        }
+
+        // 7. Path with both isLeftPath and isRightPath set (contradictory)
+        foreach (var p in _data.paths)
+        {
+            if (p.isLeftPath && p.isRightPath)
+            {
+                _consoleEntries.Add((false,
+                    $"Path \"{(string.IsNullOrEmpty(p.segmentId) ? "(unnamed)" : p.segmentId)}\" has both Left and Right flagged",
+                    p.pathId, null));
+            }
+        }
+
         if (_consoleEntries.Count == 0)
             _consoleEntries.Add((false, "No issues found", null, null));
     }
@@ -2707,6 +3189,23 @@ EditorUtility.SetDirty(_data);
         if (!_foldConsole) return;
 
         EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+        // Pinned status message (save/restore feedback)
+        if (!string.IsNullOrEmpty(_consoleStatusMsg))
+        {
+            EditorGUILayout.BeginHorizontal();
+            var pc = GUI.color;
+            GUI.color = new Color(0.5f, 0.9f, 1f);
+            EditorGUILayout.LabelField("ℹ", GUILayout.Width(14));
+            GUI.color = pc;
+            var style = new GUIStyle(EditorStyles.miniLabel) { wordWrap = true };
+            EditorGUILayout.LabelField(_consoleStatusMsg, style);
+            if (GUILayout.Button("✕", EditorStyles.miniButton, GUILayout.Width(16)))
+                _consoleStatusMsg = null;
+            EditorGUILayout.EndHorizontal();
+            EditorGUI.DrawRect(EditorGUILayout.GetControlRect(false, 1f), new Color(1f, 1f, 1f, 0.1f));
+        }
+
         foreach (var (isError, msg, pathId, juncId) in _consoleEntries)
         {
             // "No issues" row is green; warnings yellow; errors red
@@ -2806,14 +3305,47 @@ EditorUtility.SetDirty(_data);
             EditorGUILayout.Space(2);
 
             // ── Setup (scene objects + prefabs) ───────────────────
-            _foldSetup = EditorGUILayout.Foldout(_foldSetup, "Setup", true, EditorStyles.foldoutHeader);
+            {
+                var setupRect = EditorGUILayout.GetControlRect();
+                float btnW = 40f, restoreW = 22f, gap = 3f;
+                var saveRect    = new Rect(setupRect.xMax - btnW - restoreW - gap * 2, setupRect.y, btnW,    setupRect.height);
+                var restoreRect = new Rect(setupRect.xMax - restoreW - gap,            setupRect.y, restoreW, setupRect.height);
+                setupRect.xMax  = saveRect.x - gap;
+                _foldSetup = EditorGUI.Foldout(setupRect, _foldSetup, "Setup", true, EditorStyles.foldoutHeader);
+
+                bool hasBackup = _data != null && System.IO.File.Exists(
+                    System.IO.Path.Combine(
+                        System.IO.Path.GetDirectoryName(AssetDatabase.GetAssetPath(_data)),
+                        System.IO.Path.GetFileNameWithoutExtension(AssetDatabase.GetAssetPath(_data)) + "_SetupBackup.json"));
+
+                var prevBg = GUI.backgroundColor;
+                GUI.backgroundColor = new Color(0.4f, 0.8f, 1f);
+                if (GUI.Button(saveRect, "Save", EditorStyles.miniButton))
+                    SaveSetup();
+                GUI.backgroundColor = hasBackup ? new Color(0.5f, 1f, 0.5f) : new Color(0.6f, 0.6f, 0.6f);
+                if (GUI.Button(restoreRect, new GUIContent("↺", hasBackup ? "Restore setup from backup" : "No backup saved yet"),
+                        EditorStyles.miniButton))
+                    RestoreSetup();
+                GUI.backgroundColor = prevBg;
+            }
             if (_foldSetup)
             {
-                DrawSceneRefsSection();
-                DrawSceneDeploySection();
-                DrawUIScriptPrefabsSection();
-                DrawUICanvasPrefabsSection();
-                DrawPrefabsSection();
+                EditorGUI.indentLevel++;
+
+                DrawSetupSubFoldout(ref _foldSetupScripts,   "Script Objects",        () =>
+                {
+                    DrawSceneRefsSection();
+                    DrawSceneDeploySection();
+                });
+                DrawSetupSubFoldout(ref _foldSetupUIScript,  "UI Script Prefabs",     DrawUIScriptPrefabsSection);
+                DrawSetupSubFoldout(ref _foldSetupUICanvas,  "UI Canvas Prefabs",     DrawUICanvasPrefabsSection);
+                DrawSetupSubFoldout(ref _foldSetupRiver,     "River Prefabs",         DrawRiverPrefabsSection);
+                DrawSetupSubFoldout(ref _foldSetupJunctions, "Junction Prefabs",      DrawJunctionPrefabsSection);
+                DrawSetupSubFoldout(ref _foldSetupArenas,    "Arena Prefabs",         DrawArenaPrefabsSection);
+                DrawSetupSubFoldout(ref _foldSetupObstacles, "Obstacle & Shop",       DrawObstacleShopPrefabsSection);
+                DrawSetupSubFoldout(ref _foldSetupCore,      "Core & World",          DrawCorePrefabsSection);
+
+                EditorGUI.indentLevel--;
             }
             EditorGUILayout.Space(2);
 
@@ -3179,15 +3711,32 @@ EditorUtility.SetDirty(_data);
             EditorGUILayout.LabelField(path?.segmentId ?? "(unknown path)", EditorStyles.miniLabel);
 
             int i = 1;
-            foreach (var obs in grp.OrderBy(o => o.pathT))
+            LevelSelectDesignerData.DesignerObstacle toDelete = null;
+            foreach (var obs in grp.OrderBy(o => o.pathT).ToList())
             {
                 bool selected = obs.obstacleId == _selectedObstacleId;
                 var prev = GUI.backgroundColor;
+
+                EditorGUILayout.BeginHorizontal();
+
                 GUI.backgroundColor = selected ? Color.yellow : Color.clear;
                 if (GUILayout.Button($"{i}. {obs.obstacleId}", EditorStyles.miniButton))
                     _selectedObstacleId = selected ? null : obs.obstacleId;
+
+                GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
+                if (GUILayout.Button("✕", EditorStyles.miniButton, GUILayout.Width(20)))
+                    toDelete = obs;
+
                 GUI.backgroundColor = prev;
+                EditorGUILayout.EndHorizontal();
                 i++;
+            }
+            if (toDelete != null)
+            {
+                Undo.RecordObject(_data, "Delete Obstacle");
+                _data.obstacles.Remove(toDelete);
+                if (_selectedObstacleId == toDelete.obstacleId) _selectedObstacleId = null;
+                EditorUtility.SetDirty(_data);
             }
         }
     }
@@ -3910,63 +4459,147 @@ EditorUtility.SetDirty(_data);
 
     private void GenerateObstacles(GameObject obstaclesParent)
     {
-        var instantiated = new Dictionary<string, LevelSelectObstacleManager>();
-        var sorted       = _data.obstacles.OrderBy(o => o.pathId).ThenBy(o => o.pathT).ToList();
+        // Order by path index in designer (not random UUID), then T along path
+        var sorted = _data.obstacles
+            .OrderBy(o => { int i = _data.paths.FindIndex(p => p.pathId == o.pathId); return i < 0 ? int.MaxValue : i; })
+            .ThenBy(o => o.pathT)
+            .ToList();
+
+        var spawnedGOs = new List<GameObject>();
 
         foreach (var obs in sorted)
         {
             GameObject prefab = obs.obstaclePrefab != null ? obs.obstaclePrefab : _data.obstaclePrefab;
-            if (prefab == null) continue;
-
-            Vector3? pos = GetWorldPosOnPath(obs.pathId, obs.pathT);
-            if (!pos.HasValue) continue;
-
-            var obsGO = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
-            Undo.RegisterCreatedObjectUndo(obsGO, "Generate Obstacle");
-            obsGO.transform.SetParent(obstaclesParent.transform, true);
-            obsGO.transform.position = pos.Value;
-            obsGO.name = obs.obstacleId;
-
-            var mgr = obsGO.GetComponentInChildren<LevelSelectObstacleManager>();
-            if (mgr != null)
+            if (prefab == null)
             {
-                var so = new SerializedObject(mgr);
-                so.Update();
-                so.FindProperty("obstacleID").stringValue = obs.obstacleId;
-                so.ApplyModifiedProperties();
-                EditorUtility.SetDirty(mgr);
-                instantiated[obs.obstacleId] = mgr;
+                Debug.LogWarning($"[LevelSelectDesigner] Obstacle '{obs.obstacleId}' has no prefab assigned — skipped.");
+                continue;
             }
+
+            var path = _data.paths.Find(p => p.pathId == obs.pathId);
+            if (path == null || path.nodeIds.Count < 2) continue;
+
+            Vector3? posNullable = GetWorldPosOnPath(obs.pathId, obs.pathT);
+            if (!posNullable.HasValue) continue;
+            Vector3 pos = posNullable.Value;
+            pos.y += 0.25f;
+
+            var     nodePositions = path.nodeIds.Select(id => (float3)WorldPosOfNode(id)).ToList();
+            var     pathSpline    = SplineSplitUtility.BuildSplineFromPositions(nodePositions, TangentMode.AutoSmooth);
+            float3  rawTangent    = pathSpline.EvaluateTangent(obs.pathT);
+            Vector3 flowDir       = math.lengthsq(rawTangent) > 0.0001f
+                                    ? (Vector3)math.normalize(rawTangent)
+                                    : Vector3.forward;
+
+            var obsGO = (GameObject)PrefabUtility.InstantiatePrefab(prefab, obstaclesParent.transform);
+            Undo.RegisterCreatedObjectUndo(obsGO, "Generate Obstacle");
+            obsGO.name = obs.obstacleId;
+            obsGO.transform.SetPositionAndRotation(pos, Quaternion.LookRotation(-flowDir, Vector3.up));
+
+            // Set obstacleID on both manager and obstacle-object (LevelSelectDataController reads the latter)
+            var manager = obsGO.GetComponent<LevelSelectObstacleManager>()
+                       ?? obsGO.GetComponentInChildren<LevelSelectObstacleManager>();
+            if (manager != null)
+            {
+                Undo.RecordObject(manager, "Set Obstacle ID");
+                manager.obstacleID = obs.obstacleId;
+                EditorUtility.SetDirty(manager);
+            }
+
+            var obstacleObj = obsGO.GetComponent<LevelSelectPathObstacleObject>()
+                           ?? obsGO.GetComponentInChildren<LevelSelectPathObstacleObject>();
+            if (obstacleObj != null)
+            {
+                Undo.RecordObject(obstacleObj, "Set Obstacle ID");
+                obstacleObj.obstacleID = obs.obstacleId;
+                EditorUtility.SetDirty(obstacleObj);
+            }
+
+            // Enable/disable VideoOrb via the manager's designated reference
+            if (manager != null)
+            {
+                var orbProp = new SerializedObject(manager).FindProperty("videoOrb");
+                var orbGO   = orbProp?.objectReferenceValue as GameObject;
+                if (orbGO != null)
+                {
+                    Undo.RecordObject(orbGO, "Toggle VideoOrb");
+                    orbGO.SetActive(obs.hasVideoOrb);
+                    EditorUtility.SetDirty(orbGO);
+                }
+            }
+
+            spawnedGOs.Add(obsGO);
         }
 
-        // Chain nextObstacleTransform per path
-        foreach (var grp in sorted.GroupBy(o => o.pathId))
+        // Create or find RiverStopPoint child on each obstacle and wire _riverStopPoint
+        var stopPoints = new List<Transform>();
+        foreach (var go in spawnedGOs)
         {
-            var ordered = grp.OrderBy(o => o.pathT).ToList();
-            for (int i = 0; i < ordered.Count - 1; i++)
+            var manager = go.GetComponent<LevelSelectObstacleManager>()
+                       ?? go.GetComponentInChildren<LevelSelectObstacleManager>();
+
+            // Find or create child GO named "RiverStopPoint"
+            var existing = go.transform.Find("RiverStopPoint");
+            Transform stopT;
+            if (existing != null)
             {
-                if (instantiated.TryGetValue(ordered[i].obstacleId,     out var cur) &&
-                    instantiated.TryGetValue(ordered[i + 1].obstacleId, out var next))
+                stopT = existing;
+            }
+            else
+            {
+                var stopGO = new GameObject("RiverStopPoint");
+                Undo.RegisterCreatedObjectUndo(stopGO, "Create RiverStopPoint");
+                stopGO.transform.SetParent(go.transform, false);
+                stopT = stopGO.transform;
+            }
+            stopPoints.Add(stopT);
+
+            if (manager != null)
+            {
+                var so       = new SerializedObject(manager);
+                var stopProp = so.FindProperty("_riverStopPoint");
+                if (stopProp != null)
                 {
-                    var so = new SerializedObject(cur);
-                    so.Update();
-                    so.FindProperty("nextObstacleTransform").objectReferenceValue = next.transform;
+                    stopProp.objectReferenceValue = stopT;
                     so.ApplyModifiedProperties();
-                    EditorUtility.SetDirty(cur);
+                    EditorUtility.SetDirty(manager);
                 }
             }
         }
 
-        // Wire _firstObstacleTransform on LevelSelectSplineManager
-        var splineMgr = FindObjectOfType<LevelSelectSplineManager>();
-        if (splineMgr != null && sorted.Count > 0 &&
-            instantiated.TryGetValue(sorted[0].obstacleId, out var first))
+        // Build a flat list of managers in spawn order so we can chain _nextObstacle
+        var managers = new List<LevelSelectObstacleManager>();
+        foreach (var go in spawnedGOs)
         {
-            var so = new SerializedObject(splineMgr);
-            so.Update();
-            so.FindProperty("_firstObstacleTransform").objectReferenceValue = first.transform;
-            so.ApplyModifiedProperties();
-            EditorUtility.SetDirty(splineMgr);
+            var m = go.GetComponent<LevelSelectObstacleManager>()
+                 ?? go.GetComponentInChildren<LevelSelectObstacleManager>();
+            if (m != null) managers.Add(m);
+        }
+
+        // Wire _nextObstacle: each obstacle points to the next manager in sequence
+        for (int i = 0; i < managers.Count; i++)
+        {
+            var so       = new SerializedObject(managers[i]);
+            var nextProp = so.FindProperty("_nextObstacle");
+            if (nextProp != null)
+            {
+                nextProp.objectReferenceValue = (i + 1 < managers.Count) ? managers[i + 1] : null;
+                so.ApplyModifiedProperties();
+                EditorUtility.SetDirty(managers[i]);
+            }
+        }
+
+        // Wire _firstObstacle on LevelSelectSplineManager to the first obstacle in the chain
+        if (managers.Count > 0 && _data.splineManager != null)
+        {
+            var so   = new SerializedObject(_data.splineManager);
+            var prop = so.FindProperty("_firstObstacle");
+            if (prop != null)
+            {
+                prop.objectReferenceValue = managers[0];
+                so.ApplyModifiedProperties();
+                EditorUtility.SetDirty(_data.splineManager);
+            }
         }
     }
 
@@ -4077,6 +4710,14 @@ EditorUtility.SetDirty(_data);
                     entranceIndex = 0,
                     trigger       = trigger
                 });
+
+                var proximity = entGO.GetComponentInChildren<LevelSelectArenaProximity>();
+                if (proximity != null)
+                {
+                    proximity.arenaController = ctrl;
+                    EditorUtility.SetDirty(proximity);
+                }
+
                 EditorUtility.SetDirty(ctrl);
             }
 
@@ -4110,6 +4751,14 @@ EditorUtility.SetDirty(_data);
                         entranceIndex = secEnt.entranceIndex,
                         trigger       = secTrigger
                     });
+
+                    var secProximity = secEntGO.GetComponentInChildren<LevelSelectArenaProximity>();
+                    if (secProximity != null)
+                    {
+                        secProximity.arenaController = ctrl;
+                        EditorUtility.SetDirty(secProximity);
+                    }
+
                     EditorUtility.SetDirty(ctrl);
                 }
             }
@@ -4189,6 +4838,25 @@ EditorUtility.SetDirty(_data);
                                 proximity.shopCamera = camChild.GetComponent<Unity.Cinemachine.CinemachineCamera>();
                                 EditorUtility.SetDirty(proximity);
                             }
+                        }
+                    }
+
+                    // ── Spawn items at ShopItemPoints ─────────────────────
+                    if (shop.shopItems != null)
+                    {
+                        var points = shopGO.GetComponentsInChildren<ShopItemPoint>(includeInactive: true);
+                        foreach (var point in points)
+                        {
+                            int idx = point.slotIndex;
+                            if (idx < 0 || idx >= shop.shopItems.Length) continue;
+                            var itemPrefab = shop.shopItems[idx];
+                            if (itemPrefab == null) continue;
+
+                            var itemGO = (GameObject)PrefabUtility.InstantiatePrefab(itemPrefab);
+                            Undo.RegisterCreatedObjectUndo(itemGO, "Spawn Shop Item");
+                            itemGO.transform.SetParent(point.transform, false);
+                            itemGO.transform.localPosition = Vector3.zero;
+                            itemGO.transform.localRotation = Quaternion.identity;
                         }
                     }
                 }
@@ -4870,9 +5538,12 @@ EditorUtility.SetDirty(_data);
             Handles.color = ringCol;
             Handles.DrawWireDisc(new Vector3(cp.x, cp.y, 0), Vector3.forward, cr);
 
-            Handles.color = sel ? Color.yellow : Color.white;
-            Handles.DrawSolidDisc(new Vector3(cp.x, cp.y, 0), Vector3.forward, 4f);
-            Handles.color = Color.white;
+            if (_mode == DesignerMode.Landscape)
+            {
+                Handles.color = sel ? Color.yellow : Color.white;
+                Handles.DrawSolidDisc(new Vector3(cp.x, cp.y, 0), Vector3.forward, 4f);
+                Handles.color = Color.white;
+            }
         }
     }
 

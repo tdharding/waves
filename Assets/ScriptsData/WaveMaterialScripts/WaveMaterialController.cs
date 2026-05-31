@@ -72,20 +72,18 @@ public float soulFishStrength = 1f;
     // WAVE STATES
     // ─────────────────────────────────────────
 
-    [Header("RockyWaves1 State")]
-    public WaveState RockyWaves1;
-
-    [Header("RockyWaves2 State")]
-    public WaveState RockyWaves2;
-
 [Header("Map UI Wave Renderer")]
 public Renderer mapWaveRenderer;
+
+    [Header("Current Applied State")]
+    [SerializeField] private WaveState currentState;
 
     // ─────────────────────────────────────────
     // INSTANT APPLY
     // ─────────────────────────────────────────
     public void ApplyStateInstant(WaveState state)
     {
+        currentState = state;
         waveMaterial.SetFloat("_Frequency", state.Frequency);
         waveMaterial.SetFloat("_Speed", state.Speed);
         waveMaterial.SetFloat("_RippleDepth", state.RippleDepth);

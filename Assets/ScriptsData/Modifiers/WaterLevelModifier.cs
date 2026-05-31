@@ -15,6 +15,7 @@ public class WaterLevelModifier : MonoBehaviour
 
     [Header("Settings")]
     [SerializeField] private float transitionDuration = 3f;
+    [SerializeField] private bool debugLog = false;
 
     // ── Tier Awareness ──
     [Header("Tier Info (set at runtime by LevelSpawner)")]
@@ -27,14 +28,14 @@ public class WaterLevelModifier : MonoBehaviour
 
     // Called by LevelSpawner when this modifier is placed on a tier.
     // slotIndex = index into tierYOffsets. offsets must be sorted high→low (e.g. +2, 0, -2, -4).
-    public void Init(int slotIndex, float[] offsets, string tierName = "")
+    public void Init(int slotIndex, float[] offsets, string tierName = "", float baselineWaterY = 0f)
     {
         if (offsets == null || offsets.Length == 0) return;
         slotIndex = Mathf.Clamp(slotIndex, 0, offsets.Length - 1);
 
         spawnedTierName  = tierName;
         spawnedTierSlot  = slotIndex;
-        spawnedTierY     = offsets[slotIndex];
+        spawnedTierY     = baselineWaterY + offsets[slotIndex];
         spawnedFloorLabel = FloorLabel(slotIndex, offsets);
 
         bool hasAbove = slotIndex > 0;
@@ -48,7 +49,7 @@ public class WaterLevelModifier : MonoBehaviour
         if (raiseSlot != null) raiseSlot.gameObject.SetActive(hasAbove);
         if (lowerSlot != null) lowerSlot.gameObject.SetActive(hasBelow);
 
-        Debug.Log($"[WaterLevelModifier] Init — tier='{spawnedTierName}' floor={spawnedFloorLabel} slot={spawnedTierSlot} y={spawnedTierY}, raise={raiseAmount}, lower={lowerAmount}, hasAbove={hasAbove}, hasBelow={hasBelow}");
+        if (debugLog) Debug.Log($"[WaterLevelModifier] Init — tier='{spawnedTierName}' floor={spawnedFloorLabel} slot={spawnedTierSlot} y={spawnedTierY}, raise={raiseAmount}, lower={lowerAmount}, hasAbove={hasAbove}, hasBelow={hasBelow}");
     }
 
     private Transform sonarGridParent;
@@ -94,14 +95,14 @@ public class WaterLevelModifier : MonoBehaviour
     private void SetRaise(float value)
     {
         raiseOffset = value;
-        Debug.Log($"[WaterLevelModifier] SetRaise — value={value}, baselineY={baselineY}, raiseOffset={raiseOffset}, lowerOffset={lowerOffset}, targetY={baselineY + raiseOffset + lowerOffset}");
+        if (debugLog) Debug.Log($"[WaterLevelModifier] SetRaise — value={value}, baselineY={baselineY}, raiseOffset={raiseOffset}, lowerOffset={lowerOffset}, targetY={baselineY + raiseOffset + lowerOffset}");
         TweenToTarget();
     }
 
     private void SetLower(float value)
     {
         lowerOffset = -value;
-        Debug.Log($"[WaterLevelModifier] SetLower — value={value}, baselineY={baselineY}, raiseOffset={raiseOffset}, lowerOffset={lowerOffset}, targetY={baselineY + raiseOffset + lowerOffset}");
+        if (debugLog) Debug.Log($"[WaterLevelModifier] SetLower — value={value}, baselineY={baselineY}, raiseOffset={raiseOffset}, lowerOffset={lowerOffset}, targetY={baselineY + raiseOffset + lowerOffset}");
         TweenToTarget();
     }
 

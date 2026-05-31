@@ -34,12 +34,6 @@ public class LevelSelectArenaController : MonoBehaviour
              "Assign the same reference on every arena — only one arena activates it at a time.")]
     public LevelSelectSoulFishDisplay soulFishDisplay;
 
-    [Tooltip("Renderer on this arena whose _Alpha is faded out while the display is active.")]
-    public Renderer soulFishDisplayFadeTarget;
-
-    [Tooltip("Renderer on this arena whose _Alpha is faded in (0 → 1) while the display is active.")]
-    public Renderer soulFishDisplayFadeIn;
-
     [Header("Portal Links")]
     [Tooltip("One entry per river path that leads into this arena. " +
              "The controller pushes gridData and entranceIndex to each trigger in Awake, " +
@@ -183,10 +177,10 @@ entrance.targetSegmentID    = segID.SegmentID;
     /// Called automatically by <see cref="LevelSelectArenaProximity"/> when the boat
     /// enters the arena's proximity zone; can also be called manually.
     /// </summary>
-    public void ShowSoulFishDisplay()
+    public void ShowSoulFishDisplay(Renderer fadeTarget = null, Renderer fadeInTarget = null)
     {
         if (soulFishDisplay != null)
-            soulFishDisplay.Show(gridData, soulFishDisplayFadeTarget, soulFishDisplayFadeIn);
+            soulFishDisplay.Show(gridData, fadeTarget, fadeInTarget);
     }
 
     /// <summary>

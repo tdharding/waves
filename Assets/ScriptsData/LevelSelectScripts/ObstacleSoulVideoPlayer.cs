@@ -45,6 +45,8 @@ public class ObstacleSoulVideoPlayer : MonoBehaviour
 
     public void RefreshState()
     {
+        if (!gameObject.activeInHierarchy) return;
+
         List<VideoClip> newClips = new List<VideoClip>();
 
         foreach (SoulSlot slot in slots)

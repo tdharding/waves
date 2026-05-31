@@ -24,17 +24,18 @@ public class BoatWaveFollower : MonoBehaviour
     private Quaternion baseRotation;
     private Material waterMaterial;
 
-    int freqID, speedID, stepID, depthID;
+    int freqID, speedID, stepID, depthID, waveCenterID;
 
     void Start()
     {
         MeshRenderer rend = waterTransform.GetComponent<MeshRenderer>();
         waterMaterial = rend.sharedMaterial;
 
-        freqID  = Shader.PropertyToID("_Frequency");
-        speedID = Shader.PropertyToID("_Speed");
-        stepID  = Shader.PropertyToID("_WaveStepRate");
-        depthID = Shader.PropertyToID("_RippleDepth");
+        freqID       = Shader.PropertyToID("_Frequency");
+        speedID      = Shader.PropertyToID("_Speed");
+        stepID       = Shader.PropertyToID("_WaveStepRate");
+        depthID      = Shader.PropertyToID("_RippleDepth");
+        waveCenterID = Shader.PropertyToID("_WaveCenter");
 
         if (boatVisual != null)
             baseRotation = boatVisual.localRotation;
@@ -43,7 +44,11 @@ public class BoatWaveFollower : MonoBehaviour
     void Update()
     {
         Vector3 boatPos = transform.position;
-        Vector3 waveCenter = waterTransform.position;
+
+        // Read the actual wave center from the material — the modifier may have moved it.
+        // _WaveCenter is in wave plane object space; TransformPoint converts back to world.
+        Vector4 wc = waterMaterial.GetVector(waveCenterID);
+        Vector3 waveCenter = waterTransform.TransformPoint(new Vector3(wc.x, -wc.z, 0f));
 
         // --- Read shader values ---
         float frequency = waterMaterial.GetFloat(freqID);

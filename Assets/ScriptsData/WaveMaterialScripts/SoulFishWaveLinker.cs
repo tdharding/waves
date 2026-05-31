@@ -38,27 +38,40 @@ public class SoulFishWaveLinker : MonoBehaviour
     private struct ZoneEntry { public List<Vector3> nodes; public bool closed; }
     static readonly List<ZoneEntry> activeZones = new List<ZoneEntry>();
 
+    void Awake()
+    {
+        Debug.Log($"[SoulFishWaveLinker] Awake — clearing {activeZones.Count} zone(s) and {activeFish.Count} fish from statics.");
+        activeFish.Clear();
+        activeZones.Clear();
+    }
+
     public void BakePositionsOnce()
     {
-        if (!waveController || !waveController.waveMaterial) return;
+        if (!waveController)
+        {
+            Debug.LogError("[SoulFishWaveLinker] BakePositionsOnce — waveController is NULL.");
+            return;
+        }
+        if (!waveController.waveMaterial)
+        {
+            Debug.LogError("[SoulFishWaveLinker] BakePositionsOnce — waveMaterial is NULL.");
+            return;
+        }
 
         Material mat = waveController.waveMaterial;
 
         List<Vector4> packedPoints = new List<Vector4>();
 
-        // 1. Pack Zones first (as they define the areas)
         foreach (var entry in activeZones)
         {
             if (packedPoints.Count >= MAX_POINTS) break;
             PackZone(entry.nodes, entry.closed, packedPoints);
         }
 
-        // 2. Pack individual fish if space remains
         foreach (var fish in activeFish)
         {
             if (packedPoints.Count >= MAX_POINTS) break;
             if (fish == null) continue;
-
             packedPoints.Add(new Vector4(fish.position.x, fish.position.y, fish.position.z, 1f));
         }
 
@@ -67,13 +80,15 @@ public class SoulFishWaveLinker : MonoBehaviour
         for (int i = 0; i < count; i++)
             mat.SetVector(PositionIDs[i], packedPoints[i]);
 
-        // Push unused slots off-map
         for (int i = count; i < MAX_POINTS; i++)
             mat.SetVector(PositionIDs[i], (Vector4)OffMapPosition);
 
         mat.SetFloat(CountID, count);
 
-        // Keep map wave renderer in sync
+        Debug.Log($"[SoulFishWaveLinker] BakePositionsOnce — zones={activeZones.Count} fish={activeFish.Count} packed={count} mat='{mat.name}'");
+        for (int i = 0; i < count; i++)
+            Debug.Log($"  [{i}] pos=({packedPoints[i].x:F1},{packedPoints[i].y:F1},{packedPoints[i].z:F1}) w={packedPoints[i].w}");
+
         waveController.SyncMapWaves();
     }
 
@@ -95,7 +110,9 @@ public class SoulFishWaveLinker : MonoBehaviour
     {
         if (activeZones.Exists(e => e.nodes == nodes)) return;
         activeZones.Add(new ZoneEntry { nodes = nodes, closed = closed });
-        FindObjectOfType<SoulFishWaveLinker>()?.BakePositionsOnce();
+        var linker = FindObjectOfType<SoulFishWaveLinker>();
+        Debug.Log($"[SoulFishWaveLinker] RegisterZone — nodes={nodes.Count} closed={closed} linkerFound={linker != null}");
+        linker?.BakePositionsOnce();
     }
 
     public static void UnregisterZone(List<Vector3> nodes)

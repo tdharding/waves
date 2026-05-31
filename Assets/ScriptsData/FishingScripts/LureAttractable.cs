@@ -7,9 +7,7 @@ using UnityEditor;
 
 public class LureAttractable : MonoBehaviour
 {
-    [Header("Return")]
-    public float returnSpeed     = 2f;
-    public float returnThreshold = 0.3f;
+    // Return params come from LureBehaviour, captured in BeginReturn()
 
     private SplineAnimate        _splineAnimate;
     private LureBehaviour        _targetLure;
@@ -17,6 +15,8 @@ public class LureAttractable : MonoBehaviour
     private float                _orbitAngleOffset;
     private Vector3              _returnTarget;
     private float                _returnNormalizedTime;
+    private float                _returnSpeed     = 2f;
+    private float                _returnThreshold = 0.3f;
 
     public enum State { Free, Attracted, Returning }
     public State CurrentState => _state;
@@ -122,14 +122,14 @@ public class LureAttractable : MonoBehaviour
             else
             {
             float dist = Vector3.Distance(transform.position, _returnTarget);
-            transform.position = Vector3.MoveTowards(transform.position, _returnTarget, returnSpeed * Time.deltaTime);
+            transform.position = Vector3.MoveTowards(transform.position, _returnTarget, _returnSpeed * Time.deltaTime);
 
             Vector3 dir = _returnTarget - transform.position;
             if (dir.sqrMagnitude > 0.001f)
                 transform.rotation = Quaternion.Slerp(transform.rotation,
                     Quaternion.LookRotation(dir.normalized), Time.deltaTime * 5f);
 
-            if (dist <= returnThreshold)
+            if (dist <= _returnThreshold)
             {
                 if (_splineAnimate != null)
                 {
@@ -154,6 +154,11 @@ public class LureAttractable : MonoBehaviour
 
     void BeginReturn()
     {
+        if (_targetLure != null)
+        {
+            _returnSpeed     = _targetLure.returnSpeed;
+            _returnThreshold = _targetLure.returnThreshold;
+        }
         _targetLure = null;
         _state      = State.Returning;
 

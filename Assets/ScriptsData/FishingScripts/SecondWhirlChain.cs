@@ -24,17 +24,16 @@ public class SecondWhirlChain : MonoBehaviour
 
     private static readonly int TotalAlphaProp = Shader.PropertyToID("_TotalAlpha");
 
-    private float     _currentAlpha;
-    private float     _targetAlpha;
-    private Material  _mat;
+    private float                _currentAlpha;
+    private float                _targetAlpha;
+    private MaterialPropertyBlock _mpb;
 
     private Vector3   _prevAxis;
     private float     _smoothedTurnRate;
 
     void Awake()
     {
-        if (targetRenderer)
-            _mat = targetRenderer.material;
+        _mpb = new MaterialPropertyBlock();
     }
 
     void Start()
@@ -49,7 +48,11 @@ public class SecondWhirlChain : MonoBehaviour
     void Update()
     {
         _currentAlpha = Mathf.MoveTowards(_currentAlpha, _targetAlpha, fadeSpeed * Time.deltaTime);
-        if (_mat) _mat.SetFloat(TotalAlphaProp, _currentAlpha);
+        if (targetRenderer)
+        {
+            _mpb.SetFloat(TotalAlphaProp, _currentAlpha);
+            targetRenderer.SetPropertyBlock(_mpb);
+        }
     }
 
     void LateUpdate()

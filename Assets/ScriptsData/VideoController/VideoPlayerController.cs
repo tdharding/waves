@@ -119,6 +119,8 @@ public class VideoPlayerController : MonoBehaviour
 
     private IEnumerator FadeOutRoutine()
     {
+        if (targetMaterial == null) yield break;
+
         float t = 0f;
         float start = targetMaterial.GetFloat(factorProperty);
         while (t < hideDuration)

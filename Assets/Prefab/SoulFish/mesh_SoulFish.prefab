@@ -286,5 +286,3 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ee70245c0bae98c48b2134d4428c503c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LureAttractable
-  returnSpeed: 0.1
-  returnThreshold: 0.1

@@ -111,6 +111,9 @@ Material:
     - _DstBlend: 0
     - _DstBlendAlpha: 0
     - _EnvironmentReflections: 1
+    - _FishGlowIntensity: 3
+    - _FishGlowRadius: 0.08
+    - _FishGlowSoftness: 0.03
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0

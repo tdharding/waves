@@ -9,8 +9,8 @@ public class LevelSelectSplineManager : MonoBehaviour
     [SerializeField] private SplineRiverManager _riverManager;
 
     [Header("Initial Advance")]
-    [Tooltip("The first obstacle in the scene — the river will extrude up to this point on load.")]
-    [SerializeField] private Transform _firstObstacleTransform;
+    [Tooltip("The first obstacle in the scene — the river will extrude up to its RiverStopPoint on load.")]
+    [SerializeField] private LevelSelectObstacleManager _firstObstacle;
 
     private void Awake()
     {
@@ -26,9 +26,12 @@ public class LevelSelectSplineManager : MonoBehaviour
 
     private void Start()
     {
-        if (_firstObstacleTransform != null)
+        if (_firstObstacle != null)
         {
-            _riverManager?.AdvanceToPosition(_firstObstacleTransform.position);
+            Vector3 stopPos = _firstObstacle.RiverStopPoint != null
+                ? _firstObstacle.RiverStopPoint.position
+                : _firstObstacle.transform.position;
+            _riverManager?.AdvanceToPosition(stopPos);
             return;
         }
 

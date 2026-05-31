@@ -61,6 +61,7 @@ public class LevelSelectDesignerData : ScriptableObject
         public string pathId;
         public float pathT;
         public GameObject shopPrefabOverride;
+        public GameObject[] shopItems = new GameObject[4];
     }
 
     [Serializable]
@@ -70,6 +71,7 @@ public class LevelSelectDesignerData : ScriptableObject
         public string pathId;
         public float pathT;
         public int soulSlotCount;
+        public bool hasVideoOrb = true;
         public GameObject obstaclePrefab;
     }
 
@@ -142,6 +144,7 @@ public class LevelSelectDesignerData : ScriptableObject
     public PauseMenuUI                 pauseMenuUI;
     public PortalConfirmUI             portalConfirmUI;
     public SoulsOnBoatDisplayManager   soulsOnBoatDisplayManager;
+    public VideoPlayerController       videoPlayerController;
 
     // Script object prefabs (from Prefab/ScriptPrefabs)
     public GameObject cameraPrefab;
@@ -153,6 +156,7 @@ public class LevelSelectDesignerData : ScriptableObject
     public GameObject portalConfirmUIScriptPrefab;
     public GameObject soulsOnBoatDisplayScriptPrefab;
     public GameObject arenaSoulsWindowPrefab;
+    public GameObject videoPlayerControllerPrefab;
     public GameObject boatPrefab;
 
     // UI Canvas prefabs

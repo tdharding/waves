@@ -6,8 +6,7 @@ public class GameplaySoulSlot : MonoBehaviour
     [SerializeField] private bool filled;
     private int occupantSoulIdentity = -1; 
 
-    [Header("Manager Reference")]
-    // Point this to whatever script manages your tree's logic
+    [Header("Memory Tree Association (Optional)")]
     [SerializeField] private MemoryTreePlayer treePlayer;
 
     [Header("Visuals")]
@@ -23,9 +22,6 @@ public class GameplaySoulSlot : MonoBehaviour
             filledVisual.SetActive(filled);
     }
 
-    /// <summary>
-    /// Called when a player/system inserts a soul into this specific tree slot.
-    /// </summary>
     public bool TryInsertSoul(int soulIdentity)
     {
         if (filled) return false;
@@ -36,15 +32,11 @@ public class GameplaySoulSlot : MonoBehaviour
         if (filledVisual != null)
             filledVisual.SetActive(true);
 
-        // Tell the tree to update its orbs immediately
         if (treePlayer != null) treePlayer.RefreshState();
 
         return true;
     }
 
-    /// <summary>
-    /// Manual removal (e.g., player clicking the slot to take the soul back).
-    /// </summary>
     private void OnMouseDown()
     {
         if (!filled) return;

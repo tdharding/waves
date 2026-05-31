@@ -6,7 +6,7 @@ using System.Reflection;
 public class WaveEffectsLiveTuner : EditorWindow
 {
     // Shift+3 shortcut
-    [MenuItem("Window/Waves/Wave Effects Tuner #3")]
+    [MenuItem("Tools/Waves/Wave Effects Tuner #3")]
     public static void Open() => GetWindow<WaveEffectsLiveTuner>("Wave Effects Tuner");
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -145,8 +145,8 @@ public class WaveEffectsLiveTuner : EditorWindow
     {
         EditorApplication.update -= LiveUpdate;
         StopAllPreviewClips();
-        ClearTestWhirlpools();
-        ClearTestSoulFish();
+        if (testWhirlpoolsEnabled) ClearTestWhirlpools();
+        if (testSoulFishEnabled)   ClearTestSoulFish();
     }
 
     void RestoreFromPrefs()
@@ -233,7 +233,7 @@ public class WaveEffectsLiveTuner : EditorWindow
         DrawSection("Music Preview",    ref foldMusic,        DrawMusicPreview);
 
         if (EditorGUI.EndChangeCheck())
-            serializedWindow.ApplyModifiedProperties();
+            serializedWindow.ApplyModifiedPropertiesWithoutUndo();
 
         EditorGUILayout.EndScrollView();
     }
@@ -465,7 +465,7 @@ public class WaveEffectsLiveTuner : EditorWindow
     void ClearTestWhirlpools()
     {
         var wm = WhirlpoolManager.Instance;
-        if (wm != null) wm.ApplyPositions(new Vector4[8], 0, wm.globalDepth, wm.globalSwirl);
+        if (wm != null) wm.ResetOverride();
     }
 
     void ApplyTestSoulFish()
@@ -483,9 +483,9 @@ public class WaveEffectsLiveTuner : EditorWindow
     void ClearTestSoulFish()
     {
         if (!waveMaterial) return;
-        for (int i = 0; i < 10; i++)
-            waveMaterial.SetVector("_SoulFishPosition" + (i + 1), OffMap);
-        waveMaterial.SetFloat("_SoulFishCount", 0);
+        // Re-bake from live linker data so runtime zones/fish aren't lost.
+        // If no zones are registered (empty session), this writes OffMap which is correct.
+        SoulFishWaveLinker.BakeToMaterial(waveMaterial);
     }
 
     void DrawFoam()
@@ -649,7 +649,6 @@ public class WaveEffectsLiveTuner : EditorWindow
     void LoadFromPreset(WavePreset preset)
     {
         if (preset == null) return;
-        Undo.RecordObject(this, "Load Wave Preset");
 
         var s = preset.state;
         frequency             = s.Frequency;
@@ -663,7 +662,11 @@ public class WaveEffectsLiveTuner : EditorWindow
         troughBrightness       = s.TroughRingWave1Brightness;
         peakBrightness         = s.PeakRingWave2Brightness;
         soulFishMaskStrength    = s.SoulFishMaskStrength;
-        soulFishRadius          = s.SoulFishRadius;
+        // SoulFishRadius wasn't in older presets — fall back to the material's live value rather than
+        // overwriting with the default 0, which would silently kill the mask.
+        soulFishRadius = s.SoulFishRadius > 0f
+            ? s.SoulFishRadius
+            : (waveMaterial != null ? waveMaterial.GetFloat("_SoulFishRadius") : soulFishRadius);
         zoneTiling              = s.ZoneTiling;
         zoneScrollSpeed         = s.ZoneScrollSpeed;
         zoneNoiseStrength       = s.ZoneNoiseStrength;
@@ -738,7 +741,8 @@ public class WaveEffectsLiveTuner : EditorWindow
     void ExportAsNewPreset()
     {
         string path = EditorUtility.SaveFilePanelInProject(
-            "Save Wave Preset", "NewWavePreset", "asset", "Choose save location");
+            "Save Wave Preset", "NewWavePreset", "asset", "Choose save location",
+            "Assets/ScriptsData/DataScripts/WavePreset");
         if (string.IsNullOrEmpty(path)) return;
 
         var preset = CreateInstance<WavePreset>();

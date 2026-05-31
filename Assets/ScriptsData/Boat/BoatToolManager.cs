@@ -6,7 +6,6 @@ public class BoatToolManager : MonoBehaviour
 {
     [Header("Refs")]
     public GameObject boatCatapultRoot;
-    public GameObject boatLureRoot;
     public GameObject crossMastRoot;
     public BoatMovement boatMovement;
     public LureController lureController;
@@ -101,13 +100,7 @@ public class BoatToolManager : MonoBehaviour
         if (boatMovement != null)
             boatMovement.SetCatapultSlow(catapultActive);
 
-        if (boatLureRoot != null)
-            boatLureRoot.SetActive(lureActive && (lureController == null || lureController.HasLureAvailable));
-
         if (lureController != null)
-        {
-            lureController.enabled = lureActive;
-            lureController.SetBoatLureRoot(lureActive ? boatLureRoot : null);
-        }
+            lureController.SetLoadedLureVisible(lureActive && lureController.HasLureAvailable);
     }
 }

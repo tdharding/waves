@@ -74,6 +74,12 @@ public class GridSpawnerWindow : EditorWindow
 
         Vector3 origin = b.min;
 
+        var baselineMarker = grid.arenaProfile?.outerWallsPrefab?.GetComponentInChildren<BaselineMarker>();
+        float baselineY    = baselineMarker?.height ?? plane.position.y;
+        Quaternion baselineRot = baselineMarker != null
+            ? Quaternion.LookRotation(baselineMarker.transform.forward, Vector3.up)
+            : Quaternion.identity;
+
         Transform parent = null;
 
         if (createParent)
@@ -99,13 +105,16 @@ public class GridSpawnerWindow : EditorWindow
                 GameObject prefab = prefabs[cell - 1];
                 if (!prefab) continue;
 
+                var   baselineAlign = prefab.GetComponentInChildren<PrefabBaselineAlignment>();
+                float contactOffsetY = baselineAlign != null ? baselineAlign.transform.position.y : 0f;
                 Vector3 pos = new Vector3(
                     origin.x + x * tileX + tileX * 0.5f,
-                    plane.position.y,
+                    baselineY - contactOffsetY,
                     origin.z + y * tileZ + tileZ * 0.5f
                 );
 
-                Quaternion rot = plane.rotation;
+                bool align = baselineAlign != null;
+                Quaternion rot = align ? baselineRot : plane.rotation;
                 if (applyRotationOffset)
                     rot *= Quaternion.Euler(-90, 0, 0);
 

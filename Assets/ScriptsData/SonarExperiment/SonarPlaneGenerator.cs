@@ -51,6 +51,14 @@ public class SonarPlaneGenerator : MonoBehaviour
         Generate();
     }
 
+    // Cheap per-frame update — repositions tiles without rebuilding meshes.
+    public void UpdateSurfaceY(float waveSurfaceY)
+    {
+        if (Mathf.Approximately(_waveSurfaceY, waveSurfaceY)) return;
+        _waveSurfaceY = waveSurfaceY;
+        PlaceTiles();
+    }
+
     // ── lifecycle ─────────────────────────────────────────────────────────────
 
     void OnEnable()

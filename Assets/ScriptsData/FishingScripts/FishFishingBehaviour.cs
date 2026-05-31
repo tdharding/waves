@@ -37,7 +37,8 @@ public class FishFishingBehaviour : MonoBehaviour
     private Transform whirlTarget;
     private SoulWhirlDirection whirlDirection;
 
-    public bool IsBeingAttracted => fishingActive && !_travelingTube && IsEligibleForAttraction();
+    public bool IsBeingAttracted  => fishingActive && !_travelingTube && IsEligibleForAttraction();
+    public bool IsTravelingTube   => _travelingTube;
 
     private bool fishingActive;
     private bool _travelingTube;

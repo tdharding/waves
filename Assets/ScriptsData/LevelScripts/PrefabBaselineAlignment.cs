@@ -3,27 +3,23 @@ using UnityEngine;
 using UnityEditor;
 #endif
 
-// Add to a statue/world-space prefab.
-// At spawn, LevelSpawner aligns this prefab's forward to match the BaselineMarker's forward,
-// and places it at the BaselineMarker's height.
+// Place on a child transform of the prefab root, at the height where the water line should meet the object.
+// Move this transform up/down in the prefab to position the waterline disc on the object.
+// At spawn, LevelSpawner offsets the prefab so this disc aligns with the BaselineMarker disc.
 public class PrefabBaselineAlignment : MonoBehaviour
 {
+    [SerializeField] bool showDebug = false;
+
 #if UNITY_EDITOR
     void OnDrawGizmos()
     {
-        // Draw at baseline height when in scene; fall back to own Y in prefab editor.
-        var marker = FindObjectOfType<BaselineMarker>();
-        float y    = marker != null ? marker.height : transform.position.y;
-        Vector3 centre = new Vector3(transform.position.x, y, transform.position.z);
+        if (!showDebug) return;
 
-        Gizmos.color = new Color(0f, 0.9f, 0.5f, 0.9f);
-        BaselineMarker.DrawArrow(centre, Vector3.up, 3f);
-
-        Gizmos.color = new Color(0.3f, 0.7f, 1f, 0.9f);
-        BaselineMarker.DrawArrow(centre, transform.forward, 4f);
-
-        Handles.color = new Color(0.3f, 0.7f, 1f, 0.8f);
-        Handles.Label(centre + Vector3.up * 3.6f, "Baseline Align");
+        // Green disc — waterline: move this transform to where the water meets the object
+        Handles.color = new Color(0f, 0.9f, 0.5f, 0.6f);
+        Handles.DrawSolidDisc(transform.position, Vector3.up, 1.5f);
+        Handles.color = new Color(0f, 0.9f, 0.5f, 0.85f);
+        Handles.Label(transform.position + Vector3.up * 0.2f, "WATERLINE");
     }
 #endif
 }

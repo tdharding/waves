@@ -270,7 +270,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b7acdab1d4756024984e27ed95d4e527, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BaselineMarker
-  height: 0.59
+  height: -1.47
   discRadius: 5.34
 --- !u!1 &7923946534364195739
 GameObject:

@@ -4,10 +4,11 @@ using UnityEngine;
 // Matches the shader exactly: stepped XZ distance, same sine formula, same whirlpool falloff.
 public static class WaveUtils
 {
-    static readonly int FreqID  = Shader.PropertyToID("_Frequency");
-    static readonly int SpeedID = Shader.PropertyToID("_Speed");
-    static readonly int StepID  = Shader.PropertyToID("_WaveStepRate");
-    static readonly int DepthID = Shader.PropertyToID("_RippleDepth");
+    static readonly int FreqID       = Shader.PropertyToID("_Frequency");
+    static readonly int SpeedID      = Shader.PropertyToID("_Speed");
+    static readonly int StepID       = Shader.PropertyToID("_WaveStepRate");
+    static readonly int DepthID      = Shader.PropertyToID("_RippleDepth");
+    static readonly int WaveCenterID = Shader.PropertyToID("_WaveCenter");
 
     public struct WaveParams
     {
@@ -19,6 +20,14 @@ public static class WaveUtils
         public Vector3 origin;
     }
 
+    // _WaveCenter is stored in wave plane object space (x=localX, z=-localY due to -90°X rotation).
+    // TransformPoint converts it back to world space so CPU wave sampling stays in sync with the shader.
+    public static Vector3 GetWaveCenterWorld(Transform waterTransform, Material mat)
+    {
+        Vector4 wc = mat.GetVector(WaveCenterID);
+        return waterTransform.TransformPoint(new Vector3(wc.x, -wc.z, 0f));
+    }
+
     public static WaveParams ReadParams(Transform waterTransform, Material mat)
     {
         return new WaveParams
@@ -28,7 +37,7 @@ public static class WaveUtils
             stepRate  = mat.GetFloat(StepID),
             ripple    = mat.GetFloat(DepthID),
             meshScale = waterTransform.localScale.x,
-            origin    = waterTransform.position,
+            origin    = GetWaveCenterWorld(waterTransform, mat),
         };
     }
 

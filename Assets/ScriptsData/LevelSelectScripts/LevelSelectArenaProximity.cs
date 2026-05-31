@@ -20,6 +20,13 @@ public class LevelSelectArenaProximity : MonoBehaviour
     [Tooltip("Tag used to identify the boat. Must match the boat GameObject's tag.")]
     public string boatTag = "Boat";
 
+    [Header("Soul Fish Display")]
+    [Tooltip("Renderer faded out (_Alpha) while the display is active. Wire within the entrance prefab.")]
+    public Renderer fadeTarget;
+
+    [Tooltip("Renderer faded in (color.a) while the display is active. Wire within the entrance prefab.")]
+    public Renderer fadeInTarget;
+
     private void Awake()
     {
         // Ensure the collider is set to trigger
@@ -44,7 +51,7 @@ public class LevelSelectArenaProximity : MonoBehaviour
 
         string levelID = arenaController.gridData != null ? arenaController.gridData.levelID : "null";
         Debug.Log($"[ArenaProximity] '{name}': Showing display for level '{levelID}'.");
-        arenaController.ShowSoulFishDisplay();
+        arenaController.ShowSoulFishDisplay(fadeTarget, fadeInTarget);
     }
 
     private void OnTriggerExit(Collider other)

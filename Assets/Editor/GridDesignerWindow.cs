@@ -120,7 +120,7 @@ public class GridDesignerWindow : EditorWindow
     float[] cachedTierYOffsets; // pulled from LevelSpawner in scene
 
     // ── Direct Prefab Library ──
-    enum PrefabLibraryTab { MazePieces, SetPieces, Statues }
+    enum PrefabLibraryTab { MazePieces, SetPieces, Statues, Modifiers }
     PrefabLibraryTab              _prefabLibTab       = PrefabLibraryTab.MazePieces;
     string                        prefabFolderPath    = "Assets/Prefab/MazePieces";
     string                        iconsFolderPath     = "";
@@ -131,10 +131,14 @@ public class GridDesignerWindow : EditorWindow
     List<GameObject>              scannedSetPiecesLib = new List<GameObject>();
     int                           selectedSetPieceIndex = -1;
     Vector2                       setpieceScrollPos;
-    const string StatuesPrefabsFolder = "Assets/Prefab/StatuesPrefabs";
+    const string StatuesPrefabsFolder   = "Assets/Prefab/StatuesPrefabs";
     List<GameObject>              scannedStatuesLib   = new List<GameObject>();
     int                           selectedStatueIndex = -1;
     Vector2                       statueScrollPos;
+    const string ModifiersPrefabsFolder = "Assets/Prefab/ModifierPrefabs";
+    List<GameObject>              scannedModifiersLib = new List<GameObject>();
+    int                           selectedModifierIndex = -1;
+    Vector2                       modifierScrollPos;
     bool                          drawDirectPrefab    = false;
     GameObject                    _activePlacementPrefab;
     bool                          _activePlacementIsWorldSpaceProp = false;
@@ -162,6 +166,11 @@ public class GridDesignerWindow : EditorWindow
     string[]     _soulDropdownLabels;
     GUIStyle     _greyLabelStyle;
 
+    // ── Debug Console ──
+    List<string> _debugLog        = new List<string>();
+    Vector2      _debugLogScroll;
+    const int    DebugLogMaxLines  = 200;
+
     // Set piece picker state
     const string SetPiecesFolder = "Assets/Prefab/SetPieces";
     GameObject[] _scannedSetPieces;
@@ -184,7 +193,14 @@ public class GridDesignerWindow : EditorWindow
         ScanPrefabFolder();
         ScanSetPiecesLib();
         ScanStatuesLib();
+        ScanModifiersLib();
         LoadPanelWidth();
+    }
+
+    void GridLog(string msg)
+    {
+        _debugLog.Add(msg);
+        if (_debugLog.Count > DebugLogMaxLines) _debugLog.RemoveAt(0);
     }
 
     void PushUndoSnapshot()
@@ -268,45 +284,40 @@ public class GridDesignerWindow : EditorWindow
             SaveGridInPlace();
 
         EditorGUILayout.EndHorizontal();
+    }
 
-        // ── Row 2: Tool buttons ──────────────────────────────────────────────
+    void DrawToolButtons()
+    {
         EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
 
-        // Slot paint tools (■ / ●)
-        bool squarePaint = activeSlot > 0 && !drawCircle;
-        bool circlePaint = activeSlot > 0 && drawCircle;
-        SetToolbarButton("■ Square",  squarePaint, Color.white,                () => { drawCircle = false; drawOrb = drawSoul = drawSoulArea = drawSelect = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = drawDirectPrefab = false; if (activeSlot <= 0) activeSlot = 1; ClearSelectState(); });
-        SetToolbarButton("● Circle",  circlePaint, Color.white,                () => { drawCircle = true;  drawOrb = drawSoul = drawSoulArea = drawSelect = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = drawDirectPrefab = false; if (activeSlot <= 0) activeSlot = 1; ClearSelectState(); });
-
-        GUILayout.Space(6);
-
-        // Specialist tools
-        SetToolbarButton("⊕ Select",     drawSelect,            new Color(0.4f,0.8f,1f),   () => { activeSlot = -1; drawSelect = true; drawSoulArea = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false; });
-        SetToolbarButton("★ Soul",       drawSoulArea,          Color.yellow,              () => { activeSlot = -1; drawSoulArea = true; drawSelect = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false; ClearSelectState(); });
-        SetToolbarButton("◎ Orb",        drawOrb,               Color.white,               () => { activeSlot = -1; drawOrb = true; drawCircle = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = false; });
-        SetToolbarButton("▲▼ Water",     drawWaterLevelModifier, new Color(0.4f,0.8f,1f),  () => { activeSlot = -1; drawWaterLevelModifier = true; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaveModifier = drawWhirlpool = false; });
-        SetToolbarButton("〜 Wave",       drawWaveModifier,       new Color(0.6f,1f,0.6f),  () => { activeSlot = -1; drawWaveModifier = true; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWhirlpool = false; });
-        SetToolbarButton("〇 Whirlpool", drawWhirlpool,          new Color(0.7f,0.4f,1f),  () => { activeSlot = -1; drawWhirlpool = true; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = false; });
-        SetToolbarButton("✕ Eraser",    activeSlot == 0,        new Color(1f,0.5f,0.5f),  () => { activeSlot = 0; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = drawDirectPrefab = drawSelect = false; ClearSelectState(); });
-
-        GUILayout.FlexibleSpace();
-
-        // Status hints
-        GUIStyle hint = new GUIStyle(EditorStyles.miniLabel) { normal = { textColor = Color.yellow } };
-        if (_isDrawingSoulArea)
-            GUILayout.Label("Click cells — click first to close loop — Enter to finish — Esc to cancel", hint);
-        else if (drawSelect && _selectedZoneIndex >= 0)
-        {
-            hint.normal.textColor = new Color(0.4f, 0.8f, 1f);
-            GUILayout.Label($"Zone {_selectedZoneIndex}  Node {_selectedNodeIndex + 1} — drag to move — Shift+click node to bridge — Esc to deselect", hint);
-        }
-        else if (drawSelect)
-        {
-            hint.normal.textColor = new Color(0.6f, 0.6f, 0.6f);
-            GUILayout.Label("Click a soul zone node to select it", hint);
-        }
+        SetToolbarButton("⊕ Select",     drawSelect,   new Color(0.4f,0.8f,1f),  () => { activeSlot = -1; drawSelect = true; drawSoulArea = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false; });
+        SetToolbarButton("★ Soul",       drawSoulArea, Color.yellow,             () => { activeSlot = -1; drawSoulArea = true; drawSelect = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false; ClearSelectState(); });
+        SetToolbarButton("◎ Orb",        drawOrb,      Color.white,              () => { activeSlot = -1; drawOrb = true; drawCircle = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = false; });
+        SetToolbarButton("〇 Whirl",     drawWhirlpool, new Color(0.7f,0.4f,1f), () => { activeSlot = -1; drawWhirlpool = true; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = false; });
+        SetToolbarButton("✕ Eraser",    activeSlot == 0, new Color(1f,0.5f,0.5f), () => { activeSlot = 0; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = drawDirectPrefab = drawSelect = false; ClearSelectState(); });
 
         EditorGUILayout.EndHorizontal();
+
+        // Status hints
+        if (_isDrawingSoulArea || drawSelect)
+        {
+            GUIStyle hint = new GUIStyle(EditorStyles.miniLabel) { wordWrap = true };
+            if (_isDrawingSoulArea)
+            {
+                hint.normal.textColor = Color.yellow;
+                GUILayout.Label("Click cells — click first to close loop — Enter to finish — Esc to cancel", hint);
+            }
+            else if (_selectedZoneIndex >= 0)
+            {
+                hint.normal.textColor = new Color(0.4f, 0.8f, 1f);
+                GUILayout.Label($"Zone {_selectedZoneIndex}  Node {_selectedNodeIndex + 1} — drag to move — Shift+click to bridge — Esc to deselect", hint);
+            }
+            else
+            {
+                hint.normal.textColor = new Color(0.6f, 0.6f, 0.6f);
+                GUILayout.Label("Click a soul zone node to select it", hint);
+            }
+        }
     }
 
     void SetToolbarButton(string label, bool active, Color activeColor, System.Action onClick)
@@ -319,20 +330,28 @@ public class GridDesignerWindow : EditorWindow
 
     Vector2 _leftPanelScroll;
 
-    float   _leftPanelWidth   = 280f;
-    bool    _isResizingPanel  = false;
-    const float PanelMinWidth = 180f;
-    const float PanelMaxWidth = 600f;
-    const float HandleWidth   = 5f;
+    float   _leftPanelWidth    = 280f;
+    bool    _isResizingPanel   = false;
+    float   _rightPanelWidth   = 240f;
+    bool    _isResizingRightPanel = false;
+    const float PanelMinWidth  = 180f;
+    const float PanelMaxWidth  = 600f;
+    const float HandleWidth    = 5f;
 
     void LoadPanelWidth()
     {
-        _leftPanelWidth = EditorPrefs.GetFloat("GridDesigner_LeftPanelWidth", 280f);
+        _leftPanelWidth  = EditorPrefs.GetFloat("GridDesigner_LeftPanelWidth",  280f);
+        _rightPanelWidth = EditorPrefs.GetFloat("GridDesigner_RightPanelWidth", 240f);
     }
 
     void SavePanelWidth()
     {
         EditorPrefs.SetFloat("GridDesigner_LeftPanelWidth", _leftPanelWidth);
+    }
+
+    void SaveRightPanelWidth()
+    {
+        EditorPrefs.SetFloat("GridDesigner_RightPanelWidth", _rightPanelWidth);
     }
 
     void DrawPanelResizeHandle()
@@ -381,6 +400,51 @@ public class GridDesignerWindow : EditorWindow
         }
     }
 
+    void DrawRightPanelResizeHandle()
+    {
+        Rect handleRect = GUILayoutUtility.GetRect(HandleWidth, HandleWidth,
+            GUILayout.Width(HandleWidth), GUILayout.ExpandHeight(true));
+
+        bool hovering = handleRect.Contains(Event.current.mousePosition);
+        EditorGUI.DrawRect(handleRect,
+            _isResizingRightPanel ? new Color(0.4f, 0.7f, 1f, 0.8f) :
+            hovering              ? new Color(0.6f, 0.6f, 0.6f, 0.5f) :
+                                    new Color(0.3f, 0.3f, 0.3f, 0.4f));
+
+        EditorGUIUtility.AddCursorRect(handleRect, MouseCursor.ResizeHorizontal);
+
+        switch (Event.current.type)
+        {
+            case EventType.MouseDown:
+                if (handleRect.Contains(Event.current.mousePosition))
+                {
+                    _isResizingRightPanel = true;
+                    Event.current.Use();
+                }
+                break;
+
+            case EventType.MouseDrag:
+                if (_isResizingRightPanel)
+                {
+                    _rightPanelWidth -= Event.current.delta.x;
+                    _rightPanelWidth  = Mathf.Clamp(_rightPanelWidth, PanelMinWidth, PanelMaxWidth);
+                    SaveRightPanelWidth();
+                    Repaint();
+                    Event.current.Use();
+                }
+                break;
+
+            case EventType.MouseUp:
+                if (_isResizingRightPanel)
+                {
+                    _isResizingRightPanel = false;
+                    Event.current.Use();
+                }
+                break;
+        }
+    }
+
+
     void DrawLeftPanel()
     {
         EditorGUILayout.BeginVertical(GUILayout.Width(_leftPanelWidth));
@@ -388,260 +452,34 @@ public class GridDesignerWindow : EditorWindow
             GUILayout.Width(_leftPanelWidth), GUILayout.ExpandHeight(true));
         EnsureSlotCapacity(GetMaxSlotUsed());
 
-        if (GUILayout.Button("Add Slot"))
+        // ── Level file operations (top of panel) ────────────────────────────
+        EditorGUILayout.LabelField("Existing Levels", EditorStyles.boldLabel);
+        if (discoveredGrids.Count > 0)
         {
-            slotColors.Add(Random.ColorHSV(0f, 1f, 0.6f, 1f, 0.6f, 1f));
-            slotNotes.Add(string.Empty);
-        }
-
-        EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Slots", EditorStyles.boldLabel);
-
-        int slotToRemove = -1;
-
-        for (int i = 1; i <= slotColors.Count; i++)
-        {
-            EditorGUILayout.BeginHorizontal();
-            slotColors[i - 1] = EditorGUILayout.ColorField(slotColors[i - 1], GUILayout.Width(40));
-            slotNotes[i]      = EditorGUILayout.TextField(slotNotes[i]);
-
-            if (GUILayout.Button("■", GUILayout.Width(30)))
-            { activeSlot = i; drawCircle = drawOrb = drawSoul = false; }
-
-            if (GUILayout.Button("●", GUILayout.Width(30)))
-            { activeSlot = i; drawCircle = true; drawOrb = drawSoul = false; }
-
-            GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
-            if (GUILayout.Button("✕", GUILayout.Width(24)))
-                slotToRemove = i;
-            GUI.backgroundColor = Color.white;
-
-            EditorGUILayout.EndHorizontal();
-        }
-
-        // Defer removal to avoid modifying list mid-loop
-        if (slotToRemove > 0)
-        {
-            bool inUse = IsSlotInUse(slotToRemove);
-            if (!inUse || EditorUtility.DisplayDialog(
-                "Clear Slot",
-                $"Slot {slotToRemove} is painted on cells. Clear all and remove?",
-                "Clear All", "Cancel"))
-            {
-                // Zero out all cells using this slot before RemoveSlot remaps
-                for (int ci = 0; ci < CellCount; ci++)
-                {
-                    if (squareGrid[ci] == slotToRemove) squareGrid[ci] = 0;
-                    if (circleGrid[ci] == slotToRemove) circleGrid[ci] = 0;
-                }
-                if (loadedData?.tiers != null)
-                    foreach (var tier in loadedData.tiers)
-                        if (tier.cells != null)
-                            for (int ci = 0; ci < tier.cells.Length; ci++)
-                                if (tier.cells[ci] == slotToRemove) tier.cells[ci] = 0;
-
-                RemoveSlot(slotToRemove);
-            }
-        }
-
-        EditorGUILayout.Space();
-        showPrefabLibrary = EditorGUILayout.Foldout(showPrefabLibrary, "Prefab Library", true, EditorStyles.foldoutHeader);
-        if (showPrefabLibrary)
-        {
-            // ── Tab row ──────────────────────────────────────────────────
-            EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Toggle(_prefabLibTab == PrefabLibraryTab.MazePieces, "Mazepieces", EditorStyles.miniButtonLeft))
-                _prefabLibTab = PrefabLibraryTab.MazePieces;
-            if (GUILayout.Toggle(_prefabLibTab == PrefabLibraryTab.SetPieces,  "Setpieces",  EditorStyles.miniButtonMid))
-                _prefabLibTab = PrefabLibraryTab.SetPieces;
-            if (GUILayout.Toggle(_prefabLibTab == PrefabLibraryTab.Statues,    "Statues",    EditorStyles.miniButtonRight))
-                _prefabLibTab = PrefabLibraryTab.Statues;
-            EditorGUILayout.EndHorizontal();
-
-            if (_prefabLibTab == PrefabLibraryTab.MazePieces)
-            {
-                // Folder + icons path
-                EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField("Folder", GUILayout.Width(42));
-                string newPath = EditorGUILayout.TextField(prefabFolderPath);
-                if (newPath != prefabFolderPath) { prefabFolderPath = newPath; EditorPrefs.SetString("GridDesigner_PrefabFolder", prefabFolderPath); }
-                if (GUILayout.Button("…", GUILayout.Width(22)))
-                {
-                    string sel = EditorUtility.OpenFolderPanel("Select MazePieces Folder", prefabFolderPath, "");
-                    if (!string.IsNullOrEmpty(sel)) { prefabFolderPath = FileUtil.GetProjectRelativePath(sel); EditorPrefs.SetString("GridDesigner_PrefabFolder", prefabFolderPath); ScanPrefabFolder(); }
-                }
-                if (GUILayout.Button("↺", GUILayout.Width(22))) ScanPrefabFolder();
-                EditorGUILayout.EndHorizontal();
-
-                EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField("Icons", GUILayout.Width(42));
-                string newIcons = EditorGUILayout.TextField(iconsFolderPath);
-                if (newIcons != iconsFolderPath) { iconsFolderPath = newIcons; EditorPrefs.SetString("GridDesigner_IconsFolder", iconsFolderPath); }
-                if (GUILayout.Button("…", GUILayout.Width(22)))
-                {
-                    string sel = EditorUtility.OpenFolderPanel("Select Icons Folder", iconsFolderPath, "");
-                    if (!string.IsNullOrEmpty(sel)) { iconsFolderPath = FileUtil.GetProjectRelativePath(sel); EditorPrefs.SetString("GridDesigner_IconsFolder", iconsFolderPath); ScanIcons(); }
-                }
-                EditorGUILayout.EndHorizontal();
-
-                if (scannedPrefabs.Count == 0)
-                {
-                    EditorGUILayout.LabelField("  (no prefabs found)", EditorStyles.miniLabel);
-                }
-                else
-                {
-                    const int IconSize = 32;
-                    prefabScrollPos = EditorGUILayout.BeginScrollView(prefabScrollPos, GUILayout.Height(160));
-                    for (int i = 0; i < scannedPrefabs.Count; i++)
-                    {
-                        bool isSelected = drawDirectPrefab && _prefabLibTab == PrefabLibraryTab.MazePieces && selectedPrefabIndex == i;
-                        GUI.backgroundColor = isSelected ? Color.yellow : Color.white;
-                        prefabIcons.TryGetValue(scannedPrefabs[i].name, out Texture2D icon);
-                        var content = icon != null
-                            ? new GUIContent(" " + scannedPrefabs[i].name, icon)
-                            : new GUIContent(scannedPrefabs[i].name);
-                        float btnHeight = icon != null ? IconSize + 4 : EditorGUIUtility.singleLineHeight + 2;
-                        if (GUILayout.Button(content, GUILayout.Height(btnHeight)))
-                        {
-                            selectedPrefabIndex   = i;
-                            selectedSetPieceIndex = -1;
-                            selectedStatueIndex   = -1;
-                            _activePlacementPrefab = scannedPrefabs[i];
-                            _activePlacementIsWorldSpaceProp = false;
-                            drawDirectPrefab = true;
-                            activeSlot = -1;
-                            drawCircle = drawOrb = drawSoul = drawWaterLevelModifier = drawWaveModifier = false;
-                        }
-                        GUI.backgroundColor = Color.white;
-                    }
-                    EditorGUILayout.EndScrollView();
-                }
-            }
-            else if (_prefabLibTab == PrefabLibraryTab.SetPieces)
-            {
-                EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField("Folder", GUILayout.Width(42));
-                EditorGUILayout.LabelField(SetPiecesFolder, EditorStyles.miniLabel);
-                if (GUILayout.Button("↺", GUILayout.Width(22))) ScanSetPiecesLib();
-                EditorGUILayout.EndHorizontal();
-
-                if (scannedSetPiecesLib.Count == 0)
-                {
-                    EditorGUILayout.LabelField("  (no prefabs found)", EditorStyles.miniLabel);
-                }
-                else
-                {
-                    setpieceScrollPos = EditorGUILayout.BeginScrollView(setpieceScrollPos, GUILayout.Height(160));
-                    for (int i = 0; i < scannedSetPiecesLib.Count; i++)
-                    {
-                        bool isSelected = drawDirectPrefab && _prefabLibTab == PrefabLibraryTab.SetPieces && selectedSetPieceIndex == i;
-                        GUI.backgroundColor = isSelected ? Color.yellow : Color.white;
-                        if (GUILayout.Button(scannedSetPiecesLib[i].name))
-                        {
-                            selectedSetPieceIndex  = i;
-                            selectedPrefabIndex    = -1;
-                            selectedStatueIndex    = -1;
-                            _activePlacementPrefab = scannedSetPiecesLib[i];
-                            _activePlacementIsWorldSpaceProp = false;
-                            drawDirectPrefab = true;
-                            activeSlot = -1;
-                            drawCircle = drawOrb = drawSoul = drawWaterLevelModifier = drawWaveModifier = false;
-                        }
-                        GUI.backgroundColor = Color.white;
-                    }
-                    EditorGUILayout.EndScrollView();
-                }
-            }
-            else // Statues tab
-            {
-                EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField("Folder", GUILayout.Width(42));
-                EditorGUILayout.LabelField(StatuesPrefabsFolder, EditorStyles.miniLabel);
-                if (GUILayout.Button("↺", GUILayout.Width(22))) ScanStatuesLib();
-                EditorGUILayout.EndHorizontal();
-
-                if (scannedStatuesLib.Count == 0)
-                {
-                    EditorGUILayout.LabelField("  (no prefabs found)", EditorStyles.miniLabel);
-                }
-                else
-                {
-                    statueScrollPos = EditorGUILayout.BeginScrollView(statueScrollPos, GUILayout.Height(160));
-                    for (int i = 0; i < scannedStatuesLib.Count; i++)
-                    {
-                        bool isSelected = drawDirectPrefab && _prefabLibTab == PrefabLibraryTab.Statues && selectedStatueIndex == i;
-                        GUI.backgroundColor = isSelected ? Color.yellow : Color.white;
-                        if (GUILayout.Button(scannedStatuesLib[i].name))
-                        {
-                            selectedStatueIndex    = i;
-                            selectedPrefabIndex    = -1;
-                            selectedSetPieceIndex  = -1;
-                            _activePlacementPrefab = scannedStatuesLib[i];
-                            _activePlacementIsWorldSpaceProp = true;
-                            drawDirectPrefab = true;
-                            activeSlot = -1;
-                            drawCircle = drawOrb = drawSoul = drawWaterLevelModifier = drawWaveModifier = false;
-                        }
-                        GUI.backgroundColor = Color.white;
-                    }
-                    EditorGUILayout.EndScrollView();
-                }
-            }
-
-            if (drawDirectPrefab && _activePlacementPrefab != null)
-                EditorGUILayout.HelpBox($"Placing: {_activePlacementPrefab.name}", MessageType.None);
-        }
-
-        EditorGUILayout.Space();
-
-        // ── Level Data Sections ──────────────────────────────────────────
-        if (loadedData != null)
-        {
-            DrawLevelIdentitySection();
-            DrawCameraSection();
-            DrawWavePresetsSection();
-            DrawEnemySection();
-            DrawTimeTrialSection();
-            DrawPrefabsSection();
-            DrawStartRitualSection();
-            DrawSoulZonesSection();
-            DrawWhirlpoolsSection();
-        }
-
-        EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Arena", EditorStyles.boldLabel);
-
-        if (loadedData != null)
-        {
-            EditorGUI.BeginChangeCheck();
-            ArenaProfile newProfile = (ArenaProfile)EditorGUILayout.ObjectField(
-                "Arena Profile", loadedData.arenaProfile, typeof(ArenaProfile), false);
-            if (EditorGUI.EndChangeCheck())
-            {
-                Undo.RecordObject(loadedData, "Change Arena Profile");
-                loadedData.arenaProfile = newProfile;
-                EditorUtility.SetDirty(loadedData);
-            }
-
-            EditorGUILayout.Space();
-            DrawPortalList();
+            selectedDiscoveredGridIndex = EditorGUILayout.Popup(
+                selectedDiscoveredGridIndex, discoveredGridNames);
+            if (GUILayout.Button("LOAD SELECTED"))
+                LoadGrid(discoveredGrids[selectedDiscoveredGridIndex]);
         }
         else
         {
-            EditorGUILayout.HelpBox("Load a grid to set arena size.", MessageType.None);
+            EditorGUILayout.LabelField("No GridData assets found.");
         }
-
+        if (GUILayout.Button("Refresh Level List")) RefreshDiscoveredGrids();
         EditorGUILayout.Space();
+        DrawButtons();
+        EditorGUILayout.Space();
+
+        if (loadedData != null) DrawLevelIdentitySection();
+
         EditorGUILayout.LabelField("Tiers", EditorStyles.boldLabel);
 
         if (loadedData != null)
         {
             if (loadedData.tiers == null) loadedData.tiers = new List<GridData.GridTier>();
 
-            // Pull tier offsets from LevelSpawner in scene
             RefreshCachedTierOffsets();
 
-            // Base layer selector
             EditorGUILayout.BeginHorizontal();
             baseLayerVisible = EditorGUILayout.Toggle(baseLayerVisible, GUILayout.Width(16));
             GUI.backgroundColor = activeTierIndex == -1 ? Color.cyan : Color.white;
@@ -649,7 +487,6 @@ public class GridDesignerWindow : EditorWindow
             GUI.backgroundColor = Color.white;
             EditorGUILayout.EndHorizontal();
 
-            // Keep tierVisible in sync with tier count
             while (tierVisible.Count < loadedData.tiers.Count) tierVisible.Add(true);
             while (tierVisible.Count > loadedData.tiers.Count) tierVisible.RemoveAt(tierVisible.Count - 1);
 
@@ -667,7 +504,6 @@ public class GridDesignerWindow : EditorWindow
 
                 tier.name = EditorGUILayout.TextField(tier.name, GUILayout.Width(60));
 
-                // Dropdown to pick which Y offset slot this tier uses
                 if (cachedTierYOffsets != null && cachedTierYOffsets.Length > 0)
                 {
                     string[] slotLabels = new string[cachedTierYOffsets.Length];
@@ -722,24 +558,93 @@ public class GridDesignerWindow : EditorWindow
         }
 
         EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Existing Levels", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Arena", EditorStyles.boldLabel);
 
-        if (discoveredGrids.Count > 0)
+        if (loadedData != null)
         {
-            selectedDiscoveredGridIndex = EditorGUILayout.Popup(
-                selectedDiscoveredGridIndex, discoveredGridNames);
-            if (GUILayout.Button("LOAD SELECTED"))
-                LoadGrid(discoveredGrids[selectedDiscoveredGridIndex]);
+            EditorGUI.BeginChangeCheck();
+            ArenaProfile newProfile = (ArenaProfile)EditorGUILayout.ObjectField(
+                "Arena Profile", loadedData.arenaProfile, typeof(ArenaProfile), false);
+            if (EditorGUI.EndChangeCheck())
+            {
+                Undo.RecordObject(loadedData, "Change Arena Profile");
+                loadedData.arenaProfile = newProfile;
+                EditorUtility.SetDirty(loadedData);
+            }
+
+            EditorGUILayout.Space();
+            DrawPortalList();
         }
         else
         {
-            EditorGUILayout.LabelField("No GridData assets found.");
+            EditorGUILayout.HelpBox("Load a grid to set arena size.", MessageType.None);
         }
 
-        if (GUILayout.Button("Refresh Level List")) RefreshDiscoveredGrids();
+        EditorGUILayout.Space();
+
+        int slotToRemove = -1;
+
+        for (int i = 1; i <= slotColors.Count; i++)
+        {
+            EditorGUILayout.BeginHorizontal();
+            slotColors[i - 1] = EditorGUILayout.ColorField(slotColors[i - 1], GUILayout.Width(40));
+            slotNotes[i]      = EditorGUILayout.TextField(slotNotes[i]);
+
+            if (GUILayout.Button("■", GUILayout.Width(30)))
+            { activeSlot = i; drawCircle = drawOrb = drawSoul = false; }
+
+            if (GUILayout.Button("●", GUILayout.Width(30)))
+            { activeSlot = i; drawCircle = true; drawOrb = drawSoul = false; }
+
+            GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
+            if (GUILayout.Button("✕", GUILayout.Width(24)))
+                slotToRemove = i;
+            GUI.backgroundColor = Color.white;
+
+            EditorGUILayout.EndHorizontal();
+        }
+
+        // Defer removal to avoid modifying list mid-loop
+        if (slotToRemove > 0)
+        {
+            bool inUse = IsSlotInUse(slotToRemove);
+            if (!inUse || EditorUtility.DisplayDialog(
+                "Clear Slot",
+                $"Slot {slotToRemove} is painted on cells. Clear all and remove?",
+                "Clear All", "Cancel"))
+            {
+                // Zero out all cells using this slot before RemoveSlot remaps
+                for (int ci = 0; ci < CellCount; ci++)
+                {
+                    if (squareGrid[ci] == slotToRemove) squareGrid[ci] = 0;
+                    if (circleGrid[ci] == slotToRemove) circleGrid[ci] = 0;
+                }
+                if (loadedData?.tiers != null)
+                    foreach (var tier in loadedData.tiers)
+                        if (tier.cells != null)
+                            for (int ci = 0; ci < tier.cells.Length; ci++)
+                                if (tier.cells[ci] == slotToRemove) tier.cells[ci] = 0;
+
+                RemoveSlot(slotToRemove);
+            }
+        }
+
 
         EditorGUILayout.Space();
-        DrawButtons();
+
+        // ── Level Data Sections ──────────────────────────────────────────
+        if (loadedData != null)
+        {
+            DrawCameraSection();
+            DrawWavePresetsSection();
+            DrawEnemySection();
+            DrawTimeTrialSection();
+            DrawPrefabsSection();
+            DrawStartRitualSection();
+            DrawSoulZonesSection();
+            DrawWhirlpoolsSection();
+        }
+
         EditorGUILayout.EndScrollView();
         EditorGUILayout.EndVertical();
     }
@@ -1171,6 +1076,20 @@ public class GridDesignerWindow : EditorWindow
         scannedStatuesLib.Sort((a, b) => string.Compare(a.name, b.name, System.StringComparison.Ordinal));
     }
 
+    void ScanModifiersLib()
+    {
+        scannedModifiersLib.Clear();
+        selectedModifierIndex = -1;
+        if (!AssetDatabase.IsValidFolder(ModifiersPrefabsFolder)) return;
+        string[] guids = AssetDatabase.FindAssets("t:Prefab", new[] { ModifiersPrefabsFolder });
+        foreach (string guid in guids)
+        {
+            var go = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(guid));
+            if (go != null) scannedModifiersLib.Add(go);
+        }
+        scannedModifiersLib.Sort((a, b) => string.Compare(a.name, b.name, System.StringComparison.Ordinal));
+    }
+
     void DrawStartRitualSection()
     {
         _showStartRitual = EditorGUILayout.Foldout(_showStartRitual, "Start Ritual", true, EditorStyles.foldoutHeader);
@@ -1349,7 +1268,8 @@ public class GridDesignerWindow : EditorWindow
             _drawingNodes.Clear();
             _isDrawingSoulArea = true;
             drawSoulArea       = true;
-            drawSoul = drawCircle = drawOrb = drawWhirlpool = false;
+            drawSoul = drawCircle = drawOrb = drawWhirlpool = drawSelect = false;
+            ClearSelectState();
             EditorUtility.SetDirty(loadedData);
         }
 
@@ -1518,12 +1438,17 @@ public class GridDesignerWindow : EditorWindow
                     EditorGUILayout.LabelField("Shift+click another node to connect directly", EditorStyles.miniLabel);
                     EditorGUILayout.EndVertical();
                 }
-                if (GUILayout.Button("Redraw Nodes"))
+                bool hasNodes = zone.nodes != null && zone.nodes.Count > 0;
+                string drawBtnLabel = hasNodes ? "Redraw Nodes" : "Add Nodes";
+                if (GUILayout.Button(drawBtnLabel))
                 {
+                    _activeSoulZoneIndex = zi;
                     _drawingNodes.Clear();
                     _isDrawingSoulArea   = true;
                     drawSoulArea         = true;
-                    drawSoul = drawCircle = drawOrb = false;
+                    activeSlot           = -1;
+                    drawSoul = drawCircle = drawOrb = drawSelect = false;
+                    ClearSelectState();
                 }
             }
 
@@ -1803,8 +1728,246 @@ public class GridDesignerWindow : EditorWindow
 
     void DrawRightPanel()
     {
-        EditorGUILayout.BeginVertical();
+        EditorGUILayout.BeginVertical(GUILayout.ExpandWidth(false));
         DrawGrid();
+        EditorGUILayout.EndVertical();
+        DrawRightPanelResizeHandle();
+        DrawDebugConsole();
+    }
+
+    void DrawPrefabLibrarySection()
+    {
+        showPrefabLibrary = EditorGUILayout.Foldout(showPrefabLibrary, "Prefab Library", true, EditorStyles.foldoutHeader);
+        if (!showPrefabLibrary) return;
+
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Toggle(_prefabLibTab == PrefabLibraryTab.MazePieces, "Mazepieces", EditorStyles.miniButtonLeft))
+            _prefabLibTab = PrefabLibraryTab.MazePieces;
+        if (GUILayout.Toggle(_prefabLibTab == PrefabLibraryTab.SetPieces,  "Setpieces",  EditorStyles.miniButtonMid))
+            _prefabLibTab = PrefabLibraryTab.SetPieces;
+        if (GUILayout.Toggle(_prefabLibTab == PrefabLibraryTab.Statues,    "Statues",    EditorStyles.miniButtonMid))
+            _prefabLibTab = PrefabLibraryTab.Statues;
+        if (GUILayout.Toggle(_prefabLibTab == PrefabLibraryTab.Modifiers,  "Modifiers",  EditorStyles.miniButtonRight))
+            _prefabLibTab = PrefabLibraryTab.Modifiers;
+        EditorGUILayout.EndHorizontal();
+
+        if (_prefabLibTab == PrefabLibraryTab.MazePieces)
+        {
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField("Folder", GUILayout.Width(42));
+            string newPath = EditorGUILayout.TextField(prefabFolderPath);
+            if (newPath != prefabFolderPath) { prefabFolderPath = newPath; EditorPrefs.SetString("GridDesigner_PrefabFolder", prefabFolderPath); }
+            if (GUILayout.Button("…", GUILayout.Width(22)))
+            {
+                string sel = EditorUtility.OpenFolderPanel("Select MazePieces Folder", prefabFolderPath, "");
+                if (!string.IsNullOrEmpty(sel)) { prefabFolderPath = FileUtil.GetProjectRelativePath(sel); EditorPrefs.SetString("GridDesigner_PrefabFolder", prefabFolderPath); ScanPrefabFolder(); }
+            }
+            if (GUILayout.Button("↺", GUILayout.Width(22))) ScanPrefabFolder();
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField("Icons", GUILayout.Width(42));
+            string newIcons = EditorGUILayout.TextField(iconsFolderPath);
+            if (newIcons != iconsFolderPath) { iconsFolderPath = newIcons; EditorPrefs.SetString("GridDesigner_IconsFolder", iconsFolderPath); }
+            if (GUILayout.Button("…", GUILayout.Width(22)))
+            {
+                string sel = EditorUtility.OpenFolderPanel("Select Icons Folder", iconsFolderPath, "");
+                if (!string.IsNullOrEmpty(sel)) { iconsFolderPath = FileUtil.GetProjectRelativePath(sel); EditorPrefs.SetString("GridDesigner_IconsFolder", iconsFolderPath); ScanIcons(); }
+            }
+            EditorGUILayout.EndHorizontal();
+
+            if (scannedPrefabs.Count == 0)
+            {
+                EditorGUILayout.LabelField("  (no prefabs found)", EditorStyles.miniLabel);
+            }
+            else
+            {
+                const int IconSize = 32;
+                prefabScrollPos = EditorGUILayout.BeginScrollView(prefabScrollPos, GUILayout.Height(160));
+                for (int i = 0; i < scannedPrefabs.Count; i++)
+                {
+                    bool isSelected = drawDirectPrefab && _prefabLibTab == PrefabLibraryTab.MazePieces && selectedPrefabIndex == i;
+                    GUI.backgroundColor = isSelected ? Color.yellow : Color.white;
+                    prefabIcons.TryGetValue(scannedPrefabs[i].name, out Texture2D icon);
+                    var content = icon != null
+                        ? new GUIContent(" " + scannedPrefabs[i].name, icon)
+                        : new GUIContent(scannedPrefabs[i].name);
+                    float btnHeight = icon != null ? IconSize + 4 : EditorGUIUtility.singleLineHeight + 2;
+                    EditorGUILayout.BeginHorizontal();
+                    if (GUILayout.Button(content, GUILayout.Height(btnHeight)))
+                    {
+                        selectedPrefabIndex   = i;
+                        selectedSetPieceIndex = -1;
+                        selectedStatueIndex   = -1;
+                        _activePlacementPrefab = scannedPrefabs[i];
+                        _activePlacementIsWorldSpaceProp = false;
+                        drawDirectPrefab = true;
+                        activeSlot = -1;
+                        drawCircle = drawOrb = drawSoul = drawWaterLevelModifier = drawWaveModifier = false;
+                    }
+                    GUI.backgroundColor = Color.white;
+                    if (GUILayout.Button("⊙", GUILayout.Width(22), GUILayout.Height(btnHeight)))
+                        EditorGUIUtility.PingObject(scannedPrefabs[i]);
+                    EditorGUILayout.EndHorizontal();
+                }
+                EditorGUILayout.EndScrollView();
+            }
+        }
+        else if (_prefabLibTab == PrefabLibraryTab.SetPieces)
+        {
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField("Folder", GUILayout.Width(42));
+            EditorGUILayout.LabelField(SetPiecesFolder, EditorStyles.miniLabel);
+            if (GUILayout.Button("↺", GUILayout.Width(22))) ScanSetPiecesLib();
+            EditorGUILayout.EndHorizontal();
+
+            if (scannedSetPiecesLib.Count == 0)
+            {
+                EditorGUILayout.LabelField("  (no prefabs found)", EditorStyles.miniLabel);
+            }
+            else
+            {
+                setpieceScrollPos = EditorGUILayout.BeginScrollView(setpieceScrollPos, GUILayout.Height(160));
+                for (int i = 0; i < scannedSetPiecesLib.Count; i++)
+                {
+                    bool isSelected = drawDirectPrefab && _prefabLibTab == PrefabLibraryTab.SetPieces && selectedSetPieceIndex == i;
+                    GUI.backgroundColor = isSelected ? Color.yellow : Color.white;
+                    EditorGUILayout.BeginHorizontal();
+                    if (GUILayout.Button(scannedSetPiecesLib[i].name))
+                    {
+                        selectedSetPieceIndex  = i;
+                        selectedPrefabIndex    = -1;
+                        selectedStatueIndex    = -1;
+                        _activePlacementPrefab = scannedSetPiecesLib[i];
+                        _activePlacementIsWorldSpaceProp = false;
+                        drawDirectPrefab = true;
+                        activeSlot = -1;
+                        drawCircle = drawOrb = drawSoul = drawWaterLevelModifier = drawWaveModifier = false;
+                    }
+                    GUI.backgroundColor = Color.white;
+                    if (GUILayout.Button("⊙", GUILayout.Width(22)))
+                        EditorGUIUtility.PingObject(scannedSetPiecesLib[i]);
+                    EditorGUILayout.EndHorizontal();
+                }
+                EditorGUILayout.EndScrollView();
+            }
+        }
+        else if (_prefabLibTab == PrefabLibraryTab.Statues)
+        {
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField("Folder", GUILayout.Width(42));
+            EditorGUILayout.LabelField(StatuesPrefabsFolder, EditorStyles.miniLabel);
+            if (GUILayout.Button("↺", GUILayout.Width(22))) ScanStatuesLib();
+            EditorGUILayout.EndHorizontal();
+
+            if (scannedStatuesLib.Count == 0)
+            {
+                EditorGUILayout.LabelField("  (no prefabs found)", EditorStyles.miniLabel);
+            }
+            else
+            {
+                statueScrollPos = EditorGUILayout.BeginScrollView(statueScrollPos, GUILayout.Height(160));
+                for (int i = 0; i < scannedStatuesLib.Count; i++)
+                {
+                    bool isSelected = drawDirectPrefab && _prefabLibTab == PrefabLibraryTab.Statues && selectedStatueIndex == i;
+                    GUI.backgroundColor = isSelected ? Color.yellow : Color.white;
+                    EditorGUILayout.BeginHorizontal();
+                    if (GUILayout.Button(scannedStatuesLib[i].name))
+                    {
+                        selectedStatueIndex    = i;
+                        selectedPrefabIndex    = -1;
+                        selectedSetPieceIndex  = -1;
+                        selectedModifierIndex  = -1;
+                        _activePlacementPrefab = scannedStatuesLib[i];
+                        _activePlacementIsWorldSpaceProp = true;
+                        drawDirectPrefab = true;
+                        activeSlot = -1;
+                        drawCircle = drawOrb = drawSoul = drawWaterLevelModifier = drawWaveModifier = false;
+                    }
+                    GUI.backgroundColor = Color.white;
+                    if (GUILayout.Button("⊙", GUILayout.Width(22)))
+                        EditorGUIUtility.PingObject(scannedStatuesLib[i]);
+                    EditorGUILayout.EndHorizontal();
+                }
+                EditorGUILayout.EndScrollView();
+            }
+        }
+        else // Modifiers tab
+        {
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField("Folder", GUILayout.Width(42));
+            EditorGUILayout.LabelField(ModifiersPrefabsFolder, EditorStyles.miniLabel);
+            if (GUILayout.Button("↺", GUILayout.Width(22))) ScanModifiersLib();
+            EditorGUILayout.EndHorizontal();
+
+            if (scannedModifiersLib.Count == 0)
+            {
+                EditorGUILayout.LabelField("  (no prefabs found)", EditorStyles.miniLabel);
+            }
+            else
+            {
+                modifierScrollPos = EditorGUILayout.BeginScrollView(modifierScrollPos, GUILayout.Height(160));
+                for (int i = 0; i < scannedModifiersLib.Count; i++)
+                {
+                    bool isSelected = drawDirectPrefab && _prefabLibTab == PrefabLibraryTab.Modifiers && selectedModifierIndex == i;
+                    GUI.backgroundColor = isSelected ? Color.yellow : Color.white;
+                    EditorGUILayout.BeginHorizontal();
+                    if (GUILayout.Button(scannedModifiersLib[i].name))
+                    {
+                        selectedModifierIndex  = i;
+                        selectedPrefabIndex    = -1;
+                        selectedSetPieceIndex  = -1;
+                        selectedStatueIndex    = -1;
+                        _activePlacementPrefab = scannedModifiersLib[i];
+                        _activePlacementIsWorldSpaceProp = false;
+                        drawDirectPrefab = true;
+                        activeSlot = -1;
+                        drawCircle = drawOrb = drawSoul = drawWaterLevelModifier = drawWaveModifier = false;
+                    }
+                    GUI.backgroundColor = Color.white;
+                    if (GUILayout.Button("⊙", GUILayout.Width(22)))
+                        EditorGUIUtility.PingObject(scannedModifiersLib[i]);
+                    EditorGUILayout.EndHorizontal();
+                }
+                EditorGUILayout.EndScrollView();
+            }
+        }
+
+        if (drawDirectPrefab && _activePlacementPrefab != null)
+            EditorGUILayout.HelpBox($"Placing: {_activePlacementPrefab.name}", MessageType.None);
+    }
+
+    void DrawDebugConsole()
+    {
+        EditorGUILayout.BeginVertical(GUILayout.Width(_rightPanelWidth), GUILayout.ExpandHeight(true));
+
+        DrawToolButtons();
+        DrawPrefabLibrarySection();
+
+        EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
+        EditorGUILayout.LabelField("Grid Debug", EditorStyles.boldLabel, GUILayout.ExpandWidth(true));
+        if (GUILayout.Button("Clear", EditorStyles.toolbarButton, GUILayout.Width(42)))
+            _debugLog.Clear();
+        EditorGUILayout.EndHorizontal();
+
+        _debugLogScroll = EditorGUILayout.BeginScrollView(_debugLogScroll, GUILayout.ExpandHeight(true));
+
+        GUIStyle warnStyle = new GUIStyle(EditorStyles.miniLabel) { wordWrap = true };
+        warnStyle.normal.textColor = new Color(1f, 0.85f, 0.3f);
+        GUIStyle errStyle = new GUIStyle(EditorStyles.miniLabel) { wordWrap = true };
+        errStyle.normal.textColor = new Color(1f, 0.4f, 0.4f);
+        GUIStyle infoStyle = new GUIStyle(EditorStyles.miniLabel) { wordWrap = true };
+        infoStyle.normal.textColor = new Color(0.72f, 0.72f, 0.72f);
+
+        foreach (string line in _debugLog)
+        {
+            GUIStyle s = line.StartsWith("[WARN]") ? warnStyle
+                       : line.StartsWith("[ERR]")  ? errStyle
+                       : infoStyle;
+            GUILayout.Label(line, s);
+        }
+
+        EditorGUILayout.EndScrollView();
         EditorGUILayout.EndVertical();
     }
 
@@ -2327,7 +2490,11 @@ public class GridDesignerWindow : EditorWindow
     {
         EditorGUILayout.BeginHorizontal();
 
-        if (GUILayout.Button("CLEAR"))
+        GUI.backgroundColor = new Color(1f, 0.3f, 0.3f);
+        if (GUILayout.Button("CLEAR ALL") && EditorUtility.DisplayDialog(
+            "Clear All",
+            "This will erase all cells, orbs, souls, modifiers, whirlpools, and prefab placements on every layer. This can be undone.\n\nAre you sure?",
+            "Clear All", "Cancel"))
         {
             PushUndoSnapshot();
             System.Array.Clear(squareGrid, 0, CellCount);
@@ -2336,10 +2503,28 @@ public class GridDesignerWindow : EditorWindow
             {
                 loadedData.orbCellIndices?.Clear();
                 loadedData.soulSpawnPoints?.Clear();
+                loadedData.soulZones?.Clear();
+                loadedData.waterLevelModifierCellIndices?.Clear();
+                loadedData.waveModifierCellIndices?.Clear();
+                loadedData.whirlpools?.Clear();
+                loadedData.prefabPlacements?.Clear();
+                if (loadedData.tiers != null)
+                    foreach (var tier in loadedData.tiers)
+                    {
+                        if (tier.cells != null) System.Array.Clear(tier.cells, 0, tier.cells.Length);
+                        tier.waterLevelModifierCellIndices?.Clear();
+                        tier.waveModifierCellIndices?.Clear();
+                        tier.prefabPlacements?.Clear();
+                    }
             }
+            _activeSoulZoneIndex = -1;
+            _isDrawingSoulArea   = false;
+            _drawingNodes.Clear();
             RebuildSlotsFromGrid();
+            EditorUtility.SetDirty(loadedData);
             Repaint();
         }
+        GUI.backgroundColor = Color.white;
 
         if (GUILayout.Button("CLEAR ORBS") && loadedData != null)
         { PushUndoSnapshot(); loadedData.orbCellIndices?.Clear(); Repaint(); }
@@ -2355,6 +2540,13 @@ public class GridDesignerWindow : EditorWindow
         if (GUILayout.Button("SAVE AS")) SaveGrid();
         if (GUILayout.Button("LOAD"))    LoadGrid();
         EditorGUILayout.EndHorizontal();
+
+        EditorGUI.BeginDisabledGroup(loadedData == null);
+        GUI.backgroundColor = new Color(0.4f, 1f, 0.5f);
+        if (GUILayout.Button("Test Level"))
+            GameTesterTool.LaunchScene("Waves1", loadedData, null);
+        GUI.backgroundColor = Color.white;
+        EditorGUI.EndDisabledGroup();
     }
 
     void SaveGrid()

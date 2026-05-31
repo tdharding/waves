@@ -16,7 +16,7 @@ public class LevelSelectCameraController : MonoBehaviour
     public float defaultDistance = 5.16f;
 
     [Header("Orbit (Middle Mouse)")]
-    public float orbitSpeed = 150f;
+    public float orbitSpeed = 250f;
     public float pitchMin   = -60f;
     public float pitchMax   = 45f;
 

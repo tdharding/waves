@@ -102,7 +102,7 @@ public class SplineRiverManager : MonoBehaviour
     public void AdvanceToPosition(Vector3 worldPosition)
     {
         float t = WorldPositionToT(worldPosition);
-        AdvanceToT(t + _overshoot);
+        AdvanceToT(t);
     }
 
     public void AdvanceToT(float targetT)
@@ -730,4 +730,193 @@ private IEnumerator AnimateMainExtrude(float target)
             out _, out float t);
         return Mathf.Clamp01(t);
     }
+
+#if UNITY_EDITOR
+    // ─────────────────────────────────────────────────────────────
+    // Editor simulation API
+    // ─────────────────────────────────────────────────────────────
+
+    public struct EditorBranchInfo
+    {
+        public string          SegmentID;
+        public string          JunctionGroup;
+        public int             Depth;
+        public float           TriggerT;
+        public float           CurrentT;
+        public bool            IsStarted;
+        public bool            ExtrudeOnExit;
+        public bool            ExitUnlocked;
+        public SplineContainer Container;
+    }
+
+    public void Editor_SetMainExtrudeT(float t)
+    {
+        _mainCurrentT = Mathf.Clamp01(t);
+        if (_mainExtrude == null) return;
+        _mainExtrude.Range = new Vector2(0f, _mainCurrentT);
+        _mainExtrude.Rebuild();
+    }
+
+    public float Editor_GetMainCurrentT() => _mainCurrentT;
+
+    public SplineContainer Editor_GetMainContainer() => _mainContainer;
+
+    public void Editor_ResetSimulation()
+    {
+        _mainCurrentT = 0f;
+        ApplyMainExtrude(0f);
+        foreach (var b in _branches)
+        {
+            b.CurrentT      = 0f;
+            b.IsStarted     = false;
+            b.ExitUnlocked  = false;
+            b.ReverseExtrude = false;
+            if (b.Extruder != null)
+            {
+                b.Extruder.Range = Vector2.zero;
+                b.Extruder.Rebuild();
+            }
+        }
+    }
+
+    // Steps the full simulation (main river + all branches) by dt seconds.
+    // mainTargetT limits the main river; branchTargetTs[i] limits branch i
+    // (pass 1.0 for any branch that should run freely).
+    public void Editor_StepSimulation(float dt, float mainTargetT, float[] branchTargetTs = null)
+    {
+        if (_mainContainer == null) return;
+
+        float totalLen  = _mainContainer.Spline.GetLength();
+        float normSpeed = totalLen > 0f ? _extrudeSpeed / totalLen : _extrudeSpeed;
+
+        _mainCurrentT = Mathf.MoveTowards(_mainCurrentT, mainTargetT, dt * normSpeed);
+        ApplyMainExtrude(_mainCurrentT);
+
+        Editor_FireBranches();
+
+        for (int i = 0; i < _branches.Count; i++)
+        {
+            var b = _branches[i];
+            if (!b.IsStarted || b.CurrentT >= 1f || b.Extruder == null) continue;
+            float target = (branchTargetTs != null && i < branchTargetTs.Length)
+                ? branchTargetTs[i] : 1f;
+            b.CurrentT = Mathf.MoveTowards(b.CurrentT, target, dt * b.NormalizedSpeed);
+            b.Extruder.Range = ExtrudeRange(b);
+            b.Extruder.Rebuild();
+        }
+    }
+
+    // Finds which spline (main or branch) is nearest to worldPos.
+    // Index = -1 means main river; 0+ is the branch index.
+    public struct EditorSplineMatch
+    {
+        public int   Index;
+        public float T;
+        public float Distance;
+    }
+
+    public EditorSplineMatch Editor_FindNearestSpline(Vector3 worldPos)
+    {
+        var best = new EditorSplineMatch { Index = -1, T = 0f, Distance = float.MaxValue };
+
+        if (_mainContainer != null && _mainContainer.Spline != null && _mainContainer.Spline.Count > 0)
+        {
+            float3 local = _mainContainer.transform.InverseTransformPoint(worldPos);
+            SplineUtility.GetNearestPoint(_mainContainer.Spline, local, out float3 near, out float t);
+            float dist = Vector3.Distance(_mainContainer.transform.TransformPoint((Vector3)near), worldPos);
+            best = new EditorSplineMatch { Index = -1, T = t, Distance = dist };
+        }
+
+        for (int i = 0; i < _branches.Count; i++)
+        {
+            var container = _branches[i].Container;
+            if (container == null || container.Spline == null || container.Spline.Count == 0) continue;
+            float3 local = container.transform.InverseTransformPoint(worldPos);
+            SplineUtility.GetNearestPoint(container.Spline, local, out float3 near, out float t);
+            float dist = Vector3.Distance(container.transform.TransformPoint((Vector3)near), worldPos);
+            if (dist < best.Distance)
+                best = new EditorSplineMatch { Index = i, T = t, Distance = dist };
+        }
+
+        return best;
+    }
+
+    // Mirrors UpdateBranchStates(false) but never starts coroutines.
+    private void Editor_FireBranches()
+    {
+        for (int i = 0; i < _branches.Count; i++)
+        {
+            var b = _branches[i];
+            if (b.IsStarted) continue;
+
+            float parentT = b.Parent == null ? _mainCurrentT : b.Parent.CurrentT;
+            bool parentReachedTrigger = parentT >= b.TriggerT
+                || (b.ParentAlt != null && b.ParentAlt.CurrentT >= b.TriggerT);
+
+            bool previousInGroupFinished = true;
+            if (i > 0)
+            {
+                var prev = _branches[i - 1];
+                if (prev.JunctionGroup == b.JunctionGroup && !string.IsNullOrEmpty(b.JunctionGroup))
+                    if (prev.CurrentT < 1f)
+                        previousInGroupFinished = false;
+            }
+
+            bool exitGatePassed = !b.ExtrudeOnExit || b.ExitUnlocked;
+            bool reverseReady   = b.ReverseSource != null && b.ReverseSource.CurrentT >= 1f;
+            bool normalTrigger  = parentReachedTrigger && previousInGroupFinished && exitGatePassed;
+
+            if (normalTrigger || reverseReady)
+            {
+                if (reverseReady && !b.ExitUnlocked) b.ReverseExtrude = true;
+                b.IsStarted = true;
+            }
+        }
+    }
+
+    public void Editor_UnlockSegment(string segmentID)
+    {
+        foreach (var b in _branches)
+            if (b.SegmentID == segmentID)
+                b.ExitUnlocked = true;
+    }
+
+    public void Editor_LockSegment(string segmentID)
+    {
+        foreach (var b in _branches)
+        {
+            if (b.SegmentID != segmentID) continue;
+            b.ExitUnlocked  = false;
+            b.IsStarted     = false;
+            b.CurrentT      = 0f;
+            b.ReverseExtrude = false;
+            if (b.Extruder != null)
+            {
+                b.Extruder.Range = Vector2.zero;
+                b.Extruder.Rebuild();
+            }
+        }
+    }
+
+    public List<EditorBranchInfo> Editor_GetBranchInfos()
+    {
+        var list = new List<EditorBranchInfo>();
+        foreach (var b in _branches)
+        {
+            list.Add(new EditorBranchInfo
+            {
+                SegmentID     = b.SegmentID,
+                JunctionGroup = b.JunctionGroup,
+                Depth         = b.Depth,
+                TriggerT      = b.TriggerT,
+                CurrentT      = b.CurrentT,
+                IsStarted     = b.IsStarted,
+                ExtrudeOnExit = b.ExtrudeOnExit,
+                ExitUnlocked  = b.ExitUnlocked,
+                Container     = b.Container,
+            });
+        }
+        return list;
+    }
+#endif
 }

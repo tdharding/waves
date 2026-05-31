@@ -18,7 +18,7 @@ MonoBehaviour:
   gameplayWavePreset: {fileID: 11400000, guid: 1a43864c25248dd46b8bbe778b2f07ba, type: 2}
   gongWavePreset: {fileID: 0}
   runtimeWavePresetOverride: {fileID: 0}
-  enemyProfile: {fileID: 11400000, guid: 718748a4a460a624fb526d3db325b604, type: 2}
+  enemyProfile: {fileID: 0}
   isTimeTrial: 0
   timeLimitSeconds: 60
   prefabs: []

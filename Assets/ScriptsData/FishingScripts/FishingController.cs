@@ -68,6 +68,14 @@ public class FishingController : MonoBehaviour
     private readonly List<FishFishingBehaviour> registeredFish = new();
 
     // --------------------------------------------------
+    // HOOVER GLOW SHADER GLOBALS
+    // --------------------------------------------------
+
+    private static readonly int HooverFishPointsID = Shader.PropertyToID("_HooverFishPoints");
+    private static readonly int HooverFishCountID  = Shader.PropertyToID("_HooverFishCount");
+    private readonly Vector4[]  _hooverFishBuffer  = new Vector4[8];
+
+    // --------------------------------------------------
     // THE CAPTURE RELAY
     // --------------------------------------------------
 
@@ -189,9 +197,23 @@ public class FishingController : MonoBehaviour
     public void SetWhirlFX(WhirlFXController fx) => whirlFX = fx;
     public void SetSoulWhirlDirection(SoulWhirlDirection swd) => soulWhirlDirection = swd;
 
+    void LateUpdate()
+    {
+        int count = 0;
+        for (int i = 0; i < registeredFish.Count && count < 8; i++)
+        {
+            var fish = registeredFish[i];
+            if (fish != null && fish.IsTravelingTube)
+                _hooverFishBuffer[count++] = fish.transform.position;
+        }
+        Shader.SetGlobalVectorArray(HooverFishPointsID, _hooverFishBuffer);
+        Shader.SetGlobalFloat(HooverFishCountID, count);
+    }
+
     void OnDisable()
     {
         fishingActive = false;
         whirlFX?.DecreaseWhirl();
+        Shader.SetGlobalFloat(HooverFishCountID, 0f);
     }
 }

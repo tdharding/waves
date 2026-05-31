@@ -30,11 +30,16 @@ MonoBehaviour:
     WhirlpoolTwirlStrength: 4.33
     WhirlpoolAreaTwirlStrength: -1.75
     SoulFishTwirlStrength: 1.02
-    SoulFishMaskStrength: 0
-    WhirlpoolTaper: 0.668
-    WhirlpoolDarkRadiusMult: 1.62
+    SoulFishMaskStrength: 1
+    SoulFishRadius: 0.7
+    ZoneTiling: {x: 15, y: 15}
+    ZoneScrollSpeed: 0
+    ZoneNoiseStrength: 0
+    ZoneTexture: {fileID: 2800000, guid: d243e17d9d1c81249bdfa3d5e7fb97ec, type: 3}
+    WhirlpoolTaper: 0.1
+    WhirlpoolDarkRadiusMult: 1.262
     WhirlpoolDarkStrength: 1
-    WhirlpoolFalloffPower: 0.1
+    WhirlpoolFalloffPower: 3.448
     WaveStepRate: 4000
     BaseColor: {r: 1, g: 1, b: 1, a: 1}
     LightDirection: {x: -87.25, y: -186.88, z: 33.8}

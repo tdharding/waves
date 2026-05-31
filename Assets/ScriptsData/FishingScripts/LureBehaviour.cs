@@ -4,51 +4,60 @@ using UnityEngine;
 
 public class LureBehaviour : MonoBehaviour
 {
-    // Set by LureController at spawn time — do not edit in inspector
+    // Set by LureController before Launch() — do not edit in inspector
     [HideInInspector] public float attractionRadius  = 5f;
     [HideInInspector] public float duration          = 10f;
     [HideInInspector] public float sinkSpeed         = 2f;
     [HideInInspector] public float sinkDistance      = 4f;
     [HideInInspector] public float finalSinkDistance = 4f;
 
-    // Fish orbit params — read by LureAttractable
+    // Fish orbit/return params — read by LureAttractable
     [HideInInspector] public float orbitRadius      = 1.2f;
     [HideInInspector] public float orbitSpeed       = 1.5f;
     [HideInInspector] public float moveTowardSpeed  = 3f;
+    [HideInInspector] public float returnSpeed      = 2f;
+    [HideInInspector] public float returnThreshold  = 0.3f;
 
     public event Action OnLureExpired;
 
-    public static readonly List<LureBehaviour> ActiveLures = new List<LureBehaviour>();
+    public static readonly List<LureBehaviour> ActiveLures   = new List<LureBehaviour>();
+    public static readonly List<LureBehaviour> AllWaterLures = new List<LureBehaviour>();
 
     enum Phase { Dropping, Active, FinalSink }
     Phase   _phase;
     float   _timer;
     Vector3 _dropOrigin;
     Vector3 _activeOrigin;
+    bool    _launched;
 
-    void OnEnable()
+    public void Launch()
     {
+        _launched   = true;
         _phase      = Phase.Dropping;
         _dropOrigin = transform.position;
         _timer      = duration;
+        AllWaterLures.Add(this);
     }
 
     void OnDisable()
     {
         ActiveLures.Remove(this);
+        AllWaterLures.Remove(this);
     }
 
     void Update()
     {
+        if (!_launched) return;
+
         switch (_phase)
         {
             case Phase.Dropping:
-                transform.position += -transform.up * sinkSpeed * Time.deltaTime;
+                transform.position += Vector3.down * sinkSpeed * Time.deltaTime;
                 if (Vector3.Distance(transform.position, _dropOrigin) >= sinkDistance)
                 {
-                    _phase       = Phase.Active;
+                    _phase        = Phase.Active;
                     _activeOrigin = transform.position;
-                    ActiveLures.Add(this); // start attracting fish
+                    ActiveLures.Add(this);
                 }
                 break;
 
@@ -57,12 +66,12 @@ public class LureBehaviour : MonoBehaviour
                 if (_timer <= 0f)
                 {
                     _phase = Phase.FinalSink;
-                    ActiveLures.Remove(this); // fish return to paths
+                    ActiveLures.Remove(this);
                 }
                 break;
 
             case Phase.FinalSink:
-                transform.position += -transform.up * sinkSpeed * Time.deltaTime;
+                transform.position += Vector3.down * sinkSpeed * Time.deltaTime;
                 if (Vector3.Distance(transform.position, _activeOrigin) >= finalSinkDistance)
                 {
                     OnLureExpired?.Invoke();

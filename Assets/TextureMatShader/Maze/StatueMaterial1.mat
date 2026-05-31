@@ -118,7 +118,7 @@ Material:
     - _QueueControl: 0
     - _QueueOffset: 0
     - _ReceiveShadows: 1
-    - _RockSonarFactor: 1.09
+    - _RockSonarFactor: 0
     - _ShadowIntensity2: 1.05
     - _Smoothness: 0.5
     - _SmoothnessTextureChannel: 0

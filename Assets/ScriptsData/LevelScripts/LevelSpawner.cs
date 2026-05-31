@@ -20,6 +20,7 @@ public class LevelSpawner : MonoBehaviour
     [Header("Modifiers")]
     [SerializeField] GameObject waterLevelModifierPrefab;
     [SerializeField] GameObject waveModifierPrefab;
+    [SerializeField] WaveMaterialController waveController;
 
     [Header("Tier Config")]
     public TierConfig tierConfig;
@@ -50,6 +51,9 @@ public class LevelSpawner : MonoBehaviour
     [SerializeField] private WhirlFXController whirlFX;
     [SerializeField] private WhirlpoolManager  whirlpoolManager;
 
+    [Header("Sonar")]
+    [SerializeField] SonarController sonarController;
+
     public bool mazeSpawned;
     bool mazeRotated;
 
@@ -58,6 +62,8 @@ public class LevelSpawner : MonoBehaviour
     public ArenaProfile GetArenaProfile() => activeArenaProfile;
     private Bounds cachedArenaBounds;
     public Bounds GetArenaBounds() => cachedArenaBounds;
+    private float spawnedBaselineWaterY;
+    public float GetBaselineWaterY() => spawnedBaselineWaterY;
 
     // =====================================================
     // GRID DATA INJECTION
@@ -95,8 +101,12 @@ public class LevelSpawner : MonoBehaviour
 
     public void SpawnMaze()
     {
-        if (mazeSpawned) return;
-        if (!activeGridData || !referencePlane || !spawnParent) return;
+        if (mazeSpawned) { Debug.Log("[LevelSpawner] SpawnMaze — already spawned, skipping."); return; }
+        if (!activeGridData || !referencePlane || !spawnParent)
+        {
+            Debug.LogWarning($"[LevelSpawner] SpawnMaze EARLY EXIT — activeGridData={activeGridData != null} referencePlane={referencePlane != null} spawnParent={spawnParent != null}");
+            return;
+        }
 
         if (activeGridData.orbCellIndices == null)
             activeGridData.orbCellIndices = new List<int>();
@@ -107,7 +117,20 @@ public class LevelSpawner : MonoBehaviour
         float   tileZ  = b.size.z / GridData.GridSize;
         Vector3 origin = b.min;
 
+        // ── Baseline water Y — single source of truth for all tier/water positioning ──
+        var baselineMarker = activeArenaProfile?.outerWallsPrefab?.GetComponentInChildren<BaselineMarker>();
+        spawnedBaselineWaterY = baselineMarker?.height ?? spawnParent.position.y;
+        Quaternion baselineRot = baselineMarker != null
+            ? Quaternion.LookRotation(baselineMarker.transform.forward, Vector3.up)
+            : Quaternion.identity;
+
+        if (baselineMarker != null) sonarController?.SetBaselineMarker(baselineMarker);
+
         // ── Reality Layer — orbs / water / wave modifiers ──
+        var  waveModAlign    = waveModifierPrefab != null ? waveModifierPrefab.GetComponentInChildren<PrefabBaselineAlignment>() : null;
+        bool waveModHasAlign = waveModAlign != null;
+        float waveModContactY = waveModAlign != null ? waveModAlign.transform.position.y : 0f;
+
         for (int y = 0; y < GridData.GridSize; y++)
         {
             int flippedY = GridData.GridSize - 1 - y;
@@ -118,7 +141,7 @@ public class LevelSpawner : MonoBehaviour
 
                 Vector3 pos = new Vector3(
                     origin.x + x * tileX + tileX * 0.5f,
-                    spawnParent.position.y,
+                    spawnedBaselineWaterY,
                     origin.z + y * tileZ + tileZ * 0.5f
                 );
 
@@ -130,11 +153,20 @@ public class LevelSpawner : MonoBehaviour
 
                 if (activeGridData.waterLevelModifierCellIndices != null &&
                     activeGridData.waterLevelModifierCellIndices.Contains(index) && waterLevelModifierPrefab)
-                    Instantiate(waterLevelModifierPrefab, pos, Quaternion.identity, spawnParent);
+                {
+                    var go = Instantiate(waterLevelModifierPrefab, pos, Quaternion.identity, spawnParent);
+                    float[] offsets0 = tierConfig?.offsets;
+                    go.GetComponent<WaterLevelModifier>()?.Init(FindGroundFloorSlot(offsets0), offsets0, "G", spawnedBaselineWaterY);
+                }
 
                 if (activeGridData.waveModifierCellIndices != null &&
                     activeGridData.waveModifierCellIndices.Contains(index) && waveModifierPrefab)
-                    Instantiate(waveModifierPrefab, pos, Quaternion.identity, spawnParent);
+                {
+                    float waveSpawnY = spawnedBaselineWaterY - waveModContactY;
+                    Quaternion waveRot = waveModHasAlign ? baselineRot : Quaternion.identity;
+                    var go = Instantiate(waveModifierPrefab, new Vector3(pos.x, waveSpawnY, pos.z), waveRot, spawnParent);
+                    go.GetComponent<LevelWaveModifierControllerTypeA>()?.Init(waveController);
+                }
             }
         }
 
@@ -142,11 +174,6 @@ public class LevelSpawner : MonoBehaviour
         SpawnArenaPortals();
 
         // ── Direct Prefab Placements (base layer) ──
-        var   baselineMarker   = activeArenaProfile?.outerWallsPrefab?.GetComponentInChildren<BaselineMarker>();
-        float baselineY        = baselineMarker?.height ?? spawnParent.position.y;
-        Quaternion baselineRot = baselineMarker != null
-            ? Quaternion.LookRotation(baselineMarker.transform.forward, Vector3.up)
-            : Quaternion.identity;
 
         if (activeGridData.prefabPlacements != null)
         {
@@ -157,37 +184,18 @@ public class LevelSpawner : MonoBehaviour
                 int cellY    = pp.cellIndex / GridData.GridSize;
                 int flippedY = GridData.GridSize - 1 - cellY;
                 Transform par = (pp.isCircle && soulSpawnParent) ? soulSpawnParent : spawnParent;
-                float spawnY  = pp.isWorldSpaceProp ? baselineY : par.position.y;
+                var  baselineAlign    = pp.prefab.GetComponentInChildren<PrefabBaselineAlignment>();
+                bool hasBaselineAlign = baselineAlign != null;
+                float contactOffsetY  = baselineAlign != null ? baselineAlign.transform.position.y : 0f;
+                float baselineSpawnY  = spawnedBaselineWaterY - contactOffsetY;
+                float spawnY          = (pp.isWorldSpaceProp || hasBaselineAlign) ? baselineSpawnY : par.position.y;
                 Vector3 pos   = new Vector3(
                     origin.x + cellX    * tileX + tileX * 0.5f,
                     spawnY,
                     origin.z + flippedY * tileZ + tileZ * 0.5f
                 );
-                if (pp.isWorldSpaceProp)
-                {
-                    // Apply the same XZ flip that spawnParent will receive post-spawn
-                    Vector3 worldPos = pos;
-                    if (applyPostSpawnY180Rotation)
-                    {
-                        float cx = spawnParent.position.x + postSpawnPositionOffset.x;
-                        float cz = spawnParent.position.z + postSpawnPositionOffset.z;
-                        worldPos.x = 2f * cx - worldPos.x;
-                        worldPos.z = 2f * cz - worldPos.z;
-                    }
-                    else
-                    {
-                        worldPos.x += postSpawnPositionOffset.x;
-                        worldPos.z += postSpawnPositionOffset.z;
-                    }
-                    bool align = pp.prefab.GetComponentInChildren<PrefabBaselineAlignment>() != null;
-                    Instantiate(pp.prefab, worldPos, align ? baselineRot : Quaternion.identity, null);
-                }
-                else
-                {
-                    Quaternion rot = par.rotation;
-                    if (applyMinus90XRotation) rot *= Quaternion.Euler(-90f, 0f, 0f);
-                    Instantiate(pp.prefab, pos, rot, par);
-                }
+                Quaternion rot = hasBaselineAlign ? baselineRot : par.rotation;
+                Instantiate(pp.prefab, pos, rot, par);
             }
         }
 
@@ -209,7 +217,7 @@ public class LevelSpawner : MonoBehaviour
                         int index = flippedY * GridData.GridSize + x;
                         Vector3 pos = new Vector3(
                             origin.x + x * tileX + tileX * 0.5f,
-                            spawnParent.position.y + yOff,
+                            spawnedBaselineWaterY + yOff,
                             origin.z + y * tileZ + tileZ * 0.5f
                         );
                         Quaternion rot = spawnParent.rotation;
@@ -219,12 +227,17 @@ public class LevelSpawner : MonoBehaviour
                             tier.waterLevelModifierCellIndices.Contains(index) && waterLevelModifierPrefab)
                         {
                             var go = Instantiate(waterLevelModifierPrefab, pos, Quaternion.identity, spawnParent);
-                            go.GetComponent<WaterLevelModifier>()?.Init(tier.yOffsetSlot, offsets, tier.name);
+                            go.GetComponent<WaterLevelModifier>()?.Init(tier.yOffsetSlot, offsets, tier.name, spawnedBaselineWaterY);
                         }
 
                         if (tier.waveModifierCellIndices != null &&
                             tier.waveModifierCellIndices.Contains(index) && waveModifierPrefab)
-                            Instantiate(waveModifierPrefab, pos, Quaternion.identity, spawnParent);
+                        {
+                            float waveSpawnY = pos.y - waveModContactY;
+                            Quaternion waveRot = waveModHasAlign ? baselineRot : Quaternion.identity;
+                            var go = Instantiate(waveModifierPrefab, new Vector3(pos.x, waveSpawnY, pos.z), waveRot, spawnParent);
+                            go.GetComponent<LevelWaveModifierControllerTypeA>()?.Init(waveController);
+                        }
                     }
                 }
 
@@ -237,9 +250,11 @@ public class LevelSpawner : MonoBehaviour
                         int cellX    = pp.cellIndex % GridData.GridSize;
                         int cellY    = pp.cellIndex / GridData.GridSize;
                         int flippedY = GridData.GridSize - 1 - cellY;
+                        var  tierAlign      = pp.prefab.GetComponentInChildren<PrefabBaselineAlignment>();
+                        float tierContactY  = tierAlign != null ? tierAlign.transform.position.y : 0f;
                         Vector3 pos2 = new Vector3(
                             origin.x + cellX    * tileX + tileX * 0.5f,
-                            spawnParent.position.y + yOff,
+                            spawnedBaselineWaterY + yOff - tierContactY,
                             origin.z + flippedY * tileZ + tileZ * 0.5f
                         );
                         Quaternion rot2 = spawnParent.rotation;
@@ -296,7 +311,7 @@ public class LevelSpawner : MonoBehaviour
 
                 var go         = new GameObject($"Whirlpool_{i}");
                 go.transform.SetParent(handlesParent);
-                go.transform.position   = new Vector3(wx, spawnParent.position.y, wz);
+                go.transform.position   = new Vector3(wx, spawnedBaselineWaterY, wz);
                 go.transform.localScale = Vector3.one * wp.radius;
 
                 var wpTrigger = go.AddComponent<WhirlpoolExitTrigger>();
@@ -315,6 +330,19 @@ public class LevelSpawner : MonoBehaviour
 
         mazeSpawned = true;
         Debug.Log("MazeSpawned = true");
+    }
+
+    private static int FindGroundFloorSlot(float[] offsets)
+    {
+        if (offsets == null || offsets.Length == 0) return 0;
+        int best = 0;
+        float bestDist = float.MaxValue;
+        for (int i = 0; i < offsets.Length; i++)
+        {
+            float d = Mathf.Abs(offsets[i]);
+            if (d < bestDist) { bestDist = d; best = i; }
+        }
+        return best;
     }
 
     // =====================================================
@@ -342,7 +370,6 @@ public class LevelSpawner : MonoBehaviour
                 var entrance = activeGridData.entrances[i];
                 GameObject instance = SpawnPortalPrefab(
                     prefab:      activeArenaProfile?.entrancePrefabOverride ?? entrance.prefab,
-                    soulPrefab:  entrance.soulPrefab,
                     angle:       entrance.perimeterAngle,
                     tierSlot:    entrance.tierSlot,
                     centre:      centre,
@@ -358,49 +385,30 @@ public class LevelSpawner : MonoBehaviour
     }
 
     // Returns the spawned reality-layer instance (null if no prefab). Used by SpawnArenaPortals to stamp LevelExitController.
-    private GameObject SpawnPortalPrefab(GameObject prefab, GameObject soulPrefab,
+    private GameObject SpawnPortalPrefab(GameObject prefab,
                                          float angle, int tierSlot,
                                          Vector3 centre, float[] tierOffsets)
     {
-        GameObject realityInstance = null;
+        if (prefab == null) return null;
 
-        // Reality layer
-        if (prefab != null)
+        float y = spawnedBaselineWaterY;
+
+        var baseline = prefab.GetComponentInChildren<PrefabBaselineAlignment>();
+        if (baseline != null)
+            y -= baseline.transform.position.y;
+
+        if (tierSlot >= 0 && activeGridData.tiers != null && tierSlot < activeGridData.tiers.Count)
         {
-            float y = spawnParent.position.y;
-            if (tierSlot >= 0 && activeGridData.tiers != null && tierSlot < activeGridData.tiers.Count)
-            {
-                var tier = activeGridData.tiers[tierSlot];
-                y += (tierOffsets != null && tier.yOffsetSlot < tierOffsets.Length)
-                     ? tierOffsets[tier.yOffsetSlot]
-                     : tier.yOffset;
-            }
-
-            Vector3    pos = new Vector3(centre.x, y, centre.z);
-            Quaternion rot = Quaternion.Euler(0f, angle, 0f);
-            if (applyMinus90XRotation) rot *= Quaternion.Euler(-90f, 0f, 0f);
-            realityInstance = Instantiate(prefab, pos, rot, spawnParent);
+            var tier = activeGridData.tiers[tierSlot];
+            y += (tierOffsets != null && tier.yOffsetSlot < tierOffsets.Length)
+                 ? tierOffsets[tier.yOffsetSlot]
+                 : tier.yOffset;
         }
 
-        // Soul plane layer
-        if (soulPrefab != null && soulSpawnParent != null)
-        {
-            float y = soulSpawnParent.position.y;
-            if (tierSlot >= 0 && activeGridData.tiers != null && tierSlot < activeGridData.tiers.Count)
-            {
-                var tier = activeGridData.tiers[tierSlot];
-                y += (tierOffsets != null && tier.yOffsetSlot < tierOffsets.Length)
-                     ? tierOffsets[tier.yOffsetSlot]
-                     : tier.yOffset;
-            }
-
-            Vector3    soulPos = new Vector3(centre.x, y, centre.z);
-            Quaternion soulRot = Quaternion.Euler(0f, angle, 0f);
-            if (applyMinus90XRotation) soulRot *= Quaternion.Euler(-90f, 0f, 0f);
-            Instantiate(soulPrefab, soulPos, soulRot, soulSpawnParent);
-        }
-
-        return realityInstance;
+        Vector3    pos = new Vector3(centre.x, y, centre.z);
+        Quaternion rot = Quaternion.Euler(0f, angle, 0f);
+        if (applyMinus90XRotation) rot *= Quaternion.Euler(-90f, 0f, 0f);
+        return Instantiate(prefab, pos, rot, spawnParent);
     }
 
     // =====================================================
@@ -413,7 +421,11 @@ public class LevelSpawner : MonoBehaviour
 
     private void SpawnSoulFish(Vector3 origin, float tileX, float tileZ)
     {
-        if (activeGridData.soulZones == null || activeGridData.soulZones.Count == 0) return;
+        if (activeGridData.soulZones == null || activeGridData.soulZones.Count == 0)
+        {
+            Debug.Log("[LevelSpawner] SpawnSoulFish — no soulZones on GridData, skipping.");
+            return;
+        }
 
         if (soulFishContainerPrefab == null)
         {
@@ -421,14 +433,24 @@ public class LevelSpawner : MonoBehaviour
             return;
         }
 
+        Debug.Log($"[LevelSpawner] SpawnSoulFish — processing {activeGridData.soulZones.Count} zone(s).");
+
         var    linkingController = FindObjectOfType<SoulFishLinkingController>();
         string levelID           = activeGridData.levelID;
 
         for (int zoneIndex = 0; zoneIndex < activeGridData.soulZones.Count; zoneIndex++)
         {
             var zone = activeGridData.soulZones[zoneIndex];
-            if (zone.nodes == null || zone.nodes.Count == 0) continue;
-            if (zone.souls == null || zone.souls.Count == 0) continue;
+            if (zone.nodes == null || zone.nodes.Count == 0)
+            {
+                Debug.Log($"[LevelSpawner]   Zone {zoneIndex} SKIPPED — no nodes.");
+                continue;
+            }
+            if (zone.souls == null || zone.souls.Count == 0)
+            {
+                Debug.Log($"[LevelSpawner]   Zone {zoneIndex} SKIPPED — no souls assigned.");
+                continue;
+            }
 
             // Stamp home level on all souls in zone
             foreach (var s in zone.souls)

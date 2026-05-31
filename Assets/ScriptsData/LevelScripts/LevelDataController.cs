@@ -196,6 +196,8 @@ public class LevelDataController : MonoBehaviour
         ApplyMapRefPlaneOffset();
 
         ArenaProfile arenaProfile = levelSpawner.GetArenaProfile();
+        float baselineWaterY = levelSpawner.GetBaselineWaterY();
+
         if (arenaProfile != null && wavePlaneObject != null)
         {
             Renderer waveRend = wavePlaneObject.GetComponent<Renderer>();
@@ -203,18 +205,38 @@ public class LevelDataController : MonoBehaviour
             {
                 waveRend.sharedMaterial.SetFloat("_ArenaRadius1", arenaProfile.arenaRadius1);
 
-                // Reset wave plane Y and _ArenaMask.y to authored defaults —
+                // Reset wave plane Y and _ArenaMask.y to the baseline water height —
                 // WaterLevelModifier uses sharedMaterial so changes persist between sessions.
                 Vector4 mask = waveRend.sharedMaterial.GetVector("_ArenaMask");
-                mask.y = 0f;
+                mask.y = baselineWaterY;
                 waveRend.sharedMaterial.SetVector("_ArenaMask", mask);
             }
 
             Vector3 wavePos = wavePlaneObject.transform.position;
-            wavePos.y = 0f;
+            wavePos.y = baselineWaterY;
             wavePlaneObject.transform.position = wavePos;
 
             wavePlaneObject.transform.localScale = arenaProfile.wavePlaneScale;
+        }
+
+        if (sonarGridParent != null)
+        {
+            Vector3 sp = sonarGridParent.position;
+            sp.y = baselineWaterY;
+            sonarGridParent.position = sp;
+
+            if (arenaProfile != null)
+            {
+                var sonarGen = sonarGridParent.GetComponentInChildren<SonarPlaneGenerator>();
+                Material sonarMat = sonarGen?.GridType?.planeMaterial;
+                if (sonarMat != null)
+                {
+                    sonarMat.SetFloat("_ArenaRadius", arenaProfile.arenaRadius1);
+                    sonarMat.SetVector("_ArenaMask", new Vector4(
+                        arenaProfile.arenaCentreOffset.x, 0f,
+                        arenaProfile.arenaCentreOffset.y, 0f));
+                }
+            }
         }
 
         if (arenaProfile != null && mapPointer.MapSurface != null)
@@ -323,10 +345,17 @@ public class LevelDataController : MonoBehaviour
         if (waveController != null && activeGridData != null)
         {
             WavePreset preset = activeGridData.runtimeWavePresetOverride ?? activeGridData.gameplayWavePreset;
+            float maskStrength = preset != null ? preset.state.SoulFishMaskStrength : -1f;
+            Debug.Log($"[LDC] BeginGameplay — preset='{preset?.name ?? "NULL"}' SoulFishMaskStrength={maskStrength} soulFishRadius={waveController.soulFishRadius} soulFishStrength={waveController.soulFishStrength}");
             waveController.ApplyPresetInstant(preset);
             waveController.ApplySoulFishMaskSettings();
         }
+        else
+        {
+            Debug.LogWarning($"[LDC] BeginGameplay — waveController={waveController != null} activeGridData={activeGridData != null} — skipping wave apply.");
+        }
 
+        Debug.Log($"[LDC] BeginGameplay — soulFishWaveLinker={(soulFishWaveLinker != null ? "assigned" : "NULL")}");
         soulFishWaveLinker?.BakePositionsOnce();
         mapPointer?.InitialiseSnakeMarker(GetSnake());
         soulFishMapLinker?.BakePositionsOnce();

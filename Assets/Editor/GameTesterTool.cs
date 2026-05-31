@@ -1,4 +1,4 @@
-// SaveDataEditorWindow.cs
+// GameTesterTool.cs
 // Place this file anywhere inside an Editor/ folder in your project.
 // Open via: Tools > GameTesterTool
 
@@ -8,7 +8,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using System.Collections.Generic;
 
-public class SaveDataEditorWindow : EditorWindow
+public class GameTesterTool : EditorWindow
 {
     // ─────────────────────────────────────────────
     // State
@@ -37,11 +37,6 @@ public class SaveDataEditorWindow : EditorWindow
     private GridData[]  _allGridData;
     private string[]    _gridDataNames;
     private int         _selectedGridDataIndex;
-    private int                _selectedSceneIndex;
-    private string[]           _sceneNames;
-    private WavePreset[]       _allWavePresets;
-    private string[]           _wavePresetNames;
-    private int                _selectedWavePresetIndex; // 0 = none
 
     // Debug soul injection
     private int _soulsToInject = 3;
@@ -69,9 +64,7 @@ public class SaveDataEditorWindow : EditorWindow
     // EditorPrefs keys
     // ─────────────────────────────────────────────
 
-    private const string PrefScene           = "SaveDataMonitor_SceneName";
     private const string PrefGridData        = "SaveDataMonitor_GridDataName";
-    private const string PrefWavePreset      = "SaveDataMonitor_WavePresetName";
     private const string PrefUnlockWhirl     = "SaveDataMonitor_UnlockWhirl";
     private const string PrefUnlockCatapult  = "SaveDataMonitor_UnlockCatapult";
     private const string PrefUnlockLure      = "SaveDataMonitor_UnlockLure";
@@ -83,7 +76,7 @@ public class SaveDataEditorWindow : EditorWindow
     [MenuItem("Tools/GameTesterTool")]
     public static void Open()
     {
-        var window = GetWindow<SaveDataEditorWindow>("GameTesterTool");
+        var window = GetWindow<GameTesterTool>("GameTesterTool");
         window.minSize = new Vector2(380, 500);
     }
 
@@ -98,14 +91,8 @@ public class SaveDataEditorWindow : EditorWindow
 
     private void OnDisable()
     {
-        if (_sceneNames != null && _selectedSceneIndex < _sceneNames.Length)
-            EditorPrefs.SetString(PrefScene, _sceneNames[_selectedSceneIndex]);
-
         if (_gridDataNames != null && _selectedGridDataIndex < _gridDataNames.Length)
             EditorPrefs.SetString(PrefGridData, _gridDataNames[_selectedGridDataIndex]);
-
-        if (_wavePresetNames != null && _selectedWavePresetIndex < _wavePresetNames.Length)
-            EditorPrefs.SetString(PrefWavePreset, _wavePresetNames[_selectedWavePresetIndex]);
 
         EditorPrefs.SetBool(PrefUnlockWhirl,    _unlockWhirl);
         EditorPrefs.SetBool(PrefUnlockCatapult, _unlockCatapult);
@@ -247,84 +234,34 @@ public class SaveDataEditorWindow : EditorWindow
         _showLauncher = DrawSectionHeader("▶  Scene Launcher", _showLauncher);
         if (!_showLauncher) return;
 
-        // Populate scene list from build settings
-        if (_sceneNames == null || _sceneNames.Length == 0)
-            RefreshSceneNames();
+        if (_allGridData == null) RefreshGridData();
 
-        EditorGUILayout.LabelField("Scene", EditorStyles.miniLabel);
-
-        // Populate level grid data
-        if (_allGridData == null)
-            RefreshGridData();
-
-        if (_sceneNames != null && _sceneNames.Length > 0)
-            _selectedSceneIndex = EditorGUILayout.Popup(_selectedSceneIndex, _sceneNames);
-        else
-            EditorGUILayout.LabelField("  (no scenes in Build Settings)", EditorStyles.miniLabel);
-
-        EditorGUILayout.Space(4);
-
-        // GridData picker
-        EditorGUILayout.LabelField("Level (gameplay only)", EditorStyles.miniLabel);
+        // ── Test Level (Waves1) ─────────────────────────────────────────────
+        EditorGUILayout.LabelField("Test Level  (Waves1)", EditorStyles.boldLabel);
         EditorGUILayout.BeginHorizontal();
         if (_allGridData != null && _gridDataNames != null && _gridDataNames.Length > 0)
             _selectedGridDataIndex = EditorGUILayout.Popup(_selectedGridDataIndex, _gridDataNames);
         else
             EditorGUILayout.LabelField("  (no GridData assets found in Resources/Levels/)", EditorStyles.miniLabel);
-
-        if (GUILayout.Button("↺", GUILayout.Width(24)))
-            RefreshGridData();
+        if (GUILayout.Button("↺", GUILayout.Width(24))) RefreshGridData();
         EditorGUILayout.EndHorizontal();
-
-        // Wave preset override picker
-        EditorGUILayout.LabelField("Wave Preset Override (optional)", EditorStyles.miniLabel);
-        EditorGUILayout.BeginHorizontal();
-        if (_allWavePresets == null) RefreshWavePresets();
-        if (_wavePresetNames != null && _wavePresetNames.Length > 0)
-            _selectedWavePresetIndex = EditorGUILayout.Popup(_selectedWavePresetIndex, _wavePresetNames);
-        else
-            EditorGUILayout.LabelField("  (no WavePreset assets found)", EditorStyles.miniLabel);
-        if (GUILayout.Button("↺", GUILayout.Width(24)))
-            RefreshWavePresets();
-        EditorGUILayout.EndHorizontal();
-
-        EditorGUILayout.Space(6);
-
-        EditorGUILayout.BeginHorizontal();
-
-        if (GUILayout.Button("Play Scene", _okButton))
-        {
-            if (_sceneNames.Length > 0)
-                LaunchScene(_sceneNames[_selectedSceneIndex], (GridData)null, null);
-        }
 
         EditorGUI.BeginDisabledGroup(_allGridData == null || _allGridData.Length == 0);
-        if (GUILayout.Button("Play Scene + Level", _okButton))
+        if (GUILayout.Button("Test Level", _okButton))
         {
-            if (_sceneNames.Length > 0 && _allGridData != null && _allGridData.Length > 0)
-            {
-                WavePreset waveOverride = (_allWavePresets != null && _selectedWavePresetIndex > 0)
-                    ? _allWavePresets[_selectedWavePresetIndex - 1]
-                    : null;
-                LaunchScene(_sceneNames[_selectedSceneIndex], _allGridData[_selectedGridDataIndex], waveOverride);
-            }
+            if (_allGridData != null && _allGridData.Length > 0)
+                LaunchScene("Waves1", _allGridData[_selectedGridDataIndex], null);
         }
         EditorGUI.EndDisabledGroup();
 
-        EditorGUILayout.EndHorizontal();
+        EditorGUILayout.Space(12);
+
+        // ── Test LevelSelect (LevelSelectWorld1a) ───────────────────────────
+        EditorGUILayout.LabelField("Test LevelSelect  (LevelSelectWorld1a)", EditorStyles.boldLabel);
+        if (GUILayout.Button("Test LevelSelect", _okButton))
+            LaunchScene("LevelSelectWorld1a", null, null);
+
         EditorGUILayout.Space(6);
-    }
-
-    private void RefreshSceneNames()
-    {
-        _sceneNames = new[] { "Waves1", "LevelSelectWorld1a" };
-
-        string savedScene = EditorPrefs.GetString(PrefScene, "");
-        if (!string.IsNullOrEmpty(savedScene))
-        {
-            int idx = System.Array.IndexOf(_sceneNames, savedScene);
-            if (idx >= 0) _selectedSceneIndex = idx;
-        }
     }
 
     private void RefreshGridData()
@@ -354,41 +291,13 @@ public class SaveDataEditorWindow : EditorWindow
         _selectedGridDataIndex = Mathf.Clamp(_selectedGridDataIndex, 0, Mathf.Max(0, _allGridData.Length - 1));
     }
 
-    private void RefreshWavePresets()
-    {
-        var guids = AssetDatabase.FindAssets("t:WavePreset");
-        var list  = new List<WavePreset>();
-        foreach (string guid in guids)
-        {
-            var preset = AssetDatabase.LoadAssetAtPath<WavePreset>(AssetDatabase.GUIDToAssetPath(guid));
-            if (preset != null) list.Add(preset);
-        }
-        _allWavePresets  = list.ToArray();
-        _wavePresetNames = new string[_allWavePresets.Length + 1];
-        _wavePresetNames[0] = "(none)";
-        for (int i = 0; i < _allWavePresets.Length; i++)
-            _wavePresetNames[i + 1] = _allWavePresets[i].name;
-
-        string savedPreset = EditorPrefs.GetString(PrefWavePreset, "");
-        if (!string.IsNullOrEmpty(savedPreset))
-        {
-            int idx = System.Array.IndexOf(_wavePresetNames, savedPreset);
-            if (idx >= 0) _selectedWavePresetIndex = idx;
-        }
-        _selectedWavePresetIndex = Mathf.Clamp(_selectedWavePresetIndex, 0, _wavePresetNames.Length - 1);
-    }
-
-    private void LaunchScene(string sceneName, GridData levelData, WavePreset waveOverride)
+    public static void LaunchScene(string sceneName, GridData levelData, WavePreset waveOverride)
     {
         if (levelData != null)
         {
             string path = AssetDatabase.GetAssetPath(levelData);
             EditorPrefs.SetString("SaveDataMonitor_OverrideLevel", path);
             Debug.LogWarning($"[SaveDataMonitor] SETTING OVERRIDE: Level '{levelData.levelID}', Path: '{path}'");
-        }
-        else
-        {
-            Debug.LogWarning("[SaveDataMonitor] LaunchScene called with NULL levelData. No override set.");
         }
 
         if (waveOverride != null)
