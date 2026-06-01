@@ -24,3 +24,7 @@
 *.aab
 *.unitypackage
 crashlytics-build.properties
+
+# Build output directories
+OldBuilds/
+LocalBuildWindows*/
