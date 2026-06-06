@@ -37,6 +37,11 @@ public float ui3DCameraX = float.MaxValue; // sentinel — slider reads camera p
     public int permanentSouls;
 
     /// <summary>
+    /// Orbs of Omalon collected and available for spending.
+    /// </summary>
+    public int collectedOrbs;
+
+    /// <summary>
     /// Per-level record of which fish (by grid cell index) have been caught.
     /// </summary>
     public List<CaughtSoulsEntry> caughtSouls = new List<CaughtSoulsEntry>();

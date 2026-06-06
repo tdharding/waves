@@ -183,6 +183,21 @@ MonoBehaviour:
       restoreCamera: 1
       offset: {x: 0, y: 0, z: 0, w: 0}
       cameraFieldOfView: 60
+--- !u!114 &-5713407380964019498
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 97f9135d7618c094f88339d59e19613d, type: 3}
+  m_Name: GlowFXRendererFeature
+  m_EditorClassIdentifier: Assembly-CSharp::GlowFXRendererFeature
+  m_Active: 1
+  injectionPoint: 550
+  material: {fileID: 2100000, guid: f01e1856af3df9f4fbfb78f5f4d4970a, type: 2}
 --- !u!114 &-1927081915486609398
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -318,10 +333,11 @@ MonoBehaviour:
   - {fileID: 1941874921933674720}
   - {fileID: -8872254583698201852}
   - {fileID: -1566571695612846054}
+  - {fileID: -5713407380964019498}
   - {fileID: -7010519820637803867}
   - {fileID: 5348527109056812781}
   - {fileID: -7833884852205820185}
-  m_RendererFeatureMap: ad6b866f10d7b46c0a60573e35a141e5afd3bc18b0d4dbf0bbc9835460019c927a8c2854aaecc5612e60e7ac50e1930069fced429eb72eb0a7c3160c60e7d84fe09818f8f3ecf21a0463d69d766bdf841aa0d0c7576b42eaa56a0cd05da1b59eedd6e06611c9394ae766f58c3b734893
+  m_RendererFeatureMap: ad6b866f10d7b46c0a60573e35a141e5afd3bc18b0d4dbf0bbc9835460019c927a8c2854aaecc5612e60e7ac50e1930069fced429eb72eb0a7c3160c60e7d84fe09818f8f3ecf21a0463d69d766bdf841aa0d0c7576b42ead6728b0842e6b5b0a56a0cd05da1b59eedd6e06611c9394ae766f58c3b734893
   m_UseNativeRenderPass: 1
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}

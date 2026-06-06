@@ -16,9 +16,13 @@ public class GizmoManagerWindow : EditorWindow
         public int  classID;
     }
 
+    // Built-in collider classIDs (stable across Unity versions: Box, Sphere, Capsule, Mesh, Terrain, Wheel)
+    static readonly int[] ColliderClassIDs = { 65, 135, 136, 64, 39, 146 };
+
     List<GizmoEntry> entries              = new List<GizmoEntry>();
     Vector2          scroll;
     bool             annotationsAvailable;
+    bool             showColliders        = true;
 
     // AnnotationUtility reflection handles
     MethodInfo mGetAnnotations;
@@ -135,6 +139,7 @@ public class GizmoManagerWindow : EditorWindow
         }
 
         entries.Sort((a, b) => string.Compare(a.type.Name, b.type.Name, StringComparison.Ordinal));
+        showColliders = ReadColliderVisibility();
     }
 
     static bool IsSystemAssembly(Assembly asm)
@@ -161,6 +166,13 @@ public class GizmoManagerWindow : EditorWindow
         GUILayout.FlexibleSpace();
         if (GUILayout.Button("All On",  EditorStyles.toolbarButton, GUILayout.Width(52))) SetAll(true);
         if (GUILayout.Button("All Off", EditorStyles.toolbarButton, GUILayout.Width(52))) SetAll(false);
+        GUILayout.Space(6);
+        bool newShowColliders = GUILayout.Toggle(showColliders, "Colliders", EditorStyles.toolbarButton, GUILayout.Width(65));
+        if (newShowColliders != showColliders)
+        {
+            showColliders = newShowColliders;
+            SetCollidersVisible(showColliders);
+        }
         if (GUILayout.Button("Refresh", EditorStyles.toolbarButton, GUILayout.Width(55))) Refresh();
         EditorGUILayout.EndHorizontal();
 
@@ -238,6 +250,28 @@ public class GizmoManagerWindow : EditorWindow
             e.gizmoEnabled = enabled;
             entries[i] = e;
         }
+        SceneView.RepaintAll();
+    }
+
+    bool ReadColliderVisibility()
+    {
+        if (!annotationsAvailable) return true;
+        var arr = mGetAnnotations.Invoke(null, null) as Array;
+        if (arr == null) return true;
+        foreach (var ann in arr)
+        {
+            int cid = (int)fClassID.GetValue(ann);
+            if (Array.IndexOf(ColliderClassIDs, cid) >= 0)
+                if ((int)fGizmoEnabled.GetValue(ann) == 0) return false;
+        }
+        return true;
+    }
+
+    void SetCollidersVisible(bool visible)
+    {
+        if (mSetGizmoEnabled == null) return;
+        foreach (int id in ColliderClassIDs)
+            mSetGizmoEnabled.Invoke(null, new object[] { id, "", visible ? 1 : 0, false });
         SceneView.RepaintAll();
     }
 

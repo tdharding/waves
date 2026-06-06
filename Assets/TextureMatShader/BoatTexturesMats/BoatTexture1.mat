@@ -86,7 +86,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _Texture2D:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: 3f53667de0590104896be3153fbad0b6, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - unity_Lightmaps:
@@ -131,7 +131,7 @@ Material:
     - _QueueControl: 0
     - _QueueOffset: 0
     - _ReceiveShadows: 1
-    - _ShadowIntensity: -136.42
+    - _ShadowIntensity: -25.5
     - _Smoothness: 0.083
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
@@ -146,11 +146,11 @@ Material:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _BaseColour: {r: 1, g: 1, b: 1, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
-    - _DitherMultiplier: {r: 0, g: 0, b: 0, a: 0}
+    - _DitherMultiplier: {r: 1, g: 2, b: 3, a: 0}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _GridLinesColour: {r: 0, g: 0, b: 0, a: 1}
-    - _Light_Angle: {r: 11.5, g: 6.5, b: 0, a: 0}
+    - _Light_Angle: {r: -15.1, g: 6.5, b: 0, a: 0}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
-    - _Tiling: {r: 3, g: 3, b: 0, a: 0}
+    - _Tiling: {r: 0, g: 1, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

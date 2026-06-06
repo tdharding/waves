@@ -25,7 +25,8 @@ Material:
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
-  m_InvalidKeywords: []
+  m_InvalidKeywords:
+  - _ALPHATEST_ON
   m_LightmapFlags: 2
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 1
@@ -96,8 +97,8 @@ Material:
     m_Ints: []
     m_Floats:
     - _AddPrecomputedVelocity: 0
-    - _Alpha: 0
-    - _AlphaClip: 0
+    - _Alpha: 0.77
+    - _AlphaClip: 1.69
     - _AlphaToMask: 0
     - _Blend: 0
     - _BlendModePreserveSpecular: 0
@@ -109,11 +110,11 @@ Material:
     - _Cutoff: 0.5
     - _DetailAlbedoMapScale: 1
     - _DetailNormalMapScale: 1
-    - _DitherIn: 1.21
+    - _DitherIn: 3.41
     - _DstBlend: 10
     - _DstBlendAlpha: 10
     - _EnvironmentReflections: 0
-    - _FresnelPower: 0.31
+    - _FresnelPower: 1.13
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0

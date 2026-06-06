@@ -165,6 +165,7 @@ public class LevelSelectDesignerData : ScriptableObject
     public GameObject boatHUDPrefab;
     public GameObject soulsOnBoatDisplayPrefab;
     public GameObject orbsCounterPrefab;
+    public GameObject shopTooltipPrefab;
 
     // Music
     public AudioClip musicIntro;

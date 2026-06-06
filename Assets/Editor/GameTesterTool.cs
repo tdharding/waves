@@ -258,8 +258,15 @@ public class GameTesterTool : EditorWindow
 
         // ── Test LevelSelect (LevelSelectWorld1a) ───────────────────────────
         EditorGUILayout.LabelField("Test LevelSelect  (LevelSelectWorld1a)", EditorStyles.boldLabel);
+        EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Test LevelSelect", _okButton))
             LaunchScene("LevelSelectWorld1a", null, null);
+        if (GUILayout.Button("Test LevelSelect (FreshSave)", _okButton))
+        {
+            GameProgressData.ClearAll();
+            LaunchScene("LevelSelectWorld1a", null, null);
+        }
+        EditorGUILayout.EndHorizontal();
 
         EditorGUILayout.Space(6);
     }

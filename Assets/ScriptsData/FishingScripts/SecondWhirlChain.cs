@@ -11,8 +11,8 @@ public class SecondWhirlChain : MonoBehaviour
 
     [Header("Chain Settings")]
     [SerializeField] private float segmentLength      = 0.4f;
-    [SerializeField] private float turnLeanMultiplier = 1f;    // Z lean per bone per deg/sec of turn
-    [SerializeField] private float turnSmoothSpeed    = 5f;    // how quickly lean builds and decays
+    [SerializeField] private float turnLeanMultiplier = 1f;
+    [SerializeField] private float turnSmoothSpeed    = 5f;
 
     [Header("Material Fade")]
     [SerializeField] private SkinnedMeshRenderer targetRenderer;
@@ -28,8 +28,7 @@ public class SecondWhirlChain : MonoBehaviour
     private float                _targetAlpha;
     private MaterialPropertyBlock _mpb;
 
-    private Vector3   _prevAxis;
-    private float     _smoothedTurnRate;
+    private float _smoothedTurnRate;
 
     void Awake()
     {
@@ -38,9 +37,6 @@ public class SecondWhirlChain : MonoBehaviour
 
     void Start()
     {
-        if (firstWhirl)
-            _prevAxis = firstWhirl.MouthAxis;
-
         if (startActive)
             SetActive(true);
     }
@@ -62,30 +58,30 @@ public class SecondWhirlChain : MonoBehaviour
         Vector3 mouthPos = firstWhirl.MouthPosition;
         Vector3 axis     = firstWhirl.MouthAxis;
 
-        // Measure horizontal turn rate (degrees/sec) from change in mouth direction
-        float turnDelta = 0f;
-        if (_prevAxis.sqrMagnitude > 0.0001f)
-        {
-            Vector3 prevFlat    = Vector3.ProjectOnPlane(_prevAxis, Vector3.up).normalized;
-            Vector3 currentFlat = Vector3.ProjectOnPlane(axis,      Vector3.up).normalized;
-            if (prevFlat.sqrMagnitude > 0.0001f && currentFlat.sqrMagnitude > 0.0001f)
-                turnDelta = Vector3.SignedAngle(prevFlat, currentFlat, Vector3.up) / Time.deltaTime;
-        }
-        _prevAxis = axis;
+        float turnTarget = Input.GetKey(KeyCode.RightArrow) ? 1f : Input.GetKey(KeyCode.LeftArrow) ? -1f : 0f;
+        _smoothedTurnRate = Mathf.Lerp(_smoothedTurnRate, turnTarget, Time.deltaTime * turnSmoothSpeed);
 
-        _smoothedTurnRate = Mathf.Lerp(_smoothedTurnRate, turnDelta, Time.deltaTime * turnSmoothSpeed);
+        // Bone 0 — explicit frame: -Y out of mouth, +X toward world up, Z as lean axis
+        Vector3 xDir = Vector3.ProjectOnPlane(Vector3.up, axis).normalized;
+        if (xDir.sqrMagnitude < 0.001f)
+            xDir = Vector3.ProjectOnPlane(Vector3.forward, axis).normalized;
+        Vector3 yDir = -axis;
+        Vector3 zDir = Vector3.Cross(xDir, yDir);
 
-        // Bone 0 — direct follow, no lean
+        Matrix4x4 m = Matrix4x4.identity;
+        m.SetColumn(0, new Vector4(xDir.x, xDir.y, xDir.z, 0));
+        m.SetColumn(1, new Vector4(yDir.x, yDir.y, yDir.z, 0));
+        m.SetColumn(2, new Vector4(zDir.x, zDir.y, zDir.z, 0));
+
         boneChain[0].position = mouthPos;
-        boneChain[0].rotation = Quaternion.FromToRotation(-Vector3.up, axis);
+        boneChain[0].rotation = m.rotation;
 
-        // Each following bone multiplies Z lean by its index
         for (int i = 1; i < boneChain.Length && i < 4; i++)
         {
             if (boneChain[i] == null || boneChain[i - 1] == null) continue;
 
-            float zLean = -_smoothedTurnRate * turnLeanMultiplier * i;
-            boneChain[i].rotation = boneChain[0].rotation * Quaternion.Euler(0, 0, zLean);
+            float xLean = -_smoothedTurnRate * turnLeanMultiplier * i;
+            boneChain[i].rotation = boneChain[0].rotation * Quaternion.Euler(xLean, 0, 0);
             boneChain[i].position = boneChain[i - 1].position + boneChain[i].rotation * (-Vector3.up) * segmentLength;
         }
     }

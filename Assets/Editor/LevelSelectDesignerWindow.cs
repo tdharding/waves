@@ -1014,6 +1014,8 @@ public class LevelSelectDesignerWindow : EditorWindow
             "Souls Display Bar UI", _data.soulsOnBoatDisplayPrefab,  typeof(GameObject), false);
         _data.orbsCounterPrefab = (GameObject)EditorGUILayout.ObjectField(
             "Orbs Counter UI",      _data.orbsCounterPrefab,         typeof(GameObject), false);
+        _data.shopTooltipPrefab = (GameObject)EditorGUILayout.ObjectField(
+            "Shop Tooltip UI",      _data.shopTooltipPrefab,         typeof(GameObject), false);
         if (EditorGUI.EndChangeCheck()) EditorUtility.SetDirty(_data);
     }
 
@@ -1127,6 +1129,7 @@ public class LevelSelectDesignerWindow : EditorWindow
         AddObj  ("boatHUDPrefab",                 _data.boatHUDPrefab);
         AddObj  ("soulsOnBoatDisplayPrefab",      _data.soulsOnBoatDisplayPrefab);
         AddObj  ("orbsCounterPrefab",             _data.orbsCounterPrefab);
+        AddObj  ("shopTooltipPrefab",             _data.shopTooltipPrefab);
         // Core & World
         AddObj  ("dataControllerPrefab",          _data.dataControllerPrefab);
         AddObj  ("boatPrefab",                    _data.boatPrefab);
@@ -1208,6 +1211,7 @@ public class LevelSelectDesignerWindow : EditorWindow
         _data.boatHUDPrefab                   = LoadObj<GameObject>("boatHUDPrefab");
         _data.soulsOnBoatDisplayPrefab        = LoadObj<GameObject>("soulsOnBoatDisplayPrefab");
         _data.orbsCounterPrefab               = LoadObj<GameObject>("orbsCounterPrefab");
+        _data.shopTooltipPrefab               = LoadObj<GameObject>("shopTooltipPrefab");
         // Core & World
         _data.dataControllerPrefab            = LoadObj<GameObject>("dataControllerPrefab");
         _data.boatPrefab                      = LoadObj<GameObject>("boatPrefab");
@@ -1714,6 +1718,7 @@ public class LevelSelectDesignerWindow : EditorWindow
             if (GameObject.Find("BoatHUDPrompts")    == null) DeployUIPrefab(_data.boatHUDPrefab,            "BoatHUDPrompts");
             if (GameObject.Find("SoulsDisplayBarUI") == null) DeployUIPrefab(_data.soulsOnBoatDisplayPrefab, "SoulsDisplayBarUI");
             if (GameObject.Find("OrbsCounterUI")     == null) DeployUIPrefab(_data.orbsCounterPrefab,        "OrbsCounterUI");
+            if (GameObject.Find("ShopTooltipHUD")    == null) DeployUIPrefab(_data.shopTooltipPrefab,        "ShopTooltipHUD");
             }
 
             // Deploy after SoulsDisplayBarUI exists so wiring can find it

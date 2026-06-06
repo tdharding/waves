@@ -742,6 +742,7 @@ MonoBehaviour:
   boatHUDPrefab: {fileID: 1594418580111063344, guid: 7cd1490137fabfd4592c5b30018d5f4c, type: 3}
   soulsOnBoatDisplayPrefab: {fileID: 119181983208249819, guid: c491e8905455bae4a9e9846dc5636c90, type: 3}
   orbsCounterPrefab: {fileID: 6410123795611025558, guid: f7834076e3f155f479d6773e68cb88a6, type: 3}
+  shopTooltipPrefab: {fileID: 3280615064872562827, guid: 98f47fd9a15190a4ba4ad6d946e45e4c, type: 3}
   musicIntro: {fileID: 8300000, guid: 1ff10eeae8633404da517dacc2021e9e, type: 3}
   musicLoop: {fileID: 8300000, guid: 1ff10eeae8633404da517dacc2021e9e, type: 3}
   musicController: {fileID: 0}

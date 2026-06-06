@@ -1,93 +1,73 @@
 // SoulFishGlow.hlsl
-// Custom Function node — screen-space glow circles at each soul fish world position
-// as it travels through the supernatural hoover.
-//
-// Chain this after the SuckingVFX node in the shader graph.
-// Gate with GlowEnabled=1 on the hoover material, 0 on the air-suction material.
+// Custom Function node name: SoulFishGlow
+// ─────────────────────────────────────────────────────────────────────────────
+// Globals provided by FishingController.cs via Shader.SetGlobalVectorArray
 //
 // Inputs
-//   ScreenPos      float4  — Screen Position node (Default mode)
-//   GlowRadius     float   — Circle radius, fraction of screen height (e.g. 0.08)
-//   GlowSoftness   float   — Edge feather width, same units as GlowRadius (e.g. 0.04)
-//   GlowIntensity  float   — Brightness multiplier (e.g. 3)
+//   ViewDir      Vector3  — View Direction node (World space)
+//   GlowRadius   Float    — Glow cone half-angle as (1 - cos), e.g. 0.02
+//   GlowSoftness Float    — Feather width within cone, e.g. 0.005
+//   GlowIntensity Float   — Brightness multiplier
 //
-// Outputs
-//   GlowOut        float   — Accumulated glow intensity; multiply by emission colour and add to Emission
+// Output
+//   GlowOut      Float    — 0..1 mask, use as Base Color / multiply by colour
+// ─────────────────────────────────────────────────────────────────────────────
 
 #ifndef SOUL_FISH_GLOW_INCLUDED
 #define SOUL_FISH_GLOW_INCLUDED
+
 #define HOOVER_MAX_FISH 8
 float4 _HooverFishPoints[HOOVER_MAX_FISH];
 float  _HooverFishCount;
-#endif
 
 void SoulFishGlow_float(
-    float4 ScreenPos,
-    float  GlowRadius,
-    float  GlowSoftness,
+    float3 ViewDir,
+    float  GlowRadius,    // World-space radius of glow circle around fish
+    float  GlowSoftness,  // World-space feather width beyond GlowRadius
     float  GlowIntensity,
     out float GlowOut
 )
 {
     GlowOut = 0.0;
 
-    // ScreenPos from Default mode: xy/w gives 0..1 viewport UV
-    float2 fragUV = ScreenPos.xy / max(ScreenPos.w, 0.0001);
-    float  aspect = _ScreenParams.x / max(_ScreenParams.y, 1.0);
+    // ViewDir is fragment→camera; negate for camera→fragment direction
+    float3 camToFrag = normalize(-ViewDir);
 
     int count = clamp((int)_HooverFishCount, 0, HOOVER_MAX_FISH);
     for (int i = 0; i < count; i++)
     {
-        float4 clip = mul(UNITY_MATRIX_VP, float4(_HooverFishPoints[i].xyz, 1.0));
-        if (clip.w <= 0.001) continue;
+        float3 toFish   = _HooverFishPoints[i].xyz - _WorldSpaceCameraPos.xyz;
+        float  fishDist = length(toFish);
+        float3 camToFish = toFish / max(fishDist, 0.0001);
 
-        float2 fishUV = clip.xy / clip.w * 0.5 + 0.5;
-        #if defined(UNITY_UV_STARTS_AT_TOP)
-        if (_ProjectionParams.x < 0.0) fishUV.y = 1.0 - fishUV.y;
-        #endif
+        float cosAngle = dot(camToFish, camToFrag);
+        if (cosAngle <= 0.0) continue;
 
-        float2 diff  = fragUV - fishUV;
-        float  dist  = length(float2(diff.x * aspect, diff.y));
-        float  inner = max(GlowRadius - GlowSoftness, 0.0);
-        float  glow  = 1.0 - smoothstep(inner, max(GlowRadius, inner + 0.0001), dist);
+        // Convert world-space radius to angular cosine threshold at this fish's distance.
+        // cos(atan(r/d)) ≈ d/sqrt(d²+r²), exact for any angle.
+        float cosInner = fishDist / sqrt(fishDist * fishDist + GlowRadius * GlowRadius);
+        float outerR   = GlowRadius + max(GlowSoftness, 0.0001);
+        float cosOuter = fishDist / sqrt(fishDist * fishDist + outerR * outerR);
 
-        GlowOut += glow;
+        // cosAngle → 1.0 = fragment aligned with fish; cosInner > cosOuter
+        float mask = smoothstep(cosOuter, cosInner, cosAngle);
+        GlowOut = max(GlowOut, mask);
     }
 
-    GlowOut = saturate(GlowOut) * GlowIntensity;
+    GlowOut *= GlowIntensity;
 }
 
 void SoulFishGlow_half(
-    half4 ScreenPos,
+    half3 ViewDir,
     half  GlowRadius,
     half  GlowSoftness,
     half  GlowIntensity,
     out half GlowOut
 )
 {
-    GlowOut = 0.0h;
-
-    half2 fragUV = ScreenPos.xy / max(ScreenPos.w, 0.0001h);
-    half  aspect = (half)(_ScreenParams.x / max(_ScreenParams.y, 1.0));
-
-    int count = clamp((int)_HooverFishCount, 0, HOOVER_MAX_FISH);
-    for (int i = 0; i < count; i++)
-    {
-        float4 clip = mul(UNITY_MATRIX_VP, float4(_HooverFishPoints[i].xyz, 1.0));
-        if (clip.w <= 0.001) continue;
-
-        half2 fishUV = (half2)(clip.xy / clip.w * 0.5 + 0.5);
-        #if defined(UNITY_UV_STARTS_AT_TOP)
-        if (_ProjectionParams.x < 0.0) fishUV.y = 1.0h - fishUV.y;
-        #endif
-
-        half2 diff  = fragUV - fishUV;
-        half  dist  = length(half2(diff.x * aspect, diff.y));
-        half  inner = max(GlowRadius - GlowSoftness, 0.0h);
-        half  glow  = 1.0h - smoothstep(inner, max(GlowRadius, inner + 0.0001h), dist);
-
-        GlowOut += glow;
-    }
-
-    GlowOut = saturate(GlowOut) * GlowIntensity;
+    float res;
+    SoulFishGlow_float((float3)ViewDir, (float)GlowRadius, (float)GlowSoftness, (float)GlowIntensity, res);
+    GlowOut = (half)res;
 }
+
+#endif

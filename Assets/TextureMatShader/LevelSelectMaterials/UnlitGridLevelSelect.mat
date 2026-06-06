@@ -74,7 +74,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _NormalTexture:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: 3cbb9aa9e94ed9c4293d2c077d4c423c, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _OcclusionMap:
@@ -82,6 +82,10 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _ParallaxMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SampleTexture2D_2fbdacbf98d546bdb32872a838d8d4ed_Texture_1_Texture2D:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
@@ -142,19 +146,19 @@ Material:
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
-    - _Gradient_Noise: -73.69
-    - _Gradient_Noise_Blend: 2.8
+    - _Gradient_Noise: -69.4
+    - _Gradient_Noise_Blend: 9.1
     - _GridLinesColourOpacity: -0.7
     - _LightingEnabled: 0
     - _Metallic: 0
     - _Mode: 0
-    - _Normal_Strength: -6.35
+    - _Normal_Strength: 4.4
     - _OcclusionStrength: 1
     - _Parallax: 0.005
     - _QueueControl: 0
     - _QueueOffset: 0
     - _ReceiveShadows: 0
-    - _ShadowIntensity: 1.78
+    - _ShadowIntensity: 2.31
     - _Smoothness: 0.609
     - _SmoothnessTextureChannel: 0
     - _SoftParticlesEnabled: 0
@@ -164,26 +168,26 @@ Material:
     - _SrcBlend: 1
     - _SrcBlendAlpha: 1
     - _Surface: 0
-    - _Texture2DOpacity: 1
+    - _Texture2DOpacity: -2.63
     - _TextureMultiply: 3.5
     - _WorkflowMode: 1
     - _XRMotionVectorsPass: 1
     - _ZWrite: 1
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
-    - _BaseColour: {r: 0.21383637, g: 0.21383637, b: 0.21383637, a: 1}
+    - _BaseColour: {r: 0.91823894, g: 0.91823894, b: 0.91823894, a: 1}
     - _CameraFadeParams: {r: 0, g: Infinity, b: 0, a: 0}
     - _Color: {r: 0.20754719, g: 0.20754719, b: 0.20754719, a: 1}
     - _ColorAddSubDiff: {r: 0, g: 0, b: 0, a: 0}
-    - _DitherMultiplier: {r: 5.2, g: 0.26, b: 0.34, a: 0}
+    - _DitherMultiplier: {r: -0.35, g: 0.26, b: 0.34, a: 0}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _GridLinesColour: {r: 0.6603774, g: 0.6603774, b: 0.6603774, a: 1}
     - _Light_Angle: {r: 8.57, g: 2.46, b: -2.05, a: 0}
     - _NormalTiling: {r: 5, g: 5, b: 0, a: 0}
     - _SoftParticleFadeParams: {r: 0, g: 0, b: 0, a: 0}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
-    - _Tiling: {r: 50, g: 35, b: 0, a: 0}
+    - _Tiling: {r: 5.68, g: -4.27, b: 0, a: 0}
     - _Vector1Colour: {r: 1, g: 1, b: 1, a: 1}
-    - _Vector2Colour: {r: 0.11949676, g: 0.11949676, b: 0.11949676, a: 1}
+    - _Vector2Colour: {r: 0.10062885, g: 0.10062885, b: 0.10062885, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

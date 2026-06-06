@@ -2,8 +2,8 @@ using UnityEngine;
 
 public class WhirlFXController : MonoBehaviour
 {
-    [Header("Target Skinned Renderers")]
-    [SerializeField] private SkinnedMeshRenderer[] targetRenderers;
+    [Header("Target Material")]
+    [SerializeField] private Material whirlMaterial;
 
     [Header("Shader Property")]
     [SerializeField] private string alphaProperty = "Alpha";
@@ -21,54 +21,24 @@ public class WhirlFXController : MonoBehaviour
 
     private float currentAlpha;
     private float targetAlpha;
-
-    private Material[] runtimeMaterials;
+    private int _alphaPropID;
 
     void Awake()
     {
         currentAlpha = minAlpha;
         targetAlpha = minAlpha;
+        _alphaPropID = Shader.PropertyToID(alphaProperty);
 
-        // Cache per-renderer material instances (INTENTIONAL)
-        runtimeMaterials = new Material[targetRenderers.Length];
-
-        for (int i = 0; i < targetRenderers.Length; i++)
-        {
-            if (!targetRenderers[i]) continue;
-
-            runtimeMaterials[i] = targetRenderers[i].material;
-            runtimeMaterials[i].SetFloat(alphaProperty, currentAlpha);
-        }
+        if (whirlMaterial != null)
+            whirlMaterial.SetFloat(_alphaPropID, currentAlpha);
     }
 
     void Update()
     {
-        currentAlpha = Mathf.MoveTowards(
-            currentAlpha,
-            targetAlpha,
-            speed * Time.deltaTime
-        );
+        currentAlpha = Mathf.MoveTowards(currentAlpha, targetAlpha, speed * Time.deltaTime);
 
-        for (int i = 0; i < runtimeMaterials.Length; i++)
-        {
-            if (runtimeMaterials[i])
-                runtimeMaterials[i].SetFloat(alphaProperty, currentAlpha);
-        }
-    }
-
-    public void SetTargetRenderers(SkinnedMeshRenderer[] renderers)
-    {
-        targetRenderers = renderers;
-
-        runtimeMaterials = new Material[targetRenderers.Length];
-
-        for (int i = 0; i < targetRenderers.Length; i++)
-        {
-            if (!targetRenderers[i]) continue;
-
-            runtimeMaterials[i] = targetRenderers[i].material;
-            runtimeMaterials[i].SetFloat(alphaProperty, currentAlpha);
-        }
+        if (whirlMaterial != null)
+            whirlMaterial.SetFloat(_alphaPropID, currentAlpha);
     }
 
     public void SetNetAnimator(Animator animator) => netAnimator = animator;

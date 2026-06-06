@@ -1,9 +1,14 @@
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.EventSystems;
 
 [RequireComponent(typeof(Collider))]
 public class ShopItemDisplay : MonoBehaviour
 {
+    [Header("Item Data")]
+    public string itemName = "Shop Item";
+    public int price = 10;
+
     [Header("Positioning")]
     [Tooltip("How far above the spawn point the item floats.")]
     public float verticalOffset = 0.5f;
@@ -38,8 +43,48 @@ public class ShopItemDisplay : MonoBehaviour
         transform.Rotate(Vector3.up, spinSpeed * Time.deltaTime, Space.World);
     }
 
+    private void OnMouseEnter()
+    {
+        ShopItemTooltipHUD.Instance?.Show(transform, price);
+    }
+
+    private void OnMouseExit()
+    {
+        ShopItemTooltipHUD.Instance?.Hide();
+    }
+
     private void OnMouseDown()
     {
-        onClick.Invoke();
+        // Don't trigger if clicking through UI
+        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+            return;
+
+        int currentOrbs = GameProgressData.GetCollectedOrbs();
+        
+        if (currentOrbs >= price)
+        {
+            PortalConfirmUI.Instance?.Show(
+                $"Buy {itemName} for {price} Orbs?",
+                () => BuyItem(),
+                null);
+        }
+        else
+        {
+            PortalConfirmUI.Instance?.Show(
+                "You don't have enough Orbs",
+                null,
+                null,
+                showCancel: false,
+                yesLabel: "OK");
+        }
+    }
+
+    private void BuyItem()
+    {
+        if (OrbCollectCounter.SpendOrbs(price))
+        {
+            Debug.Log($"[ShopItemDisplay] Bought {itemName} for {price} Orbs.");
+            onClick.Invoke();
+        }
     }
 }

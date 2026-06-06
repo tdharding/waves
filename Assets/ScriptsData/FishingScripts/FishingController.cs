@@ -30,6 +30,9 @@ public class FishingController : MonoBehaviour
     [SerializeField] private SecondWhirlChain secondWhirlChain;
     [SerializeField] private BoatCameraZoom cameraZoom;
 
+    [Header("Fish Travel")]
+    [SerializeField] private float fishTravelSpeed = 1.5f;
+
     [Header("Whirl Shader")]
     [SerializeField] private float pinchStrengthMin = 0f;
     [SerializeField] private float pinchStrengthMax = 1.5f;
@@ -40,6 +43,9 @@ public class FishingController : MonoBehaviour
     [Header("Souls Visuals")]
     [Tooltip("The parent object containing the static soul models on the boat")]
     public Transform soulsParent;
+
+    [Header("Glow FX")]
+    [SerializeField] private Transform captureGlowPoint;
 
     [Header("Audio")]
     public SoulCaptureSFXPlayer soulCaptureSFX;
@@ -67,6 +73,12 @@ public class FishingController : MonoBehaviour
 
     private readonly List<FishFishingBehaviour> registeredFish = new();
 
+    void Start()
+    {
+        if (soulWhirlDirection != null)
+            soulWhirlDirection.travelSpeed = fishTravelSpeed;
+    }
+
     // --------------------------------------------------
     // HOOVER GLOW SHADER GLOBALS
     // --------------------------------------------------
@@ -85,6 +97,9 @@ public class FishingController : MonoBehaviour
 
         soulCaptureSFX?.PlayRandomCapture();
         ActivateNextSoulVisual();
+
+        if (captureGlowPoint != null)
+            BrightnessGlowController.TriggerCaptureGlow(captureGlowPoint);
 
         bool videoEnabled = LevelDataController.Instance == null || LevelDataController.Instance.EnableVideoPlayback;
         if (videoEnabled)
@@ -206,6 +221,12 @@ public class FishingController : MonoBehaviour
             if (fish != null && fish.IsTravelingTube)
                 _hooverFishBuffer[count++] = fish.transform.position;
         }
+
+        if (count > 0)
+        {
+            Debug.Log("[FishingController] Sending " + count + " fish to shader. Fish[0] pos: " + _hooverFishBuffer[0]);
+        }
+        
         Shader.SetGlobalVectorArray(HooverFishPointsID, _hooverFishBuffer);
         Shader.SetGlobalFloat(HooverFishCountID, count);
     }

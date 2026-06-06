@@ -96,7 +96,7 @@ Material:
     m_Ints: []
     m_Floats:
     - _AddPrecomputedVelocity: 0
-    - _Alpha: 0.7
+    - _Alpha: 0
     - _AlphaClip: 0
     - _AlphaToMask: 0
     - _Blend: 0
@@ -111,8 +111,8 @@ Material:
     - _DstBlend: 0
     - _DstBlendAlpha: 0
     - _EnvironmentReflections: 1
-    - _FishGlowIntensity: 3
-    - _FishGlowRadius: 0.08
+    - _FishGlowIntensity: 12.08
+    - _FishGlowRadius: 0.02
     - _FishGlowSoftness: 0.03
     - _GlossMapScale: 0
     - _Glossiness: 0
@@ -123,7 +123,7 @@ Material:
     - _QueueControl: 0
     - _QueueOffset: 0
     - _ReceiveShadows: 1
-    - _ShadowIntensity: 0.74
+    - _ShadowIntensity: -3.79
     - _Smoothness: 0.5
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
@@ -148,5 +148,6 @@ Material:
     - _TwirlCenter: {r: -0.76, g: 2.43, b: -9.85, a: 0}
     - _Vector2: {r: -0.3, g: 0.69, b: 0, a: 0}
     - _Vector2_1: {r: 3.22, g: -2.76, b: 0, a: 0}
+    - _WhiteColor: {r: 1, g: 1, b: 1, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

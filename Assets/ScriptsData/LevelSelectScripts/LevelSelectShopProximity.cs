@@ -22,7 +22,13 @@ public class LevelSelectShopProximity : MonoBehaviour
     [Tooltip("Priority when the boat is outside.")]
     public int inactivePriority = 0;
 
+    [Header("Animation")]
+    [Tooltip("Animator to trigger when the boat enters the proximity zone.")]
+    public Animator shopAnimator;
+    public string animatorBool = "IsVisible";
+
     private LevelSelectCameraController _mainController;
+    private ShopItemPoint[]             _itemPoints;
 
     private void Awake()
     {
@@ -48,6 +54,36 @@ public class LevelSelectShopProximity : MonoBehaviour
 
         // Find the main camera controller
         _mainController = Object.FindFirstObjectByType<LevelSelectCameraController>();
+
+        // Find shop item points in the parent shop object
+        _itemPoints = transform.parent != null 
+            ? transform.parent.GetComponentsInChildren<ShopItemPoint>(true) 
+            : GetComponentsInChildren<ShopItemPoint>(true);
+
+        // Auto-find animator if on the backdrop
+        if (shopAnimator == null)
+        {
+            // Try to find it on a child called "HalfCylinderBackdrop" or "CurveBackdrop"
+            Transform b = transform.parent != null ? transform.parent.Find("HalfCylinderBackdrop") : null;
+            if (b == null && transform.parent != null) b = transform.parent.Find("CurveBackdrop");
+            if (b != null) shopAnimator = b.GetComponent<Animator>();
+        }
+
+        SetItemsVisible(false);
+    }
+
+    private void SetItemsVisible(bool visible)
+    {
+        if (_itemPoints == null) return;
+        foreach (var point in _itemPoints)
+        {
+            if (point != null) point.gameObject.SetActive(visible);
+        }
+
+        if (shopAnimator != null)
+        {
+            shopAnimator.SetBool(animatorBool, visible);
+        }
     }
 
     private void OnTriggerEnter(Collider other)
@@ -70,10 +106,12 @@ public class LevelSelectShopProximity : MonoBehaviour
         {
             OrbCollectCounter.Instance.SetForceVisible(true);
         }
-        }
 
-        private void OnTriggerExit(Collider other)
-        {
+        SetItemsVisible(true);
+    }
+
+    private void OnTriggerExit(Collider other)
+    {
         if (!other.CompareTag(boatTag)) return;
 
         if (shopCamera != null)
@@ -92,7 +130,9 @@ public class LevelSelectShopProximity : MonoBehaviour
         {
             OrbCollectCounter.Instance.SetForceVisible(false);
         }
-        }
+
+        SetItemsVisible(false);
+    }
 
 #if UNITY_EDITOR
     private void OnDrawGizmosSelected()

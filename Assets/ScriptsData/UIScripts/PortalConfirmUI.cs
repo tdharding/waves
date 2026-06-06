@@ -50,7 +50,7 @@ public class PortalConfirmUI : MonoBehaviour
     // PUBLIC API
     // ─────────────────────────────────────────────
 
-    public void Show(string prompt, System.Action onConfirm, System.Action onCancel)
+    public void Show(string prompt, System.Action onConfirm, System.Action onCancel, bool showCancel = true, string yesLabel = "YES", string noLabel = "NO")
     {
         if (_isShowing) return; // already showing for another portal — ignore
 
@@ -60,6 +60,19 @@ public class PortalConfirmUI : MonoBehaviour
 
         if (promptText != null) promptText.text = prompt;
         if (panel != null)      panel.SetActive(true);
+
+        if (yesButton != null)
+        {
+            var txt = yesButton.GetComponentInChildren<TMP_Text>();
+            if (txt != null) txt.text = yesLabel;
+        }
+
+        if (noButton != null)
+        {
+            noButton.gameObject.SetActive(showCancel);
+            var txt = noButton.GetComponentInChildren<TMP_Text>();
+            if (txt != null) txt.text = noLabel;
+        }
     }
 
     public void Hide()
@@ -85,7 +98,12 @@ public class PortalConfirmUI : MonoBehaviour
     // Called by yesButton.onClick and Y key
     public void OnYes()
     {
-        if (!_isShowing) return;
+        Debug.Log("[PortalConfirmUI] OnYes clicked.");
+        if (!_isShowing) 
+        {
+            Debug.Log("[PortalConfirmUI]   Not showing, ignoring click.");
+            return;
+        }
         System.Action cb = _onConfirm;
         Hide();
         cb?.Invoke();
@@ -94,7 +112,12 @@ public class PortalConfirmUI : MonoBehaviour
     // Called by noButton.onClick and N key
     public void OnNo()
     {
-        if (!_isShowing) return;
+        Debug.Log("[PortalConfirmUI] OnNo clicked.");
+        if (!_isShowing)
+        {
+            Debug.Log("[PortalConfirmUI]   Not showing, ignoring click.");
+            return;
+        }
         System.Action cb = _onCancel;
         Hide();
         cb?.Invoke();

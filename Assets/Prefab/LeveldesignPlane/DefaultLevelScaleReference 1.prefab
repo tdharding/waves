@@ -14,7 +14,7 @@ GameObject:
   - component: {fileID: 9082051732858786805}
   - component: {fileID: 5268477561052474036}
   m_Layer: 0
-  m_Name: DefaultLevelScaleReference
+  m_Name: DefaultLevelScaleReference 1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

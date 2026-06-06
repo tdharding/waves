@@ -42,6 +42,15 @@ public class SoulsOnBoatDisplayManager : MonoBehaviour
             SpawnIconAtSlot(identities[i], i);
     }
 
+    /// <summary>Adds a newly caught soul to the display with a glow burst.</summary>
+    public void AddNewlyCaughtSoul(int soulIdentity)
+    {
+        List<int> identities = GameProgressData.GetSoulsOnBoatIdentities();
+        int slotIndex = identities.IndexOf(soulIdentity);
+        if (slotIndex < 0) slotIndex = _slots.Count;
+        SpawnIconAtSlot(soulIdentity, slotIndex, glowBurst: true);
+    }
+
     /// <summary>
     /// Returns a specific soul to the display. Finds its slot index from current save data
     /// so order is preserved.
@@ -108,7 +117,7 @@ public class SoulsOnBoatDisplayManager : MonoBehaviour
     // PRIVATE
     // ─────────────────────────────────────────────
 
-    private void SpawnIconAtSlot(int soulIdentity, int slotIndex)
+    private void SpawnIconAtSlot(int soulIdentity, int slotIndex, bool glowBurst = false)
     {
         if (soulIconPrefab == null || iconParent == null) return;
 
@@ -132,6 +141,9 @@ public class SoulsOnBoatDisplayManager : MonoBehaviour
         icon.transform.SetAsLastSibling();
 
         _slots[slotIndex] = icon;
+
+        if (glowBurst)
+            BrightnessGlowController.TriggerGlowAtUI(obj.GetComponent<RectTransform>());
     }
 
     private void ClearIcons()

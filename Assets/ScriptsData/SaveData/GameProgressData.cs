@@ -306,6 +306,34 @@ public static class GameProgressData
     }
 
     // ─────────────────────────────────────────────
+    // ORBS
+    // ─────────────────────────────────────────────
+
+    public static int GetCollectedOrbs()
+    {
+        return SaveManager.Load().collectedOrbs;
+    }
+
+    public static void AddOrbs(int amount)
+    {
+        if (amount <= 0) return;
+        var data = SaveManager.Load();
+        data.collectedOrbs += amount;
+        SaveManager.Write();
+    }
+
+    public static bool SpendOrbs(int amount)
+    {
+        if (amount <= 0) return false;
+        var data = SaveManager.Load();
+        if (data.collectedOrbs < amount) return false;
+
+        data.collectedOrbs -= amount;
+        SaveManager.Write();
+        return true;
+    }
+
+    // ─────────────────────────────────────────────
     // EXTERNAL WAVE MODIFIER
     // ─────────────────────────────────────────────
 

@@ -36,6 +36,7 @@ public class LevelSelectBoatControl : MonoBehaviour
 
     // ── Public API ─────────────────────────────────────────────────
     public bool ControlsFrozen   { get; set; }
+    public bool IntroMode        { get; set; }
     public bool IsBlocked        => _blocked;
     public bool IsReversed       => _isReversed;
     public bool IsLeftPath       => _isLeftPath;
@@ -104,16 +105,19 @@ public class LevelSelectBoatControl : MonoBehaviour
         _wantsLeft  = false;
         _wantsRight = false;
 
-        // Direction toggle — both Up and Down flip direction
-        if (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.DownArrow))
+        if (!IntroMode)
         {
-            _isReversed = !_isReversed;
-            _meshTargetRotation = _isReversed ? Quaternion.Euler(0f, 0f, 180f) : Quaternion.identity;
-        }
+            // Direction toggle — both Up and Down flip direction
+            if (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.DownArrow))
+            {
+                _isReversed = !_isReversed;
+                _meshTargetRotation = _isReversed ? Quaternion.Euler(0f, 0f, 180f) : Quaternion.identity;
+            }
 
-        // Path selection signals (junction node reads these)
-        if (Input.GetKeyDown(KeyCode.LeftArrow))  _wantsLeft  = true;
-        if (Input.GetKeyDown(KeyCode.RightArrow)) _wantsRight = true;
+            // Path selection signals (junction node reads these)
+            if (Input.GetKeyDown(KeyCode.LeftArrow))  _wantsLeft  = true;
+            if (Input.GetKeyDown(KeyCode.RightArrow)) _wantsRight = true;
+        }
 
         // Mesh rotation smoothing
         if (_meshTransform != null)
@@ -123,25 +127,69 @@ public class LevelSelectBoatControl : MonoBehaviour
   
         // Obstacle check
         _blocked = false;
+        bool blockedForward = false;
+        bool blockedBackward = false;
+
         Collider[] hits = Physics.OverlapBox(
             _boatCollider.bounds.center,
             _boatCollider.bounds.extents,
             transform.rotation);
-        foreach (var hit in hits)
-            if (hit.CompareTag("LevelSelectPathObstacle")) { _blocked = true; break; }
 
-        // Advance progress — skip if junction has control or obstacle blocks forward movement
+        if (hits.Length > 0 && _splineAnimate != null && _splineAnimate.Container != null)
+        {
+            Vector3 boatPos = _boatCollider.bounds.center;
+            // Get the tangent of the spline at current progress to determine "Forward" along the path
+            Vector3 tangent = (Vector3)SplineUtility.EvaluateTangent(_splineAnimate.Container.Spline, _progress);
+            tangent.Normalize();
+
+            foreach (var hit in hits)
+            {
+                if (hit.CompareTag("LevelSelectPathObstacle"))
+                {
+                    Vector3 toObstacle = hit.transform.position - boatPos;
+                    // Check if the obstacle is "Ahead" or "Behind" based on the spline tangent
+                    bool isAhead = Vector3.Dot(toObstacle, tangent) > 0;
+
+                    var obstacle = hit.GetComponent<LevelSelectPathObstacleObject>();
+                    LevelSelectPathObstacleObject.BlockingType type = (obstacle != null) 
+                        ? obstacle.blockingType 
+                        : LevelSelectPathObstacleObject.BlockingType.ForwardOnly;
+
+                    switch (type)
+                    {
+                        case LevelSelectPathObstacleObject.BlockingType.ForwardOnly:
+                            if (isAhead) blockedForward = true;
+                            break;
+                        case LevelSelectPathObstacleObject.BlockingType.BackwardOnly:
+                            if (!isAhead) blockedBackward = true;
+                            break;
+                        case LevelSelectPathObstacleObject.BlockingType.BothWays:
+                            if (isAhead) blockedForward = true;
+                            else blockedBackward = true;
+                            break;
+                    }
+
+                    if (blockedForward || blockedBackward)
+                    {
+                        _blocked = true;
+                        // Don't break yet, we need to see if we're blocked in BOTH directions by multiple obstacles
+                    }
+                }
+            }
+        }
+
+        // Advance progress — skip if junction has control or obstacle blocks movement in current direction
         if (!ControlsFrozen)
         {
             float dir = _isReversed ? -1f : 1f;
-            bool blockedForward = _blocked && dir > 0f;
+            bool currentDirBlocked = (dir > 0f) ? blockedForward : blockedBackward;
 
-            if (!blockedForward)
+            if (!currentDirBlocked)
             {
                 if (debugMovement && _speed < 0.0001f)
                     Debug.Log($"[Boat] Speed is near zero — container={_splineAnimate.Container?.name} speed={_speed}");
 
-                bool boosting = Input.GetKey(KeyCode.Space);
+                bool boosting = !IntroMode && Input.GetKey(KeyCode.Space);
                 float frameSpeed = boosting ? _speed * boostMultiplier : _speed;
                 _progress = Mathf.Clamp01(_progress + dir * frameSpeed * Time.deltaTime);
             }
@@ -149,7 +197,7 @@ public class LevelSelectBoatControl : MonoBehaviour
             // Always pin SplineAnimate to our controlled progress — prevents it running freely
             _splineAnimate.NormalizedTime = _progress;
         }
-    }
+}
 
     // ── Junction interface ─────────────────────────────────────────
     public void HandOffToJunction()

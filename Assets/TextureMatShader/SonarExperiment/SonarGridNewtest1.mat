@@ -83,7 +83,7 @@ Material:
     - _ArenMask: {r: 0, g: 0, b: 0, a: 0}
     - _ArenaMask: {r: 0, g: 0, b: 0, a: 0}
     - _GridOffset: {r: -1.1216216, g: 2.6324322, b: 0, a: 0}
-    - _MouthWorldPos: {r: 0.1948961, g: -1.0767899, b: -4.0616446, a: 0}
+    - _MouthWorldPos: {r: 0.012995241, g: -1.9491593, b: -4.758951, a: 0}
     - _PulseOrigin: {r: -5.58, g: -47.5, b: 2.3, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

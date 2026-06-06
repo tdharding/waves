@@ -34,21 +34,29 @@ public class OrbCollectCounter : MonoBehaviour
         UpdateText();
     }
 
-    public static void ResetCount()
-    {
-        _collectedCount = 0;
-        if (Instance != null) Instance.UpdateText();
-    }
-
     public static void AddOrb()
     {
-        _collectedCount++;
+        GameProgressData.AddOrbs(1);
         if (Instance != null)
         {
             Instance.UpdateText();
             Instance.ShowBriefly();
         }
-        Debug.Log($"[OrbCollectCounter] Orbs collected: {_collectedCount}");
+        Debug.Log($"[OrbCollectCounter] Orbs collected: {GameProgressData.GetCollectedOrbs()}");
+    }
+
+    public static bool SpendOrbs(int amount)
+    {
+        if (GameProgressData.SpendOrbs(amount))
+        {
+            if (Instance != null)
+            {
+                Instance.UpdateText();
+                Instance.ShowBriefly();
+            }
+            return true;
+        }
+        return false;
     }
 
     public void SetForceVisible(bool visible)
@@ -89,6 +97,6 @@ public class OrbCollectCounter : MonoBehaviour
     private void UpdateText()
     {
         if (counterText != null)
-            counterText.text = _collectedCount.ToString();
+            counterText.text = GameProgressData.GetCollectedOrbs().ToString();
     }
 }

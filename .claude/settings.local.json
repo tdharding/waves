@@ -33,7 +33,8 @@
       "Bash(Select-String -Pattern -i \"soulfish\")",
       "Bash(grep -i \"\\\\.cs$\")",
       "Bash(grep \"\\\\.cs$\")",
-      "Bash(dir \"C:\\\\Users\\\\tomdh\\\\Waves\\\\Assets\\\\TextureMatShader\\\\BoatTexturesMats\\\\SonarFX\\\\\")"
+      "Bash(dir \"C:\\\\Users\\\\tomdh\\\\Waves\\\\Assets\\\\TextureMatShader\\\\BoatTexturesMats\\\\SonarFX\\\\\")",
+      "PowerShell(git lfs version 2>&1)"
     ]
   }
 }

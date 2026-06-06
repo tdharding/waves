@@ -94,7 +94,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _Texture2D:
-        m_Texture: {fileID: 2800000, guid: 529dd1144773d014bbec8416fbe5e207, type: 3}
+        m_Texture: {fileID: 2800000, guid: 3f53667de0590104896be3153fbad0b6, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - unity_Lightmaps:
@@ -164,7 +164,7 @@ Material:
     - _SrcBlend: 1
     - _SrcBlendAlpha: 1
     - _Surface: 0
-    - _Texture2DOpacity: 0.73
+    - _Texture2DOpacity: 3.19
     - _TextureMultiply: 3.5
     - _WorkflowMode: 1
     - _XRMotionVectorsPass: 1
@@ -177,14 +177,14 @@ Material:
     - _ColorAddSubDiff: {r: 0, g: 0, b: 0, a: 0}
     - _DitherMultiplier: {r: 0, g: 0, b: 0, a: 0}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _FadeEndWorld: {r: 102.93261, g: 3.1658895, b: -17.56, a: 0}
-    - _FadeStartWorld: {r: 160.8126, g: -3.8941104, b: -13.3, a: 0}
+    - _FadeEndWorld: {r: 115.272606, g: 3.1658895, b: -17.56, a: 0}
+    - _FadeStartWorld: {r: 118.43261, g: -3.8941104, b: -13.3, a: 0}
     - _GridLinesColour: {r: 0.6603774, g: 0.6603774, b: 0.6603774, a: 1}
     - _Light_Angle: {r: -10.98, g: -1.66, b: 16.29, a: 0}
     - _NormalTiling: {r: 4.3, g: 0.36, b: 0, a: 0}
     - _SoftParticleFadeParams: {r: 0, g: 0, b: 0, a: 0}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
-    - _Tiling: {r: 0.3, g: 1, b: 0, a: 0}
+    - _Tiling: {r: 1.14, g: 0.15, b: 0, a: 0}
     - _Vector1Colour: {r: 1, g: 1, b: 1, a: 1}
     - _Vector2Colour: {r: 0.0754717, g: 0.0754717, b: 0.0754717, a: 1}
     - _White: {r: 0, g: 0, b: 0, a: 1}
