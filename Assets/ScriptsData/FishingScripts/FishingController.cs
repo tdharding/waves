@@ -72,6 +72,10 @@ public class FishingController : MonoBehaviour
     }
 
     private readonly List<FishFishingBehaviour> registeredFish = new();
+    private readonly List<Transform> tubeDeliveryTransforms = new();
+
+    public void RegisterTubeDelivery(Transform t)   { if (t != null && !tubeDeliveryTransforms.Contains(t)) tubeDeliveryTransforms.Add(t); }
+    public void UnregisterTubeDelivery(Transform t) { tubeDeliveryTransforms.Remove(t); }
 
     void Start()
     {
@@ -222,11 +226,12 @@ public class FishingController : MonoBehaviour
                 _hooverFishBuffer[count++] = fish.transform.position;
         }
 
-        if (count > 0)
+        for (int i = 0; i < tubeDeliveryTransforms.Count && count < 8; i++)
         {
-            Debug.Log("[FishingController] Sending " + count + " fish to shader. Fish[0] pos: " + _hooverFishBuffer[0]);
+            if (tubeDeliveryTransforms[i] != null)
+                _hooverFishBuffer[count++] = tubeDeliveryTransforms[i].position;
         }
-        
+
         Shader.SetGlobalVectorArray(HooverFishPointsID, _hooverFishBuffer);
         Shader.SetGlobalFloat(HooverFishCountID, count);
     }

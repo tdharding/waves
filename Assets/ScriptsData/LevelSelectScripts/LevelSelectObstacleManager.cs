@@ -81,6 +81,10 @@ public class LevelSelectObstacleManager : MonoBehaviour
                 : _nextObstacle.transform.position;
             LevelSelectSplineManager.Instance?.AdvanceSplineToPosition(stopPos);
         }
+        else
+        {
+            LevelSelectSplineManager.Instance?.AdvanceSpline(100f);
+        }
 
         ApplyUnlockedState(false);
     }

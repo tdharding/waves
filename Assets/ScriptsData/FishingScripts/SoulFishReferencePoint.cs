@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class SoulFishWaveReference : MonoBehaviour
+public class SoulFishReferencePoint : MonoBehaviour
 {
     [Tooltip("Registers this fish's position with the wave distortion mask. Disable when zone-level wave masking is used instead.")]
     [SerializeField] bool registerWithWaveLinker = false;

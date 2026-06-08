@@ -102,7 +102,7 @@ void SetPointerAlpha(float value)
     void UpdateFishMarkers()
     {
         IReadOnlyList<Transform> fishList =
-            SoulFishWaveLinker.ActiveFish;
+            SoulFishMapLinker.ActiveFish;
 
         // ADD / UPDATE
         for (int i = 0; i < fishList.Count; i++)

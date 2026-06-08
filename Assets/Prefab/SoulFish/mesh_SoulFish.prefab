@@ -270,7 +270,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 8601840276035815252}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: dbbab6ce7dd64c14d968cce8f2115526, type: 3}
+  m_Script: {fileID: 11500000, guid: ce8e425b10387fa438a72e4609a262b6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SoulFishWaveReference
   registerWithWaveLinker: 0

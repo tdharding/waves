@@ -20,6 +20,7 @@ public class LevelSpawner : MonoBehaviour
     [Header("Modifiers")]
     [SerializeField] GameObject waterLevelModifierPrefab;
     [SerializeField] GameObject waveModifierPrefab;
+    [SerializeField] GameObject soulFishInputTubePrefab;
     [SerializeField] WaveMaterialController waveController;
 
     [Header("Tier Config")]
@@ -95,6 +96,19 @@ public class LevelSpawner : MonoBehaviour
 
     public void SetGridData(GridData data) => activeGridData = data;
 
+    private void InitializeWaveModifier(GameObject go)
+    {
+        // Handle TypeA
+        go.GetComponent<LevelWaveModifierControllerTypeA>()?.Init(waveController);
+
+        // Handle TypeB
+        var controllerB = go.GetComponent<LevelWaveModifierControllerTypeB>();
+        if (controllerB != null)
+        {
+            controllerB.Init(waveController);
+        }
+    }
+
     // =====================================================
     // SPAWN
     // =====================================================
@@ -107,6 +121,8 @@ public class LevelSpawner : MonoBehaviour
             Debug.LogWarning($"[LevelSpawner] SpawnMaze EARLY EXIT — activeGridData={activeGridData != null} referencePlane={referencePlane != null} spawnParent={spawnParent != null}");
             return;
         }
+
+        Dictionary<string, GameObject> spawnedByCell = new Dictionary<string, GameObject>();
 
         if (activeGridData.orbCellIndices == null)
             activeGridData.orbCellIndices = new List<int>();
@@ -165,7 +181,7 @@ public class LevelSpawner : MonoBehaviour
                     float waveSpawnY = spawnedBaselineWaterY - waveModContactY;
                     Quaternion waveRot = waveModHasAlign ? baselineRot : Quaternion.identity;
                     var go = Instantiate(waveModifierPrefab, new Vector3(pos.x, waveSpawnY, pos.z), waveRot, spawnParent);
-                    go.GetComponent<LevelWaveModifierControllerTypeA>()?.Init(waveController);
+                    InitializeWaveModifier(go);
                 }
             }
         }
@@ -195,7 +211,9 @@ public class LevelSpawner : MonoBehaviour
                     origin.z + flippedY * tileZ + tileZ * 0.5f
                 );
                 Quaternion rot = hasBaselineAlign ? baselineRot : par.rotation;
-                Instantiate(pp.prefab, pos, rot, par);
+                var instance = Instantiate(pp.prefab, pos, rot, par);
+                spawnedByCell[$"-1_{pp.cellIndex}"] = instance;
+                InitializeWaveModifier(instance);
             }
         }
 
@@ -236,7 +254,7 @@ public class LevelSpawner : MonoBehaviour
                             float waveSpawnY = pos.y - waveModContactY;
                             Quaternion waveRot = waveModHasAlign ? baselineRot : Quaternion.identity;
                             var go = Instantiate(waveModifierPrefab, new Vector3(pos.x, waveSpawnY, pos.z), waveRot, spawnParent);
-                            go.GetComponent<LevelWaveModifierControllerTypeA>()?.Init(waveController);
+                            InitializeWaveModifier(go);
                         }
                     }
                 }
@@ -259,7 +277,9 @@ public class LevelSpawner : MonoBehaviour
                         );
                         Quaternion rot2 = spawnParent.rotation;
                         if (applyMinus90XRotation) rot2 *= Quaternion.Euler(-90f, 0f, 0f);
-                        Instantiate(pp.prefab, pos2, rot2, spawnParent);
+                        var instance = Instantiate(pp.prefab, pos2, rot2, spawnParent);
+                        spawnedByCell[$"{ti}_{pp.cellIndex}"] = instance;
+                        InitializeWaveModifier(instance);
                     }
                 }
             }
@@ -328,8 +348,41 @@ public class LevelSpawner : MonoBehaviour
         if (activeArenaProfile?.outerWallsPrefab != null)
             Instantiate(activeArenaProfile.outerWallsPrefab, Vector3.zero, Quaternion.identity);
 
+        ProcessLinkedPairs(spawnedByCell);
+
         mazeSpawned = true;
         Debug.Log("MazeSpawned = true");
+    }
+
+    private void ProcessLinkedPairs(Dictionary<string, GameObject> spawnedByCell)
+    {
+        if (activeGridData.linkedPairs == null) return;
+
+        foreach (var pair in activeGridData.linkedPairs)
+        {
+            string modKey = $"{pair.modifierTierIndex}_{pair.modifierCellIndex}";
+            string tubeKey = $"{pair.inputTubeTierIndex}_{pair.inputTubeCellIndex}";
+
+            if (spawnedByCell.TryGetValue(modKey, out var modGo) && 
+                spawnedByCell.TryGetValue(tubeKey, out var tubeGo))
+            {
+                var controller = modGo.GetComponent<LevelWaveModifierControllerTypeB>();
+                var tube = tubeGo.GetComponentInChildren<SoulFishInputTube>();
+                var trigger = tubeGo.GetComponentInChildren<SoulEnterPipeTrigger>();
+                
+                if (controller != null && tube != null)
+                {
+                    tube.SetTargetModifier(controller);
+                    if (trigger != null) controller.SetTrigger(trigger);
+                    Debug.Log($"[LevelSpawner] Linked modifier at {modKey} to tube at {tubeKey} (Trigger found: {trigger != null})");
+                }
+else if (controller != null)
+                {
+                    // Fallback for old system if needed, but LevelWaveModifierControllerTypeB no longer has LinkSoulSlot
+                    Debug.LogWarning($"[LevelSpawner] Could not find SoulFishInputTube on {tubeKey} to link to TypeB modifier.");
+                }
+            }
+        }
     }
 
     private static int FindGroundFloorSlot(float[] offsets)

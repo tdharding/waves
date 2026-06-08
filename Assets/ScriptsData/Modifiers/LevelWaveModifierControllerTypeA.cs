@@ -19,7 +19,6 @@ public class LevelWaveModifierControllerTypeA : MonoBehaviour
     [SerializeField] private bool showDebug = true;
     [SerializeField] private Vector3 debugWorldPosition;
     [SerializeField] private Vector4 debugWaveCenterSent;
-    [SerializeField] private Vector4 debugMaterialWaveCenter;
 
     private WaveMaterialController waveController;
     private Transform wavePlane;
@@ -27,10 +26,6 @@ public class LevelWaveModifierControllerTypeA : MonoBehaviour
     private static readonly List<LevelWaveModifierControllerTypeA> allModifiers = new();
 
     private bool hasBaseline;
-    private float baselineSpeed;
-    private float baselineFrequency;
-    private float baselineRippleDepth;
-    private Vector4 baselineWaveCenter;
 
     public void Init(WaveMaterialController controller)
     {
@@ -70,7 +65,7 @@ public class LevelWaveModifierControllerTypeA : MonoBehaviour
 
         if (filled == 1)
         {
-            CaptureBaseline();
+            hasBaseline = true;
             ApplyWaveCenter();
             LockOthers();
         }
@@ -99,19 +94,9 @@ public class LevelWaveModifierControllerTypeA : MonoBehaviour
             entry.slot?.SetInteractable(!locked);
     }
 
-    private void CaptureBaseline()
-    {
-        if (!waveController || !waveController.waveMaterial) return;
-        baselineSpeed       = waveController.waveMaterial.GetFloat("_Speed");
-        baselineFrequency   = waveController.waveMaterial.GetFloat("_Frequency");
-        baselineRippleDepth = waveController.waveMaterial.GetFloat("_RippleDepth");
-        baselineWaveCenter  = waveController.waveMaterial.GetVector("_WaveCenter");
-        hasBaseline = true;
-    }
-
     private void ApplyWaveCenter()
     {
-        if (!waveController || !waveController.waveMaterial) return;
+        if (!waveController) return;
 
         Vector3 worldPos = transform.position;
         debugWorldPosition = worldPos;
@@ -119,68 +104,64 @@ public class LevelWaveModifierControllerTypeA : MonoBehaviour
         Vector4 wc;
         if (wavePlane != null)
         {
-            // PositionIn in the HLSL is the wave plane's object space.
-            // On a -90° X plane: objectX = worldX/S, objectY = -worldZ/S.
-            // Shader formula: toCenter = PositionIn.xy - float2(WaveCenter.x, -WaveCenter.z)
-            // → WaveCenter.x = local.x, WaveCenter.z = -local.y
             Vector3 local = wavePlane.InverseTransformPoint(worldPos);
             wc = new Vector4(local.x, 0f, -local.y, 0f);
         }
         else
         {
-            // Fallback with no scale correction
             wc = new Vector4(worldPos.x, worldPos.y, worldPos.z, 0f);
         }
 
-        waveController.waveMaterial.SetVector("_WaveCenter", wc);
-        debugWaveCenterSent     = wc;
-        debugMaterialWaveCenter = wc;
+        currentCenter = wc;
     }
+
+    private Vector4 currentCenter;
 
     private void ApplyBoosts()
     {
-        if (!waveController || !waveController.waveMaterial) return;
+        if (!waveController || !hasBaseline) return;
 
-        float speed     = baselineSpeed;
-        float frequency = baselineFrequency;
-        float ripple    = baselineRippleDepth;
+        float totalSpeed = 0;
+        float totalFreq = 0;
+        float totalRipple = 0;
 
         foreach (var entry in slots)
         {
             if (entry.slot != null && entry.slot.IsFilled)
             {
-                speed     += entry.speedBoost;
-                frequency += entry.frequencyBoost;
-                ripple    += entry.rippleDepthBoost;
+                totalSpeed += entry.speedBoost;
+                totalFreq += entry.frequencyBoost;
+                totalRipple += entry.rippleDepthBoost;
             }
         }
 
-        waveController.waveMaterial.SetFloat("_Speed",       speed);
-        waveController.waveMaterial.SetFloat("_Frequency",   frequency);
-        waveController.waveMaterial.SetFloat("_RippleDepth", ripple);
+        waveController.SetModifierBoost(true, currentCenter, totalFreq, totalSpeed, totalRipple);
     }
 
     private void RestoreBaseline()
     {
-        if (!hasBaseline || !waveController || !waveController.waveMaterial) return;
-        waveController.waveMaterial.SetFloat("_Speed",       baselineSpeed);
-        waveController.waveMaterial.SetFloat("_Frequency",   baselineFrequency);
-        waveController.waveMaterial.SetFloat("_RippleDepth", baselineRippleDepth);
-        waveController.waveMaterial.SetVector("_WaveCenter", baselineWaveCenter);
+        if (!hasBaseline || !waveController) return;
+        waveController.SetModifierBoost(false, Vector4.zero, 0, 0, 0);
         hasBaseline = false;
-
-        debugMaterialWaveCenter = baselineWaveCenter;
     }
 
     private void LockOthers()
     {
         foreach (var mod in allModifiers)
             if (mod != this) mod.SetLocked(true);
+        
+        var typeBMods = FindObjectsByType<LevelWaveModifierControllerTypeB>(FindObjectsSortMode.None);
+        foreach (var mod in typeBMods)
+            mod.SetLocked(true);
     }
 
     private static void UnlockAll()
     {
         foreach (var mod in allModifiers)
+            mod.SetLocked(false);
+
+        var typeBMods = FindObjectsByType<LevelWaveModifierControllerTypeB>(FindObjectsSortMode.None);
+        foreach (var mod in typeBMods)
             mod.SetLocked(false);
     }
 
@@ -198,7 +179,7 @@ public class LevelWaveModifierControllerTypeA : MonoBehaviour
 
         Vector3 pos = transform.position;
 
-        Gizmos.color = hasBaseline
+         Gizmos.color = hasBaseline
             ? new Color(0f, 1f, 0.8f, 0.9f)
             : new Color(0.4f, 0.6f, 1f, 0.6f);
 
@@ -208,14 +189,5 @@ public class LevelWaveModifierControllerTypeA : MonoBehaviour
         Gizmos.DrawLine(pos - Vector3.right   * arm, pos + Vector3.right   * arm);
         Gizmos.DrawLine(pos - Vector3.forward * arm, pos + Vector3.forward * arm);
         Gizmos.DrawLine(pos - Vector3.up * 0.5f,    pos + Vector3.up * 0.5f);
-
-#if UNITY_EDITOR
-        string state = hasBaseline ? "ACTIVE" : "idle";
-        string label = $"WaveModifier [{state}]\n" +
-                       $"World pos: ({pos.x:F3}, {pos.y:F3}, {pos.z:F3})\n" +
-                       $"WaveCenter (obj spc): ({debugWaveCenterSent.x:F3}, {debugWaveCenterSent.y:F3}, {debugWaveCenterSent.z:F3})\n" +
-                       $"Material WC: ({debugMaterialWaveCenter.x:F3}, {debugMaterialWaveCenter.y:F3}, {debugMaterialWaveCenter.z:F3})";
-        UnityEditor.Handles.Label(pos + Vector3.up * 1.0f, label);
-#endif
     }
 }

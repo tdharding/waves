@@ -34,7 +34,8 @@
       "Bash(grep -i \"\\\\.cs$\")",
       "Bash(grep \"\\\\.cs$\")",
       "Bash(dir \"C:\\\\Users\\\\tomdh\\\\Waves\\\\Assets\\\\TextureMatShader\\\\BoatTexturesMats\\\\SonarFX\\\\\")",
-      "PowerShell(git lfs version 2>&1)"
+      "PowerShell(git lfs version 2>&1)",
+      "Bash(git restore *)"
     ]
   }
 }

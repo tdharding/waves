@@ -14,13 +14,15 @@ class GridSnapshot
     public List<int[]>                          tierCells;
     public List<GridData.PrefabPlacement>       prefabPlacements;
     public List<List<GridData.PrefabPlacement>> tierPrefabPlacements;
+    public List<GridData.LinkedPrefabPair>      linkedPairs;
 
     public GridSnapshot(int[] square, int[] circle,
                         List<GridData.ArenaEntrance> ents,
                         List<int> orbs, List<GridData.SoulSpawnPoint> souls,
                         List<int> waterMods, List<int> waveMods,
                         List<GridData.GridTier> tiers,
-                        List<GridData.PrefabPlacement> basePrefabs)
+                        List<GridData.PrefabPlacement> basePrefabs,
+                        List<GridData.LinkedPrefabPair> links)
     {
         squareGrid = (int[])square.Clone();
         circleGrid = (int[])circle.Clone();
@@ -52,6 +54,7 @@ class GridSnapshot
             }
 
         prefabPlacements = CopyPlacements(basePrefabs);
+        linkedPairs = links != null ? new List<GridData.LinkedPrefabPair>(links) : new List<GridData.LinkedPrefabPair>();
     }
 
     public static List<GridData.PrefabPlacement> CopyPlacements(List<GridData.PrefabPlacement> src)
@@ -146,6 +149,11 @@ public class GridDesignerWindow : EditorWindow
     bool isDragging;
     int  lastDraggedCellIndex = -1;
 
+    // TypeB Modifier + Input Tube two-click placement
+    bool _isWaitingForTubePlacement = false;
+    int  _pendingModifierCellIndex  = -1;
+    int  _pendingModifierTierIndex  = -1;
+
     Stack<GridSnapshot> undoStack = new Stack<GridSnapshot>();
     const int MaxUndoSteps = 50;
 
@@ -210,7 +218,7 @@ public class GridDesignerWindow : EditorWindow
         List<int> waveMods  = loadedData?.waveModifierCellIndices        ?? new List<int>();
         List<GridData.SoulSpawnPoint> souls     = loadedData?.soulSpawnPoints ?? new List<GridData.SoulSpawnPoint>();
         List<GridData.ArenaEntrance>  entrances = loadedData?.entrances      ?? new List<GridData.ArenaEntrance>();
-        undoStack.Push(new GridSnapshot(squareGrid, circleGrid, entrances, orbs, souls, waterMods, waveMods, loadedData?.tiers, loadedData?.prefabPlacements));
+        undoStack.Push(new GridSnapshot(squareGrid, circleGrid, entrances, orbs, souls, waterMods, waveMods, loadedData?.tiers, loadedData?.prefabPlacements, loadedData?.linkedPairs));
         if (undoStack.Count > MaxUndoSteps) undoStack.TrimExcess();
     }
 
@@ -226,6 +234,11 @@ public class GridDesignerWindow : EditorWindow
             loadedData.orbCellIndices = new List<int>(snapshot.orbIndices);
             loadedData.waterLevelModifierCellIndices = new List<int>(snapshot.waterLevelModifierIndices);
             loadedData.waveModifierCellIndices       = new List<int>(snapshot.waveModifierIndices);
+            
+            loadedData.linkedPairs = snapshot.linkedPairs != null 
+                ? new List<GridData.LinkedPrefabPair>(snapshot.linkedPairs) 
+                : new List<GridData.LinkedPrefabPair>();
+
             if (loadedData.tiers != null && snapshot.tierCells != null)
                 for (int i = 0; i < Mathf.Min(loadedData.tiers.Count, snapshot.tierCells.Count); i++)
                 {
@@ -294,15 +307,20 @@ public class GridDesignerWindow : EditorWindow
         SetToolbarButton("★ Soul",       drawSoulArea, Color.yellow,             () => { activeSlot = -1; drawSoulArea = true; drawSelect = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false; ClearSelectState(); });
         SetToolbarButton("◎ Orb",        drawOrb,      Color.white,              () => { activeSlot = -1; drawOrb = true; drawCircle = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = false; });
         SetToolbarButton("〇 Whirl",     drawWhirlpool, new Color(0.7f,0.4f,1f), () => { activeSlot = -1; drawWhirlpool = true; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = false; });
-        SetToolbarButton("✕ Eraser",    activeSlot == 0, new Color(1f,0.5f,0.5f), () => { activeSlot = 0; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = drawDirectPrefab = drawSelect = false; ClearSelectState(); });
+        SetToolbarButton("✕ Eraser",    activeSlot == 0, new Color(1f,0.5f,0.5f), () => { activeSlot = 0; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = drawDirectPrefab = drawSelect = false; ClearSelectState(); _isWaitingForTubePlacement = false; });
 
         EditorGUILayout.EndHorizontal();
 
         // Status hints
-        if (_isDrawingSoulArea || drawSelect)
+        if (_isDrawingSoulArea || drawSelect || _isWaitingForTubePlacement)
         {
             GUIStyle hint = new GUIStyle(EditorStyles.miniLabel) { wordWrap = true };
-            if (_isDrawingSoulArea)
+            if (_isWaitingForTubePlacement)
+            {
+                hint.normal.textColor = Color.cyan;
+                GUILayout.Label("Click to place the SoulFishInputTube (link to modifier)", hint);
+            }
+            else if (_isDrawingSoulArea)
             {
                 hint.normal.textColor = Color.yellow;
                 GUILayout.Label("Click cells — click first to close loop — Enter to finish — Esc to cancel", hint);
@@ -739,15 +757,61 @@ public class GridDesignerWindow : EditorWindow
 
         if (drawDirectPrefab && _activePlacementPrefab != null && loadedData != null)
         {
-            var placements = GetActivePrefabPlacements();
-            placements.RemoveAll(p => p.cellIndex == index);
-            placements.Add(new GridData.PrefabPlacement
+            if (_isWaitingForTubePlacement)
+            {
+                // Second click: Place the tube and link it
+                var tubePrefab = scannedModifiersLib.Find(p => p != null && p.name == "SoulFishInputTube");
+                if (tubePrefab == null)
+                {
+                    GridLog("[ERR] Could not find 'SoulFishInputTube' in modifiers library.");
+                    _isWaitingForTubePlacement = false;
+                    return;
+                }
+
+                var placements = GetActivePrefabPlacements();
+                placements.RemoveAll(p => p.cellIndex == index);
+                placements.Add(new GridData.PrefabPlacement
+                {
+                    cellIndex = index,
+                    prefab = tubePrefab,
+                    isCircle = drawCircle,
+                    isWorldSpaceProp = _activePlacementIsWorldSpaceProp,
+                });
+
+                if (loadedData.linkedPairs == null) loadedData.linkedPairs = new List<GridData.LinkedPrefabPair>();
+                loadedData.linkedPairs.Add(new GridData.LinkedPrefabPair
+                {
+                    modifierCellIndex = _pendingModifierCellIndex,
+                    modifierTierIndex = _pendingModifierTierIndex,
+                    inputTubeCellIndex = index,
+                    inputTubeTierIndex = activeTierIndex
+                });
+
+                GridLog($"Linked modifier at {_pendingModifierCellIndex} (T:{_pendingModifierTierIndex}) to tube at {index} (T:{activeTierIndex})");
+                _isWaitingForTubePlacement = false;
+                _pendingModifierCellIndex = -1;
+                _pendingModifierTierIndex = -1;
+                return;
+            }
+
+            // First click (or normal placement)
+            var placementsBase = GetActivePrefabPlacements();
+            placementsBase.RemoveAll(p => p.cellIndex == index);
+            placementsBase.Add(new GridData.PrefabPlacement
             {
                 cellIndex           = index,
                 prefab              = _activePlacementPrefab,
                 isCircle            = drawCircle,
                 isWorldSpaceProp    = _activePlacementIsWorldSpaceProp,
             });
+
+            if (_activePlacementPrefab.name == "TypeBWaveModifier")
+            {
+                _isWaitingForTubePlacement = true;
+                _pendingModifierCellIndex = index;
+                _pendingModifierTierIndex = activeTierIndex;
+                GridLog("Modifier placed. Now place the Input Tube.");
+            }
             return;
         }
 
@@ -1944,6 +2008,39 @@ public class GridDesignerWindow : EditorWindow
         DrawToolButtons();
         DrawPrefabLibrarySection();
 
+        if (loadedData != null && loadedData.linkedPairs != null && loadedData.linkedPairs.Count > 0)
+        {
+            bool hasBroken = false;
+            foreach (var pair in loadedData.linkedPairs)
+            {
+                if (!CellContainsPrefab(pair.modifierTierIndex, pair.modifierCellIndex, "TypeBWaveModifier") ||
+                    !CellContainsPrefab(pair.inputTubeTierIndex, pair.inputTubeCellIndex, "SoulFishInputTube"))
+                {
+                    hasBroken = true;
+                    break;
+                }
+            }
+
+            if (hasBroken)
+            {
+                EditorGUILayout.HelpBox("Broken modifier links detected!", MessageType.Warning);
+                if (GUILayout.Button("Clean Broken Links", EditorStyles.miniButton))
+                {
+                    PushUndoSnapshot();
+                    loadedData.linkedPairs.RemoveAll(p =>
+                        !CellContainsPrefab(p.modifierTierIndex, p.modifierCellIndex, "TypeBWaveModifier") ||
+                        !CellContainsPrefab(p.inputTubeTierIndex, p.inputTubeCellIndex, "SoulFishInputTube")
+                    );
+                    EditorUtility.SetDirty(loadedData);
+                    Repaint();
+                }
+            }
+            else
+            {
+                EditorGUILayout.LabelField($"Active Modifier Links: {loadedData.linkedPairs.Count}", EditorStyles.miniLabel);
+            }
+        }
+
         EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
         EditorGUILayout.LabelField("Grid Debug", EditorStyles.boldLabel, GUILayout.ExpandWidth(true));
         if (GUILayout.Button("Clear", EditorStyles.toolbarButton, GUILayout.Width(42)))
@@ -2336,6 +2433,32 @@ public class GridDesignerWindow : EditorWindow
                 }
             }
 
+            // Linked Prefab Pairs (TypeB Modifier <-> Tube)
+            if (loadedData.linkedPairs != null)
+            {
+                foreach (var pair in loadedData.linkedPairs)
+                {
+                    bool modOk = CellContainsPrefab(pair.modifierTierIndex, pair.modifierCellIndex, "TypeBWaveModifier");
+                    bool tubeOk = CellContainsPrefab(pair.inputTubeTierIndex, pair.inputTubeCellIndex, "SoulFishInputTube");
+
+                    Vector2 a = CellCenter(rect, pair.modifierCellIndex);
+                    Vector2 b = CellCenter(rect, pair.inputTubeCellIndex);
+
+                    if (modOk && tubeOk)
+                    {
+                        Handles.color = new Color(0.4f, 1f, 1f, 0.8f); // Cyan
+                        Handles.DrawLine(a, b, 2.5f);
+                        Handles.DrawSolidDisc(b, Vector3.forward, 3.5f);
+                    }
+                    else
+                    {
+                        Handles.color = new Color(1f, 0.3f, 0.3f, 0.9f); // Red
+                        Handles.DrawLine(a, b, 1.5f);
+                        Handles.Label((a + b) * 0.5f, "BROKEN LINK");
+                    }
+                }
+            }
+
             // Bridge mode lines
             if (_isBridgeMode && _selectedZoneIndex >= 0 && _bridgeNodes.Count >= 1)
             {
@@ -2418,6 +2541,33 @@ public class GridDesignerWindow : EditorWindow
         // Portal perimeter overlay
         if (loadedData != null)
             DrawPortalOverlay(rect);
+
+        // Tube placement - Escape to cancel
+        if (_isWaitingForTubePlacement)
+        {
+            Event ke = Event.current;
+            if (ke.type == EventType.KeyDown && ke.keyCode == KeyCode.Escape)
+            {
+                _isWaitingForTubePlacement = false;
+                _pendingModifierCellIndex = -1;
+                GridLog("Cancelled tube placement.");
+                ke.Use();
+                Repaint();
+            }
+        }
+    }
+
+    bool CellContainsPrefab(int tierIndex, int cellIndex, string prefabName)
+    {
+        if (loadedData == null) return false;
+        List<GridData.PrefabPlacement> placements;
+        if (tierIndex == -1) placements = loadedData.prefabPlacements;
+        else if (loadedData.tiers != null && tierIndex >= 0 && tierIndex < loadedData.tiers.Count) 
+            placements = loadedData.tiers[tierIndex].prefabPlacements;
+        else return false;
+
+        if (placements == null) return false;
+        return placements.Exists(p => p.cellIndex == cellIndex && p.prefab != null && p.prefab.name == prefabName);
     }
 
     Vector2 CellCenter(Rect gridRect, int cellIndex)

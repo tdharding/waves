@@ -106,8 +106,16 @@ public class LevelSelectDraggableSoul : MonoBehaviour, IPointerClickHandler, IPo
                 if (inserted) { OnPlacedSuccessfully(); return; }
             }
 
-            if (gameplaySlot == null && soulSlot == null)
-                Debug.Log($"[DraggableSoul] Hit object has neither GameplaySoulSlot nor SoulSlot component.");
+            SoulEnterPipeTrigger pipeTrigger = hit.collider.GetComponent<SoulEnterPipeTrigger>();
+            if (pipeTrigger != null)
+            {
+                bool inserted = pipeTrigger.TryInsertSoul(this.soulDataIdentity);
+                Debug.Log($"[DraggableSoul] SoulEnterPipeTrigger '{hit.collider.gameObject.name}' TryInsert → {inserted}");
+                if (inserted) { OnPlacedSuccessfully(); return; }
+            }
+
+            if (gameplaySlot == null && soulSlot == null && pipeTrigger == null)
+Debug.Log($"[DraggableSoul] Hit object has neither GameplaySoulSlot nor SoulSlot component.");
         }
         else
         {

@@ -241,14 +241,17 @@ PrefabInstance:
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: bdac801031bdff742a945a52936ed8b9, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 5589694274764971695}
+      addedObject: {fileID: 2172663741577792281}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: bdac801031bdff742a945a52936ed8b9, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1860385019852395316}
   m_SourcePrefab: {fileID: 100100000, guid: bdac801031bdff742a945a52936ed8b9, type: 3}
 --- !u!1 &7090196133313018843 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: bdac801031bdff742a945a52936ed8b9, type: 3}
   m_PrefabInstance: {fileID: 7972503840609355402}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &5589694274764971695
+--- !u!114 &2172663741577792281
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -257,18 +260,43 @@ MonoBehaviour:
   m_GameObject: {fileID: 7090196133313018843}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 41ce89159f31222498643b4ae2c337a4, type: 3}
+  m_Script: {fileID: 11500000, guid: 72ccfe4bc08b6424598fd44c63593e54, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LevelWaveModifierControllerTypeA
-  slots:
-  - slot: {fileID: 0}
-    speedBoost: 1
-    frequencyBoost: 4
-    rippleDepthBoost: 0.1
+  m_EditorClassIdentifier: Assembly-CSharp::LevelWaveModifierControllerTypeB
+  speedBoost: 1
+  frequencyBoost: 20
+  rippleDepthBoost: 0.1
+  pipeConnector: {fileID: 1651782632757782487}
   showDebug: 1
   debugWorldPosition: {x: 0, y: 0, z: 0}
   debugWaveCenterSent: {x: 0, y: 0, z: 0, w: 0}
   debugMaterialWaveCenter: {x: 0, y: 0, z: 0, w: 0}
+  plungerAnimator: {fileID: 1860385019852395316}
+  animationTrigger: Active
+  speedIncreaseRate: 0.2
+  maxAnimationSpeed: 1
+--- !u!95 &1860385019852395316
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7090196133313018843}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: 42ae92fe094a8ba40bb264473d414926, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!4 &7579205769779224929 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: bdac801031bdff742a945a52936ed8b9, type: 3}

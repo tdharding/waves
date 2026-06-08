@@ -212,6 +212,17 @@ public class GridData : ScriptableObject
     public List<PrefabPlacement> prefabPlacements = new List<PrefabPlacement>();
 
     [System.Serializable]
+    public struct LinkedPrefabPair
+    {
+        public int modifierCellIndex;
+        public int modifierTierIndex; // -1 = base
+        public int inputTubeCellIndex;
+        public int inputTubeTierIndex; // -1 = base
+    }
+
+    public List<LinkedPrefabPair> linkedPairs = new List<LinkedPrefabPair>();
+
+    [System.Serializable]
     public class GridTier
     {
         public string    name         = "Tier";
