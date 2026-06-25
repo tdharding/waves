@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections;
+using Unity.Cinemachine;
 
 public class LevelDataController : MonoBehaviour
 {
@@ -83,8 +84,8 @@ public class LevelDataController : MonoBehaviour
         ArenaProfile profile = GetArenaProfile();
         if (profile == null) return;
 
-        float radius = profile.droppedSoulBoundsRadius;
-        Vector3 centre = GetArenaCentre();
+        float radius = profile.WorldArenaRadius;
+Vector3 centre = GetArenaCentre();
         const int segments = 64;
         float angleStep = 360f / segments * Mathf.Deg2Rad;
 
@@ -203,20 +204,27 @@ public class LevelDataController : MonoBehaviour
             Renderer waveRend = wavePlaneObject.GetComponent<Renderer>();
             if (waveRend != null)
             {
-                waveRend.sharedMaterial.SetFloat("_ArenaRadius1", arenaProfile.arenaRadius1);
+                float waveRadius = arenaProfile.arenaRadius1;
+                waveRend.sharedMaterial.SetFloat("_ArenaRadius1", waveRadius);
 
-                // Reset wave plane Y and _ArenaMask.y to the baseline water height —
-                // WaterLevelModifier uses sharedMaterial so changes persist between sessions.
-                Vector4 mask = waveRend.sharedMaterial.GetVector("_ArenaMask");
-                mask.y = baselineWaterY;
-                waveRend.sharedMaterial.SetVector("_ArenaMask", mask);
+                // Update ArenaMask with center and water height
+                waveRend.sharedMaterial.SetVector("_ArenaMask", new Vector4(
+                    arenaProfile.arenaCentreOffset.x, 
+                    baselineWaterY, 
+                    arenaProfile.arenaCentreOffset.y, 
+                    0f));
             }
 
             Vector3 wavePos = wavePlaneObject.transform.position;
             wavePos.y = baselineWaterY;
             wavePlaneObject.transform.position = wavePos;
 
-            wavePlaneObject.transform.localScale = arenaProfile.wavePlaneScale;
+            wavePlaneObject.transform.localScale = Vector3.one;
+            var meshGen = wavePlaneObject.GetComponent<WaveMeshGenerator>();
+            if (meshGen != null)
+            {
+                meshGen.UpdateMeshSize(arenaProfile.WorldArenaWidth * arenaProfile.wavePlaneCoverageMultiplier);
+            }
         }
 
         if (sonarGridParent != null)
@@ -227,16 +235,26 @@ public class LevelDataController : MonoBehaviour
 
             if (arenaProfile != null)
             {
+                if (sonarController != null)
+                {
+                    float sonarScale = arenaProfile.WorldArenaWidth * arenaProfile.wavePlaneCoverageMultiplier;
+                    sonarController.SetGridArea(sonarScale, 5f);
+                }
+
                 var sonarGen = sonarGridParent.GetComponentInChildren<SonarPlaneGenerator>();
                 Material sonarMat = sonarGen?.GridType?.planeMaterial;
                 if (sonarMat != null)
                 {
-                    sonarMat.SetFloat("_ArenaRadius", arenaProfile.arenaRadius1);
+                    float sonarRadius = arenaProfile.arenaRadius1;
+                    sonarMat.SetFloat("_ArenaRadius", sonarRadius);
+                    
                     sonarMat.SetVector("_ArenaMask", new Vector4(
-                        arenaProfile.arenaCentreOffset.x, 0f,
-                        arenaProfile.arenaCentreOffset.y, 0f));
+                        arenaProfile.arenaCentreOffset.x, 
+                        baselineWaterY, 
+                        arenaProfile.arenaCentreOffset.y, 
+                        0f));
                 }
-            }
+}
         }
 
         if (arenaProfile != null && mapPointer.MapSurface != null)
@@ -245,6 +263,8 @@ public class LevelDataController : MonoBehaviour
             if (mapRend != null)
                 mapRend.material.SetVector("_MapGridTiling", arenaProfile.mapGridTiling);
         }
+
+        ConfigureGongTower();
 
         int visitCount = GameProgressData.GetCompletionCount(activeGridData?.levelID);
 
@@ -327,6 +347,43 @@ public class LevelDataController : MonoBehaviour
     private void OnIntroComplete()
     {
         BeginGameplay();
+    }
+
+    // =====================================================
+    // GONG TOWER
+    // =====================================================
+
+    private void ConfigureGongTower()
+    {
+        bool needsGong = isTimeTrial || FindObjectOfType<GongWavesTrigger>() != null;
+
+        // GongCamAnimationRelay is on the GongCam1 animator GO inside the GongTowerPrefab (may be inactive)
+        var relays = FindObjectsOfType<GongCamAnimationRelay>(true);
+        if (relays == null || relays.Length == 0)
+        {
+            Debug.Log("[LDC] ConfigureGongTower — no GongCamAnimationRelay found; GongTower not present in walls prefab.");
+            return;
+        }
+
+        var gongCamRelay  = relays[0];
+        var gongTowerRoot = gongCamRelay.transform.parent;
+
+        gongTowerRoot.gameObject.SetActive(needsGong);
+
+        if (!needsGong || gongWavesController == null)
+            return;
+
+        // Wire camera rig references from tower into GongWavesController
+        gongWavesController.gongCamAnimatorGO = gongCamRelay.gameObject;
+        gongWavesController.gongAnimator      = gongCamRelay.GetComponent<Animator>();
+        gongWavesController.gongCam           = gongCamRelay.GetComponentInChildren<CinemachineCamera>(true);
+
+        // Wire SisterNomAnimationRelay so its animation events reach GongWavesController
+        var sisterRelay = gongTowerRoot.GetComponentInChildren<SisterNomAnimationRelay>(true);
+        if (sisterRelay != null)
+            sisterRelay.gongController = gongWavesController;
+
+        Debug.Log($"[LDC] GongTower enabled — isTimeTrial={isTimeTrial}, gongCam={(gongWavesController.gongCam != null ? "OK" : "NULL")}");
     }
 
     // =====================================================

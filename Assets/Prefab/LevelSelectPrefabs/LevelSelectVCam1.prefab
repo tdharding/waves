@@ -12,8 +12,6 @@ GameObject:
   - component: {fileID: 748590965730954521}
   - component: {fileID: 317757123456395364}
   - component: {fileID: 6327238328819729557}
-  - component: {fileID: 1945418843340764626}
-  - component: {fileID: 7295566259123441742}
   m_Layer: 0
   m_Name: LevelSelectVCam1
   m_TagString: Untagged
@@ -29,13 +27,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 5450230635296789988}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalRotation: {x: 0.000999186, y: 0.9966673, z: -0.08062761, w: 0.012351302}
+  m_LocalPosition: {x: 143.13681, y: 1.2859411, z: -4.7294283}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 9.25, y: 178.58, z: 0}
 --- !u!114 &748590965730954521
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -60,7 +58,7 @@ MonoBehaviour:
     LookAtTarget: {fileID: 0}
     CustomLookAtTarget: 0
   Lens:
-    FieldOfView: 46
+    FieldOfView: 16.2
     OrthographicSize: 10
     NearClipPlane: 0.1
     FarClipPlane: 5000
@@ -109,61 +107,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LevelSelectCameraController
   cam: {fileID: 748590965730954521}
-  zoomSpeed: 10
-  minFOV: 5
-  maxFOV: 60
-  defaultFOV: 12
+  followDistance: 8
   minDistance: 5
-  maxDistance: 12
-  defaultDistance: 5.16
+  maxDistance: 17.46
+  zoomSpeed: 10
   orbitSpeed: 150
   pitchMin: -60
   pitchMax: 45
---- !u!114 &1945418843340764626
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5450230635296789988}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f38bda98361e1de48a4ca2bd86ea3c17, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.Cinemachine::Unity.Cinemachine.CinemachineRotationComposer
-  Composition:
-    ScreenPosition: {x: -0.08333334, y: 0.23180866}
-    DeadZone:
-      Enabled: 0
-      Size: {x: 0.2, y: 0.2}
-    HardLimits:
-      Enabled: 0
-      Size: {x: 0.8, y: 0.8}
-      Offset: {x: 0, y: 0}
-  CenterOnActivate: 0
-  TargetOffset: {x: -1.22, y: -2.8, z: 82}
-  Damping: {x: 0, y: 0}
-  Lookahead:
-    Enabled: 0
-    Time: 0
-    Smoothing: 0
-    IgnoreY: 0
---- !u!114 &7295566259123441742
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5450230635296789988}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b617507da6d07e749b7efdb34e1173e1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.Cinemachine::Unity.Cinemachine.CinemachineFollow
-  TrackerSettings:
-    BindingMode: 3
-    PositionDamping: {x: 0, y: 0, z: 0}
-    AngularDampingMode: 0
-    RotationDamping: {x: 0, y: 0, z: 0}
-    QuaternionDamping: 1
-  FollowOffset: {x: 0, y: 0, z: -3.44}
+  transitionYaw: -73.31
+  transitionPitch: 20
+  transitionDistance: 10
+  transitionDuration: 2
+  useManualStartingState: 1
+  manualStartYaw: -181.42
+  manualStartPitch: 9.25
+  manualStartDistance: 9.15
+  previewTarget: {fileID: 0}
+  previewOrigin: {x: 143.3325, y: 0, z: -12.623}

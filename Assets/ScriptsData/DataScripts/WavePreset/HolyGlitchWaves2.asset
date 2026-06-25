@@ -32,6 +32,7 @@ MonoBehaviour:
     SoulFishTwirlStrength: 0.65
     SoulFishMaskStrength: 1.58
     SoulFishRadius: 0.49
+    SoulFishBrightness1: 0
     ZoneTiling: {x: 4, y: 4}
     ZoneScrollSpeed: 0
     ZoneNoiseStrength: 0
@@ -40,7 +41,7 @@ MonoBehaviour:
     WhirlpoolDarkRadiusMult: 1.006
     WhirlpoolDarkStrength: 1
     WhirlpoolFalloffPower: 0.1
-    WaveStepRate: 8.5
+    WaveStepRate: 39.02
     BaseColor: {r: 0.6509434, g: 0.6509434, b: 0.6509434, a: 1}
     LightDirection: {x: -71.7, y: 1, z: 1}
     FoamDitherSize: 2.57

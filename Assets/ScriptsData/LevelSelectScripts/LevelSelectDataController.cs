@@ -3,6 +3,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.Splines;
 
+[DefaultExecutionOrder(-50)]
 public class LevelSelectDataController : MonoBehaviour
 {
     [Header("Cursor")]
@@ -41,13 +42,13 @@ public class LevelSelectDataController : MonoBehaviour
         WireSoulFishDisplay();
         WireJunctionNodes();
         WireBoatReferences();
-        WireCameraFollowTarget();
         WireBoatHUD();
     }
 
     void Start()
     {
         RestoreBoatPosition();
+        WireCameraFollowTarget();   // after RestoreBoatPosition so camera locks on to the correct spline position
         NotifyExitIfReturningFromLevel();
     }
 
@@ -71,7 +72,23 @@ public class LevelSelectDataController : MonoBehaviour
 
         if (string.IsNullOrEmpty(savedSegmentID))
         {
-            Debug.Log("LevelSelectDataController: No saved segment — boat stays on default.");
+            // No save data — snap boat to the start of the main river so it's in a valid position.
+            var registry = RiverSegmentRegistry.Instance;
+            if (registry != null)
+            {
+                var mainSegment = registry.GetSegment("MainRiver");
+                if (mainSegment != null)
+                {
+                    var mainContainer = mainSegment.GetComponent<SplineContainer>();
+                    if (mainContainer != null)
+                    {
+                        boatControl.RestoreToSegment(mainContainer, 0f);
+                        Debug.Log("LevelSelectDataController: No saved segment — snapped boat to MainRiver t=0.");
+                        return;
+                    }
+                }
+            }
+            Debug.Log("LevelSelectDataController: No saved segment and no MainRiver found — boat stays on default.");
             return;
         }
 
@@ -128,13 +145,15 @@ public class LevelSelectDataController : MonoBehaviour
 
     void NotifyExitIfReturningFromLevel()
     {
-        string levelID = LevelSelectionCache.JustExitedLevelID;
-        Debug.Log($"[LevelSelectDataController] JustExitedLevelID='{levelID}'  SplineRiverManager={(SplineRiverManager.Instance != null ? "found" : "NULL")}");
+        string levelID     = LevelSelectionCache.JustExitedLevelID;
+        int    portalIndex = LevelSelectionCache.JustExitedEntranceIndex;
+        Debug.Log($"[LevelSelectDataController] JustExitedLevelID='{levelID}'  portalIndex={portalIndex}  SplineRiverManager={(SplineRiverManager.Instance != null ? "found" : "NULL")}");
 
         if (string.IsNullOrEmpty(levelID)) return;
 
-        SplineRiverManager.Instance?.NotifyLevelExited(levelID);
-        LevelSelectionCache.JustExitedLevelID = string.Empty;
+        SplineRiverManager.Instance?.NotifyLevelExited(levelID, portalIndex);
+        LevelSelectionCache.JustExitedLevelID       = string.Empty;
+        LevelSelectionCache.JustExitedEntranceIndex = -1;
     }
 
     void WireSoulFishDisplay()
@@ -201,14 +220,26 @@ public class LevelSelectDataController : MonoBehaviour
     void WireCameraFollowTarget()
     {
         var camController = FindObjectOfType<LevelSelectCameraController>();
-        if (camController == null || camController.cam == null) return;
+        if (camController == null)
+        {
+            Debug.LogWarning("[LevelSelectDataController] WireCameraFollowTarget: No LevelSelectCameraController found in scene.");
+            return;
+        }
+        if (camController.cam == null)
+        {
+            Debug.LogWarning("[LevelSelectDataController] WireCameraFollowTarget: CameraController found but 'cam' (CinemachineCamera) is null.");
+            return;
+        }
 
         Transform followTarget = GameObject.Find("LevelSelectBoat")?.transform;
-
         if (followTarget != null)
         {
+            Debug.Log($"[LevelSelectDataController] WireCameraFollowTarget: found boat at {followTarget.position}, calling SetFollowTarget.");
             camController.SetFollowTarget(followTarget);
-            Debug.Log("[LevelSelectDataController] Camera follow target set to LevelSelectBoat.");
+        }
+        else
+        {
+            Debug.LogWarning("[LevelSelectDataController] WireCameraFollowTarget: No GameObject named 'LevelSelectBoat' found in scene.");
         }
     }
 

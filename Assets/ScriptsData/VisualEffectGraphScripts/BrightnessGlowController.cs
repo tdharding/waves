@@ -54,7 +54,25 @@ public class BrightnessGlowController : MonoBehaviour
 
     readonly Vector4[] pointBuffer = new Vector4[8];
 
-    void Awake() => instance = this;
+    void Awake()
+    {
+        instance = this;
+
+        // Auto-assign the boat transform to persistentPoints[0] if it has no target set
+        if (persistentPoints.Count > 0 && persistentPoints[0].target == null)
+        {
+            var boatGo = GameObject.Find("LevelSelectBoat");
+            if (boatGo != null)
+            {
+                persistentPoints[0].target = boatGo.transform;
+                Debug.Log("[BrightnessGlowController] Auto-assigned LevelSelectBoat to persistentPoints[0].");
+            }
+            else
+            {
+                Debug.LogWarning("[BrightnessGlowController] persistentPoints[0] has no target and 'LevelSelectBoat' not found in scene.");
+            }
+        }
+    }
 
     // Call from anywhere — e.g. on fish catch, orb collect, etc.
     public static void TriggerGlow(Vector3 worldPos, float duration, float radius = 0.2f, float softness = 0.07f)

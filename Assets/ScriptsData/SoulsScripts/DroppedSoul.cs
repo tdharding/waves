@@ -97,8 +97,8 @@ public class DroppedSoul : MonoBehaviour
         ArenaProfile profile = LevelDataController.Instance.GetArenaProfile();
         if (profile != null)
         {
-            arenaBoundsRadius = profile.droppedSoulBoundsRadius;
-            debugBoundsRadius = arenaBoundsRadius;
+            arenaBoundsRadius = profile.WorldArenaRadius;
+debugBoundsRadius = arenaBoundsRadius;
             arenaCentre       = LevelDataController.Instance.GetArenaCentre();
             boundsReady       = true;
         }

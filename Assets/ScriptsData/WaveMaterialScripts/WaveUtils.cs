@@ -49,16 +49,18 @@ public static class WaveUtils
         float dz      = (worldPos.z - p.origin.z) / p.meshScale;
         float dist    = Mathf.Sqrt(dx * dx + dz * dz);
         float stepped = Mathf.Floor(dist * p.stepRate) / Mathf.Max(p.stepRate, 0.0001f);
-        return -Mathf.Sin(stepped * p.frequency - Time.time * p.speed) * p.ripple * p.meshScale * multiplier;
+        float phase   = Shader.GetGlobalFloat("_WavePhase");
+        return -Mathf.Sin(stepped * p.frequency - phase) * p.ripple * p.meshScale * multiplier;
     }
 
     // Smooth version — no stepping, for boat visual positioning.
     public static float SampleWaveSmooth(Vector3 worldPos, WaveParams p, float multiplier = 1f)
     {
-        float dx   = (worldPos.x - p.origin.x) / p.meshScale;
-        float dz   = (worldPos.z - p.origin.z) / p.meshScale;
-        float dist = Mathf.Sqrt(dx * dx + dz * dz);
-        return -Mathf.Sin(dist * p.frequency - Time.time * p.speed) * p.ripple * p.meshScale * multiplier;
+        float dx      = (worldPos.x - p.origin.x) / p.meshScale;
+        float dz      = (worldPos.z - p.origin.z) / p.meshScale;
+        float dist    = Mathf.Sqrt(dx * dx + dz * dz);
+        float phase   = Shader.GetGlobalFloat("_WavePhase");
+        return -Mathf.Sin(dist * p.frequency - phase) * p.ripple * p.meshScale * multiplier;
     }
 
     public static float SampleHeightSmooth(Vector3 worldPos, WaveParams p, float multiplier = 1f)

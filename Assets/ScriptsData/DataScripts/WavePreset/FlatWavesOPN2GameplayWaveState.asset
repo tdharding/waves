@@ -30,11 +30,12 @@ MonoBehaviour:
     WhirlpoolTwirlStrength: 11.52
     WhirlpoolAreaTwirlStrength: 14.55
     SoulFishTwirlStrength: 0.78
-    SoulFishMaskStrength: 0.97
-    SoulFishRadius: 0.67
+    SoulFishMaskStrength: 0.15
+    SoulFishRadius: 1.15
+    SoulFishBrightness1: 4.48
     ZoneTiling: {x: 17, y: 17}
     ZoneScrollSpeed: 0.1
-    ZoneNoiseStrength: 0.033
+    ZoneNoiseStrength: 0.106
     ZoneTexture: {fileID: 2800000, guid: d243e17d9d1c81249bdfa3d5e7fb97ec, type: 3}
     WhirlpoolTaper: 1.49
     WhirlpoolDarkRadiusMult: 2.25

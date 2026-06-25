@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using System.Collections.Generic;
 using System.Reflection;
 
@@ -16,14 +17,27 @@ public class WaveEffectsLiveTuner : EditorWindow
     [SerializeField] Material   waveMaterial;
     [SerializeField] WavePreset activePreset;
     [SerializeField] bool       applyLive   = true;
-    bool tunerActive = false;  // not serialized — always starts inactive on open
+    [SerializeField] bool tunerActive = false; 
 
     // Wave Motion
+    [SerializeField] float   waveIncreaseFactor = 1f;
+    [SerializeField] float   baseFrequency    = 1f;
+    [SerializeField] float   baseSpeed        = 1f;
+    [SerializeField] float   baseRippleDepth  = 1f;
     [SerializeField] float   frequency    = 1f;
     [SerializeField] float   speed        = 1f;
     [SerializeField] float   rippleDepth  = 1f;
     [SerializeField] float   waveStepRate = 10f;
     [SerializeField] Vector4 waveCenter   = Vector4.zero;
+
+    // Transition Preview
+    [SerializeField] float   previewTargetValue = 3f;
+    [SerializeField] float   previewDuration = 1.5f;
+    [SerializeField] float   previewHoldDuration = 2.0f;
+    bool isPreviewing = false;
+    double previewStartTime;
+    float tunerPhase = 0f;
+    double lastUpdateTime;
 
     // Surface
     [SerializeField] float smoothness   = 0.5f;
@@ -36,6 +50,7 @@ public class WaveEffectsLiveTuner : EditorWindow
     [SerializeField] float peakBrightness   = 1.5f;
     [SerializeField] float     soulFishMaskStrength = 1f;
     [SerializeField] float     soulFishRadius       = 2f;
+    [SerializeField] float     soulFishBrightness1  = 1f;
     [SerializeField] Vector2   zoneTiling           = new Vector2(0.5f, 0.5f);
     [SerializeField] float     zoneScrollSpeed      = 0.05f;
     [SerializeField] float     zoneNoiseStrength    = 0.3f;
@@ -139,6 +154,7 @@ public class WaveEffectsLiveTuner : EditorWindow
         serializedWindow = new SerializedObject(this);
         EditorApplication.update += LiveUpdate;
         RestoreFromPrefs();
+        lastUpdateTime = EditorApplication.timeSinceStartup;
     }
 
     void OnDisable()
@@ -196,12 +212,76 @@ public class WaveEffectsLiveTuner : EditorWindow
 
     void LiveUpdate()
     {
-        if (!tunerActive || !applyLive || !waveMaterial) return;
-        ApplyToMaterial();
-        ApplyToLights();
-        ApplyTestWhirlpools();
-        ApplyTestSoulFish();
-        SceneView.RepaintAll();
+        if (!tunerActive || !waveMaterial) return;
+
+        double currentTime = EditorApplication.timeSinceStartup;
+        float deltaTime = (float)(currentTime - lastUpdateTime);
+        lastUpdateTime = currentTime;
+
+        if (isPreviewing)
+        {
+            float elapsed = (float)(currentTime - previewStartTime);
+            float totalDuration = previewDuration + previewHoldDuration;
+
+            if (elapsed <= previewDuration)
+            {
+                // Phase 1: Ramping up
+                float tRamp = Mathf.Clamp01(elapsed / Mathf.Max(previewDuration, 0.01f));
+                waveIncreaseFactor = Mathf.Lerp(1.0f, previewTargetValue, tRamp);
+            }
+            else
+            {
+                // Phase 2: Holding at target
+                waveIncreaseFactor = previewTargetValue;
+            }
+            
+            float curFreq = baseFrequency * waveIncreaseFactor;
+            float curSpeed = baseSpeed * waveIncreaseFactor;
+            float curRipple = baseRippleDepth * waveIncreaseFactor;
+
+            // Apply preview values directly to material
+            waveMaterial.SetFloat("_Frequency",   curFreq);
+            waveMaterial.SetFloat("_Speed",       curSpeed);
+            waveMaterial.SetFloat("_RippleDepth", curRipple);
+
+            // Accumulate phase
+            tunerPhase += curSpeed * deltaTime;
+            if (tunerPhase > 6.283185f) tunerPhase -= 6.283185f;
+            Shader.SetGlobalFloat("_WavePhase", tunerPhase);
+
+            if (elapsed >= totalDuration) isPreviewing = false;
+            
+            Repaint();
+            SceneView.RepaintAll();
+        }
+        else if (applyLive)
+        {
+            if (Application.isPlaying)
+            {
+                var controller = Object.FindFirstObjectByType<WaveMaterialController>();
+                if (controller != null)
+                {
+                    controller.ApplyStateInstant(BuildState());
+                    ApplyToLights();
+                    ApplyTestWhirlpools();
+                    ApplyTestSoulFish();
+                    SceneView.RepaintAll();
+                    return;
+                }
+            }
+
+            ApplyToMaterial();
+            ApplyToLights();
+            ApplyTestWhirlpools();
+            ApplyTestSoulFish();
+
+            // Accumulate phase based on current speed
+            tunerPhase += speed * deltaTime;
+            if (tunerPhase > 6.283185f) tunerPhase -= 6.283185f;
+            Shader.SetGlobalFloat("_WavePhase", tunerPhase);
+
+            SceneView.RepaintAll();
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -276,7 +356,7 @@ public class WaveEffectsLiveTuner : EditorWindow
         {
             using (new EditorGUI.DisabledScope(activePreset == null))
             {
-                if (GUILayout.Button("Load"))  { LoadFromPreset(activePreset); tunerActive = true; }
+                if (GUILayout.Button("Load/Preview")) { LoadOrPreview(); }
                 if (GUILayout.Button("Save"))  SaveToActivePreset();
             }
             if (GUILayout.Button("Save as New")) ExportAsNewPreset();
@@ -309,9 +389,78 @@ public class WaveEffectsLiveTuner : EditorWindow
 
     void DrawWaveMotion()
     {
+        EditorGUI.BeginChangeCheck();
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            waveIncreaseFactor = EditorGUILayout.Slider("Wave Increase Factor", waveIncreaseFactor, 0.1f, 5f);
+            if (GUILayout.Button("Reset", GUILayout.Width(50)))
+            {
+                waveIncreaseFactor = 1f;
+                frequency   = baseFrequency;
+                speed       = baseSpeed;
+                rippleDepth = baseRippleDepth;
+                GUI.FocusControl(null);
+            }
+        }
+        if (EditorGUI.EndChangeCheck())
+        {
+            frequency   = baseFrequency * waveIncreaseFactor;
+            speed       = baseSpeed * waveIncreaseFactor;
+            rippleDepth = baseRippleDepth * waveIncreaseFactor;
+        }
+
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            GUILayout.Space(EditorGUIUtility.labelWidth);
+            if (GUILayout.Button(isPreviewing ? "■ Stop Preview" : "▶ Play Transition", GUILayout.Height(25)))
+            {
+                if (isPreviewing)
+                {
+                    isPreviewing = false;
+                }
+                else
+                {
+                    isPreviewing = true;
+                    previewStartTime = EditorApplication.timeSinceStartup;
+                    // Ensure slider starts at 1.0 when we play
+                    waveIncreaseFactor = 1f;
+                }
+            }
+            
+            float oldLabelWidth = EditorGUIUtility.labelWidth;
+            EditorGUIUtility.labelWidth = 50;
+            previewTargetValue = EditorGUILayout.FloatField("Target", previewTargetValue, GUILayout.Width(90), GUILayout.Height(25));
+            EditorGUIUtility.labelWidth = 60;
+            previewDuration = EditorGUILayout.FloatField("Ramp", previewDuration, GUILayout.Width(100), GUILayout.Height(25));
+            EditorGUIUtility.labelWidth = 40;
+            previewHoldDuration = EditorGUILayout.FloatField("Hold", previewHoldDuration, GUILayout.Width(80), GUILayout.Height(25));
+            EditorGUIUtility.labelWidth = oldLabelWidth;
+        }
+
+        if (isPreviewing)
+        {
+            float elapsed = (float)(EditorApplication.timeSinceStartup - previewStartTime);
+            float total = previewDuration + previewHoldDuration;
+            float progress = Mathf.Clamp01(elapsed / Mathf.Max(total, 0.01f));
+            Rect rect = EditorGUILayout.GetControlRect(false, 5);
+            rect.xMin += EditorGUIUtility.labelWidth;
+            EditorGUI.ProgressBar(rect, progress, elapsed <= previewDuration ? "Ramping..." : "Holding...");
+        }
+
+        EditorGUILayout.Space(4);
+
+        EditorGUI.BeginChangeCheck();
         frequency    = EditorGUILayout.FloatField("Frequency",      frequency);
+        if (EditorGUI.EndChangeCheck()) baseFrequency = frequency / Mathf.Max(waveIncreaseFactor, 0.001f);
+
+        EditorGUI.BeginChangeCheck();
         speed        = EditorGUILayout.FloatField("Speed",          speed);
+        if (EditorGUI.EndChangeCheck()) baseSpeed = speed / Mathf.Max(waveIncreaseFactor, 0.001f);
+
+        EditorGUI.BeginChangeCheck();
         rippleDepth  = EditorGUILayout.FloatField("Ripple Depth",   rippleDepth);
+        if (EditorGUI.EndChangeCheck()) baseRippleDepth = rippleDepth / Mathf.Max(waveIncreaseFactor, 0.001f);
+
         waveStepRate = EditorGUILayout.FloatField("Wave Step Rate", waveStepRate);
         waveCenter   = EditorGUILayout.Vector4Field("Wave Center",  waveCenter);
     }
@@ -333,6 +482,7 @@ public class WaveEffectsLiveTuner : EditorWindow
         EditorGUILayout.LabelField("Soul Fish Zone", EditorStyles.boldLabel);
         soulFishMaskStrength = EditorGUILayout.FloatField("Mask Strength",           soulFishMaskStrength);
         soulFishRadius       = EditorGUILayout.FloatField("Radius",                  soulFishRadius);
+        soulFishBrightness1  = EditorGUILayout.FloatField("Brightness 1",            soulFishBrightness1);
         zoneTiling           = EditorGUILayout.Vector2Field("Zone Tiling",            zoneTiling);
         zoneScrollSpeed      = EditorGUILayout.FloatField("Scroll Speed",            zoneScrollSpeed);
         zoneNoiseStrength    = EditorGUILayout.Slider(    "Noise Strength",          zoneNoiseStrength, 0f, 1f);
@@ -594,6 +744,7 @@ public class WaveEffectsLiveTuner : EditorWindow
         waveMaterial.SetFloat("_PeakRingWave2Brightness",   peakBrightness);
         waveMaterial.SetFloat("_SoulFishMaskStrength",      soulFishMaskStrength);
         waveMaterial.SetFloat("_SoulFishRadius",            soulFishRadius);
+        waveMaterial.SetFloat("_SoulFishBrightness1",       soulFishBrightness1);
         waveMaterial.SetVector("_ZoneTiling",              zoneTiling);
         waveMaterial.SetFloat("_ZoneScrollSpeed",          zoneScrollSpeed);
         waveMaterial.SetFloat("_ZoneNoiseStrength",        zoneNoiseStrength);
@@ -651,6 +802,11 @@ public class WaveEffectsLiveTuner : EditorWindow
         if (preset == null) return;
 
         var s = preset.state;
+        waveIncreaseFactor    = 1f;
+        baseFrequency         = s.Frequency;
+        baseSpeed             = s.Speed;
+        baseRippleDepth       = s.RippleDepth;
+
         frequency             = s.Frequency;
         speed                 = s.Speed;
         rippleDepth           = s.RippleDepth;
@@ -662,6 +818,7 @@ public class WaveEffectsLiveTuner : EditorWindow
         troughBrightness       = s.TroughRingWave1Brightness;
         peakBrightness         = s.PeakRingWave2Brightness;
         soulFishMaskStrength    = s.SoulFishMaskStrength;
+        soulFishBrightness1     = s.SoulFishBrightness1;
         // SoulFishRadius wasn't in older presets — fall back to the material's live value rather than
         // overwriting with the default 0, which would silently kill the mask.
         soulFishRadius = s.SoulFishRadius > 0f
@@ -712,6 +869,65 @@ public class WaveEffectsLiveTuner : EditorWindow
         }
 
         Repaint();
+    }
+
+    void LoadOrPreview()
+    {
+        if (activePreset == null) return;
+
+        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "Waves1")
+        {
+            LoadFromPreset(activePreset);
+            tunerActive = true;
+            FrameSceneViewOnWaves();
+            return;
+        }
+
+        bool open = EditorUtility.DisplayDialog(
+            "Open Waves1?",
+            $"You are not in the Waves1 scene.\n\nOpen Waves1 and load preset '{activePreset.name}'?",
+            "Open Scene", "Cancel");
+
+        if (!open) return;
+
+        if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+
+        EditorSceneManager.OpenScene("Assets/Scenes/Waves1.unity",
+            OpenSceneMode.Single);
+
+        LoadFromPreset(activePreset);
+        tunerActive = true;
+        FrameSceneViewOnWaves();
+    }
+
+    void FrameSceneViewOnWaves()
+    {
+        SceneView sv = SceneView.lastActiveSceneView;
+        if (sv == null) return;
+
+        var controller = Object.FindFirstObjectByType<WaveMaterialController>();
+        if (controller != null)
+        {
+            sv.Frame(new Bounds(controller.transform.position, Vector3.one * 20f), false);
+            return;
+        }
+
+        if (waveMaterial != null)
+        {
+            foreach (var r in Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None))
+            {
+                foreach (var m in r.sharedMaterials)
+                {
+                    if (m == waveMaterial)
+                    {
+                        sv.Frame(r.bounds, false);
+                        return;
+                    }
+                }
+            }
+        }
+
+        sv.FrameSelected();
     }
 
     void SaveToActivePreset()
@@ -778,6 +994,7 @@ public class WaveEffectsLiveTuner : EditorWindow
         PeakRingWave2Brightness   = peakBrightness,
         SoulFishMaskStrength      = soulFishMaskStrength,
         SoulFishRadius            = soulFishRadius,
+        SoulFishBrightness1       = soulFishBrightness1,
         ZoneTiling                = zoneTiling,
         ZoneScrollSpeed           = zoneScrollSpeed,
         ZoneNoiseStrength         = zoneNoiseStrength,

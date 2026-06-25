@@ -85,6 +85,13 @@ public class SonarController : MonoBehaviour
 
     public void SetBoat(Transform boat) => boatTransform = boat;
 
+    public void SetGridArea(float horizontal, float vertical)
+    {
+        horizontalGridArea = horizontal;
+        verticalGridArea = vertical;
+        ConfigureGenerator();
+    }
+
     void OnEnable()
     {
         _hBlock = new MaterialPropertyBlock();

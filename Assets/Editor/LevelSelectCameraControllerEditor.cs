@@ -46,6 +46,7 @@ public class LevelSelectCameraControllerEditor : Editor
         EditorGUILayout.PropertyField(serializedObject.FindProperty("pitchMin"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("pitchMax"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("previewTarget"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("previewOrigin"));
 
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Editor Tools", EditorStyles.boldLabel);

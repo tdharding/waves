@@ -97,27 +97,15 @@ public class BoatController : MonoBehaviour
     // ---------------------------------------------------------
     void ApplyWaveHeightAndTilt()
     {
+        if (waterTransform == null || mat == null) return;
+
+        WaveUtils.WaveParams p = WaveUtils.ReadParams(waterTransform, mat);
         Vector3 pos = transform.position;
-        Vector3 waveCenter = waterTransform.position;
-
-        float frequency = mat.GetFloat(freqID);
-        float waveSpeed = mat.GetFloat(speedID);
-        float ripple = mat.GetFloat(depthID);
-
-        float phase = -(Time.time * waveSpeed);
-        float meshScale = waterTransform.localScale.x;
-
-        float Dist(Vector3 p)
-        {
-            return Vector3.Distance(p, waveCenter) / meshScale;
-        }
 
         //----------------------------------------------------------
         // WAVE HEIGHT
         //----------------------------------------------------------
-        float sine = Mathf.Sin(phase + Dist(pos) * frequency);
-        float amplitude = ripple * meshScale;
-        float height = sine * amplitude + extraYOffset;
+        float height = WaveUtils.SampleHeightSmooth(pos, p) + extraYOffset;
 
         // Keep the boat positioned vertically without breaking physics
         rb.position = new Vector3(rb.position.x, height, rb.position.z);
@@ -125,7 +113,7 @@ public class BoatController : MonoBehaviour
         //----------------------------------------------------------
         // SMOOTH DIRECTION DETECTOR + DEADZONE
         //----------------------------------------------------------
-        Vector3 radialDir = (pos - waveCenter).normalized;
+        Vector3 radialDir = (pos - p.origin).normalized;
         Vector3 moveDir   = transform.forward;
 
         float rawDot = Vector3.Dot(moveDir, radialDir);
@@ -157,8 +145,8 @@ public class BoatController : MonoBehaviour
         Vector3 front = pos + radialDir * tiltSampleOffset;
         Vector3 back  = pos - radialDir * tiltSampleOffset;
 
-        float frontH = Mathf.Sin(phase + Dist(front) * frequency) * amplitude;
-        float backH  = Mathf.Sin(phase + Dist(back)  * frequency) * amplitude;
+        float frontH = WaveUtils.SampleHeightSmooth(front, p);
+        float backH  = WaveUtils.SampleHeightSmooth(back, p);
 
         float pitchAmount = (backH - frontH);
 
@@ -180,8 +168,8 @@ public class BoatController : MonoBehaviour
         Vector3 right = pos + tangentDir * tiltSampleOffset;
         Vector3 left  = pos - tangentDir * tiltSampleOffset;
 
-        float rightH = Mathf.Sin(phase + Dist(right) * frequency) * amplitude;
-        float leftH  = Mathf.Sin(phase + Dist(left)  * frequency) * amplitude;
+        float rightH = WaveUtils.SampleHeightSmooth(right, p);
+        float leftH  = WaveUtils.SampleHeightSmooth(left, p);
 
         float rollAmount = (leftH - rightH);
         float rollAngle = Mathf.Clamp(rollAmount * rollMultiplier, -maxRollAngle, maxRollAngle);

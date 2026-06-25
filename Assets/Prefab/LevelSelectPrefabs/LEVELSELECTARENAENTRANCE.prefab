@@ -101,6 +101,154 @@ Transform:
   m_Children: []
   m_Father: {fileID: 3200962535003473596}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1515041947553896645
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4129215970543410383}
+  - component: {fileID: 2118153461875294208}
+  - component: {fileID: 8425581515590852838}
+  - component: {fileID: 6124933005110272913}
+  m_Layer: 0
+  m_Name: EntranceSplineRunIn
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &4129215970543410383
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1515041947553896645}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0.000000007450581, z: 0.9758986, w: 0.21822476}
+  m_LocalPosition: {x: 0, y: 6.55, z: 0.52}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 3200962535003473596}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 154.79}
+--- !u!114 &2118153461875294208
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1515041947553896645}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dab5c7d4c32e743048dfca98e2d5914f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Splines::UnityEngine.Splines.SplineContainer
+  m_Spline:
+    m_EditModeType: 1
+    m_Knots: []
+    m_MetaData: []
+    m_Closed: 0
+    m_IntData:
+      m_Data: []
+    m_FloatData:
+      m_Data: []
+    m_Float4Data:
+      m_Data: []
+    m_ObjectData:
+      m_Data: []
+  m_Splines:
+  - m_EditModeType: 1
+    m_Knots:
+    - Position:
+        x: 0
+        y: 0
+        z: 0
+      TangentIn:
+        x: 0
+        y: 0
+        z: 0
+      TangentOut:
+        x: 0
+        y: 0
+        z: 0
+      Rotation:
+        value:
+          x: 0.69189763
+          y: 0.14586867
+          z: 0.14586867
+          w: 0.69189763
+    - Position:
+        x: 0.58424854
+        y: -1.3363886
+        z: 0.000000059604645
+      TangentIn:
+        x: 0
+        y: 0
+        z: 0
+      TangentOut:
+        x: 0
+        y: 0
+        z: 0
+      Rotation:
+        value:
+          x: 0.6918973
+          y: 0.14586838
+          z: 0.14586873
+          w: 0.69189805
+    m_MetaData:
+    - Mode: 1
+      Tension: 0.5
+    - Mode: 1
+      Tension: 0.5
+    m_Closed: 0
+    m_IntData:
+      m_Data: []
+    m_FloatData:
+      m_Data: []
+    m_Float4Data:
+      m_Data: []
+    m_ObjectData:
+      m_Data: []
+  m_Knots:
+    m_KnotsLink: []
+--- !u!114 &8425581515590852838
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1515041947553896645}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bcfd573552e40744b886a2b8eb208c9b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RiverSegmentID
+  segmentID: 
+  isLeftPath: 0
+  isRightPath: 0
+  segmentType: 0
+  junctionGroup: 
+  leadsToArena: 0
+  arenaIsAtEnd: 1
+  extrudeOnExit: 0
+  reverseExtrude: 0
+  skipRegistration: 0
+--- !u!114 &6124933005110272913
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1515041947553896645}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 86c06f4c95c1ef848a663ff61568063b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EntranceSplineRunIn
 --- !u!1 &1900484462342391509
 GameObject:
   m_ObjectHideFlags: 0
@@ -224,6 +372,7 @@ Transform:
   - {fileID: 5063597348671496469}
   - {fileID: 6350045063846692727}
   - {fileID: 7778857984063831329}
+  - {fileID: 4129215970543410383}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: -90, y: -23.81, z: 0}
 --- !u!1 &4180301691313738305

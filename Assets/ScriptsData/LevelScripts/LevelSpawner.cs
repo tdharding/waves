@@ -45,6 +45,10 @@ public class LevelSpawner : MonoBehaviour
     [SerializeField] float mazeMoveDuration = 2f;
     [SerializeField] AudioSource mazeSound;
 
+    [Header("Spline Walls")]
+    [SerializeField] GameObject splineWallPrefab;
+    [SerializeField] GameObject splineNodePointPrefab;
+
     [Header("Fishing")]
     [SerializeField] FishingController fishingController;
 
@@ -65,6 +69,8 @@ public class LevelSpawner : MonoBehaviour
     public Bounds GetArenaBounds() => cachedArenaBounds;
     private float spawnedBaselineWaterY;
     public float GetBaselineWaterY() => spawnedBaselineWaterY;
+    private BaselineMarker activeBaselineMarker;
+    public BaselineMarker GetBaselineMarker() => activeBaselineMarker;
 
     // =====================================================
     // GRID DATA INJECTION
@@ -83,14 +89,6 @@ public class LevelSpawner : MonoBehaviour
 
         if (activeArenaProfile == null)
             Debug.LogWarning($"[LevelSpawner] No ArenaProfile on GridData '{data.name}'. Assign one in the Grid Designer.");
-
-        if (activeArenaProfile?.arenaSizeReferencePlane != null)
-        {
-            GameObject refObj  = Instantiate(activeArenaProfile.arenaSizeReferencePlane);
-            referencePlane     = refObj.GetComponent<Renderer>();
-            referencePlane.enabled = false;
-
-        }
 
     }
 
@@ -116,9 +114,10 @@ public class LevelSpawner : MonoBehaviour
     public void SpawnMaze()
     {
         if (mazeSpawned) { Debug.Log("[LevelSpawner] SpawnMaze — already spawned, skipping."); return; }
-        if (!activeGridData || !referencePlane || !spawnParent)
+        
+        if (!activeGridData || !spawnParent)
         {
-            Debug.LogWarning($"[LevelSpawner] SpawnMaze EARLY EXIT — activeGridData={activeGridData != null} referencePlane={referencePlane != null} spawnParent={spawnParent != null}");
+            Debug.LogWarning($"[LevelSpawner] SpawnMaze EARLY EXIT — activeGridData={activeGridData != null} spawnParent={spawnParent != null}");
             return;
         }
 
@@ -127,14 +126,17 @@ public class LevelSpawner : MonoBehaviour
         if (activeGridData.orbCellIndices == null)
             activeGridData.orbCellIndices = new List<int>();
 
-        Bounds  b      = referencePlane.bounds;
+        float r = activeArenaProfile != null ? activeArenaProfile.WorldArenaRadius : 20f;
+        Bounds b = new Bounds(Vector3.zero, new Vector3(r * 2, 0, r * 2));
+        
         cachedArenaBounds = b;
-        float   tileX  = b.size.x / GridData.GridSize;
-        float   tileZ  = b.size.z / GridData.GridSize;
+float   tileX  = b.size.x / GridData.GridSize;
+float   tileZ  = b.size.z / GridData.GridSize;
         Vector3 origin = b.min;
 
         // ── Baseline water Y — single source of truth for all tier/water positioning ──
         var baselineMarker = activeArenaProfile?.outerWallsPrefab?.GetComponentInChildren<BaselineMarker>();
+        activeBaselineMarker = baselineMarker;
         spawnedBaselineWaterY = baselineMarker?.height ?? spawnParent.position.y;
         Quaternion baselineRot = baselineMarker != null
             ? Quaternion.LookRotation(baselineMarker.transform.forward, Vector3.up)
@@ -288,6 +290,9 @@ public class LevelSpawner : MonoBehaviour
         // ── Soul Fish — spawned before offset/rotation so they move with spawnParent ──
         SpawnSoulFish(origin, tileX, tileZ);
 
+        // ── Spline Walls — must be before Y180 rotation so they move with spawnParent ──
+        SpawnSplineWalls();
+
         if (!mazeRotated)
         {
             spawnParent.position += postSpawnPositionOffset;
@@ -354,6 +359,115 @@ public class LevelSpawner : MonoBehaviour
         Debug.Log("MazeSpawned = true");
     }
 
+    // =====================================================
+    // SPLINE WALL SPAWNING
+    // =====================================================
+
+    private void SpawnSplineWalls()
+    {
+        if (activeGridData?.splineWallPaths == null || activeGridData.splineWallPaths.Count == 0) return;
+
+        var baselineAlign = splineWallPrefab != null
+            ? splineWallPrefab.GetComponentInChildren<PrefabBaselineAlignment>() : null;
+        float defaultContactY = baselineAlign != null ? baselineAlign.transform.localPosition.y : 0f;
+
+        // Nodes are stored in normalised grid space (-0.5..0.5). Scale by arena width for world positions.
+        float arenaWidth = activeArenaProfile != null ? activeArenaProfile.WorldArenaWidth : 12f;
+
+        foreach (var path in activeGridData.splineWallPaths)
+        {
+            if (path?.nodes == null || path.nodes.Count < 2) continue;
+
+            var prefab = path.prefabOverride != null ? path.prefabOverride : splineWallPrefab;
+            if (prefab == null) { Debug.LogWarning("[LevelSpawner] SplineWall: no prefab assigned."); continue; }
+
+            var align    = prefab.GetComponentInChildren<PrefabBaselineAlignment>();
+            float cY     = align != null ? align.transform.localPosition.y : defaultContactY;
+            float spawnY = spawnedBaselineWaterY - cY;
+
+            // tileSpacing is world units; convert to normalised space for WalkSpline
+            float normStep = Mathf.Max(0.001f, path.tileSpacing / arenaWidth);
+
+            WalkSpline(path.nodes, path.isClosed, path.IsSegmentCurved, normStep, (pos2d, tangent) =>
+            {
+                float   angle = Mathf.Atan2(tangent.x, tangent.y) * Mathf.Rad2Deg;
+                Vector3 pos   = new Vector3(pos2d.x * arenaWidth, spawnY, pos2d.y * arenaWidth);
+                Instantiate(prefab, pos, Quaternion.Euler(0f, angle, 0f), spawnParent);
+            });
+
+            // Spawn node point markers at each control node
+            if (splineNodePointPrefab != null)
+            {
+                var nodeAlign      = splineNodePointPrefab.GetComponentInChildren<PrefabBaselineAlignment>();
+                float nodeContactY = nodeAlign != null ? nodeAlign.transform.localPosition.y : 0f;
+                float nodeSpawnY   = spawnedBaselineWaterY - nodeContactY;
+
+                foreach (var node in path.nodes)
+                {
+                    Vector3 nodePos = new Vector3(node.x * arenaWidth, nodeSpawnY, node.y * arenaWidth);
+                    Instantiate(splineNodePointPrefab, nodePos, Quaternion.identity, spawnParent);
+                }
+            }
+        }
+    }
+
+    static void WalkSpline(List<Vector2> pts, bool closed, System.Func<int,bool> isCurvedSeg, float spacing, System.Action<Vector2, Vector2> onSpawn)
+    {
+        int       n        = pts.Count;
+        int       segCount = closed ? n : n - 1;
+        const int steps    = 30;
+
+        float   accumulated = 0f;
+        float   nextSpawn   = 0f;
+        bool    firstCurved = isCurvedSeg(0);
+        Vector2 prev        = firstCurved ? SplineSample(pts, 0, 0f, closed) : pts[0];
+
+        for (int seg = 0; seg < segCount; seg++)
+        {
+            bool curved      = isCurvedSeg(seg);
+            int stepsThisSeg = curved ? steps : 1;
+            for (int s = 1; s <= stepsThisSeg; s++)
+            {
+                float   lt   = (float)s / stepsThisSeg;
+                int     i2   = closed ? (seg + 1) % n : Mathf.Min(seg + 1, n - 1);
+                Vector2 curr = curved ? SplineSample(pts, seg, lt, closed) : Vector2.Lerp(pts[seg], pts[i2], lt);
+                float   dist = Vector2.Distance(prev, curr);
+                accumulated += dist;
+
+                while (nextSpawn <= accumulated)
+                {
+                    float   back    = accumulated - nextSpawn;
+                    float   frac    = dist > 0.0001f ? 1f - back / dist : 1f;
+                    Vector2 spawnPt = Vector2.Lerp(prev, curr, frac);
+                    Vector2 tangent = dist > 0.0001f ? (curr - prev).normalized : Vector2.up;
+                    onSpawn(spawnPt, tangent);
+                    nextSpawn += spacing;
+                }
+                prev = curr;
+            }
+        }
+    }
+
+    static Vector2 SplineSample(List<Vector2> pts, int seg, float t, bool closed)
+    {
+        int n  = pts.Count;
+        int i0 = closed ? (seg - 1 + n) % n : Mathf.Max(seg - 1, 0);
+        int i1 = seg;
+        int i2 = closed ? (seg + 1) % n : Mathf.Min(seg + 1, n - 1);
+        int i3 = closed ? (seg + 2) % n : Mathf.Min(seg + 2, n - 1);
+        return CatmullRom2D(pts[i0], pts[i1], pts[i2], pts[i3], t);
+    }
+
+    static Vector2 CatmullRom2D(Vector2 p0, Vector2 p1, Vector2 p2, Vector2 p3, float t)
+    {
+        float t2 = t * t, t3 = t2 * t;
+        return 0.5f * (
+            2f * p1 +
+            (-p0 + p2) * t +
+            (2f * p0 - 5f * p1 + 4f * p2 - p3) * t2 +
+            (-p0 + 3f * p1 - 3f * p2 + p3) * t3);
+    }
+
     private void ProcessLinkedPairs(Dictionary<string, GameObject> spawnedByCell)
     {
         if (activeGridData.linkedPairs == null) return;
@@ -373,6 +487,7 @@ public class LevelSpawner : MonoBehaviour
                 if (controller != null && tube != null)
                 {
                     tube.SetTargetModifier(controller);
+                    tube.SetFishingController(fishingController);
                     if (trigger != null) controller.SetTrigger(trigger);
                     Debug.Log($"[LevelSpawner] Linked modifier at {modKey} to tube at {tubeKey} (Trigger found: {trigger != null})");
                 }
@@ -425,6 +540,7 @@ else if (controller != null)
                     prefab:      activeArenaProfile?.entrancePrefabOverride ?? entrance.prefab,
                     angle:       entrance.perimeterAngle,
                     tierSlot:    entrance.tierSlot,
+                    spawnRadius: entrance.spawnRadius,
                     centre:      centre,
                     tierOffsets: tierOffsets
                 );
@@ -439,7 +555,7 @@ else if (controller != null)
 
     // Returns the spawned reality-layer instance (null if no prefab). Used by SpawnArenaPortals to stamp LevelExitController.
     private GameObject SpawnPortalPrefab(GameObject prefab,
-                                         float angle, int tierSlot,
+                                         float angle, int tierSlot, float spawnRadius,
                                          Vector3 centre, float[] tierOffsets)
     {
         if (prefab == null) return null;
@@ -458,9 +574,21 @@ else if (controller != null)
                  : tier.yOffset;
         }
 
-        Vector3    pos = new Vector3(centre.x, y, centre.z);
+        Vector3 pos;
+        if (activeArenaProfile != null)
+        {
+            float r = activeArenaProfile.WorldArenaRadius;
+            Vector3 dir = Quaternion.Euler(0f, angle, 0f) * Vector3.forward;
+            // spawnRadius is "Inward" offset from the discRadius perimeter
+            pos = new Vector3(centre.x + dir.x * (r - spawnRadius), y, centre.z + dir.z * (r - spawnRadius));
+        }
+        else
+        {
+            pos = new Vector3(centre.x, y, centre.z);
+        }
+
         Quaternion rot = Quaternion.Euler(0f, angle, 0f);
-        if (applyMinus90XRotation) rot *= Quaternion.Euler(-90f, 0f, 0f);
+if (applyMinus90XRotation) rot *= Quaternion.Euler(-90f, 0f, 0f);
         return Instantiate(prefab, pos, rot, spawnParent);
     }
 

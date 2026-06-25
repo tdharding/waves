@@ -3,6 +3,12 @@
 uniform float4 _WhirlpoolPositions[8];
 #endif
 
+// Global phase provided by WaveMaterialController to prevent teleporting waves
+#ifndef WAVE_PHASE_DECLARED
+#define WAVE_PHASE_DECLARED
+float _WavePhase;
+#endif
+
 void WavesAndWhirlpools_float(
     float3 PositionIn,
     float4 WaveCenter,
@@ -24,7 +30,10 @@ void WavesAndWhirlpools_float(
     float2 toCenter = PositionIn.xy - float2(WaveCenter.x, -WaveCenter.z);
     float  dist     = length(toCenter);
     float  stepped  = floor(dist * WaveStepRate) / max(WaveStepRate, 0.0001);
-    float  wave     = sin(stepped * Frequency - Time * Speed) * RippleDepth;
+
+    // Using accumulated _WavePhase global instead of Time * Speed to prevent "skipping" 
+    // when Speed or Frequency changes.
+    float  wave     = sin(stepped * Frequency - _WavePhase) * RippleDepth;
     PositionOut.z  -= wave;
 
     // Whirlpools — also use XY for horizontal distance

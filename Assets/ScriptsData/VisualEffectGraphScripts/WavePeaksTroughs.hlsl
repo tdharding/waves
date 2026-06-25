@@ -1,3 +1,9 @@
+// Global phase provided by WaveMaterialController to prevent teleporting waves
+#ifndef WAVE_PHASE_DECLARED
+#define WAVE_PHASE_DECLARED
+float _WavePhase;
+#endif
+
 void WavePeaksTroughs_float(
     float3 PositionIn,
     float4 WaveCenter,
@@ -17,7 +23,8 @@ void WavePeaksTroughs_float(
     float  stepped  = floor(dist * WaveStepRate) / max(WaveStepRate, 0.0001);
 
     // Re-derive wave height — same formula as vertex stage, no RippleDepth multiply needed
-    float  height   = sin(stepped * Frequency - Time * Speed); // -1 to +1
+    // Using accumulated _WavePhase global instead of Time * Speed to prevent "skipping" 
+    float  height   = sin(stepped * Frequency - _WavePhase); // -1 to +1
     float  height01 = height * 0.5 + 0.5;                      // 0 = trough, 1 = peak
 
     // Whirlpool pulls surface into a deep trough

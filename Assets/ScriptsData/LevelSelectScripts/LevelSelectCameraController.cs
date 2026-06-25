@@ -36,6 +36,7 @@ public class LevelSelectCameraController : MonoBehaviour
 
     [Header("Editor Preview")]
     [SerializeField] private Transform previewTarget;
+    [SerializeField] private Vector3   previewOrigin;   // world position the boat starts at — set by spawner
 
     public bool IsControlEnabled { get; set; } = true;
 
@@ -56,12 +57,23 @@ public class LevelSelectCameraController : MonoBehaviour
     private void Start()
     {
         _currentDistance = followDistance;
+        // Self-initialise if the data controller hasn't called SetFollowTarget yet
+        if (_boatTarget == null && previewTarget != null)
+        {
+            Debug.Log($"[CameraController] Start: _boatTarget null, self-initialising from previewTarget '{previewTarget.name}'");
+            SetFollowTarget(previewTarget);
+        }
+        else if (_boatTarget == null)
+        {
+            Debug.LogWarning("[CameraController] Start: _boatTarget null and no previewTarget — camera has no follow target.");
+        }
     }
 
     // Called by LevelSelectDataController at runtime
     public void SetFollowTarget(Transform target)
     {
         _boatTarget = target;
+        Debug.Log($"[CameraController] SetFollowTarget: target='{(target != null ? target.name : "NULL")}', cam='{(cam != null ? cam.name : "NULL")}'");
 
         if (_orbitPivot == null)
         {
@@ -75,30 +87,34 @@ public class LevelSelectCameraController : MonoBehaviour
 
             if (useManualStartingState)
             {
-                _yaw = manualStartYaw;
-                _pitch = manualStartPitch;
+                _yaw             = manualStartYaw;
+                _pitch           = manualStartPitch;
                 _currentDistance = manualStartDistance;
+                Debug.Log($"[CameraController] SetFollowTarget: MANUAL start — yaw={_yaw}, pitch={_pitch}, dist={_currentDistance}");
             }
             else
             {
-                // Derive starting angle from the camera's current world position
                 Vector3 offset = cam.transform.position - _boatTarget.position;
-                Vector3 dir = offset.normalized;
+                Vector3 dir    = offset.normalized;
                 if (dir == Vector3.zero) dir = Vector3.back;
 
-                _yaw = Mathf.Atan2(dir.x, dir.z) * Mathf.Rad2Deg;
-                _pitch = -Mathf.Asin(Mathf.Clamp(dir.y, -1f, 1f)) * Mathf.Rad2Deg;
-                _pitch = Mathf.Clamp(_pitch, pitchMin, pitchMax);
+                _yaw             = Mathf.Atan2(dir.x, dir.z) * Mathf.Rad2Deg;
+                _pitch           = -Mathf.Asin(Mathf.Clamp(dir.y, -1f, 1f)) * Mathf.Rad2Deg;
+                _pitch           = Mathf.Clamp(_pitch, pitchMin, pitchMax);
                 _currentDistance = Mathf.Clamp(offset.magnitude, minDistance, maxDistance);
+                Debug.Log($"[CameraController] SetFollowTarget: DERIVED start — camPos={cam.transform.position}, boatPos={_boatTarget.position}, offset={offset}, yaw={_yaw:F2}, pitch={_pitch:F2}, dist={_currentDistance:F2}");
             }
 
-            _orbitPivot.rotation = Quaternion.Euler(_pitch, _yaw, 0f);
+            _orbitPivot.rotation       = Quaternion.Euler(_pitch, _yaw, 0f);
+            _introRelativeRotation     = Quaternion.Inverse(_boatTarget.rotation) * _orbitPivot.rotation;
 
-            // Capture initial relative rotation for the intro follow
-            _introRelativeRotation = Quaternion.Inverse(_boatTarget.rotation) * _orbitPivot.rotation;
-            
-            // Initial positioning
             ApplyCameraState();
+            Debug.Log($"[CameraController] SetFollowTarget: final cam position={cam.transform.position}, rotation={cam.transform.eulerAngles}");
+        }
+        else
+        {
+            if (_boatTarget == null) Debug.LogWarning("[CameraController] SetFollowTarget: target is NULL — camera will not initialise.");
+            if (cam == null)         Debug.LogWarning("[CameraController] SetFollowTarget: 'cam' field is NULL — assign the CinemachineCamera.");
         }
     }
 
@@ -222,30 +238,35 @@ public class LevelSelectCameraController : MonoBehaviour
     private void InternalEditorPreview(float p, float y, float d, string undoName)
     {
         if (cam == null) return;
-        Transform target = previewTarget;
-        if (target == null)
+
+        // Use the stored preview origin (boat's game-start world position) if set by spawner.
+        // Fall back to the previewTarget transform, then search the scene.
+        Vector3 pivot;
+        if (previewOrigin != Vector3.zero)
         {
-            var boat = Object.FindAnyObjectByType<LevelSelectBoatControl>();
-            if (boat != null) target = boat.BoatTransform;
+            pivot = previewOrigin;
         }
-        
-        // Safety: Don't use the camera as its own target
-        if (target == null || target == cam.transform) 
+        else
         {
-            Debug.LogWarning("[CameraController] No valid preview target found. Assign the Boat to 'Preview Target'.");
-            return;
+            Transform target = previewTarget;
+            if (target == null)
+            {
+                var boat = Object.FindAnyObjectByType<LevelSelectBoatControl>();
+                if (boat != null) target = boat.BoatTransform;
+            }
+            if (target == null || target == cam.transform)
+            {
+                Debug.LogWarning("[CameraController] No valid preview target found. Set 'Preview Origin' or assign the Boat to 'Preview Target'.");
+                return;
+            }
+            pivot = target.position;
         }
 
         Undo.RecordObject(cam.transform, undoName);
-        
-        // Force distance to be at least small positive to avoid camera flipping
+
         d = Mathf.Max(d, 0.1f);
-
         Quaternion rotation = Quaternion.Euler(p, y, 0f);
-        Vector3 offset = rotation * (Vector3.back * d);
-
-        // Explicit world position calculation
-        cam.transform.position = target.position + offset;
+        cam.transform.position = pivot + rotation * (Vector3.back * d);
         cam.transform.rotation = rotation;
     }
 #endif

@@ -178,7 +178,6 @@ Transform:
   - {fileID: 9018882980638937}
   - {fileID: 1473015679857748393}
   - {fileID: 6642932603362548387}
-  - {fileID: 4658917059899710227}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &14147224759018174
@@ -195,13 +194,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SoulFishInputTube
   localSpline: {fileID: 1220300225781093163}
   targetModifier: {fileID: 0}
-  fishPrefab: {fileID: 4524349162463559140}
+  fishingController: {fileID: 0}
+  fishPrefab: {fileID: 1019405579569507755, guid: c9a7a1fabeb26f04ab236a92e309a60b, type: 3}
   tubeExtrudePrefab: {fileID: 2215127129855429466, guid: fbff2a76bfebe0c4a8574cfa0da02282, type: 3}
   tubeMaterial: {fileID: 2100000, guid: 44fb2336382538743a3e39d5a2f5824b, type: 2}
   travelSpeed: 0.4
-  curveStrength: 1.5
-  joinKnotCount: 9
-  tubeGlowRadius: 1
+  curveStrength: 4.57
+  joinKnotCount: 3
+  tubeGlowRadius: 0.05
   tubeGlowIntensity: 4
 --- !u!1 &9112356510660160673
 GameObject:
@@ -355,73 +355,6 @@ MonoBehaviour:
       m_Data: []
   m_Knots:
     m_KnotsLink: []
---- !u!1001 &3525210675644420175
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 5002501005402672165}
-    m_Modifications:
-    - target: {fileID: 1019405579569507755, guid: c9a7a1fabeb26f04ab236a92e309a60b, type: 3}
-      propertyPath: m_Name
-      value: SoulFishTUBULAR
-      objectReference: {fileID: 0}
-    - target: {fileID: 8091803114252208988, guid: c9a7a1fabeb26f04ab236a92e309a60b, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8091803114252208988, guid: c9a7a1fabeb26f04ab236a92e309a60b, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8091803114252208988, guid: c9a7a1fabeb26f04ab236a92e309a60b, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8091803114252208988, guid: c9a7a1fabeb26f04ab236a92e309a60b, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 8091803114252208988, guid: c9a7a1fabeb26f04ab236a92e309a60b, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8091803114252208988, guid: c9a7a1fabeb26f04ab236a92e309a60b, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8091803114252208988, guid: c9a7a1fabeb26f04ab236a92e309a60b, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8091803114252208988, guid: c9a7a1fabeb26f04ab236a92e309a60b, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8091803114252208988, guid: c9a7a1fabeb26f04ab236a92e309a60b, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8091803114252208988, guid: c9a7a1fabeb26f04ab236a92e309a60b, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: c9a7a1fabeb26f04ab236a92e309a60b, type: 3}
---- !u!1 &4524349162463559140 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 1019405579569507755, guid: c9a7a1fabeb26f04ab236a92e309a60b, type: 3}
-  m_PrefabInstance: {fileID: 3525210675644420175}
-  m_PrefabAsset: {fileID: 0}
---- !u!4 &4658917059899710227 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 8091803114252208988, guid: c9a7a1fabeb26f04ab236a92e309a60b, type: 3}
-  m_PrefabInstance: {fileID: 3525210675644420175}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &4504968066861264067
 PrefabInstance:
   m_ObjectHideFlags: 0

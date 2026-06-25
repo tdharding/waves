@@ -95,6 +95,31 @@ public class GridDesignerWindow : EditorWindow
     bool _isDrawingSoulArea;
 
     // Select tool state
+    enum SelectionType
+    {
+        None,
+        SoulZoneNode,
+        PrefabPlacement,
+        Whirlpool,
+        Orb,
+        WaterModifier,
+        WaveModifier,
+        GridSlot,
+        SplineWallNode   // index = path index, subIndex = node index within path
+    }
+
+    struct SelectionInfo
+    {
+        public SelectionType type;
+        public int           cellIndex;
+        public int           tierIndex; // -1 for base
+        public int           index;     // index in list (e.g. soul zone index, whirlpool index)
+        public int           subIndex;  // e.g. node index within soul zone
+        public int           value;     // for GridSlot (slot id)
+        public bool          isCircle;  // for GridSlot/Prefab
+    }
+
+    SelectionInfo _currentSelection;
     int  _selectedZoneIndex = -1;
     int  _selectedNodeIndex = -1;
     bool _isDraggingNode    = false;
@@ -153,6 +178,13 @@ public class GridDesignerWindow : EditorWindow
     bool _isWaitingForTubePlacement = false;
     int  _pendingModifierCellIndex  = -1;
     int  _pendingModifierTierIndex  = -1;
+
+    // Spline wall mode
+    bool _drawSplineWall      = false;
+    bool _showSplineWalls     = true;
+    int  _activeSplinePathIdx = 0;
+    int  _dragSplinePathIdx   = -1;
+    int  _dragSplineNodeIdx   = -1;
 
     Stack<GridSnapshot> undoStack = new Stack<GridSnapshot>();
     const int MaxUndoSteps = 50;
@@ -303,18 +335,24 @@ public class GridDesignerWindow : EditorWindow
     {
         EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
 
-        SetToolbarButton("⊕ Select",     drawSelect,   new Color(0.4f,0.8f,1f),  () => { activeSlot = -1; drawSelect = true; drawSoulArea = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false; });
-        SetToolbarButton("★ Soul",       drawSoulArea, Color.yellow,             () => { activeSlot = -1; drawSoulArea = true; drawSelect = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false; ClearSelectState(); });
-        SetToolbarButton("◎ Orb",        drawOrb,      Color.white,              () => { activeSlot = -1; drawOrb = true; drawCircle = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = false; });
-        SetToolbarButton("〇 Whirl",     drawWhirlpool, new Color(0.7f,0.4f,1f), () => { activeSlot = -1; drawWhirlpool = true; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = false; });
-        SetToolbarButton("✕ Eraser",    activeSlot == 0, new Color(1f,0.5f,0.5f), () => { activeSlot = 0; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = drawDirectPrefab = drawSelect = false; ClearSelectState(); _isWaitingForTubePlacement = false; });
+        SetToolbarButton("⊕ Select",  drawSelect,    new Color(0.4f,0.8f,1f),  () => { activeSlot = -1; _drawSplineWall = false; drawSelect = true; drawSoulArea = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false; });
+        SetToolbarButton("★ Soul",    drawSoulArea,  Color.yellow,             () => { activeSlot = -1; _drawSplineWall = false; drawSoulArea = true; drawSelect = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false; ClearSelectState(); LogSelection(_currentSelection); });
+        SetToolbarButton("◎ Orb",     drawOrb,       Color.white,              () => { activeSlot = -1; _drawSplineWall = false; drawOrb = true; drawCircle = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = false; });
+        SetToolbarButton("〇 Whirl",  drawWhirlpool, new Color(0.7f,0.4f,1f), () => { activeSlot = -1; _drawSplineWall = false; drawWhirlpool = true; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = false; });
+        SetToolbarButton("✕ Eraser", activeSlot == 0, new Color(1f,0.5f,0.5f), () => { activeSlot = 0; _drawSplineWall = false; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = drawDirectPrefab = drawSelect = false; ClearSelectState(); LogSelection(_currentSelection); _isWaitingForTubePlacement = false; });
+        SetToolbarButton("≋ Walls",  _drawSplineWall, new Color(1f,0.7f,0.2f), () => { activeSlot = -1; _drawSplineWall = true; drawSelect = drawSoulArea = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = drawDirectPrefab = false; ClearSelectState(); _isWaitingForTubePlacement = false; });
 
         EditorGUILayout.EndHorizontal();
 
         // Status hints
-        if (_isDrawingSoulArea || drawSelect || _isWaitingForTubePlacement)
+        GUIStyle hint = new GUIStyle(EditorStyles.miniLabel) { wordWrap = true };
+        if (_drawSplineWall)
         {
-            GUIStyle hint = new GUIStyle(EditorStyles.miniLabel) { wordWrap = true };
+            hint.normal.textColor = new Color(1f, 0.7f, 0.2f);
+            GUILayout.Label("Left-click: place node  |  Drag node: move  |  Right-click node: delete  |  Esc: deselect path", hint);
+        }
+        else if (_isDrawingSoulArea || drawSelect || _isWaitingForTubePlacement)
+        {
             if (_isWaitingForTubePlacement)
             {
                 hint.normal.textColor = Color.cyan;
@@ -947,6 +985,10 @@ public class GridDesignerWindow : EditorWindow
         _showLevelIdentity = EditorGUILayout.Foldout(_showLevelIdentity, "Level Identity", true, EditorStyles.foldoutHeader);
         if (!_showLevelIdentity) return;
 
+        GUI.enabled = false;
+        EditorGUILayout.ObjectField("Asset", loadedData, typeof(GridData), false);
+        GUI.enabled = true;
+
         EditorGUI.BeginChangeCheck();
         string newID   = EditorGUILayout.TextField("Level ID",     loadedData.levelID);
         string newName = EditorGUILayout.TextField("Display Name", loadedData.displayName);
@@ -1176,6 +1218,7 @@ public class GridDesignerWindow : EditorWindow
         _selectedNodeIndex = -1;
         _isDraggingNode    = false;
         _dragCurrentCell   = -1;
+        _currentSelection  = new SelectionInfo { type = SelectionType.None };
         CancelBridge();
     }
 
@@ -1239,6 +1282,225 @@ public class GridDesignerWindow : EditorWindow
             }
         }
         zoneIdx = -1; nodeIdx = -1; return false;
+    }
+
+    SelectionInfo FindAnythingAtCell(int cellIndex)
+    {
+        SelectionInfo info = new SelectionInfo { type = SelectionType.None, cellIndex = cellIndex, tierIndex = activeTierIndex };
+
+        // 1. Soul Zone Nodes (High priority as they are small dots)
+        if (FindNodeAtCell(cellIndex, out int zi, out int ni))
+        {
+            info.type = SelectionType.SoulZoneNode;
+            info.index = zi;
+            info.subIndex = ni;
+            return info;
+        }
+
+        // 2. Prefab Placements
+        if (activeTierIndex >= 0 && loadedData.tiers != null && activeTierIndex < loadedData.tiers.Count)
+        {
+            var tier = loadedData.tiers[activeTierIndex];
+            int pIdx = tier.prefabPlacements?.FindIndex(p => p.cellIndex == cellIndex) ?? -1;
+            if (pIdx >= 0)
+            {
+                info.type = SelectionType.PrefabPlacement;
+                info.index = pIdx;
+                return info;
+            }
+        }
+        else
+        {
+            int pIdx = loadedData.prefabPlacements?.FindIndex(p => p.cellIndex == cellIndex) ?? -1;
+            if (pIdx >= 0)
+            {
+                info.type = SelectionType.PrefabPlacement;
+                info.tierIndex = -1;
+                info.index = pIdx;
+                return info;
+            }
+        }
+
+        // 3. Whirlpools
+        int wIdx = loadedData.whirlpools?.FindIndex(w => w.cellIndex == cellIndex) ?? -1;
+        if (wIdx >= 0)
+        {
+            info.type = SelectionType.Whirlpool;
+            info.index = wIdx;
+            return info;
+        }
+
+        // 4. Modifiers
+        var waterMods = GetActiveTierWaterModifiers();
+        if (waterMods.Contains(cellIndex))
+        {
+            info.type = SelectionType.WaterModifier;
+            return info;
+        }
+
+        var waveMods = GetActiveTierWaveModifiers();
+        if (waveMods.Contains(cellIndex))
+        {
+            info.type = SelectionType.WaveModifier;
+            return info;
+        }
+
+        // 5. Orbs (Base layer only)
+        if (activeTierIndex == -1 && loadedData.orbCellIndices != null && loadedData.orbCellIndices.Contains(cellIndex))
+        {
+            info.type = SelectionType.Orb;
+            return info;
+        }
+
+        // 6. Grid Slots
+        if (activeTierIndex >= 0 && loadedData.tiers != null && activeTierIndex < loadedData.tiers.Count)
+        {
+            var tier = loadedData.tiers[activeTierIndex];
+            if (tier.cells != null && tier.cells[cellIndex] > 0)
+            {
+                info.type = SelectionType.GridSlot;
+                info.value = tier.cells[cellIndex];
+                return info;
+            }
+        }
+        else
+        {
+            if (circleGrid[cellIndex] > 0)
+            {
+                info.type = SelectionType.GridSlot;
+                info.isCircle = true;
+                info.value = circleGrid[cellIndex];
+                return info;
+            }
+            if (squareGrid[cellIndex] > 0)
+            {
+                info.type = SelectionType.GridSlot;
+                info.isCircle = false;
+                info.value = squareGrid[cellIndex];
+                return info;
+            }
+        }
+
+        return new SelectionInfo { type = SelectionType.None };
+    }
+
+    void LogSelection(SelectionInfo info)
+    {
+        if (info.type == SelectionType.None)
+        {
+            GridLog("Deselected.");
+            return;
+        }
+
+        string tierStr = info.tierIndex == -1 ? "Base" : $"T{info.tierIndex + 1}";
+        string loc = $"at cell {info.cellIndex} ({tierStr})";
+
+        switch (info.type)
+        {
+            case SelectionType.SoulZoneNode:
+                GridLog($"Selected: Soul Zone {info.index} Node {info.subIndex + 1} {loc}");
+                break;
+            case SelectionType.PrefabPlacement:
+                var placements = info.tierIndex == -1 ? loadedData.prefabPlacements : loadedData.tiers[info.tierIndex].prefabPlacements;
+                string pName = (info.index >= 0 && info.index < placements.Count && placements[info.index].prefab != null) 
+                    ? placements[info.index].prefab.name : "Prefab";
+                GridLog($"Selected: {pName} {loc}");
+                break;
+            case SelectionType.Whirlpool:
+                GridLog($"Selected: Whirlpool {info.index + 1} {loc}");
+                break;
+            case SelectionType.Orb:
+                GridLog($"Selected: Orb {loc}");
+                break;
+            case SelectionType.WaterModifier:
+                GridLog($"Selected: Water Modifier {loc}");
+                break;
+            case SelectionType.WaveModifier:
+                GridLog($"Selected: Wave Modifier {loc}");
+                break;
+            case SelectionType.GridSlot:
+                string note = (info.value >= 0 && info.value < slotNotes.Count) ? slotNotes[info.value] : "";
+                string shape = info.isCircle ? "Circle" : "Square";
+                GridLog($"Selected: Slot {info.value} ({shape}) {loc} {(string.IsNullOrEmpty(note) ? "" : " - " + note)}");
+                break;
+        }
+    }
+
+    void MoveSelection(SelectionInfo info, int newCellIndex)
+    {
+        if (info.type == SelectionType.None || info.cellIndex == newCellIndex) return;
+
+        Undo.RecordObject(loadedData, "Move Selection");
+        PushUndoSnapshot();
+
+        string tierStr = info.tierIndex == -1 ? "Base" : $"T{info.tierIndex + 1}";
+        GridLog($"Moved selection from {info.cellIndex} to {newCellIndex} ({tierStr})");
+
+        switch (info.type)
+        {
+            case SelectionType.SoulZoneNode:
+                var zone = loadedData.soulZones[info.index];
+                zone.nodes[info.subIndex] = newCellIndex;
+                _selectedNodeIndex = info.subIndex;
+                _selectedZoneIndex = info.index;
+                break;
+
+            case SelectionType.PrefabPlacement:
+                List<GridData.PrefabPlacement> placements = info.tierIndex == -1 
+                    ? loadedData.prefabPlacements 
+                    : loadedData.tiers[info.tierIndex].prefabPlacements;
+                placements[info.index].cellIndex = newCellIndex;
+                break;
+
+            case SelectionType.Whirlpool:
+                loadedData.whirlpools[info.index].cellIndex = newCellIndex;
+                break;
+
+            case SelectionType.Orb:
+                loadedData.orbCellIndices.Remove(info.cellIndex);
+                if (!loadedData.orbCellIndices.Contains(newCellIndex))
+                    loadedData.orbCellIndices.Add(newCellIndex);
+                break;
+
+            case SelectionType.WaterModifier:
+                var waterMods = info.tierIndex == -1 
+                    ? loadedData.waterLevelModifierCellIndices 
+                    : loadedData.tiers[info.tierIndex].waterLevelModifierCellIndices;
+                waterMods.Remove(info.cellIndex);
+                if (!waterMods.Contains(newCellIndex)) waterMods.Add(newCellIndex);
+                break;
+
+            case SelectionType.WaveModifier:
+                var waveMods = info.tierIndex == -1 
+                    ? loadedData.waveModifierCellIndices 
+                    : loadedData.tiers[info.tierIndex].waveModifierCellIndices;
+                waveMods.Remove(info.cellIndex);
+                if (!waveMods.Contains(newCellIndex)) waveMods.Add(newCellIndex);
+                break;
+
+            case SelectionType.GridSlot:
+                if (info.tierIndex >= 0)
+                {
+                    var tier = loadedData.tiers[info.tierIndex];
+                    tier.cells[info.cellIndex] = 0;
+                    tier.cells[newCellIndex] = info.value;
+                }
+                else if (info.isCircle)
+                {
+                    circleGrid[info.cellIndex] = 0;
+                    circleGrid[newCellIndex] = info.value;
+                }
+                else
+                {
+                    squareGrid[info.cellIndex] = 0;
+                    squareGrid[newCellIndex] = info.value;
+                }
+                break;
+        }
+
+        _currentSelection.cellIndex = newCellIndex;
+        EditorUtility.SetDirty(loadedData);
+        Repaint();
     }
 
     void CommitBridge()
@@ -1718,8 +1980,12 @@ public class GridDesignerWindow : EditorWindow
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField("ID", GUILayout.Width(18));
             string newEntID    = EditorGUILayout.TextField(ent.id, GUILayout.Width(78));
-            EditorGUILayout.LabelField("Angle", GUILayout.Width(36));
-            float  newEntAngle = EditorGUILayout.FloatField(ent.perimeterAngle, GUILayout.Width(38));
+            
+            float prevLabelWidth = EditorGUIUtility.labelWidth;
+            EditorGUIUtility.labelWidth = 36f;
+            float newEntAngle = EditorGUILayout.FloatField("Angle", ent.perimeterAngle, GUILayout.Width(74));
+            EditorGUIUtility.labelWidth = prevLabelWidth;
+
             EditorGUILayout.LabelField("°", GUILayout.Width(10));
             GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
             if (GUILayout.Button("✕", GUILayout.Width(22))) entToRemove = i;
@@ -1731,21 +1997,9 @@ public class GridDesignerWindow : EditorWindow
             EditorGUILayout.LabelField("Tier", GUILayout.Width(28));
             int entTierPopup   = EditorGUILayout.Popup(Mathf.Clamp(ent.tierSlot + 1, 0, tierLabels.Length - 1), tierLabels, GUILayout.Width(72));
             int newEntTierSlot = entTierPopup - 1;
-            EditorGUILayout.LabelField("Inward", GUILayout.Width(42));
-            float newSpawnRadius = EditorGUILayout.FloatField(ent.spawnRadius, GUILayout.Width(42));
+            
             EditorGUILayout.EndHorizontal();
 
-            // Row 3: Prefab
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField("Prefab", GUILayout.Width(46));
-            GameObject newEntPrefab = (GameObject)EditorGUILayout.ObjectField(ent.prefab, typeof(GameObject), false);
-            EditorGUILayout.EndHorizontal();
-
-            // Row 4: Soul prefab
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField("SoulPfb", GUILayout.Width(46));
-            GameObject newEntSoulPrefab = (GameObject)EditorGUILayout.ObjectField(ent.soulPrefab, typeof(GameObject), false);
-            EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.EndVertical();
 
@@ -1755,9 +2009,6 @@ public class GridDesignerWindow : EditorWindow
                 ent.id             = newEntID;
                 ent.perimeterAngle = newEntAngle;
                 ent.tierSlot       = newEntTierSlot;
-                ent.spawnRadius    = newSpawnRadius;
-                ent.prefab         = newEntPrefab;
-                ent.soulPrefab     = newEntSoulPrefab;
                 EditorUtility.SetDirty(loadedData);
                 Repaint();
             }
@@ -1867,7 +2118,10 @@ public class GridDesignerWindow : EditorWindow
                         _activePlacementIsWorldSpaceProp = false;
                         drawDirectPrefab = true;
                         activeSlot = -1;
-                        drawCircle = drawOrb = drawSoul = drawWaterLevelModifier = drawWaveModifier = false;
+                        drawCircle = drawOrb = drawSoul = drawSoulArea = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false;
+                        drawSelect = false;
+                        ClearSelectState();
+                        LogSelection(_currentSelection);
                     }
                     GUI.backgroundColor = Color.white;
                     if (GUILayout.Button("⊙", GUILayout.Width(22), GUILayout.Height(btnHeight)))
@@ -1906,7 +2160,10 @@ public class GridDesignerWindow : EditorWindow
                         _activePlacementIsWorldSpaceProp = false;
                         drawDirectPrefab = true;
                         activeSlot = -1;
-                        drawCircle = drawOrb = drawSoul = drawWaterLevelModifier = drawWaveModifier = false;
+                        drawCircle = drawOrb = drawSoul = drawSoulArea = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false;
+                        drawSelect = false;
+                        ClearSelectState();
+                        LogSelection(_currentSelection);
                     }
                     GUI.backgroundColor = Color.white;
                     if (GUILayout.Button("⊙", GUILayout.Width(22)))
@@ -1946,7 +2203,10 @@ public class GridDesignerWindow : EditorWindow
                         _activePlacementIsWorldSpaceProp = true;
                         drawDirectPrefab = true;
                         activeSlot = -1;
-                        drawCircle = drawOrb = drawSoul = drawWaterLevelModifier = drawWaveModifier = false;
+                        drawCircle = drawOrb = drawSoul = drawSoulArea = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false;
+                        drawSelect = false;
+                        ClearSelectState();
+                        LogSelection(_currentSelection);
                     }
                     GUI.backgroundColor = Color.white;
                     if (GUILayout.Button("⊙", GUILayout.Width(22)))
@@ -1986,7 +2246,10 @@ public class GridDesignerWindow : EditorWindow
                         _activePlacementIsWorldSpaceProp = false;
                         drawDirectPrefab = true;
                         activeSlot = -1;
-                        drawCircle = drawOrb = drawSoul = drawWaterLevelModifier = drawWaveModifier = false;
+                        drawCircle = drawOrb = drawSoul = drawSoulArea = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false;
+                        drawSelect = false;
+                        ClearSelectState();
+                        LogSelection(_currentSelection);
                     }
                     GUI.backgroundColor = Color.white;
                     if (GUILayout.Button("⊙", GUILayout.Width(22)))
@@ -2007,6 +2270,7 @@ public class GridDesignerWindow : EditorWindow
 
         DrawToolButtons();
         DrawPrefabLibrarySection();
+        if (loadedData != null) DrawSplineWallsSection();
 
         if (loadedData != null && loadedData.linkedPairs != null && loadedData.linkedPairs.Count > 0)
         {
@@ -2080,6 +2344,14 @@ public class GridDesignerWindow : EditorWindow
 
         Event e = Event.current;
 
+        // Spline wall input — handled at rect level before cell loop so nodes are free-floating
+        if (_drawSplineWall && loadedData != null)
+            HandleSplineWallInput(rect, e);
+
+        // Select tool — spline wall node picking (pixel-based, before cell loop)
+        if (drawSelect && loadedData != null)
+            HandleSelectSplineWallInput(rect, e);
+
         for (int y = 0; y < GridSize; y++)
         {
             for (int x = 0; x < GridSize; x++)
@@ -2134,19 +2406,8 @@ public class GridDesignerWindow : EditorWindow
                         Handles.DrawSolidDisc(cell.center, Vector3.forward, CellSize * 0.3f);
                     }
 
-                    // Selected node highlight
-                    if (_selectedZoneIndex >= 0 && _selectedNodeIndex >= 0
-                        && _selectedZoneIndex < loadedData.soulZones.Count)
-                    {
-                        var selZone = loadedData.soulZones[_selectedZoneIndex];
-                        if (selZone.nodes != null && _selectedNodeIndex < selZone.nodes.Count
-                            && selZone.nodes[_selectedNodeIndex] == index)
-                        {
-                            Handles.color = Color.white;
-                            Handles.DrawWireDisc(cell.center, Vector3.forward, CellSize * 0.44f);
-                            Handles.DrawWireDisc(cell.center, Vector3.forward, CellSize * 0.38f);
-                        }
-                    }
+                    // Selection highlight (removed from loop, moved to overlay)
+
 
                     // Bridge mode — highlight endpoint and in-progress cells
                     if (_isBridgeMode)
@@ -2302,42 +2563,57 @@ public class GridDesignerWindow : EditorWindow
                 {
                     if (e.type == EventType.MouseDown && mouseOver)
                     {
-                        bool hasNode = FindNodeAtCell(index, out int zi, out int ni);
+                        var clicked = FindAnythingAtCell(index);
 
-                        if (hasNode)
+                        if (clicked.type != SelectionType.None)
                         {
                             // Shift+click another node in same zone → connect directly
-                            if (e.shift && _selectedZoneIndex == zi && _selectedNodeIndex >= 0 && ni != _selectedNodeIndex)
+                            if (e.shift && clicked.type == SelectionType.SoulZoneNode && 
+                                _currentSelection.type == SelectionType.SoulZoneNode &&
+                                clicked.index == _currentSelection.index && clicked.subIndex != _currentSelection.subIndex)
                             {
-                                ConnectNodes(zi, _selectedNodeIndex, ni);
+                                ConnectNodes(clicked.index, _currentSelection.subIndex, clicked.subIndex);
                             }
                             else
                             {
-                                _selectedZoneIndex   = zi;
-                                _selectedNodeIndex   = ni;
-                                _activeSoulZoneIndex = zi;
-                                _isDraggingNode      = true;
-                                _dragCurrentCell     = index;
+                                _currentSelection    = clicked;
+                                _selectedZoneIndex   = (clicked.type == SelectionType.SoulZoneNode) ? clicked.index : -1;
+                                _selectedNodeIndex   = (clicked.type == SelectionType.SoulZoneNode) ? clicked.subIndex : -1;
+                                _activeSoulZoneIndex = (clicked.type == SelectionType.SoulZoneNode) ? clicked.index : _activeSoulZoneIndex;
+                                
+                                if (clicked.type == SelectionType.SoulZoneNode)
+                                {
+                                    _isDraggingNode  = true;
+                                    _dragCurrentCell = index;
+                                }
                             }
                         }
                         else
                         {
-                            // Click empty cell — deselect
-                            ClearSelectState();
+                            // Click empty cell — move if we have a selection
+                            if (_currentSelection.type != SelectionType.None)
+                            {
+                                MoveSelection(_currentSelection, index);
+                            }
+                            else
+                            {
+                                ClearSelectState();
+                            }
                         }
                         e.Use();
                         Repaint();
                     }
                     else if (e.type == EventType.MouseDrag && _isDraggingNode && mouseOver && index != _dragCurrentCell)
                     {
-                        if (_selectedZoneIndex >= 0 && _selectedNodeIndex >= 0)
+                        if (_currentSelection.type == SelectionType.SoulZoneNode)
                         {
-                            var zone = loadedData.soulZones[_selectedZoneIndex];
-                            if (_selectedNodeIndex < zone.nodes.Count)
+                            var zone = loadedData.soulZones[_currentSelection.index];
+                            if (_currentSelection.subIndex < zone.nodes.Count)
                             {
                                 Undo.RecordObject(loadedData, "Move Soul Zone Node");
-                                zone.nodes[_selectedNodeIndex] = index;
+                                zone.nodes[_currentSelection.subIndex] = index;
                                 _dragCurrentCell = index;
+                                _currentSelection.cellIndex = index;
                                 EditorUtility.SetDirty(loadedData);
                                 Repaint();
                             }
@@ -2352,7 +2628,7 @@ public class GridDesignerWindow : EditorWindow
                     }
                 }
                 // ── Paint tool handling ───────────────────────────────────
-                else
+                else if (!_drawSplineWall)
                 {
                 if (e.type == EventType.MouseDown && mouseOver)
                 {
@@ -2383,25 +2659,25 @@ public class GridDesignerWindow : EditorWindow
             }
         }
 
-        // Soul zone connecting lines + radius preview overlay (drawn after all cells so lines sit on top)
-        if (loadedData?.soulZones != null)
+        // Grid Overlays (drawn after all cells so lines sit on top)
+        if (loadedData != null)
         {
             Handles.BeginGUI();
 
-            // Radius scatter rings — drawn first so lines and dots sit on top
+            // Radius scatter rings
             float pxPerUnit = GetPixelsPerWorldUnit();
-            if (pxPerUnit > 0f)
+            if (pxPerUnit > 0f && loadedData.soulZones != null)
             {
                 // Soul fish zone radii
                 for (int zi = 0; zi < loadedData.soulZones.Count; zi++)
                 {
                     var zone = loadedData.soulZones[zi];
                     if (zone.nodes == null || zone.nodes.Count == 0) continue;
-                    bool  isActive  = zi == _activeSoulZoneIndex;
-                    Color rc        = ZonePalette[zi % ZonePalette.Length];
-                    rc.a            = isActive ? 0.55f : 0.18f;
-                    Handles.color   = rc;
-                    float radiusPx  = zone.radius * pxPerUnit;
+                    bool isActive = zi == _activeSoulZoneIndex;
+                    Color rc = ZonePalette[zi % ZonePalette.Length];
+                    rc.a = isActive ? 0.55f : 0.18f;
+                    Handles.color = rc;
+                    float radiusPx = zone.radius * pxPerUnit;
                     foreach (int node in zone.nodes)
                         Handles.DrawWireDisc(CellCenter(rect, node), Vector3.forward, radiusPx, 2f);
                 }
@@ -2411,29 +2687,32 @@ public class GridDesignerWindow : EditorWindow
                 {
                     foreach (var wp in loadedData.whirlpools)
                     {
-                        Handles.color  = new Color(0.7f, 0.4f, 1f, 0.55f);
+                        Handles.color = new Color(0.7f, 0.4f, 1f, 0.55f);
                         float radiusPx = wp.radius * pxPerUnit;
                         Handles.DrawWireDisc(CellCenter(rect, wp.cellIndex), Vector3.forward, radiusPx, 2f);
                     }
                 }
             }
 
-            for (int zi = 0; zi < loadedData.soulZones.Count; zi++)
+            if (loadedData.soulZones != null)
             {
-                var zone = loadedData.soulZones[zi];
-                if (zone.nodes == null || zone.nodes.Count < 2) continue;
-                Color lc = ZonePalette[zi % ZonePalette.Length];
-                lc.a = 0.85f;
-                Handles.color = lc;
-                for (int ni = 0; ni < zone.nodes.Count - 1; ni++)
+                for (int zi = 0; zi < loadedData.soulZones.Count; zi++)
                 {
-                    Vector2 a = CellCenter(rect, zone.nodes[ni]);
-                    Vector2 b = CellCenter(rect, zone.nodes[ni + 1]);
-                    Handles.DrawLine(a, b, 3f);
+                    var zone = loadedData.soulZones[zi];
+                    if (zone.nodes == null || zone.nodes.Count < 2) continue;
+                    Color lc = ZonePalette[zi % ZonePalette.Length];
+                    lc.a = 0.85f;
+                    Handles.color = lc;
+                    for (int ni = 0; ni < zone.nodes.Count - 1; ni++)
+                    {
+                        Vector2 a = CellCenter(rect, zone.nodes[ni]);
+                        Vector2 b = CellCenter(rect, zone.nodes[ni + 1]);
+                        Handles.DrawLine(a, b, 3f);
+                    }
                 }
             }
 
-            // Linked Prefab Pairs (TypeB Modifier <-> Tube)
+            // Linked Prefab Pairs
             if (loadedData.linkedPairs != null)
             {
                 foreach (var pair in loadedData.linkedPairs)
@@ -2446,16 +2725,43 @@ public class GridDesignerWindow : EditorWindow
 
                     if (modOk && tubeOk)
                     {
-                        Handles.color = new Color(0.4f, 1f, 1f, 0.8f); // Cyan
+                        Handles.color = new Color(0.4f, 1f, 1f, 0.8f);
                         Handles.DrawLine(a, b, 2.5f);
                         Handles.DrawSolidDisc(b, Vector3.forward, 3.5f);
                     }
                     else
                     {
-                        Handles.color = new Color(1f, 0.3f, 0.3f, 0.9f); // Red
+                        Handles.color = new Color(1f, 0.3f, 0.3f, 0.9f);
                         Handles.DrawLine(a, b, 1.5f);
                         Handles.Label((a + b) * 0.5f, "BROKEN LINK");
                     }
+                }
+            }
+
+            // Selection Circle
+            if (_currentSelection.type != SelectionType.None)
+            {
+                Vector2 center;
+                if (_currentSelection.type == SelectionType.SplineWallNode
+                    && loadedData?.splineWallPaths != null
+                    && _currentSelection.index < loadedData.splineWallPaths.Count)
+                {
+                    var wPath = loadedData.splineWallPaths[_currentSelection.index];
+                    center = (wPath.nodes != null && _currentSelection.subIndex < wPath.nodes.Count)
+                        ? WorldXZToPixel(rect, wPath.nodes[_currentSelection.subIndex])
+                        : rect.center;
+                }
+                else
+                {
+                    center = CellCenter(rect, _currentSelection.cellIndex);
+                }
+
+                Handles.color = Color.white;
+                Handles.DrawWireDisc(center, Vector3.forward, CellSize * 0.55f, 3.5f);
+
+                if (_currentSelection.type == SelectionType.SoulZoneNode)
+                {
+                    Handles.DrawSolidDisc(center, Vector3.forward, CellSize * 0.2f);
                 }
             }
 
@@ -2482,6 +2788,10 @@ public class GridDesignerWindow : EditorWindow
                     Handles.DrawLine(a, b, 1.5f);
                 }
             }
+
+            // Spline wall overlay — drawn on top of all other overlays
+            DrawSplineWallOverlay(rect);
+
             Handles.EndGUI();
         }
 
@@ -2497,17 +2807,59 @@ public class GridDesignerWindow : EditorWindow
                     sk.Use();
                     Repaint();
                 }
-                else if ((sk.keyCode == KeyCode.Delete || sk.keyCode == KeyCode.Backspace)
-                         && _selectedZoneIndex >= 0 && _selectedNodeIndex >= 0
-                         && loadedData?.soulZones != null
-                         && _selectedZoneIndex < loadedData.soulZones.Count)
+                else if (sk.keyCode == KeyCode.Delete || sk.keyCode == KeyCode.Backspace)
                 {
-                    var zone = loadedData.soulZones[_selectedZoneIndex];
-                    if (zone.nodes != null && _selectedNodeIndex < zone.nodes.Count)
+                    if (_currentSelection.type != SelectionType.None)
                     {
-                        Undo.RecordObject(loadedData, "Delete Soul Zone Node");
-                        zone.nodes.RemoveAt(_selectedNodeIndex);
-                        _selectedNodeIndex = Mathf.Clamp(_selectedNodeIndex - 1, -1, zone.nodes.Count - 1);
+                        Undo.RecordObject(loadedData, "Delete Selection");
+                        PushUndoSnapshot();
+
+                        switch (_currentSelection.type)
+                        {
+                            case SelectionType.SoulZoneNode:
+                                var zone = loadedData.soulZones[_currentSelection.index];
+                                zone.nodes.RemoveAt(_currentSelection.subIndex);
+                                break;
+                            case SelectionType.PrefabPlacement:
+                                var placements = _currentSelection.tierIndex == -1 ? loadedData.prefabPlacements : loadedData.tiers[_currentSelection.tierIndex].prefabPlacements;
+                                placements.RemoveAt(_currentSelection.index);
+                                break;
+                            case SelectionType.Whirlpool:
+                                loadedData.whirlpools.RemoveAt(_currentSelection.index);
+                                break;
+                            case SelectionType.Orb:
+                                loadedData.orbCellIndices.Remove(_currentSelection.cellIndex);
+                                break;
+                            case SelectionType.WaterModifier:
+                                var waterMods = _currentSelection.tierIndex == -1 ? loadedData.waterLevelModifierCellIndices : loadedData.tiers[_currentSelection.tierIndex].waterLevelModifierCellIndices;
+                                waterMods.Remove(_currentSelection.cellIndex);
+                                break;
+                            case SelectionType.WaveModifier:
+                                var waveMods = _currentSelection.tierIndex == -1 ? loadedData.waveModifierCellIndices : loadedData.tiers[_currentSelection.tierIndex].waveModifierCellIndices;
+                                waveMods.Remove(_currentSelection.cellIndex);
+                                break;
+                            case SelectionType.GridSlot:
+                                if (_currentSelection.tierIndex >= 0) loadedData.tiers[_currentSelection.tierIndex].cells[_currentSelection.cellIndex] = 0;
+                                else if (_currentSelection.isCircle) circleGrid[_currentSelection.cellIndex] = 0;
+                                else squareGrid[_currentSelection.cellIndex] = 0;
+                                break;
+                            case SelectionType.SplineWallNode:
+                                if (loadedData.splineWallPaths != null
+                                    && _currentSelection.index < loadedData.splineWallPaths.Count)
+                                {
+                                    var wp = loadedData.splineWallPaths[_currentSelection.index];
+                                    int delIdx = _currentSelection.subIndex;
+                                    if (wp.nodes != null && delIdx < wp.nodes.Count)
+                                    {
+                                        wp.nodes.RemoveAt(delIdx);
+                                        if (wp.segmentCurved != null && delIdx < wp.segmentCurved.Count)
+                                            wp.segmentCurved.RemoveAt(delIdx);
+                                    }
+                                }
+                                break;
+                        }
+
+                        ClearSelectState();
                         EditorUtility.SetDirty(loadedData);
                         sk.Use();
                         Repaint();
@@ -2541,6 +2893,38 @@ public class GridDesignerWindow : EditorWindow
         // Portal perimeter overlay
         if (loadedData != null)
             DrawPortalOverlay(rect);
+
+        // Spline wall mode — Escape to exit mode, Delete/Backspace to remove last node on active path
+        if (_drawSplineWall && loadedData != null)
+        {
+            Event sw = Event.current;
+            if (sw.type == EventType.KeyDown)
+            {
+                if (sw.keyCode == KeyCode.Escape)
+                {
+                    _drawSplineWall = false;
+                    sw.Use();
+                    Repaint();
+                }
+                else if ((sw.keyCode == KeyCode.Delete || sw.keyCode == KeyCode.Backspace)
+                         && loadedData.splineWallPaths != null
+                         && _activeSplinePathIdx < loadedData.splineWallPaths.Count)
+                {
+                    var activePath = loadedData.splineWallPaths[_activeSplinePathIdx];
+                    if (activePath.nodes != null && activePath.nodes.Count > 0)
+                    {
+                        Undo.RecordObject(loadedData, "Delete Spline Wall Node");
+                        int lastIdx = activePath.nodes.Count - 1;
+                        activePath.nodes.RemoveAt(lastIdx);
+                        if (activePath.segmentCurved != null && lastIdx < activePath.segmentCurved.Count)
+                            activePath.segmentCurved.RemoveAt(lastIdx);
+                        EditorUtility.SetDirty(loadedData);
+                        sw.Use();
+                        Repaint();
+                    }
+                }
+            }
+        }
 
         // Tube placement - Escape to cancel
         if (_isWaitingForTubePlacement)
@@ -2579,30 +2963,27 @@ public class GridDesignerWindow : EditorWindow
     }
 
     // Derives how many grid pixels equal one world unit, using the arena profile's
-    // reference plane prefab as the authority on real-world arena dimensions.
+    // reference plane prefab (or baseline radius) as the authority on real-world arena dimensions.
     float GetPixelsPerWorldUnit()
     {
         var profile = loadedData?.arenaProfile;
-        if (profile == null || profile.arenaSizeReferencePlane == null) return -1f;
+        if (profile == null) return -1f;
 
-        var mf = profile.arenaSizeReferencePlane.GetComponent<MeshFilter>()
-              ?? profile.arenaSizeReferencePlane.GetComponentInChildren<MeshFilter>();
-        if (mf == null || mf.sharedMesh == null) return -1f;
+        float worldWidth = profile.WorldArenaWidth;
 
-        Vector3 localSize  = mf.sharedMesh.bounds.size;
-        Vector3 scale      = profile.arenaSizeReferencePlane.transform.localScale;
-        float   worldWidth = localSize.x * Mathf.Abs(scale.x);
         if (worldWidth <= 0f) return -1f;
 
         return (CellSize * GridSize) / worldWidth;
     }
 
     void DrawPortalOverlay(Rect gridRect)
-    {
+{
         const float ringRadius   = GridPixelSize * 0.5f + 14f;
         const float arrowLen     = 10f;
         const float dotRadius    = 5f;
         Vector2     centre       = gridRect.center;
+
+        float pxPerUnit = GetPixelsPerWorldUnit();
 
         Handles.BeginGUI();
 
@@ -2686,6 +3067,7 @@ public class GridDesignerWindow : EditorWindow
         EditorGUILayout.EndHorizontal();
 
         EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("NEW"))     CreateNewGrid();
         if (GUILayout.Button("SAVE"))    SaveGridInPlace();
         if (GUILayout.Button("SAVE AS")) SaveGrid();
         if (GUILayout.Button("LOAD"))    LoadGrid();
@@ -2697,6 +3079,35 @@ public class GridDesignerWindow : EditorWindow
             GameTesterTool.LaunchScene("Waves1", loadedData, null);
         GUI.backgroundColor = Color.white;
         EditorGUI.EndDisabledGroup();
+    }
+
+    void CreateNewGrid()
+    {
+        if (loadedData != null || GetMaxSlotUsed() > 0)
+        {
+            if (!EditorUtility.DisplayDialog("New Grid", "Discard current grid and start fresh?", "Yes", "No"))
+                return;
+        }
+
+        string path = EditorUtility.SaveFilePanelInProject("Create New Grid", "NewGridData", "asset", "Select location for the new GridData asset.", GridDataFolder);
+        if (string.IsNullOrEmpty(path)) return;
+
+        GridData data = ScriptableObject.CreateInstance<GridData>();
+        
+        // Initialize with default empty state
+        data.cells        = new int[GridData.CellCount];
+        data.overlayCells = new int[GridData.CellCount];
+        data.slotNotes    = new List<string> { string.Empty };
+        data.slotColors   = new List<Color>();
+        data.levelID      = "new_level";
+        data.displayName  = "New Level";
+
+        AssetDatabase.CreateAsset(data, path);
+        AssetDatabase.SaveAssets();
+
+        GridLog($"Created and loaded new grid asset at {path}");
+        LoadGrid(data);
+        RefreshDiscoveredGrids();
     }
 
     void SaveGrid()
@@ -2895,5 +3306,479 @@ public class GridDesignerWindow : EditorWindow
             activeSlot--;
 
         Repaint();
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // SPLINE WALL EDITOR
+    // ─────────────────────────────────────────────────────────────
+
+    void DrawSplineWallsSection()
+    {
+        if (loadedData == null) return;
+
+        _showSplineWalls = EditorGUILayout.Foldout(_showSplineWalls, "Spline Walls", true, EditorStyles.foldoutHeader);
+        if (!_showSplineWalls) return;
+
+        if (loadedData.splineWallPaths == null) loadedData.splineWallPaths = new List<GridData.SplineWallPath>();
+
+        int toRemove = -1;
+        for (int pi = 0; pi < loadedData.splineWallPaths.Count; pi++)
+        {
+            var  path     = loadedData.splineWallPaths[pi];
+            bool selectedNodeOnThisPath = _currentSelection.type == SelectionType.SplineWallNode
+                                       && _currentSelection.index == pi;
+            bool isActive = ((_drawSplineWall && pi == _activeSplinePathIdx) || selectedNodeOnThisPath);
+
+            // Row 1: name + delete
+            EditorGUILayout.BeginHorizontal();
+            GUI.backgroundColor = isActive ? GetSplineWallColor(pi) : Color.white;
+            if (GUILayout.Button($"SplineWall{pi + 1}"))
+            {
+                _activeSplinePathIdx = pi;
+                _drawSplineWall      = true;
+            }
+            GUI.backgroundColor = Color.white;
+            GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
+            if (GUILayout.Button("✕", GUILayout.Width(28))) toRemove = pi;
+            GUI.backgroundColor = Color.white;
+            EditorGUILayout.EndHorizontal();
+
+            // Row 2: toggles + spacing
+            EditorGUILayout.BeginHorizontal();
+            EditorGUI.BeginChangeCheck();
+            bool  newClosed  = GUILayout.Toggle(path.isClosed, "Loop",  GUILayout.Width(46));
+            GUILayout.Label(new GUIContent("Spacing", "Tile spacing — distance between each wall piece along the path"), GUILayout.Width(52));
+            float newSpacing = EditorGUILayout.FloatField(path.tileSpacing);
+            if (EditorGUI.EndChangeCheck())
+            {
+                Undo.RecordObject(loadedData, "Edit Spline Wall Path");
+                path.isClosed    = newClosed;
+                path.tileSpacing = Mathf.Max(0.05f, newSpacing);
+                EditorUtility.SetDirty(loadedData);
+            }
+            EditorGUILayout.EndHorizontal();
+
+            if (isActive)
+            {
+                EditorGUI.indentLevel++;
+
+                // Prefab
+                EditorGUI.BeginChangeCheck();
+                var newPrefab = (GameObject)EditorGUILayout.ObjectField(
+                    "Prefab", path.prefabOverride, typeof(GameObject), false);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    Undo.RecordObject(loadedData, "Set Spline Wall Prefab");
+                    path.prefabOverride = newPrefab;
+                    EditorUtility.SetDirty(loadedData);
+                }
+
+                // Node list
+                int nodeCount = path.nodes?.Count ?? 0;
+                EditorGUILayout.LabelField($"Nodes  ({nodeCount})", EditorStyles.miniBoldLabel);
+                if (path.nodes != null)
+                {
+                    int insertAfter = -1;
+
+                    for (int ni = 0; ni < path.nodes.Count; ni++)
+                    {
+                        EditorGUILayout.BeginHorizontal();
+
+                        bool isSelectedNode = _currentSelection.type == SelectionType.SplineWallNode
+                                           && _currentSelection.index == pi
+                                           && _currentSelection.subIndex == ni;
+
+                        GUI.backgroundColor = isSelectedNode ? new Color(1f, 0.7f, 0.2f) : Color.white;
+                        if (GUILayout.Button($"{ni}", GUILayout.Width(22)))
+                        {
+                            _currentSelection = new SelectionInfo
+                            {
+                                type      = SelectionType.SplineWallNode,
+                                index     = pi,
+                                subIndex  = ni,
+                                cellIndex = -1,
+                            };
+                            Repaint();
+                        }
+                        GUI.backgroundColor = Color.white;
+
+                        EditorGUI.BeginChangeCheck();
+                        Vector2 node = path.nodes[ni];
+                        float   newX = EditorGUILayout.FloatField(node.x, GUILayout.Width(52));
+                        float   newZ = EditorGUILayout.FloatField(node.y, GUILayout.Width(52));
+                        if (EditorGUI.EndChangeCheck())
+                        {
+                            Undo.RecordObject(loadedData, "Edit Spline Wall Node");
+                            path.nodes[ni] = new Vector2(newX, newZ);
+                            EditorUtility.SetDirty(loadedData);
+                        }
+
+                        GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
+                        if (GUILayout.Button("✕", GUILayout.Width(20)))
+                        {
+                            Undo.RecordObject(loadedData, "Delete Spline Wall Node");
+                            path.nodes.RemoveAt(ni);
+                            if (path.segmentCurved != null && ni < path.segmentCurved.Count)
+                                path.segmentCurved.RemoveAt(ni);
+                            EditorUtility.SetDirty(loadedData);
+                            EditorGUILayout.EndHorizontal();
+                            break;
+                        }
+                        GUI.backgroundColor = Color.white;
+
+                        EditorGUILayout.EndHorizontal();
+
+                        // "+" insert and curve toggle between this node and the next
+                        bool hasNext = ni < path.nodes.Count - 1;
+                        bool isLoop  = path.isClosed && ni == path.nodes.Count - 1;
+                        if (hasNext || isLoop)
+                        {
+                            EditorGUILayout.BeginHorizontal();
+                            GUILayout.Space(26);
+                            GUI.backgroundColor = new Color(0.6f, 0.9f, 0.6f);
+                            if (GUILayout.Button("+", EditorStyles.miniButton, GUILayout.Width(22)))
+                                insertAfter = ni;
+                            GUI.backgroundColor = Color.white;
+
+                            // Per-segment curve toggle
+                            if (path.segmentCurved == null) path.segmentCurved = new List<bool>();
+                            while (path.segmentCurved.Count <= ni) path.segmentCurved.Add(true);
+                            bool segCurved    = path.segmentCurved[ni];
+                            bool newSegCurved = GUILayout.Toggle(segCurved, new GUIContent(segCurved ? "~" : "—", segCurved ? "Curved segment" : "Straight segment"), EditorStyles.miniButton, GUILayout.Width(22));
+                            if (newSegCurved != segCurved)
+                            {
+                                Undo.RecordObject(loadedData, "Toggle Segment Curve");
+                                path.segmentCurved[ni] = newSegCurved;
+                                EditorUtility.SetDirty(loadedData);
+                            }
+
+                            EditorGUILayout.EndHorizontal();
+                        }
+                    }
+
+                    if (insertAfter >= 0)
+                    {
+                        Undo.RecordObject(loadedData, "Insert Spline Wall Node");
+                        int     nextIdx  = (insertAfter + 1) % path.nodes.Count;
+                        Vector2 midpoint = (path.nodes[insertAfter] + path.nodes[nextIdx]) * 0.5f;
+                        path.nodes.Insert(insertAfter + 1, midpoint);
+                        if (path.segmentCurved == null) path.segmentCurved = new List<bool>();
+                        while (path.segmentCurved.Count <= insertAfter) path.segmentCurved.Add(true);
+                        bool inheritedCurve = path.segmentCurved[insertAfter];
+                        path.segmentCurved.Insert(insertAfter + 1, inheritedCurve);
+                        EditorUtility.SetDirty(loadedData);
+                    }
+                }
+
+                EditorGUI.indentLevel--;
+            }
+        }
+
+        if (toRemove >= 0)
+        {
+            Undo.RecordObject(loadedData, "Remove Spline Wall Path");
+            loadedData.splineWallPaths.RemoveAt(toRemove);
+            _activeSplinePathIdx = Mathf.Clamp(_activeSplinePathIdx, 0, Mathf.Max(0, loadedData.splineWallPaths.Count - 1));
+            EditorUtility.SetDirty(loadedData);
+        }
+
+        if (GUILayout.Button("+ Add Spline Wall Path"))
+        {
+            Undo.RecordObject(loadedData, "Add Spline Wall Path");
+            loadedData.splineWallPaths.Add(new GridData.SplineWallPath
+            {
+                prefabOverride = GetDefaultSplineWallPrefab()
+            });
+            _activeSplinePathIdx = loadedData.splineWallPaths.Count - 1;
+            _drawSplineWall      = true;
+            EditorUtility.SetDirty(loadedData);
+        }
+    }
+
+    void HandleSelectSplineWallInput(Rect rect, Event e)
+    {
+        if (loadedData?.splineWallPaths == null || loadedData.splineWallPaths.Count == 0) return;
+
+        const float pickRadius = 9f;
+
+        if (e.type == EventType.MouseDown && e.button == 0 && rect.Contains(e.mousePosition))
+        {
+            // Check proximity to any spline wall node
+            int   hitPath = -1, hitNode = -1;
+            float best    = pickRadius;
+            for (int pi = 0; pi < loadedData.splineWallPaths.Count; pi++)
+            {
+                var path = loadedData.splineWallPaths[pi];
+                if (path.nodes == null) continue;
+                for (int ni = 0; ni < path.nodes.Count; ni++)
+                {
+                    float d = Vector2.Distance(WorldXZToPixel(rect, path.nodes[ni]), e.mousePosition);
+                    if (d < best) { best = d; hitPath = pi; hitNode = ni; }
+                }
+            }
+
+            if (hitPath >= 0)
+            {
+                _currentSelection = new SelectionInfo
+                {
+                    type     = SelectionType.SplineWallNode,
+                    index    = hitPath,
+                    subIndex = hitNode,
+                    cellIndex = -1,
+                };
+                _isDraggingNode = true;
+                e.Use();
+                Repaint();
+            }
+        }
+        else if (e.type == EventType.MouseDrag && e.button == 0
+                 && _isDraggingNode && _currentSelection.type == SelectionType.SplineWallNode)
+        {
+            int pi = _currentSelection.index;
+            int ni = _currentSelection.subIndex;
+            if (loadedData.splineWallPaths != null && pi < loadedData.splineWallPaths.Count)
+            {
+                var path = loadedData.splineWallPaths[pi];
+                if (path.nodes != null && ni < path.nodes.Count)
+                {
+                    Undo.RecordObject(loadedData, "Move Spline Wall Node");
+                    path.nodes[ni] = PixelToWorldXZ(rect, e.mousePosition);
+                    EditorUtility.SetDirty(loadedData);
+                }
+            }
+            e.Use();
+            Repaint();
+        }
+        else if (e.type == EventType.MouseUp && e.button == 0
+                 && _currentSelection.type == SelectionType.SplineWallNode)
+        {
+            _isDraggingNode = false;
+            e.Use();
+        }
+    }
+
+    void HandleSplineWallInput(Rect rect, Event e)
+    {
+        if (loadedData.splineWallPaths == null)
+            loadedData.splineWallPaths = new List<GridData.SplineWallPath>();
+
+        // Ensure at least one path exists and active index is valid
+        if (loadedData.splineWallPaths.Count == 0)
+        {
+            loadedData.splineWallPaths.Add(new GridData.SplineWallPath
+            {
+                prefabOverride = GetDefaultSplineWallPrefab()
+            });
+            _activeSplinePathIdx = 0;
+            EditorUtility.SetDirty(loadedData);
+        }
+        _activeSplinePathIdx = Mathf.Clamp(_activeSplinePathIdx, 0, loadedData.splineWallPaths.Count - 1);
+
+        const float pickRadius = 9f;
+
+        if (e.type == EventType.MouseDown && e.button == 0 && rect.Contains(e.mousePosition))
+        {
+            // Check if near an existing node on any path
+            int hitPath = -1, hitNode = -1;
+            float bestDist = pickRadius;
+            for (int pi = 0; pi < loadedData.splineWallPaths.Count; pi++)
+            {
+                var path = loadedData.splineWallPaths[pi];
+                if (path.nodes == null) continue;
+                for (int ni = 0; ni < path.nodes.Count; ni++)
+                {
+                    float d = Vector2.Distance(WorldXZToPixel(rect, path.nodes[ni]), e.mousePosition);
+                    if (d < bestDist) { bestDist = d; hitPath = pi; hitNode = ni; }
+                }
+            }
+
+            if (hitPath >= 0)
+            {
+                // Start dragging existing node
+                _activeSplinePathIdx = hitPath;
+                _dragSplinePathIdx   = hitPath;
+                _dragSplineNodeIdx   = hitNode;
+            }
+            else
+            {
+                // Add node to active path
+                Undo.RecordObject(loadedData, "Add Spline Wall Node");
+                var activePath = loadedData.splineWallPaths[_activeSplinePathIdx];
+                if (activePath.nodes == null) activePath.nodes = new List<Vector2>();
+                activePath.nodes.Add(PixelToWorldXZ(rect, e.mousePosition));
+                EditorUtility.SetDirty(loadedData);
+            }
+            e.Use();
+            Repaint();
+        }
+        else if (e.type == EventType.MouseDrag && e.button == 0 && _dragSplineNodeIdx >= 0)
+        {
+            if (_dragSplinePathIdx >= 0 && _dragSplinePathIdx < loadedData.splineWallPaths.Count)
+            {
+                var path = loadedData.splineWallPaths[_dragSplinePathIdx];
+                if (path.nodes != null && _dragSplineNodeIdx < path.nodes.Count)
+                {
+                    Undo.RecordObject(loadedData, "Move Spline Wall Node");
+                    path.nodes[_dragSplineNodeIdx] = PixelToWorldXZ(rect, e.mousePosition);
+                    EditorUtility.SetDirty(loadedData);
+                }
+            }
+            e.Use();
+            Repaint();
+        }
+        else if (e.type == EventType.MouseUp && e.button == 0)
+        {
+            if (_dragSplineNodeIdx >= 0)
+            {
+                _dragSplinePathIdx = -1;
+                _dragSplineNodeIdx = -1;
+                e.Use();
+            }
+        }
+        else if (e.type == EventType.MouseDown && e.button == 1 && rect.Contains(e.mousePosition))
+        {
+            // Right-click: delete nearest node
+            int hitPath = -1, hitNode = -1;
+            float bestDist = pickRadius;
+            for (int pi = 0; pi < loadedData.splineWallPaths.Count; pi++)
+            {
+                var path = loadedData.splineWallPaths[pi];
+                if (path.nodes == null) continue;
+                for (int ni = 0; ni < path.nodes.Count; ni++)
+                {
+                    float d = Vector2.Distance(WorldXZToPixel(rect, path.nodes[ni]), e.mousePosition);
+                    if (d < bestDist) { bestDist = d; hitPath = pi; hitNode = ni; }
+                }
+            }
+            if (hitPath >= 0)
+            {
+                Undo.RecordObject(loadedData, "Delete Spline Wall Node");
+                loadedData.splineWallPaths[hitPath].nodes.RemoveAt(hitNode);
+                EditorUtility.SetDirty(loadedData);
+                e.Use();
+                Repaint();
+            }
+        }
+    }
+
+    void DrawSplineWallOverlay(Rect rect)
+    {
+        if (loadedData?.splineWallPaths == null || loadedData.splineWallPaths.Count == 0) return;
+
+        for (int pi = 0; pi < loadedData.splineWallPaths.Count; pi++)
+        {
+            var  path     = loadedData.splineWallPaths[pi];
+            if (path?.nodes == null || path.nodes.Count == 0) continue;
+
+            bool  isActive = _drawSplineWall && pi == _activeSplinePathIdx;
+            Color col      = GetSplineWallColor(pi);
+            col.a = isActive ? 0.95f : 0.45f;
+
+            int n        = path.nodes.Count;
+            int segCount = path.isClosed ? n : n - 1;
+
+            // Draw spline curve or straight segments (per-segment)
+            if (n >= 2)
+            {
+                Handles.color = col;
+                float lineW = isActive ? 2.5f : 1.5f;
+                const int samplesPerSeg = 16;
+
+                for (int seg = 0; seg < segCount; seg++)
+                {
+                    bool curved = path.IsSegmentCurved(seg);
+                    int  i2     = path.isClosed ? (seg + 1) % n : seg + 1;
+                    if (curved)
+                    {
+                        Vector2 prev2d = WorldXZToPixel(rect, SplineWallSample(path.nodes, seg, 0f, path.isClosed));
+                        for (int s = 1; s <= samplesPerSeg; s++)
+                        {
+                            Vector2 next = WorldXZToPixel(rect, SplineWallSample(path.nodes, seg, (float)s / samplesPerSeg, path.isClosed));
+                            Handles.DrawLine(prev2d, next, lineW);
+                            prev2d = next;
+                        }
+                    }
+                    else
+                    {
+                        Handles.DrawLine(WorldXZToPixel(rect, path.nodes[seg]), WorldXZToPixel(rect, path.nodes[i2]), lineW);
+                    }
+                }
+            }
+
+            // Draw nodes
+            for (int ni = 0; ni < n; ni++)
+            {
+                Vector2 px          = WorldXZToPixel(rect, path.nodes[ni]);
+                bool    isDragNode  = pi == _dragSplinePathIdx && ni == _dragSplineNodeIdx;
+                float   r           = isActive ? 5f : 3.5f;
+
+                Handles.color = isDragNode ? Color.white : col;
+                Handles.DrawSolidDisc(px, Vector3.forward, r);
+
+                if (ni == 0)
+                {
+                    Handles.color = new Color(col.r, col.g, col.b, col.a * 0.55f);
+                    Handles.DrawWireDisc(px, Vector3.forward, r + 2.5f, 1.5f);
+                }
+
+                if (isActive && n <= 30)
+                {
+                    Handles.color = Color.white;
+                    Handles.Label(px + new Vector2(6f, -8f), ni.ToString(), EditorStyles.miniLabel);
+                }
+            }
+        }
+    }
+
+    // Catmull-Rom sample shared by editor overlay and (via LevelSpawner) runtime
+    static Vector2 SplineWallSample(List<Vector2> pts, int seg, float t, bool closed)
+    {
+        int n  = pts.Count;
+        int i0 = closed ? (seg - 1 + n) % n : Mathf.Max(seg - 1, 0);
+        int i1 = seg;
+        int i2 = closed ? (seg + 1) % n : Mathf.Min(seg + 1, n - 1);
+        int i3 = closed ? (seg + 2) % n : Mathf.Min(seg + 2, n - 1);
+        float t2 = t * t, t3 = t2 * t;
+        Vector2 p0 = pts[i0], p1 = pts[i1], p2 = pts[i2], p3 = pts[i3];
+        return 0.5f * (2f * p1 + (-p0 + p2) * t + (2f * p0 - 5f * p1 + 4f * p2 - p3) * t2 + (-p0 + 3f * p1 - 3f * p2 + p3) * t3);
+    }
+
+    GameObject GetDefaultSplineWallPrefab()
+    {
+        // Prefer exact name match, then any name containing "SplineWall"
+        foreach (var p in scannedPrefabs)
+            if (p != null && p.name == "BasicSplineWall1") return p;
+        foreach (var p in scannedPrefabs)
+            if (p != null && p.name.Contains("SplineWall")) return p;
+        return null;
+    }
+
+    Color GetSplineWallColor(int pathIdx)
+    {
+        Color[] palette = {
+            new Color(1.0f, 0.55f, 0.1f),
+            new Color(0.9f, 0.9f, 0.1f),
+            new Color(0.2f, 1.0f, 0.5f),
+            new Color(0.1f, 0.8f, 1.0f),
+            new Color(0.9f, 0.2f, 1.0f),
+            new Color(1.0f, 0.3f, 0.3f),
+        };
+        return palette[pathIdx % palette.Length];
+    }
+
+    // Nodes are stored in normalised grid space (-0.5..0.5), independent of arena size.
+    // Multiply by arenaWorldWidth at runtime to get world positions.
+    Vector2 WorldXZToPixel(Rect gridRect, Vector2 normXZ)
+    {
+        float gridPx = CellSize * GridSize;
+        return new Vector2(gridRect.center.x + normXZ.x * gridPx,
+                           gridRect.center.y - normXZ.y * gridPx);
+    }
+
+    Vector2 PixelToWorldXZ(Rect gridRect, Vector2 pixel)
+    {
+        float gridPx = CellSize * GridSize;
+        return new Vector2( (pixel.x - gridRect.center.x) / gridPx,
+                           -(pixel.y - gridRect.center.y) / gridPx);
     }
 }

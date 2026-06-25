@@ -37,12 +37,30 @@ public class SoulWhirlDirection : MonoBehaviour
     public Transform[] GetPath()  => boneChain;
     public float EntryRadius      => mouthRadius;
 
-    public bool IsInSector(Vector3 worldPosition)
-    {
-        if (boneChain == null || boneChain.Length < 1) return false;
-        return Vector3.Distance(worldPosition, MouthPosition) <= suctionReach + suctionRadius;
-    }
+ public bool IsInSector(Vector3 worldPosition)
+{
+    if (boneChain == null || boneChain.Length < 1) return false;
 
+    // Vector from the mouth to the fish
+    Vector3 toFish = worldPosition - MouthPosition;
+    
+    // Project the fish position onto the mouth's forward axis
+    // MouthAxis points "out" from the tube towards the water
+    float distAlongAxis = Vector3.Dot(toFish, MouthAxis);
+
+    // 1. Is the fish in front of the mouth and within the suction reach?
+    if (distAlongAxis < 0 || distAlongAxis > suctionReach) return false;
+
+    // 2. Calculate the funnel radius at this specific distance along the axis
+    float t = distAlongAxis / suctionReach;
+    float currentRadiusAtDist = Mathf.Lerp(mouthRadius, suctionRadius, t);
+
+    // 3. Is the fish within that radius (distance from the center axis)?
+    Vector3 projectionOnAxis = MouthPosition + MouthAxis * distAlongAxis;
+    float distFromAxis = Vector3.Distance(worldPosition, projectionOnAxis);
+
+    return distFromAxis <= currentRadiusAtDist;
+}
     // --------------------------------------------------
     // UNITY
     // --------------------------------------------------

@@ -7,6 +7,7 @@ public class BoatToWaterMaterial : MonoBehaviour
     public Transform boat;
     public BoatVisual boatVisual;
     public BoatMovement boatMovement;
+    public Transform waterTransform;
 
     [Header("Sonar Screen Space")]
 public Material rockSonarMaterial;
@@ -54,17 +55,24 @@ public Camera mainCamera;
     [Range(-1f, 2f)] public float outerRadiusZoomedIn  =  1.30f;
     [Range(-1f, 2f)] public float outerRadiusZoomedOut =  0.03f;
 
-    [Header("Arena Boat Mask")]
-    [Tooltip("Direction from front (camera-near) to back (camera-far) of the arena.")]
+    [Header("Arena Boat Mask (Distance-Based)")]
+    [Tooltip("Fallbacks if no BaselineMarker is found in the scene.")]
+    public float fallbackFadeStart = 10f;
+    public float fallbackFadeEnd   = 18f;
+
+    [Header("Boat Wake")]
+    public float wakeRadius      = 1.5f;
+    public float wakeLength      = 1.0f;
+    public float ringFrequency   = 8f;
+    public float ringScrollSpeed = 3f;
+    public float ringFalloff     = 1.5f;
+    public float ringAmplitude   = 0.05f;
+    public float idleAmplitude   = 0.01f;
+
+    [Header("Deprecated Axis (No longer used for strength)")]
     public Vector3 maskAxis = Vector3.forward;
-    [Tooltip("Offset of the front point along the axis from arena centre (negative = closer to camera).")]
     public float maskFrontOffset = 0f;
-    [Tooltip("Offset of the back point along the axis from arena centre (positive = further from camera).")]
     public float maskBackOffset  = 0f;
-    [Tooltip("Point along the axis where the mask is at FULL strength (boat in front of this = fully masked).")]
-    public float maskFadeStartOffset = 0f;
-    [Tooltip("Point along the axis where the mask fades to ZERO (boat behind this = no mask).")]
-    public float maskFadeEndOffset   = 10f;
 
     void Start()
 {
@@ -108,6 +116,25 @@ public Camera mainCamera;
         UpdateArenaMaskRadii();
         waterMaterial.SetVector(boatForwardProperty, boat.forward);
         waterMaterial.SetVector(boatRightProperty, boat.right);
+
+        float speed01 = boatMovement != null ? boatMovement.Speed01 : 0f;
+        if (waterTransform != null)
+        {
+            Vector3 localBoatPos = waterTransform.InverseTransformPoint(boat.position);
+            waterMaterial.SetVector("_BoatCenter", new Vector4(localBoatPos.x, 0f, -localBoatPos.y, 0f));
+
+            // Convert boat forward direction to wave mesh object space (direction only, no position offset)
+            Vector3 localForward = waterTransform.InverseTransformDirection(boat.forward);
+            waterMaterial.SetVector("_BoatForwardLocal", new Vector4(localForward.x, -localForward.y, 0f, 0f));
+        }
+        waterMaterial.SetFloat("_BoatSpeed01",      speed01);
+        waterMaterial.SetFloat("_WakeRadius",       wakeRadius);
+        waterMaterial.SetFloat("_WakeLength",       wakeLength);
+        waterMaterial.SetFloat("_RingFrequency",    ringFrequency);
+        waterMaterial.SetFloat("_RingScrollSpeed",  ringScrollSpeed);
+        waterMaterial.SetFloat("_RingFalloff",      ringFalloff);
+        waterMaterial.SetFloat("_RingAmplitude",    ringAmplitude);
+        waterMaterial.SetFloat("_IdleAmplitude",    idleAmplitude);
 
         bool boosting = Input.GetKey(KeyCode.Space);
 
@@ -171,19 +198,28 @@ public Camera mainCamera;
         var ldc = LevelDataController.Instance;
         if (ldc == null) return;
 
-        float radius = ldc.GetArenaProfile()?.droppedSoulBoundsRadius ?? 20f;
+        // Try to get thresholds from the BaselineMarker
+        float startDist = fallbackFadeStart;
+        float endDist   = fallbackFadeEnd;
+
+        var spawner = Object.FindFirstObjectByType<LevelSpawner>();
+        var marker  = spawner != null ? spawner.GetBaselineMarker() : null;
+
+        if (marker != null)
+        {
+            startDist = marker.MaskFadeStartRadius;
+            endDist   = marker.MaskFadeEndRadius;
+        }
+
         Vector3 centre = ldc.GetArenaCentre();
-        Vector3 axisDir = maskAxis.normalized;
+        // Calculate the boat's distance from the arena center (on the horizontal plane)
+        Vector3 boatPosXZ = new Vector3(boat.position.x, 0, boat.position.z);
+        Vector3 centreXZ = new Vector3(centre.x, 0, centre.z);
+        float boatDist = Vector3.Distance(boatPosXZ, centreXZ);
 
-        Vector3 fadeStartPt = centre + axisDir * maskFadeStartOffset;
-        Vector3 fadeEndPt   = centre + axisDir * maskFadeEndOffset;
-
-        Vector3 fadeAxis   = fadeEndPt - fadeStartPt;
-        float   fadeLength = fadeAxis.magnitude;
-        if (fadeLength < 0.001f) return;
-
-        float t = Mathf.Clamp01(Vector3.Dot(boat.position - fadeStartPt, fadeAxis / fadeLength) / fadeLength);
-        float strength = 1f - Mathf.SmoothStep(0f, 1f, t);
+        // Strength increases as the boat moves away from the center towards the walls.
+        float t = Mathf.InverseLerp(startDist, endDist, boatDist);
+        float strength = Mathf.SmoothStep(0f, 1f, t);
 
         Shader.SetGlobalFloat("_ArenaBoatMaskStrength", strength);
     }
@@ -192,42 +228,28 @@ public Camera mainCamera;
     private void OnDrawGizmosSelected()
     {
         var ldc = LevelDataController.Instance;
-        float radius  = ldc != null ? (ldc.GetArenaProfile()?.droppedSoulBoundsRadius ?? 20f) : 20f;
         Vector3 centre = ldc != null ? ldc.GetArenaCentre() : transform.position;
-        Vector3 axisDir = maskAxis.normalized;
 
-        Vector3 frontPt = centre + axisDir * (-radius + maskFrontOffset);
-        Vector3 backPt  = centre + axisDir * ( radius + maskBackOffset);
+        var spawner = Object.FindFirstObjectByType<LevelSpawner>();
+        var marker  = spawner != null ? spawner.GetBaselineMarker() : null;
 
-        // Front dot (green = full mask)
-        Gizmos.color = Color.green;
-        Gizmos.DrawSphere(frontPt, 0.4f);
+        float startDist = marker != null ? marker.MaskFadeStartRadius : fallbackFadeStart;
+        float endDist   = marker != null ? marker.MaskFadeEndRadius   : fallbackFadeEnd;
+        
+        // Draw the concentric fade rings
+        UnityEditor.Handles.color = new Color(1f, 0f, 1f, 0.4f); // Magenta = Start
+        UnityEditor.Handles.DrawWireDisc(centre, Vector3.up, startDist);
+        UnityEditor.Handles.Label(centre + Vector3.forward * startDist, "Mask Fade Start");
 
-        // Back dot (red = no mask)
-        Gizmos.color = Color.red;
-        Gizmos.DrawSphere(backPt, 0.4f);
+        UnityEditor.Handles.color = new Color(0f, 1f, 1f, 0.4f); // Cyan = End
+        UnityEditor.Handles.DrawWireDisc(centre, Vector3.up, endDist);
+        UnityEditor.Handles.Label(centre + Vector3.forward * endDist, "Mask Full Strength");
 
-        // Axis line
-        Gizmos.color = Color.yellow;
-        Gizmos.DrawLine(frontPt, backPt);
-
-        // Midpoint dividing line (perpendicular to axis, horizontal)
-        Vector3 mid  = (frontPt + backPt) * 0.5f;
-        Vector3 perp = Vector3.Cross(axisDir, Vector3.up).normalized * radius;
-        Gizmos.color = new Color(1f, 1f, 0f, 0.5f);
-        Gizmos.DrawLine(mid - perp, mid + perp);
-
-        // Fade zone — cyan = full strength, magenta = zero strength
-        Vector3 fadeStartPt = centre + axisDir * maskFadeStartOffset;
-        Vector3 fadeEndPt   = centre + axisDir * maskFadeEndOffset;
-
-        Gizmos.color = Color.cyan;
-        Gizmos.DrawSphere(fadeStartPt, 0.4f);
-        Gizmos.DrawLine(fadeStartPt - perp, fadeStartPt + perp);
-
-        Gizmos.color = Color.magenta;
-        Gizmos.DrawSphere(fadeEndPt, 0.4f);
-        Gizmos.DrawLine(fadeEndPt - perp, fadeEndPt + perp);
+        if (boat != null)
+        {
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawLine(centre, new Vector3(boat.position.x, centre.y, boat.position.z));
+        }
     }
 #endif
 

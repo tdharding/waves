@@ -157,10 +157,7 @@ public class GridData : ScriptableObject
         [Tooltip("-1 = base layer. 0+ = index into GridData.tiers for Y height.")]
         public int tierSlot = -1;
 
-        [Tooltip("Inward offset from the arena perimeter wall where the boat and SoulBoat spawn. " +
-                 "0 = exactly at the wall. Increase to move the spawn point further inside the arena. " +
-                 "Facing is auto-derived as perimeterAngle + 180° (always toward centre).")]
-        public float spawnRadius = 2f;
+        public float spawnRadius = 0f;
 
         [Header("River Routing")]
         [Tooltip("Set automatically by LevelSelectArenaController at runtime. " +
@@ -264,4 +261,25 @@ public class GridData : ScriptableObject
 
     [Tooltip("ArenaProfile asset for this level. Used directly by LevelSpawner — replaces the old arenaSize enum.")]
     public ArenaProfile arenaProfile;
+
+    // ─────────────────────────────────────────────
+    // SPLINE WALL PATHS
+    // Free-floating spline paths that tile wall prefabs at runtime.
+    // Nodes are world XZ positions (Vector2.x = world X, Vector2.y = world Z).
+    // ─────────────────────────────────────────────
+
+    [System.Serializable]
+    public class SplineWallPath
+    {
+        public List<Vector2> nodes         = new List<Vector2>();
+        public bool          isClosed      = false;
+        public List<bool>    segmentCurved = new List<bool>(); // index i = curved flag for segment node[i]→node[i+1]; missing = true
+        public float         tileSpacing   = 0.2f;
+        public GameObject    prefabOverride; // null = use LevelSpawner.splineWallPrefab
+
+        public bool IsSegmentCurved(int seg) =>
+            segmentCurved != null && seg < segmentCurved.Count ? segmentCurved[seg] : true;
+    }
+
+    public List<SplineWallPath> splineWallPaths = new List<SplineWallPath>();
 }

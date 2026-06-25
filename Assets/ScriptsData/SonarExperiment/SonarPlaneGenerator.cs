@@ -36,9 +36,9 @@ public class SonarPlaneGenerator : MonoBehaviour
     public static readonly int GridDensityShaderID    = Shader.PropertyToID("_GridDensity");
     public static readonly int GridWorldScaleID       = Shader.PropertyToID("_GridWorldScale");
 
-    readonly List<Transform> _hTiles = new List<Transform>();
-    readonly List<Transform> _vTiles = new List<Transform>();
-    readonly List<Transform> _xTiles = new List<Transform>();
+    readonly List<Transform> _hLevels = new List<Transform>();
+    readonly List<Transform> _vTiles  = new List<Transform>();
+    readonly List<Transform> _xTiles  = new List<Transform>();
     Mesh _sharedMesh;
 
     // ── configure (called by SonarController) ─────────────────────────────────
@@ -63,7 +63,7 @@ public class SonarPlaneGenerator : MonoBehaviour
 
     void OnEnable()
     {
-        if (_hTiles.Count == 0 && gridType != null)
+        if (_hLevels.Count == 0 && gridType != null)
             Generate();
     }
 
@@ -86,7 +86,7 @@ public class SonarPlaneGenerator : MonoBehaviour
         _sharedMesh = BuildMesh(gridType.subdivisions, _cellSize);
 
         int poolSize = Columns * Rows * Levels;
-        SpawnPool("Horizontal",    poolSize, Quaternion.identity,           _hTiles);
+        SpawnHorizontalLevels();
         if (gridType.spawnVertical)
             SpawnPool("Vertical",      poolSize, Quaternion.Euler(90f, 0f, 0f), _vTiles);
         if (gridType.spawnCrossVertical)
@@ -99,7 +99,7 @@ public class SonarPlaneGenerator : MonoBehaviour
     {
         for (int i = transform.childCount - 1; i >= 0; i--)
             DestroyImmediate(transform.GetChild(i).gameObject);
-        _hTiles.Clear();
+        _hLevels.Clear();
         _vTiles.Clear();
         _xTiles.Clear();
     }
@@ -118,6 +118,20 @@ public class SonarPlaneGenerator : MonoBehaviour
         }
     }
 
+    void SpawnHorizontalLevels()
+    {
+        Mesh levelMesh = BuildHorizontalMesh(Columns, Rows, gridType.subdivisions, _cellSize);
+        for (int lev = 0; lev < Levels; lev++)
+        {
+            var go = new GameObject($"Horizontal_{lev}");
+            go.transform.SetParent(transform, false);
+            go.AddComponent<MeshFilter>().sharedMesh = levelMesh;
+            var mr = go.AddComponent<MeshRenderer>();
+            if (gridType.planeMaterial != null) mr.sharedMaterial = gridType.planeMaterial;
+            _hLevels.Add(go.transform);
+        }
+    }
+
     // ── static placement ──────────────────────────────────────────────────────
 
     void PlaceTiles()
@@ -132,19 +146,27 @@ public class SonarPlaneGenerator : MonoBehaviour
         float topY     = StackTopY;
         Vector3 org    = transform.position;
 
-        int hIdx = 0, vIdx = 0, xIdx = 0;
+        // Horizontal — one mesh per level, centred on the generator
+        for (int lev = 0; lev < Levels; lev++)
+        {
+            if (lev >= _hLevels.Count) break;
+            float y = topY - lev * LevelSpacing;
+            _hLevels[lev].position = new Vector3(org.x, y, org.z);
+        }
+
+        // Vertical / cross-vertical — unchanged per-tile placement
+        int vIdx = 0, xIdx = 0;
         for (int lev = 0; lev < Levels; lev++)
         {
             float y = topY - lev * LevelSpacing;
             for (int col = 0; col < cols; col++)
             {
-                for (int row = 0; row < rowCount; row++, hIdx++, vIdx++, xIdx++)
+                for (int row = 0; row < rowCount; row++, vIdx++, xIdx++)
                 {
                     var pos = new Vector3(
                         org.x - halfX + col * cs,
                         y,
                         org.z - halfZ + row * cs);
-                    if (hIdx < _hTiles.Count) _hTiles[hIdx].position = pos;
                     if (vIdx < _vTiles.Count) _vTiles[vIdx].position = pos;
                     if (xIdx < _xTiles.Count) _xTiles[xIdx].position = pos;
                 }
@@ -153,6 +175,48 @@ public class SonarPlaneGenerator : MonoBehaviour
     }
 
     // ── procedural mesh ───────────────────────────────────────────────────────
+
+    static Mesh BuildHorizontalMesh(int cols, int rows, int subs, float cellSize)
+    {
+        int vertsX = cols * subs + 1;
+        int vertsZ = rows * subs + 1;
+        var verts  = new Vector3[vertsX * vertsZ];
+        var uvs    = new Vector2[vertsX * vertsZ];
+
+        float halfW = cols * cellSize * 0.5f;
+        float halfD = rows * cellSize * 0.5f;
+        float stepX = cellSize / subs;
+        float stepZ = cellSize / subs;
+
+        for (int j = 0; j < vertsZ; j++)
+            for (int i = 0; i < vertsX; i++)
+            {
+                int idx    = j * vertsX + i;
+                verts[idx] = new Vector3(i * stepX - halfW, 0f, j * stepZ - halfD);
+                uvs[idx]   = new Vector2((float)i / subs, (float)j / subs);
+            }
+
+        int quadW = vertsX - 1, quadZ = vertsZ - 1;
+        var tris  = new int[quadW * quadZ * 6];
+        int t     = 0;
+        for (int j = 0; j < quadZ; j++)
+            for (int i = 0; i < quadW; i++)
+            {
+                int tl = j * vertsX + i, tr = tl + 1;
+                int bl = (j + 1) * vertsX + i, br = bl + 1;
+                tris[t++] = tl; tris[t++] = bl; tris[t++] = tr;
+                tris[t++] = tr; tris[t++] = bl; tris[t++] = br;
+            }
+
+        var mesh = new Mesh { name = "SonarHorizontalLevel" };
+        mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+        mesh.vertices    = verts;
+        mesh.uv          = uvs;
+        mesh.triangles   = tris;
+        mesh.RecalculateNormals();
+        mesh.RecalculateBounds();
+        return mesh;
+    }
 
     static Mesh BuildMesh(int subs, float size)
     {

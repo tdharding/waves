@@ -22,6 +22,8 @@ public class SplineRiverManager : MonoBehaviour
     [SerializeField] private float _extrudeSpeed = 1.5f;
     [SerializeField] private float _overshoot    = 0.05f;
     [SerializeField] private float _branchOvershoot = 0.5f;
+    [Tooltip("When a branch unlocks on exit, start its extrusion at this normalised T (0-1) so the mesh head is already slightly beyond where the boat spawns.")]
+    [SerializeField] [Range(0f, 0.5f)] private float _exitExtrudeHeadStart = 0.1f;
 
     [Header("Barriers")]
     [SerializeField] private GameObject _barrierPrefab; // Sphere collider tagged "LevelSelectPathObstacle"
@@ -300,42 +302,33 @@ private IEnumerator AnimateMainExtrude(float target)
     /// segment IDs from portal links whose arenaPath also has ExtrudeOnExit ticked, then
     /// unlocks only the branches matching those IDs — the river paths behind that specific arena.
     /// </summary>
-    public void NotifyLevelExited(string levelID)
+    // portalIndex: the exit door index from LevelExitController.portalIndex — which door the player left through.
+    // Used to look up the matching portalLink on the ArenaController and unlock only that branch.
+    public void NotifyLevelExited(string levelID, int portalIndex = -1)
     {
-        Debug.Log($"[SplineRiverManager] NotifyLevelExited called — levelID='{levelID}'");
+        Debug.Log($"[SplineRiverManager] NotifyLevelExited — levelID='{levelID}'  portalIndex={portalIndex}");
 
         if (string.IsNullOrEmpty(levelID)) { Debug.LogWarning("[SplineRiverManager] levelID is empty — aborting."); return; }
 
-        // ── DEBUG: show every arena controller and whether it matches
         var allArenas = FindObjectsOfType<LevelSelectArenaController>();
-        Debug.Log($"[SplineRiverManager] Found {allArenas.Length} LevelSelectArenaController(s) in scene:");
-        foreach (var arena in allArenas)
-        {
-            string aID = arena.gridData != null ? arena.gridData.levelID : "(no gridData)";
-            bool matches = aID == levelID;
-            Debug.Log($"  Arena '{arena.name}'  levelID='{aID}'  MATCH={matches}  portalLinks={arena.portalLinks.Count}");
-
-            if (!matches) continue;
-
-            foreach (var link in arena.portalLinks)
-            {
-                if (link.arenaPath == null) { Debug.Log($"    Link {arena.portalLinks.IndexOf(link)}: arenaPath is NULL"); continue; }
-                var segID = link.arenaPath.GetComponent<RiverSegmentID>();
-                Debug.Log($"    Link {arena.portalLinks.IndexOf(link)}: arenaPath='{link.arenaPath.name}'  RiverSegmentID={(segID != null ? "found" : "MISSING")}  SegmentID='{segID?.SegmentID}'  ExtrudeOnExit={segID?.ExtrudeOnExit}");
-            }
-        }
-
-        // Collect segment IDs from this arena's portal links that have ExtrudeOnExit flagged
         var targetSegmentIDs = new System.Collections.Generic.HashSet<string>();
+
         foreach (var arena in allArenas)
         {
             if (arena.gridData == null || arena.gridData.levelID != levelID) continue;
-            foreach (var link in arena.portalLinks)
+
+            Debug.Log($"[SplineRiverManager] Arena '{arena.name}'  portalLinks={arena.portalLinks.Count}  portalIndex={portalIndex}");
+
+            for (int i = 0; i < arena.portalLinks.Count; i++)
             {
-                if (link.arenaPath == null) continue;
-                var segID = link.arenaPath.GetComponent<RiverSegmentID>();
-                if (segID != null && segID.ExtrudeOnExit && !string.IsNullOrEmpty(segID.SegmentID))
-                    targetSegmentIDs.Add(segID.SegmentID);
+                if (portalIndex >= 0 && i != portalIndex) continue;
+
+                var link = arena.portalLinks[i];
+                if (link.arenaPath == null) { Debug.Log($"  Link[{i}]: arenaPath NULL"); continue; }
+                var seg = link.arenaPath.GetComponent<RiverSegmentID>();
+                Debug.Log($"  Link[{i}]: segmentID='{seg?.SegmentID}'  ExtrudeOnExit={seg?.ExtrudeOnExit}  selected={portalIndex < 0 || i == portalIndex}");
+                if (seg != null && seg.ExtrudeOnExit && !string.IsNullOrEmpty(seg.SegmentID))
+                    targetSegmentIDs.Add(seg.SegmentID);
             }
         }
 
@@ -343,26 +336,25 @@ private IEnumerator AnimateMainExtrude(float target)
 
         if (targetSegmentIDs.Count == 0)
         {
-            Debug.LogWarning($"[SplineRiverManager] No arenaPath segments with ExtrudeOnExit=true found for '{levelID}'. " +
-                             $"Check that the arenaPath's RiverSegmentID has ExtrudeOnExit ticked.");
+            Debug.LogWarning($"[SplineRiverManager] No ExtrudeOnExit segments found for '{levelID}' portalIndex={portalIndex}.");
             return;
         }
 
-        // ── DEBUG: show each branch and why it passes/fails the unlock check
         Debug.Log($"[SplineRiverManager] Checking {_branches.Count} branch(es) against target IDs:");
         bool anyUnlocked = false;
         foreach (var b in _branches)
         {
-            bool idMatch    = targetSegmentIDs.Contains(b.SegmentID);
-            bool canUnlock  = b.ExtrudeOnExit && !b.IsStarted && !b.ExitUnlocked && idMatch;
+            bool idMatch   = targetSegmentIDs.Contains(b.SegmentID);
+            bool canUnlock = b.ExtrudeOnExit && !b.IsStarted && !b.ExitUnlocked && idMatch;
             Debug.Log($"  Branch '{b.SegmentID}'  ExtrudeOnExit={b.ExtrudeOnExit}  IsStarted={b.IsStarted}  ExitUnlocked={b.ExitUnlocked}  IDMatch={idMatch}  → WillUnlock={canUnlock}");
 
             if (!canUnlock) continue;
 
             b.ExitUnlocked = true;
+            b.CurrentT     = _exitExtrudeHeadStart;
             GameProgressData.UnlockSegmentOnExit(b.SegmentID);
             anyUnlocked = true;
-            Debug.Log($"[SplineRiverManager] ✓ Exit-unlocked segment '{b.SegmentID}' (arena: '{levelID}').");
+            Debug.Log($"[SplineRiverManager] ✓ Exit-unlocked '{b.SegmentID}'  headStart={_exitExtrudeHeadStart}");
         }
 
         if (anyUnlocked)
@@ -747,6 +739,15 @@ private IEnumerator AnimateMainExtrude(float target)
         public bool            ExtrudeOnExit;
         public bool            ExitUnlocked;
         public SplineContainer Container;
+    }
+
+    public void ForceJumpExtrudeToT(float t)
+    {
+        _mainCurrentT = Mathf.Clamp01(t);
+        ApplyMainExtrude(_mainCurrentT);
+        RestoreExitUnlocked();
+        UpdateBranchStates(true);
+        UpdateBarriers();
     }
 
     public void Editor_SetMainExtrudeT(float t)

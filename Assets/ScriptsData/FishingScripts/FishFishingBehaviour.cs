@@ -189,55 +189,66 @@ public class FishFishingBehaviour : MonoBehaviour
     }
 
     void AttractTowardsWhirl()
+{
+    if (whirlDirection == null) return;
+
+    Vector3 target = whirlDirection.MouthPosition;
+
+    if (!hasCachedSplinePos)
     {
-        if (whirlDirection == null) return;
+        cachedSplinePosition = transform.position;
+        hasCachedSplinePos   = true;
+        currentPullSpeed     = basePullSpeed;
+        splineAnimate.Pause();
+    }
 
-        Vector3 target = whirlDirection.MouthPosition;
+    // --- NEW DIRECTIONAL LOGIC ---
+    // Calculate how well the fish is aligned with the mouth's intake direction
+    Vector3 toMouth = (target - transform.position).normalized;
+    // -whirlDirection.MouthAxis points "into" the tube
+    float alignment = Vector3.Dot(toMouth, -whirlDirection.MouthAxis);
+    // Ensure speed doesn't drop to 0, but give a 5x boost for perfect alignment
+    float alignmentMultiplier = Mathf.Clamp(alignment, 0.2f, 1.0f); 
 
-        if (!hasCachedSplinePos)
+    currentPullSpeed = Mathf.Min(currentPullSpeed + pullAcceleration * Time.deltaTime, maxPullSpeed);
+    
+    // Apply the alignment multiplier to the movement
+    transform.position = Vector3.MoveTowards(transform.position, target, currentPullSpeed * alignmentMultiplier * Time.deltaTime);
+    // -----------------------------
+
+    float dist = Vector3.Distance(transform.position, target);
+    float t    = Mathf.InverseLerp(fishing.CurrentFishingRange, whirlDirection.EntryRadius, dist);
+    transform.localScale = cachedDefaultScale * Mathf.Lerp(1f, minScale, t);
+
+    if (dist <= whirlDirection.EntryRadius)
+    {
+        if (identity != null)
         {
-            cachedSplinePosition = transform.position;
-            hasCachedSplinePos   = true;
-            currentPullSpeed     = basePullSpeed;
-            splineAnimate.Pause();
+            _travelingTube = true;
+            _tubeReleased  = false;
+            var capturedIdentity = identity;
+            StartCoroutine(whirlDirection.TravelAlongPath(
+                transform,
+                onCaptured: () =>
+                {
+                    fishing.OnFishCaptured(capturedIdentity);
+                    Destroy(capturedIdentity.gameObject);
+                },
+                onReleased: () =>
+                {
+                    _travelingTube = false;
+                    _tubeReleased  = false;
+                },
+                isReleased: () => _tubeReleased
+            ));
         }
-
-        currentPullSpeed  = Mathf.Min(currentPullSpeed + pullAcceleration * Time.deltaTime, maxPullSpeed);
-        transform.position = Vector3.MoveTowards(transform.position, target, currentPullSpeed * Time.deltaTime);
-
-        float dist = Vector3.Distance(transform.position, target);
-        float t    = Mathf.InverseLerp(fishing.CurrentFishingRange, whirlDirection.EntryRadius, dist);
-        transform.localScale = cachedDefaultScale * Mathf.Lerp(1f, minScale, t);
-
-        if (dist <= whirlDirection.EntryRadius)
+        else
         {
-            if (identity != null)
-            {
-                _travelingTube = true;
-                _tubeReleased  = false;
-                var capturedIdentity = identity;
-                StartCoroutine(whirlDirection.TravelAlongPath(
-                    transform,
-                    onCaptured: () =>
-                    {
-                        fishing.OnFishCaptured(capturedIdentity);
-                        Destroy(capturedIdentity.gameObject);
-                    },
-                    onReleased: () =>
-                    {
-                        _travelingTube = false;
-                        _tubeReleased  = false;
-                    },
-                    isReleased: () => _tubeReleased
-                ));
-            }
-            else
-            {
-                Debug.LogError("FishFishingBehaviour: No LinkIdentityLabel found. Cannot complete capture.", this);
-                Destroy(gameObject);
-            }
+            Debug.LogError("FishFishingBehaviour: No LinkIdentityLabel found. Cannot complete capture.", this);
+            Destroy(gameObject);
         }
     }
+}
 
     void LateUpdate()
     {

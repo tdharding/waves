@@ -1,0 +1,136 @@
+{
+    "entries": [
+        {
+            "key": "splitPreset",
+            "value": "b59257c53d56d484098c3fac4ecc4954"
+        },
+        {
+            "key": "pathPrefab",
+            "value": "f4129452c015d6547947f34b10d1341f"
+        },
+        {
+            "key": "branchWaterExtrudePrefab",
+            "value": "236c1531b2c82bc40a42e7657502f16a"
+        },
+        {
+            "key": "barrierPrefab",
+            "value": "81f54d9e5f0cd2149a669edc76b1ab99"
+        },
+        {
+            "key": "riverBlockPrefab",
+            "value": "070f6a1ad10a0e34aa3247fe890bb1a4"
+        },
+        {
+            "key": "splineInstantiateSpacing",
+            "value": "0.15"
+        },
+        {
+            "key": "junctionScriptObject",
+            "value": "cdc03d5a67a4c8a4ca447c17a1a65a6b"
+        },
+        {
+            "key": "junctionRightFacingPrefab",
+            "value": "08a0e3b54a9037545a500567ad11a7af"
+        },
+        {
+            "key": "junctionLeftFacingPrefab",
+            "value": "4112896818a87814181c705d9fb75161"
+        },
+        {
+            "key": "junctionPrefab",
+            "value": "cdc03d5a67a4c8a4ca447c17a1a65a6b"
+        },
+        {
+            "key": "junctionGapPadding",
+            "value": "0"
+        },
+        {
+            "key": "arenaPrefab",
+            "value": "1f8a1bc0973719f48851a1d2efa25504"
+        },
+        {
+            "key": "arenaEntrancePrefab",
+            "value": "fb37ce94a14f8f24a9a64d50b2d45a57"
+        },
+        {
+            "key": "obstaclePrefab",
+            "value": "343705c9ba8011941978eabad3d8f143"
+        },
+        {
+            "key": "shopPrefab",
+            "value": "4cf4b2f660ffe3a47a1134471c985525"
+        },
+        {
+            "key": "cameraPrefab",
+            "value": "fe8178a8b0cae4447b5ffd9ae4e14c6d"
+        },
+        {
+            "key": "soulsOnBoatDisplayScriptPrefab",
+            "value": "9848bdf02a10a194e94177b011aa6f0e"
+        },
+        {
+            "key": "arenaSoulsWindowPrefab",
+            "value": "088dabe833b2e2840b3fd741cc7e2c0e"
+        },
+        {
+            "key": "pauseManagerScriptPrefab",
+            "value": "bbbf8fae451ede54099f8b840c7f35f3"
+        },
+        {
+            "key": "portalConfirmUIScriptPrefab",
+            "value": "50d0c938afb39ff46804f74b97ba6334"
+        },
+        {
+            "key": "videoPlayerControllerPrefab",
+            "value": "91ac232e9d3af38488cc6119a5e54bc8"
+        },
+        {
+            "key": "canvasParentPrefab",
+            "value": "101379c0820e7ea4482066818e3876df"
+        },
+        {
+            "key": "pauseMenuPrefab",
+            "value": "8789cad67eb9fa74592325b13b52c09d"
+        },
+        {
+            "key": "boatHUDPrefab",
+            "value": "7cd1490137fabfd4592c5b30018d5f4c"
+        },
+        {
+            "key": "soulsOnBoatDisplayPrefab",
+            "value": "c491e8905455bae4a9e9846dc5636c90"
+        },
+        {
+            "key": "orbsCounterPrefab",
+            "value": "f7834076e3f155f479d6773e68cb88a6"
+        },
+        {
+            "key": "shopTooltipPrefab",
+            "value": "98f47fd9a15190a4ba4ad6d946e45e4c"
+        },
+        {
+            "key": "dataControllerPrefab",
+            "value": "6b22932c3e7b0874081f1cf19cb45440"
+        },
+        {
+            "key": "boatPrefab",
+            "value": "f7060ca2a7d8d3642848aee6b1851725"
+        },
+        {
+            "key": "landscapeTilePrefab",
+            "value": "78fcaaa5184a3c2448e4c351b4ed9e79"
+        },
+        {
+            "key": "openingSequencePrefab",
+            "value": "ac17943291d2d9d42b50db647d5bfb47"
+        },
+        {
+            "key": "musicIntro",
+            "value": "1ff10eeae8633404da517dacc2021e9e"
+        },
+        {
+            "key": "musicLoop",
+            "value": "1ff10eeae8633404da517dacc2021e9e"
+        }
+    ]
+}

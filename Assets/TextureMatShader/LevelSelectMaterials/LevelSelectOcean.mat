@@ -70,7 +70,7 @@ Material:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _DepthColor: {r: 0.408805, g: 0.408805, b: 0.408805, a: 1}
     - _DepthColor_1: {r: 0.10062885, g: 0.10062885, b: 0.10062885, a: 1}
-    - _RipplePalmPoint: {r: 144.6316, g: -9.07211, b: -12.275781, a: 0}
+    - _RipplePalmPoint: {r: 144.6316, g: -9.072108, b: -12.27578, a: 0}
     - _Tiling: {r: 20, g: 20, b: 0, a: 0}
     - _remap: {r: 12, g: -2.46, b: 0, a: 0}
   m_BuildTextureStacks: []

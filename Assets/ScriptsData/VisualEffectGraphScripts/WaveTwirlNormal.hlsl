@@ -1,3 +1,9 @@
+// Global phase provided by WaveMaterialController to prevent teleporting waves
+#ifndef WAVE_PHASE_DECLARED
+#define WAVE_PHASE_DECLARED
+float _WavePhase;
+#endif
+
 void WaveTwirlNormal_float(
     float2 UV,
     float3 PositionIn,
@@ -24,7 +30,8 @@ void WaveTwirlNormal_float(
 
     // Wave gradient — cos of the same argument gives the slope of the sine wave.
     // Magnitude near 1 = steep incline, near 0 = flat peak or trough.
-    float  gradient = cos(stepped * Frequency - Time * Speed);
+    // Using accumulated _WavePhase global instead of Time * Speed to prevent "skipping" 
+    float  gradient = cos(stepped * Frequency - _WavePhase);
     float  slope    = abs(gradient);
 
     // Rotation angle: base twirl + depth/whirlpool disturbance

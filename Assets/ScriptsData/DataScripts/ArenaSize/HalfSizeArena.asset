@@ -15,13 +15,13 @@ MonoBehaviour:
   arenaSize: 1
   mapGridTiling: {x: 0.5, y: 0.5}
   outerWallsPrefab: {fileID: 739048599901300926, guid: 4de421e3cb12494419cb1685640150f2, type: 3}
-  arenaSizeReferencePlane: {fileID: 5281232935054549149, guid: 0ed8f07a01cae944684f8e181930f736, type: 3}
+  arenaSizeReferencePlane: {fileID: 0}
   arenaRadius1: -2
   mapWidth: 3.172
   mapHeight: 2.914
   mazeWallMarkerScale: 1
   wavePlaneScale: {x: 2, y: 2, z: 2}
-  entrancePrefabOverride: {fileID: 2407630338747065755, guid: e14d0274a95191943a555a047c956df6, type: 3}
-  exitPrefabOverride: {fileID: 2407630338747065755, guid: e14d0274a95191943a555a047c956df6, type: 3}
+  entrancePrefabOverride: {fileID: 3508056878682996915, guid: 02d35998e30eece4199c26b9e7c7e393, type: 3}
   droppedSoulBoundsRadius: 2.75
+  useBaselineRadius: 1
   arenaCentreOffset: {x: 0, y: 0}

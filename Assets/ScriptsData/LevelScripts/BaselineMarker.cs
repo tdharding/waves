@@ -10,13 +10,29 @@ public class BaselineMarker : MonoBehaviour
     public float height     = 0f;
     public float discRadius = 12f;
 
+    [Header("Arena Mask Settings")]
+    [Range(0f, 1f)] public float maskFadeStartPct = 0.7f;
+    [Range(0f, 1f)] public float maskFadeEndPct   = 0.9f;
+
+    public float MaskFadeStartRadius => discRadius * maskFadeStartPct;
+    public float MaskFadeEndRadius   => discRadius * maskFadeEndPct;
+
 #if UNITY_EDITOR
     void OnDrawGizmos()
     {
         Vector3 centre = new Vector3(transform.position.x, height, transform.position.z);
 
+        // Main Arena Radius
         Handles.color = new Color(0f, 0.9f, 0.5f, 0.6f);
         Handles.DrawWireDisc(centre, Vector3.up, discRadius);
+
+        // Mask Fade Start (Percentage-based)
+        Handles.color = new Color(1f, 0f, 1f, 0.5f); // Magenta
+        Handles.DrawWireDisc(centre, Vector3.up, MaskFadeStartRadius);
+
+        // Mask Fade End (Percentage-based)
+        Handles.color = new Color(0f, 1f, 1f, 0.5f); // Cyan
+        Handles.DrawWireDisc(centre, Vector3.up, MaskFadeEndRadius);
 
         Gizmos.color = new Color(0f, 0.9f, 0.5f, 0.6f);
         Gizmos.DrawLine(centre - Vector3.right   * 1f, centre + Vector3.right   * 1f);

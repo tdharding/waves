@@ -46,7 +46,7 @@ MonoBehaviour:
     soulPrefab: {fileID: 0}
     perimeterAngle: 0
     tierSlot: -1
-    spawnRadius: 2
+    spawnRadius: 0
     targetSegmentID: Branch_10
     targetProgress: 0.94147694
     targetIsLeftPath: 1
@@ -451,6 +451,7 @@ MonoBehaviour:
     prefab: {fileID: 2720298257398297881, guid: 865bb5ac0cce2e94a94faf8cef26c7fd, type: 3}
     isCircle: 0
     isWorldSpaceProp: 1
+  linkedPairs: []
   tiers: []
   whirlpools: []
   whirlpoolDepth: 5

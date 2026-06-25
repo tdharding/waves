@@ -13,7 +13,8 @@ public static class LevelSelectionCache
     // -1 = not set (will fall back to entrance[0]).
     public static int SelectedEntranceIndex { get; set; } = -1;
 
-    public static string JustExitedLevelID { get; set; }
+    public static string JustExitedLevelID       { get; set; }
+    public static int    JustExitedEntranceIndex { get; set; } = -1;
 
     public static string CurrentWorldScene { get; set; }
 }

@@ -50,8 +50,8 @@ Material:
     - _DitherMult2: 63.67
     - _Edge1: 2.2
     - _FishGlowIntensity: 4
-    - _FishGlowRadius: 1
-    - _FishGlowSoftness: 1
+    - _FishGlowRadius: 0.05
+    - _FishGlowSoftness: 0.08
     - _QueueControl: 0
     - _QueueOffset: 0
     - _RockSonarFactor: 1.1

@@ -8,6 +8,7 @@ public class LevelWaveModifierControllerTypeB : MonoBehaviour
     public float frequencyBoost;
     public float rippleDepthBoost;
     public Transform pipeConnector;
+    public UnityEngine.Splines.SplineContainer splineReceiver;
 
     [Header("Debug Info")]
     [SerializeField] private bool showDebug = true;
@@ -44,6 +45,8 @@ public class LevelWaveModifierControllerTypeB : MonoBehaviour
 
     public void OnSoulArrived(int identity)
     {
+        if (currentSoulIdentity != -1 && currentSoulIdentity == identity) return; // Prevent double trigger
+
         currentSoulIdentity = identity;
         hasBaseline = true;
         LockOthers();
@@ -63,7 +66,18 @@ public class LevelWaveModifierControllerTypeB : MonoBehaviour
 
         if (associatedTrigger != null) associatedTrigger.SetLocked(true);
 
-        Debug.Log($"[TypeBMod] Soul {identity} arrived via tube.");
+        Debug.Log($"[TypeBMod] Soul {identity} arrived and triggered physics EntryTrigger.");
+    }
+
+    private void OnTriggerEnter(Collider other)
+    {
+        var soulId = other.GetComponent<SoulDeliveryIdentity>();
+        if (soulId == null) soulId = other.GetComponentInParent<SoulDeliveryIdentity>();
+
+        if (soulId != null)
+        {
+            OnSoulArrived(soulId.identity);
+        }
     }
 
     private void Awake()
@@ -72,6 +86,7 @@ public class LevelWaveModifierControllerTypeB : MonoBehaviour
         if (waveController == null)
             waveController = FindObjectOfType<WaveMaterialController>();
         if (plungerAnimator == null) plungerAnimator = GetComponentInChildren<Animator>();
+        if (splineReceiver == null) splineReceiver = GetComponentInChildren<UnityEngine.Splines.SplineContainer>();
         debugWorldPosition = transform.position;
     }
 

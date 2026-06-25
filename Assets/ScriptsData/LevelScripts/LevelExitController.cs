@@ -81,7 +81,13 @@ public class LevelExitController : MonoBehaviour
         if (gridData != null)
         {
             GameProgressData.IncrementCompletionCount(gridData.levelID);
-            LevelSelectionCache.JustExitedLevelID = gridData.levelID;
+            LevelSelectionCache.JustExitedLevelID       = gridData.levelID;
+            LevelSelectionCache.JustExitedEntranceIndex = portalIndex;
+            Debug.Log($"[LevelExitController] Exiting level — levelID='{gridData.levelID}'  portalIndex={portalIndex}  → JustExitedLevelID set");
+        }
+        else
+        {
+            Debug.LogWarning("[LevelExitController] SelectedGridData is NULL — JustExitedLevelID will not be set. River exit extrusion will not trigger.");
         }
 
         SaveBoatStateForPortal();

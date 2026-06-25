@@ -12,15 +12,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 79b5890c35354a64b805317944492ec2, type: 3}
   m_Name: LargeSizeArena 1
   m_EditorClassIdentifier: Assembly-CSharp::ArenaProfile
-  arenaSize: 0
   mapGridTiling: {x: 1, y: 1}
   outerWallsPrefab: {fileID: 7923946534364195739, guid: ebb4992ac31a17e4bb4436467e70456d, type: 3}
-  arenaSizeReferencePlane: {fileID: 5281232935054549149, guid: e2d2ed3f3b8f3a548bde45e70ba7c8e8, type: 3}
-  arenaRadius1: -4.54
+  overrideArenaRadius1: 0
+  manualArenaRadius1: -20.12
   mapWidth: 1.598
   mapHeight: 1.457
   mazeWallMarkerScale: 0.4
-  wavePlaneScale: {x: 4, y: 4, z: 4}
+  wavePlaneCoverageMultiplier: 2.36
   entrancePrefabOverride: {fileID: 3508056878682996915, guid: 02d35998e30eece4199c26b9e7c7e393, type: 3}
   droppedSoulBoundsRadius: 4.85
   arenaCentreOffset: {x: 0, y: 0}

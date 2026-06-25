@@ -11,7 +11,7 @@ public class BoatCameraZoom : MonoBehaviour
     public float maxFOV = 60f;
 
     [Header("Default / Sonar")]
-    public float defaultFOV = 50f;
+    public float defaultFOV = 14f;
     public float sonarFOV = 40f;
     public float sonarTweenTime = 0.25f;
 

@@ -15,7 +15,87 @@ public class LevelSelectDesignerWindow : EditorWindow
     private enum DesignerMode { Draw, Select, Junction, Arena, Obstacle, Shop, Landscape }
 
     // ── Data ──────────────────────────────────────────────────────
-    private LevelSelectDesignerData _data;
+    private LevelSelectDesignerData _sourceData; // The actual asset on disk
+    private LevelSelectDesignerData _data;       // The working clone
+
+    private void SetData(LevelSelectDesignerData asset)
+    {
+        if (asset == _sourceData && _data != null) return;
+
+        if (hasUnsavedChanges)
+        {
+            if (EditorUtility.DisplayDialog("Unsaved Changes",
+                "You have unsaved changes in the current designer data. Do you want to save them before switching?",
+                "Save", "Discard"))
+            {
+                SaveChanges();
+            }
+        }
+
+        _sourceData = asset;
+        _data = asset != null ? Instantiate(asset) : null;
+
+        if (_data != null)
+        {
+            _data.name = asset.name + " (Workspace)";
+            _data.hideFlags = HideFlags.HideAndDontSave;
+        }
+
+        hasUnsavedChanges = false;
+        if (_sourceData != null)
+        {
+            EditorPrefs.SetString(K_DataPath, AssetDatabase.GetAssetPath(_sourceData));
+            TryOpenLinkedScene();
+        }
+    }
+
+    public override void SaveChanges()
+    {
+        if (_sourceData == null || _data == null) return;
+
+        Undo.RecordObject(_sourceData, "Save Level Select Designer Changes");
+        EditorUtility.CopySerialized(_data, _sourceData);
+        EditorUtility.SetDirty(_sourceData);
+        AssetDatabase.SaveAssets();
+
+        hasUnsavedChanges = false;
+        _consoleStatusMsg = "Changes saved to asset.";
+        base.SaveChanges();
+    }
+
+    private void DiscardChangesWithPrompt()
+    {
+        if (EditorUtility.DisplayDialog("Discard Changes",
+            "Are you sure you want to discard all unsaved changes?",
+            "Discard", "Cancel"))
+        {
+            DiscardChanges();
+        }
+    }
+
+    public override void DiscardChanges()
+    {
+        SetData(_sourceData);
+        base.DiscardChanges();
+    }
+
+    private void TryOpenLinkedScene()
+    {
+        if (_data == null || string.IsNullOrEmpty(_data.targetScenePath)) return;
+        if (!System.IO.File.Exists(_data.targetScenePath)) return;
+
+        var active = EditorSceneManager.GetActiveScene();
+        if (active.path == _data.targetScenePath) return; // already open
+
+        if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+        EditorSceneManager.OpenScene(_data.targetScenePath);
+    }
+
+    private void MarkDirty()
+    {
+        if (_data != null) EditorUtility.SetDirty(_data);
+        hasUnsavedChanges = true;
+    }
 
     // ── Interaction state ─────────────────────────────────────────
     private DesignerMode _mode = DesignerMode.Select;
@@ -58,7 +138,7 @@ public class LevelSelectDesignerWindow : EditorWindow
     private string _consoleStatusMsg;   // pinned action feedback line (save/restore etc.)
 
     // ── Landscape canvas ──────────────────────────────────────────
-    private float _landscapeCanvasAlpha = 0.55f;
+    private float _landscapeCanvasAlpha = 0.56f;
     private const float ARENA_OUTER_RING_RADIUS = 4f;   // world-space outer arena ring
     private const float ARENA_INNER_RING_RADIUS = 2f;   // world-space inner orbit ring
 
@@ -167,14 +247,15 @@ public class LevelSelectDesignerWindow : EditorWindow
         if (primary == null) return;
 
         // Add missing secondary nodes, spread evenly around the orbit ring
+        float arenaRadius = GetArenaRadius(arena);
         while (arena.secondaryEntrances.Count < needed)
         {
             int   i     = arena.secondaryEntrances.Count;
             float angle = ((i + 1) * 360f / (needed + 1)) * Mathf.Deg2Rad;
             var offset  = new Vector3(
-                Mathf.Sin(angle) * ARENA_INNER_RING_RADIUS,
+                Mathf.Sin(angle) * arenaRadius,
                 0f,
-                Mathf.Cos(angle) * ARENA_INNER_RING_RADIUS);
+                Mathf.Cos(angle) * arenaRadius);
 
             var newNode = new LevelSelectDesignerData.DesignerNode
             {
@@ -191,7 +272,7 @@ public class LevelSelectDesignerWindow : EditorWindow
             });
         }
 
-        EditorUtility.SetDirty(_data);
+        MarkDirty();
     }
 
     private string GetArenaPresetName(LevelSelectDesignerData.DesignerArena arena)
@@ -251,6 +332,7 @@ public class LevelSelectDesignerWindow : EditorWindow
     private const float PANEL_MAX_W = 600f;
 
     // ── EditorPrefs keys ──────────────────────────────────────────
+    private const string K_SetupTemplate = "Assets/Resources/Levels/_LevelSelectSetupTemplate.json";
     private const string K_DataPath   = "LSD_DataPath";
     private const string K_ViewCX     = "LSD_ViewCX";
     private const string K_ViewCY     = "LSD_ViewCY";
@@ -279,19 +361,33 @@ public class LevelSelectDesignerWindow : EditorWindow
 
         string savedPath = EditorPrefs.GetString(K_DataPath, "");
         if (!string.IsNullOrEmpty(savedPath))
-            _data = AssetDatabase.LoadAssetAtPath<LevelSelectDesignerData>(savedPath);
+        {
+            var asset = AssetDatabase.LoadAssetAtPath<LevelSelectDesignerData>(savedPath);
+            if (asset != null)
+                SetData(asset);
+        }
 
         _splitPreset = AssetDatabase.LoadAssetAtPath<SplineSplitterPreset>(PresetPath);
 
         if (_data != null)
             TryAutoFillPrefabs();
+
+        Undo.undoRedoPerformed += OnUndoRedoPerformed;
     }
 
     private void OnDisable()
     {
         SaveViewPrefs();
-        if (_data != null)
-            EditorPrefs.SetString(K_DataPath, AssetDatabase.GetAssetPath(_data));
+        if (_sourceData != null)
+            EditorPrefs.SetString(K_DataPath, AssetDatabase.GetAssetPath(_sourceData));
+
+        Undo.undoRedoPerformed -= OnUndoRedoPerformed;
+    }
+
+    private void OnUndoRedoPerformed()
+    {
+        MarkDirty();
+        Repaint();
     }
 
     private void SaveViewPrefs()
@@ -313,6 +409,7 @@ public class LevelSelectDesignerWindow : EditorWindow
 
         DrawToolbar();
 
+        EditorGUI.BeginChangeCheck();
         EditorGUILayout.BeginHorizontal(GUILayout.ExpandHeight(true));
         DrawLeftPanel();
         DrawPanelHandle(ref _isResizingLeft,  ref _leftPanelWidth,  +1f);
@@ -320,6 +417,11 @@ public class LevelSelectDesignerWindow : EditorWindow
         DrawPanelHandle(ref _isResizingRight, ref _rightPanelWidth, -1f);
         DrawRightPanel();
         EditorGUILayout.EndHorizontal();
+
+        if (EditorGUI.EndChangeCheck())
+        {
+            MarkDirty();
+        }
     }
 
     // ── Panel resize handle ───────────────────────────────────────
@@ -373,13 +475,56 @@ public class LevelSelectDesignerWindow : EditorWindow
 
         EditorGUI.BeginChangeCheck();
         var newData = (LevelSelectDesignerData)EditorGUILayout.ObjectField(
-            _data, typeof(LevelSelectDesignerData), false, GUILayout.Width(220));
+            _sourceData, typeof(LevelSelectDesignerData), false, GUILayout.Width(220));
         if (EditorGUI.EndChangeCheck())
+            SetData(newData);
+
+        // Scene picker — stored on the data asset
+        if (_data != null)
         {
-            _data = newData;
-            if (_data != null)
-                EditorPrefs.SetString(K_DataPath, AssetDatabase.GetAssetPath(_data));
+            var linkedScene = string.IsNullOrEmpty(_data.targetScenePath)
+                ? null
+                : AssetDatabase.LoadAssetAtPath<SceneAsset>(_data.targetScenePath);
+
+            EditorGUI.BeginChangeCheck();
+            var pickedScene = (SceneAsset)EditorGUILayout.ObjectField(
+                linkedScene, typeof(SceneAsset), false, GUILayout.Width(160));
+            if (EditorGUI.EndChangeCheck())
+            {
+                _data.targetScenePath = pickedScene != null
+                    ? AssetDatabase.GetAssetPath(pickedScene) : "";
+                // Also write through to source so it persists without a full Save
+                if (_sourceData != null)
+                {
+                    _sourceData.targetScenePath = _data.targetScenePath;
+                    EditorUtility.SetDirty(_sourceData);
+                    AssetDatabase.SaveAssetIfDirty(_sourceData);
+                }
+                if (pickedScene != null) TryOpenLinkedScene();
+            }
+
+            if (!string.IsNullOrEmpty(_data.targetScenePath))
+            {
+                var activeScene = EditorSceneManager.GetActiveScene();
+                bool isOpen = activeScene.path == _data.targetScenePath;
+                GUI.enabled = !isOpen;
+                if (GUILayout.Button(isOpen ? "Scene Open" : "Open Scene",
+                        EditorStyles.toolbarButton, GUILayout.Width(80)))
+                    TryOpenLinkedScene();
+                GUI.enabled = true;
+            }
         }
+
+        if (hasUnsavedChanges)
+        {
+            GUI.backgroundColor = new Color(0.7f, 1f, 0.7f);
+            if (GUILayout.Button("Save", EditorStyles.toolbarButton, GUILayout.Width(40)))
+                SaveChanges();
+            GUI.backgroundColor = Color.white;
+
+            if (GUILayout.Button("Discard", EditorStyles.toolbarButton, GUILayout.Width(55)))
+                DiscardChangesWithPrompt();
+}
 
         if (GUILayout.Button("New", EditorStyles.toolbarButton, GUILayout.Width(36)))
             CreateNewDataAsset();
@@ -416,38 +561,159 @@ public class LevelSelectDesignerWindow : EditorWindow
 
     private void CreateNewDataAsset()
     {
-        string path = EditorUtility.SaveFilePanelInProject(
-            "New Designer Data", "LevelSelectDesignerData", "asset",
-            "Choose location", "Assets");
-        if (string.IsNullOrEmpty(path)) return;
-        _data = CreateInstance<LevelSelectDesignerData>();
-        TryAutoFillPrefabs();
-        AssetDatabase.CreateAsset(_data, path);
+        string dataPath = EditorUtility.SaveFilePanelInProject(
+            "New Level Select Data", "LevelSelectWorldData", "asset",
+            "Choose location for the data asset", DataDir);
+        if (string.IsNullOrEmpty(dataPath)) return;
+
+        // Derive scene name: strip trailing "Data" from filename if present
+        string baseName = System.IO.Path.GetFileNameWithoutExtension(dataPath);
+        string sceneName = baseName.EndsWith("Data")
+            ? baseName.Substring(0, baseName.Length - 4)
+            : baseName;
+
+        // Create the data asset
+        var newAsset = CreateInstance<LevelSelectDesignerData>();
+        newAsset.openingSequenceStartPos = OpeningSequenceDefaultStart;
+        SeedMainRiverStartNode(newAsset);
+
+        // Create and link the scene
+        string scenePath = CreateLinkedScene(sceneName, newAsset);
+        newAsset.targetScenePath = scenePath;
+
+        AssetDatabase.CreateAsset(newAsset, dataPath);
         AssetDatabase.SaveAssets();
-        EditorPrefs.SetString(K_DataPath, path);
+
+        SetData(newAsset);
+        TryAutoFillPrefabs();
+        TryApplySetupTemplate();
+
+        // Open the new scene
+        if (!string.IsNullOrEmpty(scenePath))
+            EditorSceneManager.OpenScene(scenePath);
+
+        MarkDirty();
+    }
+
+    private static string CreateLinkedScene(string sceneName, LevelSelectDesignerData asset)
+    {
+        string destPath = $"{ScenesDir}/{sceneName}.unity";
+
+        if (System.IO.File.Exists(destPath))
+        {
+            Debug.Log($"[LevelSelectDesigner] Scene already exists at {destPath} — linking without overwrite.");
+            return destPath;
+        }
+
+        // Find the best template: prefer LevelSelectWorld1a, fall back to any LevelSelectWorld scene
+        string templatePath = null;
+        foreach (var s in EditorBuildSettings.scenes)
+        {
+            string n = System.IO.Path.GetFileNameWithoutExtension(s.path);
+            if (n == "LevelSelectWorld1a") { templatePath = s.path; break; }
+            if (n.StartsWith("LevelSelectWorld") && templatePath == null)
+                templatePath = s.path;
+        }
+
+        if (templatePath == null)
+        {
+            // Last resort: scan the scenes folder directly
+            var found = AssetDatabase.FindAssets("t:Scene LevelSelectWorld", new[] { ScenesDir });
+            if (found.Length > 0)
+                templatePath = AssetDatabase.GUIDToAssetPath(found[0]);
+        }
+
+        if (templatePath == null)
+        {
+            Debug.LogWarning("[LevelSelectDesigner] No LevelSelectWorld template scene found — scene not created.");
+            return "";
+        }
+
+        // Ensure destination directory exists
+        System.IO.Directory.CreateDirectory(ScenesDir);
+
+        if (!AssetDatabase.CopyAsset(templatePath, destPath))
+        {
+            Debug.LogWarning($"[LevelSelectDesigner] Failed to copy template scene to {destPath}.");
+            return "";
+        }
+
+        AssetDatabase.Refresh();
+
+        // Add to Build Settings (disabled by default so user opts in)
+        var scenes = new System.Collections.Generic.List<EditorBuildSettingsScene>(EditorBuildSettings.scenes);
+        if (!scenes.Exists(s => s.path == destPath))
+        {
+            scenes.Add(new EditorBuildSettingsScene(destPath, false));
+            EditorBuildSettings.scenes = scenes.ToArray();
+        }
+
+        Debug.Log($"[LevelSelectDesigner] Created scene '{sceneName}' at {destPath} (added to Build Settings, disabled — enable when ready).");
+        return destPath;
+    }
+
+    // Default main river stub nodes — derived from average of World1 + World2 data.
+    // Direction: strong -X with slight -Z drift from the opening sequence start.
+    private static readonly Vector3[] MainRiverSeedOffsets =
+    {
+        new Vector3(  0f,   0f,   0f),   // [0] opening sequence start (filled from openingSequenceStartPos)
+        new Vector3(-61f,   0f,  -2.5f), // [1] ~(82, 0, -15) — first intermediate
+        new Vector3(-78f,   0f,  -2.7f), // [2] ~(65, 0, -15)
+        new Vector3(-93f,   0f,  -2.4f), // [3] ~(50, 0, -15)
+    };
+
+    private static void SeedMainRiverStartNode(LevelSelectDesignerData data)
+    {
+        // Don't add a second main river if one already exists
+        if (data.paths.Exists(p => p.segmentType == LevelSelectDesignerData.SegmentType.MainRiver))
+            return;
+
+        var nodeIds = new System.Collections.Generic.List<string>();
+        foreach (var offset in MainRiverSeedOffsets)
+        {
+            var node = new LevelSelectDesignerData.DesignerNode
+            {
+                id            = System.Guid.NewGuid().ToString(),
+                worldPosition = data.openingSequenceStartPos + offset,
+                type          = LevelSelectDesignerData.NodeType.Waypoint
+            };
+            data.nodes.Add(node);
+            nodeIds.Add(node.id);
+        }
+
+        var path = new LevelSelectDesignerData.DesignerPath
+        {
+            pathId      = System.Guid.NewGuid().ToString(),
+            segmentId   = "MainRiver",
+            riverName   = "MainRiver",
+            segmentType = LevelSelectDesignerData.SegmentType.MainRiver,
+            nodeIds     = nodeIds,
+            editorColor = Color.cyan
+        };
+        data.paths.Add(path);
     }
 
     private void LoadDataAsset()
     {
-        string absPath = EditorUtility.OpenFilePanel("Load Designer Data", "Assets", "asset");
+        string absPath = EditorUtility.OpenFilePanel("Load Designer Data",
+            System.IO.Path.Combine(Application.dataPath.Replace("Assets", ""), DataDir), "asset");
         if (string.IsNullOrEmpty(absPath)) return;
 
-        // Convert absolute OS path → relative project path
+        string relPath = absPath;
         if (absPath.StartsWith(Application.dataPath))
-            absPath = "Assets" + absPath.Substring(Application.dataPath.Length);
+            relPath = "Assets" + absPath.Substring(Application.dataPath.Length);
 
-        var loaded = AssetDatabase.LoadAssetAtPath<LevelSelectDesignerData>(absPath);
+        var loaded = AssetDatabase.LoadAssetAtPath<LevelSelectDesignerData>(relPath);
         if (loaded == null)
         {
-            _consoleStatusMsg = $"Load failed — not a LevelSelectDesignerData asset: {absPath}";
+            _consoleStatusMsg = $"Load failed — not a LevelSelectDesignerData asset: {relPath}";
             Repaint();
             return;
         }
 
-        _data = loaded;
-        EditorPrefs.SetString(K_DataPath, absPath);
+        SetData(loaded);
         TryAutoFillPrefabs();
-        _consoleStatusMsg = $"Loaded → {absPath}";
+        _consoleStatusMsg = $"Loaded → {relPath}";
         Repaint();
     }
 
@@ -455,40 +721,32 @@ public class LevelSelectDesignerWindow : EditorWindow
     {
         if (_data == null) return;
 
-        string sourcePath = AssetDatabase.GetAssetPath(_data);
+        string sourcePath = _sourceData != null ? AssetDatabase.GetAssetPath(_sourceData) : "";
         string defaultName = string.IsNullOrEmpty(sourcePath)
             ? "LevelSelectDesignerData"
             : System.IO.Path.GetFileNameWithoutExtension(sourcePath) + "_copy";
-        string defaultDir = string.IsNullOrEmpty(sourcePath) ? "Assets" : System.IO.Path.GetDirectoryName(sourcePath);
+        string defaultDir = string.IsNullOrEmpty(sourcePath) ? DataDir : System.IO.Path.GetDirectoryName(sourcePath);
 
         string destPath = EditorUtility.SaveFilePanelInProject(
             "Save Designer Data As", defaultName, "asset", "Choose location", defaultDir);
         if (string.IsNullOrEmpty(destPath)) return;
 
-        if (!string.IsNullOrEmpty(sourcePath))
-        {
-            AssetDatabase.CopyAsset(sourcePath, destPath);
-        }
-        else
-        {
-            AssetDatabase.CreateAsset(_data, destPath);
-        }
-
+        var newAsset = Instantiate(_data);
+        newAsset.hideFlags = HideFlags.None;
+        AssetDatabase.CreateAsset(newAsset, destPath);
         AssetDatabase.SaveAssets();
-        AssetDatabase.Refresh();
 
-        var copy = AssetDatabase.LoadAssetAtPath<LevelSelectDesignerData>(destPath);
-        if (copy != null)
-        {
-            _data = copy;
-            EditorPrefs.SetString(K_DataPath, destPath);
-        }
-
-        _consoleStatusMsg = $"Saved as → {destPath}";
+        SetData(newAsset);
+        _consoleStatusMsg = $"Saved As → {destPath}";
         Repaint();
     }
 
-    private const string PrefabDir = "Assets/Prefab/LevelSelectPrefabs";
+    private const string PrefabDir   = "Assets/Prefab/LevelSelectPrefabs";
+    private const string DataDir     = "Assets/ScriptsData/DataScripts/LevelSelectWorldData";
+    private const string ScenesDir   = "Assets/Scenes/LevelSelectWorlds";
+
+    // Canonical world-space position shared by all level select opening sequences
+    private static readonly Vector3 OpeningSequenceDefaultStart = new Vector3(143.3325f, 0f, -12.6230f);
 
     private void TryAutoFillPrefabs()
     {
@@ -528,6 +786,25 @@ public class LevelSelectDesignerWindow : EditorWindow
         if (guids.Length == 0) return false;
         field = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(guids[0]));
         return field != null;
+    }
+
+    private void TryApplySetupTemplate()
+    {
+        // Prefer World1's backup; fall back to any _SetupBackup.json in the data folder
+        string world1Backup = System.IO.Path.Combine(DataDir, "LevelSelectWorld1Data_SetupBackup.json");
+        if (System.IO.File.Exists(world1Backup))
+        {
+            ApplySetupFromFile(world1Backup);
+            _consoleStatusMsg = "Setup pre-filled from LevelSelectWorld1Data template.";
+            return;
+        }
+
+        string[] candidates = System.IO.Directory.GetFiles(DataDir, "*_SetupBackup.json");
+        if (candidates.Length > 0)
+        {
+            ApplySetupFromFile(candidates[0]);
+            _consoleStatusMsg = $"Setup pre-filled from {System.IO.Path.GetFileName(candidates[0])}.";
+        }
     }
 
     private void FrameAll()
@@ -618,7 +895,7 @@ public class LevelSelectDesignerWindow : EditorWindow
                 Undo.RecordObject(_data, "Delete Path");
                 DeletePath(path.pathId);
                 if (_selectedPathId == path.pathId) _selectedPathId = null;
-                EditorUtility.SetDirty(_data);
+                MarkDirty();
                 GUI.backgroundColor = prevBg;
                 break;
             }
@@ -644,7 +921,7 @@ public class LevelSelectDesignerWindow : EditorWindow
             };
             _data.paths.Add(p);
             _selectedPathId = p.pathId;
-            EditorUtility.SetDirty(_data);
+            MarkDirty();
         }
     }
 
@@ -668,13 +945,62 @@ public class LevelSelectDesignerWindow : EditorWindow
         path.arenaIsAtEnd          = EditorGUILayout.Toggle("Arena at End",          path.arenaIsAtEnd);
         path.extrudeOnExit         = EditorGUILayout.Toggle("Extrude on Exit",       path.extrudeOnExit);
         path.tJunctionBidirectional = EditorGUILayout.Toggle("T-Junction Both Ways", path.tJunctionBidirectional);
+        EditorGUILayout.Space(2);
+        path.curveStrength     = EditorGUILayout.Slider("Curve Strength",      path.curveStrength,     0.1f, 3f);
+        path.curveSubdivisions = EditorGUILayout.IntSlider("Curve Subdivisions", path.curveSubdivisions, 1,    20);
 
         EditorGUILayout.LabelField($"Knots: {path.nodeIds.Count}", EditorStyles.miniLabel);
+
+        // Arena link info — shown when path leads to an arena
+        if (path.leadsToArena && path.nodeIds.Count > 0)
+        {
+            string terminalNodeId = path.arenaIsAtEnd
+                ? path.nodeIds[path.nodeIds.Count - 1]
+                : path.nodeIds[0];
+
+            var linkedArena = _data.arenas.Find(a =>
+                a.nodeId == terminalNodeId ||
+                a.secondaryEntrances.Any(s => s.nodeId == terminalNodeId));
+
+            EditorGUILayout.Space(4);
+            var boxStyle = new GUIStyle(EditorStyles.helpBox);
+            EditorGUILayout.BeginVertical(boxStyle);
+            EditorGUILayout.LabelField("Arena Link", EditorStyles.miniBoldLabel);
+
+            if (linkedArena != null)
+            {
+                string levelID     = linkedArena.gridData != null ? linkedArena.gridData.levelID     : "—";
+                string displayName = linkedArena.gridData != null ? linkedArena.gridData.displayName : "—";
+
+                bool isSecondary = linkedArena.nodeId != terminalNodeId;
+                int  entranceIdx = isSecondary
+                    ? linkedArena.secondaryEntrances.Find(s => s.nodeId == terminalNodeId)?.entranceIndex ?? -1
+                    : linkedArena.entranceIndex;
+
+                string entranceId = "—";
+                if (linkedArena.gridData != null &&
+                    entranceIdx >= 0 && entranceIdx < linkedArena.gridData.entrances.Count)
+                    entranceId = linkedArena.gridData.entrances[entranceIdx].id;
+
+                GUI.enabled = false;
+                EditorGUILayout.ObjectField("GridData", linkedArena.gridData, typeof(GridData), false);
+                GUI.enabled = true;
+                EditorGUILayout.LabelField("Level ID",      levelID,     EditorStyles.miniLabel);
+                EditorGUILayout.LabelField("Display Name",  displayName, EditorStyles.miniLabel);
+                EditorGUILayout.LabelField("Entrance ID",   entranceId,  EditorStyles.miniLabel);
+            }
+            else
+            {
+                EditorGUILayout.LabelField("No arena found at terminal node", EditorStyles.miniLabel);
+            }
+
+            EditorGUILayout.EndVertical();
+        }
 
         if (EditorGUI.EndChangeCheck())
         {
             Undo.RecordObject(_data, "Edit Path");
-            EditorUtility.SetDirty(_data);
+            MarkDirty();
         }
 
         // ── Node Y heights ────────────────────────────────────────
@@ -705,7 +1031,7 @@ public class LevelSelectDesignerWindow : EditorWindow
             {
                 Undo.RecordObject(_data, "Edit Node Y");
                 node.worldPosition = new Vector3(node.worldPosition.x, newY, node.worldPosition.z);
-                EditorUtility.SetDirty(_data);
+                MarkDirty();
             }
             EditorGUILayout.EndHorizontal();
             GUI.backgroundColor = prevBg;
@@ -828,7 +1154,7 @@ public class LevelSelectDesignerWindow : EditorWindow
         if (EditorGUI.EndChangeCheck())
         {
             Undo.RecordObject(_data, "Edit Obstacle");
-            EditorUtility.SetDirty(_data);
+            MarkDirty();
         }
 
         EditorGUILayout.Space(2);
@@ -838,7 +1164,7 @@ public class LevelSelectDesignerWindow : EditorWindow
             Undo.RecordObject(_data, "Delete Obstacle");
             _data.obstacles.Remove(obs);
             _selectedObstacleId = null;
-            EditorUtility.SetDirty(_data);
+            MarkDirty();
         }
         GUI.backgroundColor = Color.white;
     }
@@ -868,7 +1194,7 @@ public class LevelSelectDesignerWindow : EditorWindow
             Undo.RecordObject(_data, "Edit Arena");
             SyncEntranceNodes(arena);
             _selectedEntranceIdx = -1;
-            EditorUtility.SetDirty(_data);
+            MarkDirty();
         }
 
         // ── Entrance list ─────────────────────────────────────────
@@ -890,6 +1216,35 @@ public class LevelSelectDesignerWindow : EditorWindow
                 EditorGUILayout.BeginVertical(EditorStyles.helpBox);
                 GUI.backgroundColor = prevBg;
 
+                // GridData entrance ID
+                string gridEntranceId = (entrances != null && i < entrances.Count)
+                    ? entrances[i].id : "—";
+
+                // Which designer path connects to this entrance
+                string linkedSegId = "—";
+                if (i == arena.entranceIndex)
+                {
+                    var p = _data.paths.FirstOrDefault(x => x.leadsToArena &&
+                        x.nodeIds.Count > 0 &&
+                        (x.arenaIsAtEnd
+                            ? x.nodeIds[x.nodeIds.Count - 1] == arena.nodeId
+                            : x.nodeIds[0] == arena.nodeId));
+                    if (p != null) linkedSegId = p.segmentId ?? p.pathId;
+                }
+                else
+                {
+                    var sec = arena.secondaryEntrances.Find(s => s.entranceIndex == i);
+                    if (sec != null)
+                    {
+                        var p = _data.paths.FirstOrDefault(x => x.leadsToArena &&
+                            x.nodeIds.Count > 0 &&
+                            (x.arenaIsAtEnd
+                                ? x.nodeIds[x.nodeIds.Count - 1] == sec.nodeId
+                                : x.nodeIds[0] == sec.nodeId));
+                        if (p != null) linkedSegId = p.segmentId ?? p.pathId;
+                    }
+                }
+
                 EditorGUILayout.BeginHorizontal();
                 string label = $"Entrance {i}" + (isBranchEntry ? "  ← branch" : "");
                 if (GUILayout.Button(label, EditorStyles.miniLabel))
@@ -898,6 +1253,9 @@ public class LevelSelectDesignerWindow : EditorWindow
                     Repaint();
                 }
                 EditorGUILayout.EndHorizontal();
+
+                EditorGUILayout.LabelField("GridData ID", gridEntranceId, EditorStyles.miniLabel);
+                EditorGUILayout.LabelField("Linked Path", linkedSegId,    EditorStyles.miniLabel);
 
                 // Mark which entrance connects to the branch
                 EditorGUI.BeginChangeCheck();
@@ -949,7 +1307,7 @@ public class LevelSelectDesignerWindow : EditorWindow
                 for (int i = 0; i < Mathf.Min(shop.shopItems.Length, 4); i++)
                     resized[i] = shop.shopItems[i];
             shop.shopItems = resized;
-            EditorUtility.SetDirty(_data);
+            MarkDirty();
         }
 
         EditorGUILayout.Space(6);
@@ -961,7 +1319,7 @@ public class LevelSelectDesignerWindow : EditorWindow
         if (EditorGUI.EndChangeCheck())
         {
             Undo.RecordObject(_data, "Edit Shop Items");
-            EditorUtility.SetDirty(_data);
+            MarkDirty();
         }
 
         var prevBg = GUI.backgroundColor;
@@ -984,7 +1342,7 @@ public class LevelSelectDesignerWindow : EditorWindow
             "  Tile Prefab", _data.landscapeTilePrefab, typeof(GameObject), false);
         _data.boatPathManager = (SplinePathStitcher)EditorGUILayout.ObjectField(
             "Boat Path Manager", _data.boatPathManager, typeof(SplinePathStitcher), false);
-        if (EditorGUI.EndChangeCheck()) EditorUtility.SetDirty(_data);
+        if (EditorGUI.EndChangeCheck()) MarkDirty();
     }
 
     private void DrawUIScriptPrefabsSection()
@@ -998,7 +1356,7 @@ public class LevelSelectDesignerWindow : EditorWindow
             "Arena Souls Window", _data.arenaSoulsWindowPrefab,         typeof(GameObject), false);
         _data.pauseManagerScriptPrefab = (GameObject)EditorGUILayout.ObjectField(
             "Pause Manager",      _data.pauseManagerScriptPrefab,       typeof(GameObject), false);
-        if (EditorGUI.EndChangeCheck()) EditorUtility.SetDirty(_data);
+        if (EditorGUI.EndChangeCheck()) MarkDirty();
     }
 
     private void DrawUICanvasPrefabsSection()
@@ -1016,7 +1374,7 @@ public class LevelSelectDesignerWindow : EditorWindow
             "Orbs Counter UI",      _data.orbsCounterPrefab,         typeof(GameObject), false);
         _data.shopTooltipPrefab = (GameObject)EditorGUILayout.ObjectField(
             "Shop Tooltip UI",      _data.shopTooltipPrefab,         typeof(GameObject), false);
-        if (EditorGUI.EndChangeCheck()) EditorUtility.SetDirty(_data);
+        if (EditorGUI.EndChangeCheck()) MarkDirty();
     }
 
     private void DrawRiverPrefabsSection()
@@ -1031,7 +1389,7 @@ public class LevelSelectDesignerWindow : EditorWindow
         _data.barrierPrefab            = (GameObject)EditorGUILayout.ObjectField("Barrier",         _data.barrierPrefab,            typeof(GameObject), false);
         _data.riverBlockPrefab         = (GameObject)EditorGUILayout.ObjectField("Block",           _data.riverBlockPrefab,         typeof(GameObject), false);
         _data.splineInstantiateSpacing = EditorGUILayout.FloatField("Block Spacing",                _data.splineInstantiateSpacing);
-        if (EditorGUI.EndChangeCheck()) EditorUtility.SetDirty(_data);
+        if (EditorGUI.EndChangeCheck()) MarkDirty();
     }
 
     private void DrawJunctionPrefabsSection()
@@ -1042,7 +1400,7 @@ public class LevelSelectDesignerWindow : EditorWindow
         _data.junctionLeftFacingPrefab  = (GameObject)EditorGUILayout.ObjectField("Left Facing",   _data.junctionLeftFacingPrefab,  typeof(GameObject), false);
         _data.junctionPrefab            = (GameObject)EditorGUILayout.ObjectField("Fallback",       _data.junctionPrefab,            typeof(GameObject), false);
         _data.junctionGapPadding        = EditorGUILayout.FloatField("Gap Padding",                 _data.junctionGapPadding);
-        if (EditorGUI.EndChangeCheck()) EditorUtility.SetDirty(_data);
+        if (EditorGUI.EndChangeCheck()) MarkDirty();
     }
 
     private void DrawArenaPrefabsSection()
@@ -1050,7 +1408,7 @@ public class LevelSelectDesignerWindow : EditorWindow
         EditorGUI.BeginChangeCheck();
         _data.arenaPrefab         = (GameObject)EditorGUILayout.ObjectField("Arena Head",     _data.arenaPrefab,         typeof(GameObject), false);
         _data.arenaEntrancePrefab = (GameObject)EditorGUILayout.ObjectField("Arena Entrance", _data.arenaEntrancePrefab, typeof(GameObject), false);
-        if (EditorGUI.EndChangeCheck()) EditorUtility.SetDirty(_data);
+        if (EditorGUI.EndChangeCheck()) MarkDirty();
     }
 
     private void DrawObstacleShopPrefabsSection()
@@ -1058,7 +1416,7 @@ public class LevelSelectDesignerWindow : EditorWindow
         EditorGUI.BeginChangeCheck();
         _data.obstaclePrefab = (GameObject)EditorGUILayout.ObjectField("Obstacle", _data.obstaclePrefab, typeof(GameObject), false);
         _data.shopPrefab     = (GameObject)EditorGUILayout.ObjectField("Shop",     _data.shopPrefab,     typeof(GameObject), false);
-        if (EditorGUI.EndChangeCheck()) EditorUtility.SetDirty(_data);
+        if (EditorGUI.EndChangeCheck()) MarkDirty();
     }
 
     private void DrawCorePrefabsSection()
@@ -1068,9 +1426,10 @@ public class LevelSelectDesignerWindow : EditorWindow
         _data.boatPrefab                  = (GameObject)EditorGUILayout.ObjectField("Boat",              _data.boatPrefab,                   typeof(GameObject), false);
         _data.landscapeTilePrefab         = (GameObject)EditorGUILayout.ObjectField("Landscape Tile",    _data.landscapeTilePrefab,          typeof(GameObject), false);
         _data.videoPlayerControllerPrefab = (GameObject)EditorGUILayout.ObjectField("Video Controller",  _data.videoPlayerControllerPrefab,  typeof(GameObject), false);
+        _data.openingSequencePrefab       = (GameObject)EditorGUILayout.ObjectField("Opening Sequence",  _data.openingSequencePrefab,        typeof(GameObject), false);
         _data.musicIntro                  = (AudioClip)EditorGUILayout.ObjectField("Music Intro",        _data.musicIntro,                   typeof(AudioClip),  false);
         _data.musicLoop                   = (AudioClip)EditorGUILayout.ObjectField("Music Loop",         _data.musicLoop,                    typeof(AudioClip),  false);
-        if (EditorGUI.EndChangeCheck()) EditorUtility.SetDirty(_data);
+        if (EditorGUI.EndChangeCheck()) MarkDirty();
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -1123,6 +1482,8 @@ public class LevelSelectDesignerWindow : EditorWindow
         AddObj  ("soulsOnBoatDisplayScriptPrefab",_data.soulsOnBoatDisplayScriptPrefab);
         AddObj  ("arenaSoulsWindowPrefab",        _data.arenaSoulsWindowPrefab);
         AddObj  ("pauseManagerScriptPrefab",      _data.pauseManagerScriptPrefab);
+        AddObj  ("portalConfirmUIScriptPrefab",  _data.portalConfirmUIScriptPrefab);
+        AddObj  ("videoPlayerControllerPrefab",  _data.videoPlayerControllerPrefab);
         // UI Canvas Prefabs
         AddObj  ("canvasParentPrefab",            _data.canvasParentPrefab);
         AddObj  ("pauseMenuPrefab",               _data.pauseMenuPrefab);
@@ -1134,35 +1495,41 @@ public class LevelSelectDesignerWindow : EditorWindow
         AddObj  ("dataControllerPrefab",          _data.dataControllerPrefab);
         AddObj  ("boatPrefab",                    _data.boatPrefab);
         AddObj  ("landscapeTilePrefab",           _data.landscapeTilePrefab);
+        AddObj  ("openingSequencePrefab",         _data.openingSequencePrefab);
         AddObj  ("musicIntro",                    _data.musicIntro);
         AddObj  ("musicLoop",                     _data.musicLoop);
 
-        string json     = JsonUtility.ToJson(snap, true);
-        string dataPath = AssetDatabase.GetAssetPath(_data);
-        string dir      = System.IO.Path.GetDirectoryName(dataPath);
-        string baseName = System.IO.Path.GetFileNameWithoutExtension(dataPath);
-        string savePath = System.IO.Path.Combine(dir, baseName + "_SetupBackup.json");
+        if (System.IO.File.Exists(K_SetupTemplate))
+        {
+            if (!EditorUtility.DisplayDialog("Overwrite Setup Template?",
+                    $"A setup template already exists.\nOverwrite it with the current data from '{_sourceData.name}'?",
+                    "Overwrite", "Cancel"))
+                return;
+        }
 
-        System.IO.File.WriteAllText(savePath, json);
+        string json = JsonUtility.ToJson(snap, true);
+        System.IO.File.WriteAllText(K_SetupTemplate, json);
         AssetDatabase.Refresh();
-        _consoleStatusMsg = $"Setup saved → {savePath}";
+        _consoleStatusMsg = $"Setup template saved → {K_SetupTemplate}";
         Repaint();
     }
 
     private void RestoreSetup()
     {
-        if (_data == null) return;
+        if (_sourceData == null) return;
 
-        string dataPath = AssetDatabase.GetAssetPath(_data);
-        string dir      = System.IO.Path.GetDirectoryName(dataPath);
-        string baseName = System.IO.Path.GetFileNameWithoutExtension(dataPath);
-        string savePath = System.IO.Path.Combine(dir, baseName + "_SetupBackup.json");
-
-        if (!System.IO.File.Exists(savePath))
+        if (!System.IO.File.Exists(K_SetupTemplate))
         {
-            Debug.LogWarning("[LevelSelectDesigner] No setup backup found — save one first.");
+            Debug.LogWarning("[LevelSelectDesigner] No setup template found — open World1a and hit Save first.");
             return;
         }
+
+        ApplySetupFromFile(K_SetupTemplate);
+    }
+
+    private void ApplySetupFromFile(string savePath)
+    {
+        if (!System.IO.File.Exists(savePath)) return;
 
         var snap = JsonUtility.FromJson<SetupSnapshot>(System.IO.File.ReadAllText(savePath));
 
@@ -1205,6 +1572,8 @@ public class LevelSelectDesignerWindow : EditorWindow
         _data.soulsOnBoatDisplayScriptPrefab  = LoadObj<GameObject>("soulsOnBoatDisplayScriptPrefab");
         _data.arenaSoulsWindowPrefab          = LoadObj<GameObject>("arenaSoulsWindowPrefab");
         _data.pauseManagerScriptPrefab        = LoadObj<GameObject>("pauseManagerScriptPrefab");
+        _data.portalConfirmUIScriptPrefab     = LoadObj<GameObject>("portalConfirmUIScriptPrefab");
+        _data.videoPlayerControllerPrefab     = LoadObj<GameObject>("videoPlayerControllerPrefab");
         // UI Canvas Prefabs
         _data.canvasParentPrefab              = LoadObj<GameObject>("canvasParentPrefab");
         _data.pauseMenuPrefab                 = LoadObj<GameObject>("pauseMenuPrefab");
@@ -1216,10 +1585,11 @@ public class LevelSelectDesignerWindow : EditorWindow
         _data.dataControllerPrefab            = LoadObj<GameObject>("dataControllerPrefab");
         _data.boatPrefab                      = LoadObj<GameObject>("boatPrefab");
         _data.landscapeTilePrefab             = LoadObj<GameObject>("landscapeTilePrefab");
+        _data.openingSequencePrefab           = LoadObj<GameObject>("openingSequencePrefab");
         _data.musicIntro                      = LoadObj<AudioClip>("musicIntro");
         _data.musicLoop                       = LoadObj<AudioClip>("musicLoop");
 
-        EditorUtility.SetDirty(_data);
+        MarkDirty();
         _consoleStatusMsg = $"Setup restored from {savePath}";
         Repaint();
     }
@@ -1314,6 +1684,10 @@ public class LevelSelectDesignerWindow : EditorWindow
             () => TryFind<VideoPlayerController>(v => { _data.videoPlayerController = v; EditorUtility.SetDirty(_data); }),
             () => DeployVideoController());
 
+        DrawDeployRow("Opening Sequence", _data.openingSequence != null,
+            () => TryFind<LevelSelectOpeningSequence>(v => { _data.openingSequence = v; EditorUtility.SetDirty(_data); }),
+            () => DeployOpeningSequence());
+
         EditorGUILayout.Space(4);
 
 
@@ -1342,7 +1716,7 @@ public class LevelSelectDesignerWindow : EditorWindow
         if (GUILayout.Button("Find", EditorStyles.miniButton, GUILayout.Width(34)))
         {
             onFind();
-            EditorUtility.SetDirty(_data);
+            MarkDirty();
         }
 
         if (!present)
@@ -1352,7 +1726,7 @@ public class LevelSelectDesignerWindow : EditorWindow
             if (GUILayout.Button("Deploy", EditorStyles.miniButton, GUILayout.Width(46)))
             {
                 onDeploy();
-                EditorUtility.SetDirty(_data);
+                MarkDirty();
             }
             GUI.backgroundColor = prevBg;
         }
@@ -1371,7 +1745,7 @@ public class LevelSelectDesignerWindow : EditorWindow
         if (barUI != null)
         {
             _data.soulDisplaySlotManager = barUI.GetComponentInChildren<SoulDisplaySlotManager>();
-            EditorUtility.SetDirty(_data);
+            MarkDirty();
 
             if (_data.soulDisplaySlotManager != null && _data.soulsOnBoatDisplayManager != null)
             {
@@ -1418,7 +1792,7 @@ public class LevelSelectDesignerWindow : EditorWindow
             return;
         _data.pauseManager = manager;
         WirePauseManager();
-        EditorUtility.SetDirty(_data);
+        MarkDirty();
     }
 
     private void WirePauseManager()
@@ -1525,7 +1899,7 @@ public class LevelSelectDesignerWindow : EditorWindow
         if (DeployScriptOnly<LevelSelectBoatControl>("LevelSelectBoatControl", out var c, null))
         {
             _data.boatControl = c;
-            EditorUtility.SetDirty(_data);
+            MarkDirty();
         }
     }
 
@@ -1539,7 +1913,7 @@ public class LevelSelectDesignerWindow : EditorWindow
         so.ApplyModifiedProperties();
 
         _data.musicController = ctrl;
-        EditorUtility.SetDirty(_data);
+        MarkDirty();
     }
 
     private void DeployPlayerBoat()
@@ -1571,7 +1945,7 @@ public class LevelSelectDesignerWindow : EditorWindow
         if (existing != null)
         {
             _data.videoPlayerController = existing;
-            EditorUtility.SetDirty(_data);
+            MarkDirty();
             return;
         }
 
@@ -1587,12 +1961,120 @@ public class LevelSelectDesignerWindow : EditorWindow
         Undo.RegisterCreatedObjectUndo(go, "Deploy Video Controller");
         go.name = "VideoPlayerController";
         _data.videoPlayerController = go.GetComponent<VideoPlayerController>();
-        EditorUtility.SetDirty(_data);
+        MarkDirty();
+    }
+
+    private void ApplyOpeningSequenceStartNode()
+    {
+        Undo.RecordObject(_data, "Apply Opening Sequence Start Node");
+
+        var mainPath = _data.paths.Find(p => p.segmentType == LevelSelectDesignerData.SegmentType.MainRiver)
+                    ?? _data.paths.FirstOrDefault();
+
+        if (mainPath == null || mainPath.nodeIds.Count == 0)
+        {
+            // No main river at all — seed one with the start node
+            SeedMainRiverStartNode(_data);
+            MarkDirty();
+            Debug.Log($"[LevelSelectDesigner] Opening sequence: created main river with start node at {_data.openingSequenceStartPos}");
+            return;
+        }
+
+        var startNode = _data.nodes.Find(n => n.id == mainPath.nodeIds[0]);
+        if (startNode == null) return;
+
+        if (startNode.worldPosition != _data.openingSequenceStartPos)
+        {
+            startNode.worldPosition = _data.openingSequenceStartPos;
+            MarkDirty();
+            Debug.Log($"[LevelSelectDesigner] Opening sequence: moved main river node[0] to {_data.openingSequenceStartPos}");
+        }
+    }
+
+    private void DeployOpeningSequence()
+    {
+        var existing = UnityEngine.Object.FindObjectOfType<LevelSelectOpeningSequence>();
+        if (existing != null)
+        {
+            _data.openingSequence = existing;
+            WireOpeningSequence();
+            MarkDirty();
+            return;
+        }
+
+        var prefab = _data.openingSequencePrefab;
+        if (prefab == null)
+        {
+            Debug.LogWarning("[LevelSelectDesigner] No Opening Sequence prefab assigned — cannot deploy.");
+            return;
+        }
+
+        var parent = FindOrCreateParent("LEVELSELECT_SCRIPTS");
+        var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab, parent.transform);
+        Undo.RegisterCreatedObjectUndo(go, "Deploy Opening Sequence");
+        go.name = "OPENING SEQUENCE CONTROLLER";
+        _data.openingSequence = go.GetComponent<LevelSelectOpeningSequence>();
+        WireOpeningSequence();
+        MarkDirty();
+    }
+
+    private void WireOpeningSequence()
+    {
+        if (_data.openingSequence == null) return;
+
+        var so = new SerializedObject(_data.openingSequence);
+        so.Update();
+
+        var bcProp    = so.FindProperty("boatControl");
+        var camProp   = so.FindProperty("normalCamera");
+        var skipProp  = so.FindProperty("skipIntro");
+
+        if (bcProp  != null && _data.boatControl      != null && bcProp.objectReferenceValue  == null)
+            bcProp.objectReferenceValue  = _data.boatControl;
+        if (camProp != null && _data.cameraController != null && camProp.objectReferenceValue == null)
+            camProp.objectReferenceValue = _data.cameraController;
+        if (skipProp != null)
+            skipProp.boolValue = !_data.useOpeningSequence;
+
+        so.ApplyModifiedProperties();
+        EditorUtility.SetDirty(_data.openingSequence);
+    }
+
+    private void WireCameraPreviewTarget()
+    {
+        if (_data.cameraController == null) return;
+
+        var so = new SerializedObject(_data.cameraController);
+        so.Update();
+
+        // Wire previewTarget to boat root transform if not already set
+        var boatGo = GameObject.Find("LevelSelectBoat");
+        if (boatGo != null)
+        {
+            var targetProp = so.FindProperty("previewTarget");
+            if (targetProp != null && targetProp.objectReferenceValue == null)
+                targetProp.objectReferenceValue = boatGo.transform;
+        }
+
+        // Always sync previewOrigin from the data so previews pivot at the boat's game-start position
+        if (_data.useOpeningSequence && _data.openingSequenceStartPos != Vector3.zero)
+        {
+            var originProp = so.FindProperty("previewOrigin");
+            if (originProp != null)
+                originProp.vector3Value = _data.openingSequenceStartPos;
+        }
+
+        so.ApplyModifiedProperties();
+        EditorUtility.SetDirty(_data.cameraController);
     }
 
     private void EnsureMainCamera()
     {
-        if (Camera.main != null) return;
+        if (Camera.main != null)
+        {
+            EnsureCinemachineBrain(Camera.main.gameObject);
+            return;
+        }
 
         // Tag any existing camera "MainCamera"
         var existing = UnityEngine.Object.FindObjectOfType<Camera>();
@@ -1602,18 +2084,32 @@ public class LevelSelectDesignerWindow : EditorWindow
             existing.gameObject.tag = "MainCamera";
             Debug.Log($"[LevelSelectDesigner] Tagged '{existing.name}' as MainCamera.");
             EditorUtility.SetDirty(existing.gameObject);
+            EnsureCinemachineBrain(existing.gameObject);
             return;
         }
 
-        // No camera at all — create a minimal one
+        // Spawn MainCameraLevelSelect prefab
         var parent = FindOrCreateParent("CAMERA");
-        var camGO  = new GameObject("MainCamera");
+        var guids  = AssetDatabase.FindAssets("MainCameraLevelSelect t:Prefab");
+        GameObject camGO;
+        if (guids.Length == 0)
+        {
+            Debug.LogError("[LevelSelectDesigner] Prefab 'MainCameraLevelSelect' not found in project.");
+            return;
+        }
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(guids[0]));
+        camGO = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
         Undo.RegisterCreatedObjectUndo(camGO, "Create Main Camera");
-        camGO.tag = "MainCamera";
         camGO.transform.SetParent(parent.transform, false);
-        Undo.AddComponent<Camera>(camGO);
-        Undo.AddComponent<AudioListener>(camGO);
-        Debug.Log("[LevelSelectDesigner] Created new Main Camera.");
+        EnsureCinemachineBrain(camGO);
+        Debug.Log("[LevelSelectDesigner] Spawned MainCameraLevelSelect prefab.");
+    }
+
+    private void EnsureCinemachineBrain(GameObject camGO)
+    {
+        if (camGO.GetComponent<Unity.Cinemachine.CinemachineBrain>() != null) return;
+        Undo.AddComponent<Unity.Cinemachine.CinemachineBrain>(camGO);
+        Debug.Log($"[LevelSelectDesigner] Added CinemachineBrain to '{camGO.name}'.");
     }
 
     private void DeployCameraController()
@@ -1653,7 +2149,9 @@ public class LevelSelectDesignerWindow : EditorWindow
         if (comp == null) comp = Undo.AddComponent<LevelSelectCameraController>(go);
         _data.cameraController = comp;
 
-        // Wiring handled by WireAllSceneObjects
+        // Pre-wire camera preview fields so editor Preview Start/Transition work immediately.
+        _data.cameraController = comp;
+        WireCameraPreviewTarget();
     }
 
     private void DeployCinemachine()
@@ -1724,7 +2222,11 @@ public class LevelSelectDesignerWindow : EditorWindow
             // Deploy after SoulsDisplayBarUI exists so wiring can find it
             if (_data.soulsOnBoatDisplayManager == null) DeploySoulsOnBoatDisplay();
             WirePauseMenuPanels();
-EditorUtility.SetDirty(_data);
+
+        if (_data.openingSequence == null)
+            DeployOpeningSequence();
+
+        EditorUtility.SetDirty(_data);
     }
 
     private void AutoFindAll()
@@ -1743,7 +2245,8 @@ EditorUtility.SetDirty(_data);
         TryFind<PauseManager>(v                 => _data.pauseManager              = v);
         TryFind<SoulsOnBoatDisplayManager>(v    => _data.soulsOnBoatDisplayManager = v);
         TryFind<VideoPlayerController>(v        => _data.videoPlayerController     = v);
-        EditorUtility.SetDirty(_data);
+        TryFind<LevelSelectOpeningSequence>(v  => _data.openingSequence           = v);
+        MarkDirty();
     }
 
     private void WirePauseMenuPanels()
@@ -1847,16 +2350,33 @@ EditorUtility.SetDirty(_data);
             if (pp != null && pp.objectReferenceValue == null) { pp.objectReferenceValue = _data.pathPrefab; so.ApplyModifiedProperties(); EditorUtility.SetDirty(_data.boatPathManager); }
         }
 
-        // ── CinemachineCamera → LevelSelectCameraController ───────────────────
+        // ── CinemachineCamera → LevelSelectCameraController + TrackingTarget ───
         if (_data.cameraController != null)
         {
             var camGO = GameObject.Find("LevelSelectCamera");
             var vcam  = camGO?.GetComponentInChildren<Unity.Cinemachine.CinemachineCamera>();
             if (vcam != null)
             {
+                // Wire cam field on the controller
                 var so   = new SerializedObject(_data.cameraController);
                 var prop = so.FindProperty("cam");
                 if (prop != null) { prop.objectReferenceValue = vcam; so.ApplyModifiedProperties(); EditorUtility.SetDirty(_data.cameraController); }
+
+                // Wire TrackingTarget on the CinemachineCamera to the boat
+                var boatGo = GameObject.Find("LevelSelectBoat");
+                if (boatGo != null)
+                {
+                    var vcamSo       = new SerializedObject(vcam);
+                    var trackingProp = vcamSo.FindProperty("Target.TrackingTarget");
+                    if (trackingProp != null)
+                    {
+                        trackingProp.objectReferenceValue = boatGo.transform;
+                        vcamSo.ApplyModifiedProperties();
+                        EditorUtility.SetDirty(vcam);
+                    }
+                    else
+                        Debug.LogWarning("[LevelSelectDesigner] Could not find 'Target.TrackingTarget' on CinemachineCamera — property path may differ in this Cinemachine version.");
+                }
             }
         }
 
@@ -1920,6 +2440,8 @@ EditorUtility.SetDirty(_data);
 
         WirePauseMenuPanels();
         WirePauseManager();
+        WireOpeningSequence();
+        WireCameraPreviewTarget();
 
         Debug.Log("[LevelSelectDesigner] Wire All complete.");
     }
@@ -1934,12 +2456,29 @@ EditorUtility.SetDirty(_data);
         _data.branchStartOffset  = EditorGUILayout.Slider("Branch Start Offset", _data.branchStartOffset, -5f, 5f);
         _data.arenaHeadOffset    = EditorGUILayout.FloatField("Arena Head Offset", _data.arenaHeadOffset);
         _data.shopHeadOffset     = EditorGUILayout.FloatField("Shop Head Offset", _data.shopHeadOffset);
-        if (EditorGUI.EndChangeCheck()) EditorUtility.SetDirty(_data);
+        if (EditorGUI.EndChangeCheck()) MarkDirty();
     }
 
     private void DrawActionButtons()
     {
         EditorGUILayout.Space(6);
+
+        // ── Opening Sequence ──────────────────────────────────────
+        EditorGUI.BeginChangeCheck();
+        bool prevUseOpening = _data.useOpeningSequence;
+        _data.useOpeningSequence = EditorGUILayout.ToggleLeft("Opening Sequence", _data.useOpeningSequence);
+        // Pre-fill the start position with the canonical value when first enabled
+        if (_data.useOpeningSequence && !prevUseOpening && _data.openingSequenceStartPos == Vector3.zero)
+            _data.openingSequenceStartPos = OpeningSequenceDefaultStart;
+        if (_data.useOpeningSequence)
+        {
+            EditorGUI.indentLevel++;
+            _data.openingSequenceStartPos = EditorGUILayout.Vector3Field("River Start Pos", _data.openingSequenceStartPos);
+            EditorGUI.indentLevel--;
+        }
+        if (EditorGUI.EndChangeCheck()) MarkDirty();
+
+        EditorGUILayout.Space(4);
 
         bool sceneOk  = IsValidLevelSelectScene();
         bool dataOk   = !_consoleHasErrors;
@@ -1962,16 +2501,10 @@ EditorUtility.SetDirty(_data);
         if (GUILayout.Button("GENERATE", GUILayout.Height(30)))
         {
             PruneLooseNodes();
-            EditorApplication.delayCall += () => { if (_data != null) Generate(); };
-        }
-        GUI.backgroundColor = prevColor;
-
-        if (GUILayout.Button("Respawn", GUILayout.Height(24)))
-        {
-            PruneLooseNodes();
             ClearGeneratedObjects();
             EditorApplication.delayCall += () => { if (_data != null) Generate(); };
         }
+        GUI.backgroundColor = prevColor;
         GUI.enabled = true;
 
         if (GUILayout.Button("Clear Generated", GUILayout.Height(24)))
@@ -2008,7 +2541,7 @@ EditorUtility.SetDirty(_data);
                 _selectedArenaNodeId = null;
                 _isDrawing          = false;
                 _drawingNodeIds.Clear();
-                EditorUtility.SetDirty(_data);
+                MarkDirty();
                 ClearGeneratedObjects();
             }
         }
@@ -2320,7 +2853,7 @@ EditorUtility.SetDirty(_data);
                 }
             }
 
-            EditorUtility.SetDirty(_data);
+            MarkDirty();
             Repaint();
             e.Use();
         }
@@ -2355,7 +2888,7 @@ EditorUtility.SetDirty(_data);
                 _isExtending     = false;
                 _extendingPathId = null;
                 _drawingNodeIds.Clear();
-                EditorUtility.SetDirty(_data);
+                MarkDirty();
                 Repaint();
                 return;
             }
@@ -2407,7 +2940,7 @@ EditorUtility.SetDirty(_data);
         _selectedPathId = path.pathId;
         _isDrawing      = false;
         _drawingNodeIds.Clear();
-        EditorUtility.SetDirty(_data);
+        MarkDirty();
         Repaint();
     }
 
@@ -2486,18 +3019,16 @@ EditorUtility.SetDirty(_data);
                 var ownerArena = FindArenaForSecondaryNode(node.id);
                 if (ownerArena != null)
                 {
-                    var primary = _data.nodes.Find(n => n.id == ownerArena.nodeId);
-                    if (primary != null)
-                    {
-                        Vector3 dir = np - primary.worldPosition; dir.y = 0f;
-                        if (dir.sqrMagnitude < 0.0001f) dir = Vector3.forward;
-                        np   = primary.worldPosition + dir.normalized * ARENA_INNER_RING_RADIUS;
-                        np.y = primary.worldPosition.y;
-                    }
+                    float   clampR      = GetArenaRadius(ownerArena);
+                    Vector3 trueCenter  = GetTrueArenaCenter(ownerArena);
+                    Vector3 dir = np - trueCenter; dir.y = 0f;
+                    if (dir.sqrMagnitude < 0.0001f) dir = Vector3.forward;
+                    np   = trueCenter + dir.normalized * clampR;
+                    np.y = trueCenter.y;
                 }
 
                 node.worldPosition = new Vector3(np.x, node.worldPosition.y, np.z);
-                EditorUtility.SetDirty(_data);
+                MarkDirty();
                 Repaint();
             }
             e.Use();
@@ -2539,7 +3070,7 @@ EditorUtility.SetDirty(_data);
                 Undo.RecordObject(_data, "Delete Node");
                 DeleteNode(_selectedNodeId);
                 _selectedNodeId = null;
-                EditorUtility.SetDirty(_data);
+                MarkDirty();
                 Repaint();
                 e.Use();
             }
@@ -2548,7 +3079,7 @@ EditorUtility.SetDirty(_data);
                 Undo.RecordObject(_data, "Delete Path");
                 DeletePath(_selectedPathId);
                 _selectedPathId = null;
-                EditorUtility.SetDirty(_data);
+                MarkDirty();
                 Repaint();
                 e.Use();
             }
@@ -2616,7 +3147,7 @@ EditorUtility.SetDirty(_data);
                 Undo.RecordObject(_data, "Remove Junction");
                 existingNode.type = LevelSelectDesignerData.NodeType.Waypoint;
                 _data.junctions.RemoveAll(j => j.nodeId == existingNodeId);
-                EditorUtility.SetDirty(_data);
+                MarkDirty();
                 Repaint();
                 e.Use();
             }
@@ -2651,7 +3182,7 @@ EditorUtility.SetDirty(_data);
         _drawingNodeIds.Add(junctionNode.id);
         _isDrawing = true;
 
-        EditorUtility.SetDirty(_data);
+        MarkDirty();
         Repaint();
         e.Use();
     }
@@ -2680,7 +3211,7 @@ EditorUtility.SetDirty(_data);
 
         path.arenaIsAtEnd    = atEnd;
         _selectedArenaNodeId = newNodeId;
-        EditorUtility.SetDirty(_data);
+        MarkDirty();
     }
 
     private void RemoveArena(string nodeId)
@@ -2725,7 +3256,7 @@ EditorUtility.SetDirty(_data);
                 }
         }
 
-        EditorUtility.SetDirty(_data);
+        MarkDirty();
         Repaint();
         e.Use();
     }
@@ -2754,7 +3285,7 @@ EditorUtility.SetDirty(_data);
         };
         _data.obstacles.Add(obs);
         _selectedObstacleId = obs.obstacleId;
-        EditorUtility.SetDirty(_data);
+        MarkDirty();
         Repaint();
         e.Use();
     }
@@ -2793,7 +3324,7 @@ EditorUtility.SetDirty(_data);
             _selectedShopNodeId = nodeId;
         }
 
-        EditorUtility.SetDirty(_data);
+        MarkDirty();
         Repaint();
         e.Use();
     }
@@ -2833,6 +3364,17 @@ EditorUtility.SetDirty(_data);
         }
     }
 
+    // Returns the true world-space center of the spawned arena (node + arenaHeadOffset along arrival dir)
+    private Vector3 GetTrueArenaCenter(LevelSelectDesignerData.DesignerArena arena)
+    {
+        var primary = _data.nodes.Find(n => n.id == arena.nodeId);
+        if (primary == null) return Vector3.zero;
+        float y   = GetArenaArrivalYAngle(arena);
+        float rad = y * Mathf.Deg2Rad;
+        Vector3 dir = new Vector3(Mathf.Sin(rad), 0f, Mathf.Cos(rad));
+        return primary.worldPosition + dir * _data.arenaHeadOffset;
+    }
+
     private float GetArenaArrivalYAngle(LevelSelectDesignerData.DesignerArena arena)
     {
         var branch = _data.paths.FirstOrDefault(p =>
@@ -2856,12 +3398,17 @@ EditorUtility.SetDirty(_data);
             var primary = _data.nodes.Find(n => n.id == arena.nodeId);
             if (primary == null) continue;
 
-            float arrivalY = GetArenaArrivalYAngle(arena);
+            float arrivalY   = GetArenaArrivalYAngle(arena);
+            float arrivalRad = arrivalY * Mathf.Deg2Rad;
+            Vector3 offsetDir    = new Vector3(Mathf.Sin(arrivalRad), 0f, Mathf.Cos(arrivalRad));
+            Vector3 trueCenter3D = primary.worldPosition + offsetDir * _data.arenaHeadOffset;
 
-            Vector2 center = WorldToCanvas(primary.worldPosition);
-            Handles.color = new Color(1f, 0.7f, 0.2f, 0.2f);
-            Handles.DrawWireDisc(center, Vector3.forward, ARENA_OUTER_RING_RADIUS * _zoom);
-            Handles.DrawWireDisc(center, Vector3.forward, ARENA_INNER_RING_RADIUS * _zoom);
+            float   arenaR = GetArenaRadius(arena);
+            Vector2 center = WorldToCanvas(trueCenter3D);
+            Handles.color = new Color(1f, 0.7f, 0.2f, 0.35f);
+            Handles.DrawWireDisc(center, Vector3.forward, arenaR * _zoom);
+            Handles.color = new Color(1f, 0.7f, 0.2f, 0.12f);
+            Handles.DrawWireDisc(center, Vector3.forward, arenaR * _zoom * 1.15f);
 
             // Line from arena centre to each secondary entrance orbit node
             foreach (var sec in arena.secondaryEntrances)
@@ -2879,8 +3426,8 @@ EditorUtility.SetDirty(_data);
                 float a1rad    = arrivalY * Mathf.Deg2Rad;
                 var   a1inward = new Vector2(-Mathf.Sin(a1rad), Mathf.Cos(a1rad));
                 var   a1appr   = -a1inward;
-                Vector2 outer  = center + a1appr * ARENA_OUTER_RING_RADIUS * _zoom;
-                Vector2 inner  = center + a1appr * ARENA_INNER_RING_RADIUS * _zoom;
+                Vector2 outer  = center + a1appr * arenaR * _zoom * 1.15f;
+                Vector2 inner  = center + a1appr * arenaR * _zoom;
                 Vector2 back   = inner - a1inward * 6f;
                 Vector2 perp   = new Vector2(-a1inward.y, a1inward.x) * 4f;
                 Handles.color  = new Color(1f, 0.5f, 0.1f, 0.9f);
@@ -3005,10 +3552,11 @@ EditorUtility.SetDirty(_data);
                 var prevNode = _data.nodes.Find(n => n.id == path.nodeIds[path.nodeIds.Count - 2]);
                 if (lastNode == null || prevNode == null) continue;
 
+                float   aR       = GetArenaRadius(arena);
                 Vector2 inward   = (WorldToCanvas(lastNode.worldPosition) - WorldToCanvas(prevNode.worldPosition)).normalized;
                 Vector2 approach = -inward;
-                Vector2 outerPt  = center + approach * ARENA_OUTER_RING_RADIUS * _zoom;
-                Vector2 innerPt  = center + approach * ARENA_INNER_RING_RADIUS * _zoom;
+                Vector2 outerPt  = center + approach * aR * _zoom * 1.15f;
+                Vector2 innerPt  = center + approach * aR * _zoom;
 
                 Color col   = isArenaSelected ? new Color(1f, 0.6f, 0.1f) : new Color(0.9f, 0.7f, 0.3f, 0.7f);
                 float width = 1.5f;
@@ -3276,7 +3824,7 @@ EditorUtility.SetDirty(_data);
             }
         }
 
-        EditorUtility.SetDirty(_data);
+        MarkDirty();
         RunValidation();
     }
 
@@ -3292,7 +3840,7 @@ EditorUtility.SetDirty(_data);
         _data.junctions.RemoveAll(j => j.nodeId == junc.nodeId);
         if (_selectedJunctionNodeId == junc.nodeId)
             _selectedJunctionNodeId = null;
-        EditorUtility.SetDirty(_data);
+        MarkDirty();
         Repaint();
     }
 
@@ -3312,23 +3860,20 @@ EditorUtility.SetDirty(_data);
             // ── Setup (scene objects + prefabs) ───────────────────
             {
                 var setupRect = EditorGUILayout.GetControlRect();
-                float btnW = 40f, restoreW = 22f, gap = 3f;
-                var saveRect    = new Rect(setupRect.xMax - btnW - restoreW - gap * 2, setupRect.y, btnW,    setupRect.height);
-                var restoreRect = new Rect(setupRect.xMax - restoreW - gap,            setupRect.y, restoreW, setupRect.height);
-                setupRect.xMax  = saveRect.x - gap;
+                float btnW = 40f, importW = 50f, gap = 3f;
+                var saveRect   = new Rect(setupRect.xMax - btnW - importW - gap * 2, setupRect.y, btnW,   setupRect.height);
+                var importRect = new Rect(setupRect.xMax - importW - gap,            setupRect.y, importW, setupRect.height);
+                setupRect.xMax = saveRect.x - gap;
                 _foldSetup = EditorGUI.Foldout(setupRect, _foldSetup, "Setup", true, EditorStyles.foldoutHeader);
 
-                bool hasBackup = _data != null && System.IO.File.Exists(
-                    System.IO.Path.Combine(
-                        System.IO.Path.GetDirectoryName(AssetDatabase.GetAssetPath(_data)),
-                        System.IO.Path.GetFileNameWithoutExtension(AssetDatabase.GetAssetPath(_data)) + "_SetupBackup.json"));
+                bool hasTemplate = System.IO.File.Exists(K_SetupTemplate);
 
                 var prevBg = GUI.backgroundColor;
                 GUI.backgroundColor = new Color(0.4f, 0.8f, 1f);
-                if (GUI.Button(saveRect, "Save", EditorStyles.miniButton))
+                if (GUI.Button(saveRect, new GUIContent("Save", "Save current setup as the shared template"), EditorStyles.miniButton))
                     SaveSetup();
-                GUI.backgroundColor = hasBackup ? new Color(0.5f, 1f, 0.5f) : new Color(0.6f, 0.6f, 0.6f);
-                if (GUI.Button(restoreRect, new GUIContent("↺", hasBackup ? "Restore setup from backup" : "No backup saved yet"),
+                GUI.backgroundColor = hasTemplate ? new Color(0.5f, 1f, 0.5f) : new Color(0.6f, 0.6f, 0.6f);
+                if (GUI.Button(importRect, new GUIContent("Import", hasTemplate ? "Import prefab setup from shared template" : "No template saved yet — open World1a and hit Save first"),
                         EditorStyles.miniButton))
                     RestoreSetup();
                 GUI.backgroundColor = prevBg;
@@ -3436,7 +3981,7 @@ EditorUtility.SetDirty(_data);
             {
                 Undo.RecordObject(_data, "Delete Arena");
                 RemoveArena(arena.nodeId);
-                EditorUtility.SetDirty(_data);
+                MarkDirty();
                 GUI.backgroundColor = prevBg;
                 EditorGUILayout.EndHorizontal();
                 break;
@@ -3452,7 +3997,7 @@ EditorUtility.SetDirty(_data);
                 Undo.RecordObject(_data, "Set Arena GridData");
                 arena.gridData = newGrid;
                 SyncEntranceNodes(arena);
-                EditorUtility.SetDirty(_data);
+                MarkDirty();
             }
         }
     }
@@ -3512,7 +4057,7 @@ EditorUtility.SetDirty(_data);
                 Undo.RecordObject(_data, capturedIsRiver ? "Clear Junction River" : "Clear Junction Branch");
                 if (capturedIsRiver) capturedJunc.riverPathId  = null;
                 else                 capturedJunc.branchPathId = null;
-                EditorUtility.SetDirty(_data);
+                MarkDirty();
                 Repaint();
             });
             menu.AddSeparator("");
@@ -3587,7 +4132,7 @@ EditorUtility.SetDirty(_data);
             {
                 Undo.RecordObject(_data, "Repair Junction");
                 RepairJunction(junc);
-                EditorUtility.SetDirty(_data);
+                MarkDirty();
                 Repaint();
             }
             var prevJuncBg = GUI.backgroundColor;
@@ -3699,7 +4244,7 @@ EditorUtility.SetDirty(_data);
             };
             _data.paths.Add(p);
             _selectedPathId = p.pathId;
-            EditorUtility.SetDirty(_data);
+            MarkDirty();
         }
     }
 
@@ -3741,7 +4286,7 @@ EditorUtility.SetDirty(_data);
                 Undo.RecordObject(_data, "Delete Obstacle");
                 _data.obstacles.Remove(toDelete);
                 if (_selectedObstacleId == toDelete.obstacleId) _selectedObstacleId = null;
-                EditorUtility.SetDirty(_data);
+                MarkDirty();
             }
         }
     }
@@ -3968,6 +4513,10 @@ EditorUtility.SetDirty(_data);
         // Deploy and wire all scene script objects FIRST so managers exist before path generation
         DeployAllSceneObjects();
 
+        // Snap main river start node to opening sequence start position if enabled
+        if (_data.useOpeningSequence)
+            ApplyOpeningSequenceStartNode();
+
         var mainVisuals = FindOrCreateParent("MAINRIVERVISUALS");
         var branches    = FindOrCreateParent("RIVERBRANCHES");
         var junctionsGO = FindOrCreateParent("RIVERJUNCTIONS");
@@ -4030,12 +4579,13 @@ EditorUtility.SetDirty(_data);
 
             Vector3 shift = arrivalDir * _data.arenaHeadOffset;
 
-            // 2. Get radius from prefab or scene
+            // 2. Get radius — prefer stored arenaRadius, fall back to prefab/scene gizmo
             GameObject headPrefab = arena.arenaPrefabOverride != null ? arena.arenaPrefabOverride : _data.arenaPrefab;
             var existingArena = FindObjectsOfType<LevelSelectDesignerArenaTag>().FirstOrDefault(t => t.nodeId == arena.nodeId);
             var gizmo = existingArena?.GetComponentInChildren<LevelSelectArenaRadiusGizmo>()
                      ?? headPrefab?.GetComponentInChildren<LevelSelectArenaRadiusGizmo>();
-            float radius = gizmo != null ? gizmo.radius : 10f;
+            float radius = gizmo != null ? gizmo.radius : (arena.arenaRadius > 0.1f ? arena.arenaRadius : 10f);
+            arena.arenaRadius = radius; // keep designer data in sync
 
             // 3. Process secondary nodes
             foreach (var sec in arena.secondaryEntrances)
@@ -4043,16 +4593,13 @@ EditorUtility.SetDirty(_data);
                 var sn = _data.nodes.Find(n => n.id == sec.nodeId);
                 if (sn == null) continue;
 
-                Vector3 dirToSec = sn.worldPosition - arenaNode.worldPosition; dirToSec.y = 0f;
+                // Snap to the true arena ring (arena center = node + arrivalShift)
+                Vector3 trueArenaCenter = arenaNode.worldPosition + shift;
+                Vector3 dirToSec = sn.worldPosition - trueArenaCenter; dirToSec.y = 0f;
                 if (dirToSec.sqrMagnitude < 0.0001f) dirToSec = Vector3.forward;
                 dirToSec.Normalize();
-
-                // Snap designer position to radius circle
-                sn.worldPosition = arenaNode.worldPosition + dirToSec * radius;
-
-                // Actual scene gate position is shifted by the same arrival offset
-                Vector3 actualGatePos = sn.worldPosition + shift;
-                _correctedNodePositions[sec.nodeId] = actualGatePos;
+                sn.worldPosition = trueArenaCenter + dirToSec * radius;
+                _correctedNodePositions[sec.nodeId] = sn.worldPosition;
 
                 // Store direction INTO arena for tangent forcing
                 _arenaEntranceDirections[sec.nodeId] = -dirToSec;
@@ -4096,14 +4643,14 @@ EditorUtility.SetDirty(_data);
             {
                 path.leadsToArena = true;
                 path.arenaIsAtEnd = true;
-                EditorUtility.SetDirty(_data);
+                MarkDirty();
             }
             // Path STARTS at secondary node -> Exit (arena is at t=0)
             else if (secondaryNodeIds.Contains(path.nodeIds[0]))
             {
                 path.leadsToArena = true;
                 path.arenaIsAtEnd = false;
-                EditorUtility.SetDirty(_data);
+                MarkDirty();
             }
         }
 
@@ -4133,6 +4680,7 @@ EditorUtility.SetDirty(_data);
         GenerateArenas();
         GenerateShops();
 
+        WireRunInSegments(generatedContainers);
         WireSourceSegments(generatedContainers);
         WireAllSceneObjects();
 
@@ -4191,7 +4739,7 @@ EditorUtility.SetDirty(_data);
         var      fullSpline = fullContainer.Splines[0];
         float4x4 fl2w       = fullContainer.transform.localToWorldMatrix;
 
-        int subs  = _data.curveSubdivisions > 0 ? _data.curveSubdivisions
+        int subs  = path.curveSubdivisions > 0 ? path.curveSubdivisions
                   : (_splitPreset != null ? _splitPreset.subdivisions : 5);
         int steps = subs * Mathf.Max(1, fullSpline.Count - 1);
 
@@ -4732,8 +5280,9 @@ EditorUtility.SetDirty(_data);
                 var secNode = _data.nodes.Find(n => n.id == secEnt.nodeId);
                 if (secNode == null || _data.arenaEntrancePrefab == null) continue;
 
-                // Canvas angle: direction from arena designer node to orbit node
-                Vector3 secDir3 = secNode.worldPosition - node.worldPosition; secDir3.y = 0f;
+                // Canvas angle: direction from true arena center to orbit node
+                Vector3 trueCenter = GetTrueArenaCenter(arena);
+                Vector3 secDir3 = secNode.worldPosition - trueCenter; secDir3.y = 0f;
                 if (secDir3.sqrMagnitude < 0.0001f) secDir3 = Vector3.forward;
                 float canvasAngle = Mathf.Atan2(secDir3.x, secDir3.z) * Mathf.Rad2Deg;
 
@@ -4917,6 +5466,27 @@ EditorUtility.SetDirty(_data);
         }
     }
 
+    // Returns the arena radius for designer ring drawing and node placement.
+    // Reads from the prefab's LevelSelectArenaRadiusGizmo and caches into arenaData.arenaRadius.
+    private float GetArenaRadius(LevelSelectDesignerData.DesignerArena arenaData)
+    {
+        if (arenaData.arenaRadius > 0.1f) return arenaData.arenaRadius;
+
+        GameObject prefab = arenaData.arenaPrefabOverride != null
+            ? arenaData.arenaPrefabOverride : _data?.arenaPrefab;
+        if (prefab != null)
+        {
+            var gizmo = prefab.GetComponentInChildren<LevelSelectArenaRadiusGizmo>();
+            if (gizmo != null)
+            {
+                arenaData.arenaRadius = gizmo.radius;
+                MarkDirty();
+                return arenaData.arenaRadius;
+            }
+        }
+        return 10f; // matches LevelSelectArenaRadiusGizmo default
+    }
+
     private string FindBakedEndpointID(RiverSegmentID[] baked, string baseSegmentId, Vector3 juncPos)
     {
         string best     = null;
@@ -4934,6 +5504,98 @@ EditorUtility.SetDirty(_data);
             if (dist < bestDist) { bestDist = dist; best = seg.SegmentID; }
         }
         return best;
+    }
+
+    private void WireRunInSegments(List<SplineContainer> generatedContainers)
+    {
+        var runIns = FindObjectsOfType<EntranceSplineRunIn>();
+        foreach (var runIn in runIns)
+        {
+            var container = runIn.GetComponent<SplineContainer>();
+            var segId     = runIn.GetComponent<RiverSegmentID>();
+            if (container == null || segId == null || container.Spline.Count < 2) continue;
+
+            // Knot 0 is the river-connection side.
+            // Check the arena-flagged endpoint of each path — last knot for arenaIsAtEnd=true,
+            // first knot for arenaIsAtEnd=false — so branches in either direction match correctly.
+            Vector3 runInKnot0  = container.transform.TransformPoint((Vector3)container.Spline[0].Position);
+
+            SplineContainer nearest      = null;
+            float           nearestDist  = float.MaxValue;
+            bool            matchedStart = false;
+
+            foreach (var c in generatedContainers)
+            {
+                if (c == null || c.Spline.Count == 0) continue;
+                var cSegId = c.GetComponent<RiverSegmentID>();
+                if (cSegId == null || !cSegId.LeadsToArena) continue;
+
+                Vector3 arenaKnot;
+                bool    atStart;
+                if (cSegId.ArenaIsAtEnd)
+                {
+                    arenaKnot = c.transform.TransformPoint((Vector3)c.Spline[c.Spline.Count - 1].Position);
+                    atStart   = false;
+                }
+                else
+                {
+                    arenaKnot = c.transform.TransformPoint((Vector3)c.Spline[0].Position);
+                    atStart   = true;
+                }
+
+                float dist = Vector3.Distance(runInKnot0, arenaKnot);
+                if (dist < nearestDist) { nearestDist = dist; nearest = c; matchedStart = atStart; }
+            }
+
+            if (nearest == null)
+            {
+                Debug.LogWarning($"[LSD] EntranceSplineRunIn '{runIn.name}': no matching path found.");
+                continue;
+            }
+
+            // Copy segment identity from the parent path so stitching appends to the same highway.
+            // arenaIsAtEnd on the RunIn always matches the parent — the RunIn sits at the same end.
+            var srcSegId = nearest.GetComponent<RiverSegmentID>();
+            if (srcSegId != null)
+            {
+                var so = new SerializedObject(segId);
+                so.Update();
+                so.FindProperty("segmentID").stringValue      = srcSegId.SegmentID;
+                so.FindProperty("junctionGroup").stringValue  = srcSegId.JunctionGroup;
+                so.FindProperty("segmentType").enumValueIndex = (int)srcSegId.Type;
+                so.FindProperty("isLeftPath").boolValue       = srcSegId.IsLeftPath;
+                so.FindProperty("isRightPath").boolValue      = srcSegId.IsRightPath;
+                so.FindProperty("extrudeOnExit").boolValue    = srcSegId.ExtrudeOnExit;
+                so.FindProperty("leadsToArena").boolValue     = true;
+                so.FindProperty("arenaIsAtEnd").boolValue     = srcSegId.ArenaIsAtEnd;
+                so.FindProperty("skipRegistration").boolValue = true;
+                so.ApplyModifiedProperties();
+                EditorUtility.SetDirty(segId);
+            }
+
+            // Replace both terminal knots with exact RunIn positions so the path
+            // follows the RunIn geometry and welds correctly.
+            Vector3 runInK1World    = container.transform.TransformPoint((Vector3)container.Spline[1].Position);
+            int     arenaKnotIdx    = matchedStart ? 0 : nearest.Spline.Count - 1;
+            int     adjacentKnotIdx = matchedStart ? 1 : nearest.Spline.Count - 2;
+
+            var k0snap = nearest.Spline[arenaKnotIdx];
+            k0snap.Position = (Unity.Mathematics.float3)nearest.transform.InverseTransformPoint(runInKnot0);
+            nearest.Spline.SetTangentMode(arenaKnotIdx, TangentMode.AutoSmooth);
+            nearest.Spline[arenaKnotIdx] = k0snap;
+
+            var k1snap = nearest.Spline[adjacentKnotIdx];
+            k1snap.Position = (Unity.Mathematics.float3)nearest.transform.InverseTransformPoint(runInK1World);
+            nearest.Spline.SetTangentMode(adjacentKnotIdx, TangentMode.AutoSmooth);
+            nearest.Spline[adjacentKnotIdx] = k1snap;
+
+            EditorUtility.SetDirty(nearest);
+
+            // The branch's terminal knots now carry the RunIn geometry, so the RunIn container
+            // does NOT go into generatedContainers (that would duplicate those knots in the boat path).
+            // SplineRiverManager picks up the RunIn independently via its RiverSegmentID in the scene.
+            Debug.Log($"[LSD] RunIn '{runIn.name}' → '{nearest.name}' dist={nearestDist:F3}m — terminal knots replaced, RunIn excluded from boat path");
+        }
     }
 
     private void WireSourceSegments(List<SplineContainer> containers)
@@ -4980,7 +5642,7 @@ EditorUtility.SetDirty(_data);
         int before = _data.nodes.Count;
         _data.nodes.RemoveAll(n => !referenced.Contains(n.id));
         if (_data.nodes.Count != before)
-            EditorUtility.SetDirty(_data);
+            MarkDirty();
     }
 
     private void ClearGeneratedObjects()
@@ -5007,7 +5669,7 @@ EditorUtility.SetDirty(_data);
             _data.soulDisplaySlotManager = null;
             _data.musicController        = null;
             _data.pauseManager           = null;
-            EditorUtility.SetDirty(_data);
+            MarkDirty();
         }
     }
 
@@ -5040,7 +5702,7 @@ EditorUtility.SetDirty(_data);
             }
         }
 
-        SetSplineFromPositions(container, positions);
+        SetSplineFromPositions(container, positions, path.curveStrength);
 
         if (container.Splines.Count == 0) return;
         var spline = container.Splines[0];
@@ -5051,7 +5713,7 @@ EditorUtility.SetDirty(_data);
         {
             SplineUtility.GetPointAtLinearDistance(spline, 0f, _data.branchStartOffset, out float T_start);
 
-            int subs  = _data.curveSubdivisions > 0 ? _data.curveSubdivisions : 5;
+            int subs  = path.curveSubdivisions > 0 ? path.curveSubdivisions : 5;
             int steps = subs * Mathf.Max(1, spline.Count - 1);
 
             var trimPos = new List<float3>();
@@ -5140,8 +5802,10 @@ EditorUtility.SetDirty(_data);
         return _data.nodes.Find(n => n.id == nodeId)?.worldPosition ?? Vector3.zero;
     }
 
-    private static void SetSplineFromPositions(SplineContainer container, List<Vector3> worldPositions)
+    private static void SetSplineFromPositions(SplineContainer container, List<Vector3> worldPositions, float curveStrength = 1f)
     {
+        float tangentScale = 0.333f * Mathf.Max(0.01f, curveStrength);
+
         var local = worldPositions
             .Select(p => (float3)container.transform.InverseTransformPoint(p))
             .ToList();
@@ -5155,17 +5819,17 @@ EditorUtility.SetDirty(_data);
 
             if (i > 0 && i < local.Count - 1)
             {
-                tanIn  = (pos - local[i - 1]) * 0.333f;
-                tanOut = (local[i + 1] - pos) * 0.333f;
+                tanIn  = (pos - local[i - 1]) * tangentScale;
+                tanOut = (local[i + 1] - pos) * tangentScale;
             }
             else if (i == 0 && local.Count > 1)
             {
-                tanOut = (local[1] - pos) * 0.333f;
+                tanOut = (local[1] - pos) * tangentScale;
                 tanIn  = -tanOut;
             }
             else if (i == local.Count - 1 && local.Count > 1)
             {
-                tanIn  = (pos - local[i - 1]) * 0.333f;
+                tanIn  = (pos - local[i - 1]) * tangentScale;
                 tanOut = -tanIn;
             }
 
@@ -5337,7 +6001,7 @@ EditorUtility.SetDirty(_data);
                 Undo.RecordObject(_data, "Move Hill Point");
                 var wp = CanvasToWorldPos(e.mousePosition);
                 hp.positionXZ = new Vector2(wp.x, wp.z);
-                EditorUtility.SetDirty(_data);
+                MarkDirty();
                 SyncHillPointsToScene();
                 Repaint();
                 e.Use();
@@ -5352,7 +6016,7 @@ EditorUtility.SetDirty(_data);
             Undo.RecordObject(_data, "Delete Hill Point");
             _data.hillPoints.RemoveAll(h => h.id == _selectedHillPointId);
             _selectedHillPointId = null;
-            EditorUtility.SetDirty(_data);
+            MarkDirty();
             SyncHillPointsToScene();
             e.Use();
         }
@@ -5378,7 +6042,7 @@ EditorUtility.SetDirty(_data);
         _data.landscapeWorldY   = EditorGUILayout.FloatField("World Y",   _data.landscapeWorldY);
         if (EditorGUI.EndChangeCheck())
         {
-            EditorUtility.SetDirty(_data);
+            MarkDirty();
             Repaint();
         }
 
@@ -5427,7 +6091,7 @@ EditorUtility.SetDirty(_data);
                 };
                 _data.hillPoints.Insert(i + 1, dupe);
                 _selectedHillPointId = dupe.id;
-                EditorUtility.SetDirty(_data);
+                MarkDirty();
                 SyncHillPointsToScene();
                 GUI.backgroundColor = rowBg;
                 EditorGUILayout.EndHorizontal();
@@ -5440,7 +6104,7 @@ EditorUtility.SetDirty(_data);
                 Undo.RecordObject(_data, "Delete Hill Point");
                 _data.hillPoints.RemoveAt(i);
                 if (_selectedHillPointId == hp.id) _selectedHillPointId = null;
-                EditorUtility.SetDirty(_data);
+                MarkDirty();
                 SyncHillPointsToScene();
                 GUI.backgroundColor = rowBg;
                 EditorGUILayout.EndHorizontal();
@@ -5482,7 +6146,7 @@ EditorUtility.SetDirty(_data);
             };
             _data.hillPoints.Add(hp);
             _selectedHillPointId = hp.id;
-            EditorUtility.SetDirty(_data);
+            MarkDirty();
             SyncHillPointsToScene();
             Repaint();
         }
@@ -5572,6 +6236,23 @@ EditorUtility.SetDirty(_data);
         if (tool == null)
             tool = Undo.AddComponent<LandscapeTool>(parentGo);
 
+        // Auto-assign target material
+        if (tool.targetMaterial == null)
+        {
+            var guids = AssetDatabase.FindAssets("LevelSelectLandscape t:Material");
+            var mat   = guids.Length > 0
+                ? AssetDatabase.LoadAssetAtPath<Material>(AssetDatabase.GUIDToAssetPath(guids[0]))
+                : null;
+            if (mat != null)
+            {
+                tool.targetMaterial = mat;
+                EditorUtility.SetDirty(tool);
+                Debug.Log($"[LevelSelectDesigner] Assigned material '{mat.name}' to LandscapeTool.");
+            }
+            else
+                Debug.LogWarning("[LevelSelectDesigner] Could not find material 'LevelSelectLandscape' in project.");
+        }
+
         // HillPointsContainer child for hill handles
         var hillContainer = new GameObject("Hill_Points_Container");
         Undo.RegisterCreatedObjectUndo(hillContainer, "Create Hill_Points_Container");
@@ -5582,7 +6263,7 @@ EditorUtility.SetDirty(_data);
         if (_data.landscapeTool == null)
         {
             _data.landscapeTool = tool;
-            EditorUtility.SetDirty(_data);
+            MarkDirty();
         }
 
         float size   = _data.landscapeTileSize;

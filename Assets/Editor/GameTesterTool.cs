@@ -38,6 +38,11 @@ public class GameTesterTool : EditorWindow
     private string[]    _gridDataNames;
     private int         _selectedGridDataIndex;
 
+    // LevelSelect scene list
+    private string[] _levelSelectSceneNames;
+    private int      _selectedLevelSelectIndex;
+    private const string PrefLevelSelectIndex = "SaveDataMonitor_LevelSelectIndex";
+
     // Debug soul injection
     private int _soulsToInject = 3;
 
@@ -93,6 +98,7 @@ public class GameTesterTool : EditorWindow
     {
         if (_gridDataNames != null && _selectedGridDataIndex < _gridDataNames.Length)
             EditorPrefs.SetString(PrefGridData, _gridDataNames[_selectedGridDataIndex]);
+        EditorPrefs.SetInt(PrefLevelSelectIndex, _selectedLevelSelectIndex);
 
         EditorPrefs.SetBool(PrefUnlockWhirl,    _unlockWhirl);
         EditorPrefs.SetBool(PrefUnlockCatapult, _unlockCatapult);
@@ -256,17 +262,34 @@ public class GameTesterTool : EditorWindow
 
         EditorGUILayout.Space(12);
 
-        // ── Test LevelSelect (LevelSelectWorld1a) ───────────────────────────
-        EditorGUILayout.LabelField("Test LevelSelect  (LevelSelectWorld1a)", EditorStyles.boldLabel);
+        // ── Test LevelSelect ────────────────────────────────────────────────
+        EditorGUILayout.LabelField("Test LevelSelect", EditorStyles.boldLabel);
+
+        if (_levelSelectSceneNames == null) RefreshLevelSelectScenes();
+
+        EditorGUILayout.BeginHorizontal();
+        if (_levelSelectSceneNames != null && _levelSelectSceneNames.Length > 0)
+        {
+            _selectedLevelSelectIndex = EditorGUILayout.Popup(_selectedLevelSelectIndex, _levelSelectSceneNames);
+        }
+        else
+        {
+            EditorGUILayout.LabelField("  (no LevelSelectWorld scenes in Build Settings)", EditorStyles.miniLabel);
+        }
+        if (GUILayout.Button("↺", GUILayout.Width(24))) RefreshLevelSelectScenes();
+        EditorGUILayout.EndHorizontal();
+
+        EditorGUI.BeginDisabledGroup(_levelSelectSceneNames == null || _levelSelectSceneNames.Length == 0);
         EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Test LevelSelect", _okButton))
-            LaunchScene("LevelSelectWorld1a", null, null);
-        if (GUILayout.Button("Test LevelSelect (FreshSave)", _okButton))
+            LaunchScene(_levelSelectSceneNames[_selectedLevelSelectIndex], null, null);
+        if (GUILayout.Button("Fresh Save", _okButton))
         {
             GameProgressData.ClearAll();
-            LaunchScene("LevelSelectWorld1a", null, null);
+            LaunchScene(_levelSelectSceneNames[_selectedLevelSelectIndex], null, null);
         }
         EditorGUILayout.EndHorizontal();
+        EditorGUI.EndDisabledGroup();
 
         EditorGUILayout.Space(6);
     }
@@ -296,6 +319,20 @@ public class GameTesterTool : EditorWindow
             if (idx >= 0) _selectedGridDataIndex = idx;
         }
         _selectedGridDataIndex = Mathf.Clamp(_selectedGridDataIndex, 0, Mathf.Max(0, _allGridData.Length - 1));
+    }
+
+    private void RefreshLevelSelectScenes()
+    {
+        var names = new System.Collections.Generic.List<string>();
+        foreach (var s in EditorBuildSettings.scenes)
+        {
+            string sceneName = System.IO.Path.GetFileNameWithoutExtension(s.path);
+            if (sceneName.StartsWith("LevelSelectWorld"))
+                names.Add(sceneName);
+        }
+        _levelSelectSceneNames = names.ToArray();
+        _selectedLevelSelectIndex = Mathf.Clamp(
+            EditorPrefs.GetInt(PrefLevelSelectIndex, 0), 0, Mathf.Max(0, _levelSelectSceneNames.Length - 1));
     }
 
     public static void LaunchScene(string sceneName, GridData levelData, WavePreset waveOverride)

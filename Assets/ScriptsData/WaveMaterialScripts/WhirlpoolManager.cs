@@ -56,11 +56,10 @@ public class WhirlpoolManager : MonoBehaviour
         }
 
         RefreshHandles();
-        if (_handles == null || _handles.Count == 0) return;
         if (targetRenderer == null) targetRenderer = GetComponent<Renderer>();
         if (targetRenderer == null) return;
 
-        int count = Mathf.Min(_handles.Count, MaxWhirlpools);
+        int count = (_handles != null) ? Mathf.Min(_handles.Count, MaxWhirlpools) : 0;
         for (int i = 0; i < count; i++)
         {
             if (_handles[i] == null) continue;

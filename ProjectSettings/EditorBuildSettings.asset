@@ -15,6 +15,9 @@ EditorBuildSettings:
     path: Assets/Scenes/LevelSelectWorlds/LevelSelectWorld1a.unity
     guid: ce77d88891103ea488bd90fad910261f
   - enabled: 1
+    path: Assets/Scenes/LevelSelectWorlds/LevelSelectWorld2.unity
+    guid: 75d8ada57d588024bb0e20899004fcd8
+  - enabled: 1
     path: Assets/Scenes/Waves1.unity
     guid: 5deeedd361fd0c0419299dcdba03ae03
   - enabled: 1
@@ -23,6 +26,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/SoulWellv2.unity
     guid: 72054a206a08f264d9fec452fdc3b4a4
+  - enabled: 0
+    path: Assets/Scenes/LevelSelectWorlds/LevelSelectWorld3.unity
+    guid: 5a3b7c654620cb54b96add0883ecacd1
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0

@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 88b6f058feac51f46a3f56ed88db9a43, type: 3}
-  m_Name: LevelSelectWorld1Data
+  m_Name: LevelSelectWorld1Data (Workspace) (Workspace) (Workspace) (Workspace) (Workspace)
   m_EditorClassIdentifier: 
   hillPoints:
   - id: 2ce12732-fe5f-4b7d-a23d-a36643212d5e
@@ -115,7 +115,7 @@ MonoBehaviour:
     height: -9.4
   nodes:
   - id: 6c2c0bb8-0ed6-4a0c-a0c7-31ed04a6984b
-    worldPosition: {x: 143.33249, y: 0, z: -12.622975}
+    worldPosition: {x: 143.3325, y: 0, z: -12.623}
     type: 0
   - id: 59214d0b-2605-484c-986e-6dbb5f2e6200
     worldPosition: {x: 59.770077, y: 0, z: -14.376511}
@@ -202,7 +202,7 @@ MonoBehaviour:
     worldPosition: {x: 50.57192, y: 0, z: -58.77673}
     type: 2
   - id: 42d269e4-b405-49ab-b6c3-741fe862ad7a
-    worldPosition: {x: 50.27866, y: 0, z: -65.14999}
+    worldPosition: {x: 49.668354, y: 0, z: -70.10738}
     type: 2
   - id: 49c1d47e-5de4-49fe-8b55-50311c8db4f0
     worldPosition: {x: 73.06753, y: 2, z: -20.134197}
@@ -244,7 +244,7 @@ MonoBehaviour:
     worldPosition: {x: 74.42018, y: 7, z: -5.2645493}
     type: 0
   - id: 1efbbfc3-3907-423b-803d-510d6c112e10
-    worldPosition: {x: 73.37488, y: 0, z: -58.797375}
+    worldPosition: {x: 71.02595, y: 0, z: -60.701576}
     type: 2
   - id: d4bf991a-9bd4-4932-9603-f4747318f0b1
     worldPosition: {x: 72.527504, y: 0, z: -73.47877}
@@ -259,7 +259,7 @@ MonoBehaviour:
     worldPosition: {x: 51.437588, y: 0, z: 1.6261704}
     type: 2
   - id: dacea770-fa77-416e-a428-1b3dc63cb873
-    worldPosition: {x: 50.32569, y: 0, z: 7.908534}
+    worldPosition: {x: 52.252945, y: 0, z: 10.115828}
     type: 2
   - id: 4e37035d-9d8b-4dd2-98db-5dc4b5ebd5e3
     worldPosition: {x: 53.714115, y: 0, z: 33.93114}
@@ -274,7 +274,7 @@ MonoBehaviour:
     worldPosition: {x: 46.19828, y: 0, z: -30.43651}
     type: 2
   - id: c3ebdf81-1b15-4158-b94a-aed422e7842e
-    worldPosition: {x: 44.9416, y: 0, z: -36.69152}
+    worldPosition: {x: 41.928574, y: 0, z: -40.36386}
     type: 2
   - id: 569c26a4-1755-43b0-9c07-d7cb0791387a
     worldPosition: {x: 43.65459, y: 0, z: -44.10935}
@@ -316,6 +316,8 @@ MonoBehaviour:
     tJunctionBidirectional: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.27, g: 0.45396018, b: 0.9, a: 1}
+    curveStrength: 1
+    curveSubdivisions: 2
   - pathId: d76a5911-edc8-4b81-bf5a-e916981c85a9
     segmentId: Branch_02
     nodeIds:
@@ -337,6 +339,8 @@ MonoBehaviour:
     tJunctionBidirectional: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.6379202, g: 0.9, b: 0.27, a: 1}
+    curveStrength: 1
+    curveSubdivisions: 2
   - pathId: 56a317bf-2a92-4de6-9c51-314bb88ca7fe
     segmentId: Branch_03
     nodeIds:
@@ -353,6 +357,8 @@ MonoBehaviour:
     tJunctionBidirectional: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.9, g: 0.27, b: 0.8218802, a: 1}
+    curveStrength: 1
+    curveSubdivisions: 2
   - pathId: 742e74b0-9db8-4d0e-9e9c-4444806e8f22
     segmentId: Branch_04
     nodeIds:
@@ -370,6 +376,8 @@ MonoBehaviour:
     tJunctionBidirectional: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.27, g: 0.9, b: 0.79415953, a: 1}
+    curveStrength: 1
+    curveSubdivisions: 2
   - pathId: c564b862-98a6-4b38-8624-ec315e20d761
     segmentId: Branch_05
     nodeIds:
@@ -390,6 +398,8 @@ MonoBehaviour:
     tJunctionBidirectional: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.9, g: 0.61019945, b: 0.27, a: 1}
+    curveStrength: 1
+    curveSubdivisions: 2
   - pathId: 5fad6cce-d3e3-4f4e-8cc7-d76df1527c7a
     segmentId: Branch_06
     nodeIds:
@@ -409,6 +419,8 @@ MonoBehaviour:
     tJunctionBidirectional: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.4262395, g: 0.27, b: 0.9, a: 1}
+    curveStrength: 1
+    curveSubdivisions: 2
   - pathId: f4130742-bb83-462d-9ea8-702f38d425eb
     segmentId: Branch_07
     nodeIds:
@@ -425,6 +437,8 @@ MonoBehaviour:
     tJunctionBidirectional: 1
     arenaGridDataGuid: 
     editorColor: {r: 0.14844342, g: 0, b: 0.59748423, a: 1}
+    curveStrength: 1
+    curveSubdivisions: 2
   - pathId: 9478c785-69b7-4d72-b393-76fe99317392
     segmentId: Branch_08
     nodeIds:
@@ -441,6 +455,8 @@ MonoBehaviour:
     tJunctionBidirectional: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.29772076, g: 0.9, b: 0.27, a: 1}
+    curveStrength: 1
+    curveSubdivisions: 2
   - pathId: 6bb249e3-3441-4319-ab32-6a62310c93c7
     segmentId: Branch_09
     nodeIds:
@@ -459,6 +475,8 @@ MonoBehaviour:
     tJunctionBidirectional: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.9, g: 0.27, b: 0.48168087, a: 1}
+    curveStrength: 1
+    curveSubdivisions: 2
   - pathId: bd5bfeb4-4f80-450e-8d0d-8bb510bfd605
     segmentId: Branch_10
     nodeIds:
@@ -478,6 +496,8 @@ MonoBehaviour:
     tJunctionBidirectional: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.8496011, g: 0.9, b: 0.27, a: 1}
+    curveStrength: 1
+    curveSubdivisions: 2
   - pathId: db17090f-f193-4e5b-be2c-60b3da3f2080
     segmentId: Branch_11
     nodeIds:
@@ -494,6 +514,8 @@ MonoBehaviour:
     tJunctionBidirectional: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.76643884, g: 0.27, b: 0.9, a: 1}
+    curveStrength: 1
+    curveSubdivisions: 2
   - pathId: f12be29d-3255-4b71-9cd4-835d72370534
     segmentId: Branch_12
     nodeIds:
@@ -510,6 +532,8 @@ MonoBehaviour:
     tJunctionBidirectional: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.27, g: 0.9, b: 0.58247864, a: 1}
+    curveStrength: 1
+    curveSubdivisions: 2
   - pathId: dfa92b1f-e23e-4215-9476-86d2752f1b1a
     segmentId: Branch_12_A
     nodeIds:
@@ -525,6 +549,8 @@ MonoBehaviour:
     tJunctionBidirectional: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.27, g: 0.9, b: 0.58247864, a: 1}
+    curveStrength: 1
+    curveSubdivisions: 2
   - pathId: 337df6c0-8fdc-4695-81db-8c2e21410635
     segmentId: Branch_13
     nodeIds:
@@ -541,6 +567,8 @@ MonoBehaviour:
     tJunctionBidirectional: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.9, g: 0.39851856, b: 0.27, a: 1}
+    curveStrength: 1
+    curveSubdivisions: 2
   junctions:
   - junctionId: 0d671f13-d1c5-474b-bce9-6b44f87068f5
     nodeId: db9eb3ab-3a90-468d-a907-26390f7804b8
@@ -647,21 +675,25 @@ MonoBehaviour:
     gridData: {fileID: 11400000, guid: 15996f2eff601204fa34541b73f04fef, type: 2}
     entranceIndex: 0
     arenaPrefabOverride: {fileID: 0}
+    arenaRadius: 6.38
     secondaryEntrances: []
   - nodeId: ac4ab5d1-055f-4e0e-ac8d-8b3d8117e4b4
     gridData: {fileID: 11400000, guid: 29ab7ebedcac2144b8db32a053b1b4e1, type: 2}
     entranceIndex: 0
     arenaPrefabOverride: {fileID: 0}
+    arenaRadius: 6.38
     secondaryEntrances: []
   - nodeId: af0eff7b-19b3-414c-bf42-873c4dbc6587
     gridData: {fileID: 11400000, guid: 5bb1ed4e497dc3947b7a98d9a72bf57d, type: 2}
     entranceIndex: 0
     arenaPrefabOverride: {fileID: 0}
+    arenaRadius: 6.38
     secondaryEntrances: []
   - nodeId: 6e80d699-9518-4038-9894-b1703af41238
     gridData: {fileID: 11400000, guid: 35a0967df88c24143aefb3b3e583c9b4, type: 2}
     entranceIndex: 0
     arenaPrefabOverride: {fileID: 0}
+    arenaRadius: 6.38
     secondaryEntrances:
     - nodeId: 42d269e4-b405-49ab-b6c3-741fe862ad7a
       entranceIndex: 1
@@ -669,6 +701,7 @@ MonoBehaviour:
     gridData: {fileID: 11400000, guid: 0775b34affa845a47af4af9f15dde459, type: 2}
     entranceIndex: 0
     arenaPrefabOverride: {fileID: 0}
+    arenaRadius: 6.38
     secondaryEntrances:
     - nodeId: 1efbbfc3-3907-423b-803d-510d6c112e10
       entranceIndex: 1
@@ -676,11 +709,13 @@ MonoBehaviour:
     gridData: {fileID: 11400000, guid: aa6d73f345d54394aaa7eeebc7f71a36, type: 2}
     entranceIndex: 0
     arenaPrefabOverride: {fileID: 0}
+    arenaRadius: 6.38
     secondaryEntrances: []
   - nodeId: da74b6f0-a607-4b89-a5fb-7d65d87efbfd
     gridData: {fileID: 11400000, guid: e47ca983b56d67a4b82c9a93803e1bf5, type: 2}
     entranceIndex: 0
     arenaPrefabOverride: {fileID: 0}
+    arenaRadius: 6.38
     secondaryEntrances:
     - nodeId: dacea770-fa77-416e-a428-1b3dc63cb873
       entranceIndex: 1
@@ -688,6 +723,7 @@ MonoBehaviour:
     gridData: {fileID: 11400000, guid: e47ca983b56d67a4b82c9a93803e1bf5, type: 2}
     entranceIndex: 0
     arenaPrefabOverride: {fileID: 0}
+    arenaRadius: 6.38
     secondaryEntrances:
     - nodeId: c3ebdf81-1b15-4158-b94a-aed422e7842e
       entranceIndex: 1
@@ -746,6 +782,11 @@ MonoBehaviour:
   musicIntro: {fileID: 8300000, guid: 1ff10eeae8633404da517dacc2021e9e, type: 3}
   musicLoop: {fileID: 8300000, guid: 1ff10eeae8633404da517dacc2021e9e, type: 3}
   musicController: {fileID: 0}
+  openingSequence: {fileID: 0}
+  targetScenePath: Assets/Scenes/LevelSelectWorlds/LevelSelectWorld1a.unity
+  useOpeningSequence: 1
+  openingSequenceStartPos: {x: 143.3325, y: 0, z: -12.623}
+  openingSequencePrefab: {fileID: 7575765240899787153, guid: ac17943291d2d9d42b50db647d5bfb47, type: 3}
   canvasOriginX: 0
   canvasOriginZ: 0
   canvasUnitsPerPixel: 0.1

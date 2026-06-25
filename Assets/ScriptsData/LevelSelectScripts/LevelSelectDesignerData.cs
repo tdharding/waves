@@ -42,6 +42,10 @@ public class LevelSelectDesignerData : ScriptableObject
         public bool tJunctionBidirectional;
         public string arenaGridDataGuid;
         public Color editorColor = Color.cyan;
+        [Tooltip("Multiplier on Bezier tangent length. 1 = default smoothness, lower = tighter curves, higher = more sweeping.")]
+        public float curveStrength = 1f;
+        [Tooltip("Knots inserted per segment between nodes. Higher = spline follows path more closely.")]
+        public int curveSubdivisions = 2;
     }
 
     [Serializable]
@@ -90,6 +94,10 @@ public class LevelSelectDesignerData : ScriptableObject
         public int        entranceIndex;
         public GameObject arenaPrefabOverride;
 
+        [Tooltip("World-space radius of the arena — read from LevelSelectArenaRadiusGizmo on the prefab. " +
+                 "Controls ring display and entrance node placement in the designer.")]
+        public float arenaRadius = 10f;
+
         // One entry per additional entrance beyond the primary (nodeId above)
         public List<DesignerArenaEntrance> secondaryEntrances = new List<DesignerArenaEntrance>();
     }
@@ -115,18 +123,18 @@ public class LevelSelectDesignerData : ScriptableObject
     public GameObject riverBlockPrefab;
     public float      junctionGapPadding      = 0f;
     public float      splineInstantiateSpacing = 0.15f;
-    public int        curveSubdivisions        = 5;
+    public int        curveSubdivisions        = 2;
     public float      branchStartOffset        = 0.5f;
     public float      arenaHeadOffset          = 5f;
     public float      shopHeadOffset           = 5f;
 
     // Landscape tile settings
     public GameObject landscapeTilePrefab;
-    public float landscapeTileSize = 10f;
-    public int landscapeTilesX = 10;
-    public int landscapeTilesZ = 10;
-    public Vector2 landscapeOffset = Vector2.zero;
-    public float landscapeWorldY = 0f;
+    public float landscapeTileSize = 41.62f;
+    public int landscapeTilesX = 5;
+    public int landscapeTilesZ = 5;
+    public Vector2 landscapeOffset = new Vector2(-97.9f, -130.9f);
+    public float landscapeWorldY = -1.65f;
 
     // Scene-level references (persistent — survive Respawn)
     public LandscapeTool       landscapeTool;
@@ -173,6 +181,15 @@ public class LevelSelectDesignerData : ScriptableObject
 
     // Scene-level music reference
     public LevelSelectMusicController musicController;
+    public LevelSelectOpeningSequence openingSequence;
+
+    // Linked scene
+    public string targetScenePath = "";
+
+    // Opening sequence settings
+    public bool      useOpeningSequence        = false;
+    public Vector3   openingSequenceStartPos   = Vector3.zero;
+    public GameObject openingSequencePrefab;
 
     // Canvas state
 public float canvasOriginX      = 0f;

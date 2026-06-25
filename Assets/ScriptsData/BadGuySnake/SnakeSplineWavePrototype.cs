@@ -125,21 +125,10 @@ void Update()
 }
     float GetWaveHeightAtPosition(Vector3 worldPos)
     {
-        Vector3 waveCenter = waterTransform.position;
+        if (waterTransform == null || waveMaterial == null) return worldPos.y;
 
-        float frequency = waveMaterial.GetFloat(freqID);
-        float waveSpeed = waveMaterial.GetFloat(speedID);
-        float ripple = waveMaterial.GetFloat(depthID);
-
-        float phase = -(Time.time * waveSpeed);
-        float meshScale = waterTransform.localScale.x;
-
-        float dist = Vector3.Distance(worldPos, waveCenter) / meshScale;
-
-        float sine = Mathf.Sin(phase + dist * frequency);
-        float amplitude = ripple * meshScale;
-
-        float height = sine * amplitude * heightMultiplier + extraYOffset;
+        WaveUtils.WaveParams p = WaveUtils.ReadParams(waterTransform, waveMaterial);
+        float height = WaveUtils.SampleHeightSmooth(worldPos, p) * heightMultiplier + extraYOffset;
 
         return waterTransform.position.y + height;
     }

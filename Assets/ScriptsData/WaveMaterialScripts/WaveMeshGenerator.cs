@@ -24,6 +24,13 @@ public class WaveMeshGenerator : MonoBehaviour
     }
 #endif
 
+    public void UpdateMeshSize(float newSize)
+    {
+        if (Mathf.Approximately(size, newSize)) return;
+        size = newSize;
+        Generate();
+    }
+
     [ContextMenu("Generate Wave Mesh")]
     public void Generate()
     {

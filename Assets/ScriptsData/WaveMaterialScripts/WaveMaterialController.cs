@@ -27,6 +27,7 @@ public class WaveMaterialController : MonoBehaviour
         public float SoulFishTwirlStrength;
         public float SoulFishMaskStrength;
         public float SoulFishRadius;
+        public float SoulFishBrightness1;
         public Vector2 ZoneTiling;
         public float ZoneScrollSpeed;
         public float ZoneNoiseStrength;
@@ -63,7 +64,7 @@ public class WaveMaterialController : MonoBehaviour
     public Material waveMaterial;
 
     [Header("Transition Settings")]
-    public float TransitionSpeed = 2f;
+    public float generalSmoothTime = 0.5f;
 
     [Header("Map UI Wave Renderer")]
     public Renderer mapWaveRenderer;
@@ -71,6 +72,17 @@ public class WaveMaterialController : MonoBehaviour
     [Header("State Tracking")]
     [SerializeField] private WaveState targetGlobalState;
     [SerializeField] private WaveState currentGlobalState;
+
+    private WaveState _baselineState; // Tracks the moving baseline (presets)
+    private float _modifierIntensity = 0f;
+    private float _modIntensityVel;
+    private float _speedVel;
+    private float _freqVel;
+    private float _rippleVel;
+    private WaveState _generalVel; // Struct to track velocities for secondary properties
+
+    private float _accumulatedPhase = 0f;
+    private const float TWO_PI = 6.283185f;
 
     private bool isModifierActive = false;
     private Vector4 modWaveCenter;
@@ -85,26 +97,90 @@ public class WaveMaterialController : MonoBehaviour
     {
         currentGlobalState = GetCurrentStateFromMaterial();
         targetGlobalState = currentGlobalState;
-    }
-
-    private WaveState ComputeEffectiveTarget()
-    {
-        if (!isModifierActive) return targetGlobalState;
-
-        WaveState boosted = targetGlobalState;
-        boosted.Frequency   += modFreqBoost;
-        boosted.Speed       += modSpeedBoost;
-        boosted.RippleDepth += modRippleBoost;
-        boosted.WaveCenter   = modWaveCenter;
-        return boosted;
+        _baselineState = currentGlobalState;
     }
 
     private void Update()
     {
         if (!waveMaterial) return;
 
-        currentGlobalState = LerpWaveState(currentGlobalState, ComputeEffectiveTarget(), TransitionSpeed * Time.deltaTime);
+        // 1. Smoothly transition the modifier intensity factor (0 to 1)
+        float targetInt = isModifierActive ? 1.0f : 0.0f;
+        _modifierIntensity = Mathf.SmoothDamp(_modifierIntensity, targetInt, ref _modIntensityVel, generalSmoothTime);
+
+        // 2. Smoothly transition the baseline state towards the target preset
+        _baselineState = SmoothDampSecondaryProperties(_baselineState, targetGlobalState, ref _generalVel, generalSmoothTime);
+        _baselineState.Speed     = Mathf.SmoothDamp(_baselineState.Speed,     targetGlobalState.Speed,     ref _speedVel,  generalSmoothTime);
+        _baselineState.Frequency = Mathf.SmoothDamp(_baselineState.Frequency, targetGlobalState.Frequency, ref _freqVel,  generalSmoothTime);
+        _baselineState.RippleDepth = Mathf.SmoothDamp(_baselineState.RippleDepth, targetGlobalState.RippleDepth, ref _rippleVel, generalSmoothTime);
+
+        // 3. Proportional Scaling: Result = Baseline + (Boost * Intensity)
+        currentGlobalState = _baselineState;
+        currentGlobalState.Speed       += modSpeedBoost  * _modifierIntensity;
+        currentGlobalState.Frequency   += modFreqBoost   * _modifierIntensity;
+        currentGlobalState.RippleDepth += modRippleBoost * _modifierIntensity;
+        
+        // 4. Update WaveCenter (Instant swap when active)
+        currentGlobalState.WaveCenter = isModifierActive ? modWaveCenter : _baselineState.WaveCenter;
+
+        // 5. Accumulate phase for smooth vertex animation
+        _accumulatedPhase += currentGlobalState.Speed * Time.deltaTime;
+        if (_accumulatedPhase > TWO_PI) _accumulatedPhase -= TWO_PI;
+        else if (_accumulatedPhase < 0) _accumulatedPhase += TWO_PI;
+
         ApplyCombinedState();
+    }
+
+    private WaveState SmoothDampSecondaryProperties(WaveState current, WaveState target, ref WaveState vel, float smoothTime)
+    {
+        WaveState res = current;
+        // Frequency, Speed, and RippleDepth are handled proportionally in Update()
+        
+        res.Smoothness = Mathf.SmoothDamp(current.Smoothness, target.Smoothness, ref vel.Smoothness, smoothTime);
+        res.Transparency = Mathf.SmoothDamp(current.Transparency, target.Transparency, ref vel.Transparency, smoothTime);
+        res.Strength = Mathf.SmoothDamp(current.Strength, target.Strength, ref vel.Strength, smoothTime);
+        res.TroughRingWave1Brightness = Mathf.SmoothDamp(current.TroughRingWave1Brightness, target.TroughRingWave1Brightness, ref vel.TroughRingWave1Brightness, smoothTime);
+        res.PeakRingWave2Brightness = Mathf.SmoothDamp(current.PeakRingWave2Brightness, target.PeakRingWave2Brightness, ref vel.PeakRingWave2Brightness, smoothTime);
+        res.TwirlBaseStrength = Mathf.SmoothDamp(current.TwirlBaseStrength, target.TwirlBaseStrength, ref vel.TwirlBaseStrength, smoothTime);
+        res.TwirlSlopeBoost = Mathf.SmoothDamp(current.TwirlSlopeBoost, target.TwirlSlopeBoost, ref vel.TwirlSlopeBoost, smoothTime);
+        res.TwirlScale = Mathf.SmoothDamp(current.TwirlScale, target.TwirlScale, ref vel.TwirlScale, smoothTime);
+        res.DepthTwirlStrength = Mathf.SmoothDamp(current.DepthTwirlStrength, target.DepthTwirlStrength, ref vel.DepthTwirlStrength, smoothTime);
+        res.DepthFadeStrength = Mathf.SmoothDamp(current.DepthFadeStrength, target.DepthFadeStrength, ref vel.DepthFadeStrength, smoothTime);
+        res.DepthFadeLine = Mathf.SmoothDamp(current.DepthFadeLine, target.DepthFadeLine, ref vel.DepthFadeLine, smoothTime);
+        res.WhirlpoolTwirlStrength = Mathf.SmoothDamp(current.WhirlpoolTwirlStrength, target.WhirlpoolTwirlStrength, ref vel.WhirlpoolTwirlStrength, smoothTime);
+        res.WhirlpoolAreaTwirlStrength = Mathf.SmoothDamp(current.WhirlpoolAreaTwirlStrength, target.WhirlpoolAreaTwirlStrength, ref vel.WhirlpoolAreaTwirlStrength, smoothTime);
+        res.SoulFishTwirlStrength = Mathf.SmoothDamp(current.SoulFishTwirlStrength, target.SoulFishTwirlStrength, ref vel.SoulFishTwirlStrength, smoothTime);
+        res.SoulFishMaskStrength = Mathf.SmoothDamp(current.SoulFishMaskStrength, target.SoulFishMaskStrength, ref vel.SoulFishMaskStrength, smoothTime);
+        res.SoulFishRadius = Mathf.SmoothDamp(current.SoulFishRadius, target.SoulFishRadius, ref vel.SoulFishRadius, smoothTime);
+        res.SoulFishBrightness1 = Mathf.SmoothDamp(current.SoulFishBrightness1, target.SoulFishBrightness1, ref vel.SoulFishBrightness1, smoothTime);
+        res.ZoneTiling.x = Mathf.SmoothDamp(current.ZoneTiling.x, target.ZoneTiling.x, ref vel.ZoneTiling.x, smoothTime);
+        res.ZoneTiling.y = Mathf.SmoothDamp(current.ZoneTiling.y, target.ZoneTiling.y, ref vel.ZoneTiling.y, smoothTime);
+        res.ZoneScrollSpeed = Mathf.SmoothDamp(current.ZoneScrollSpeed, target.ZoneScrollSpeed, ref vel.ZoneScrollSpeed, smoothTime);
+        res.ZoneNoiseStrength = Mathf.SmoothDamp(current.ZoneNoiseStrength, target.ZoneNoiseStrength, ref vel.ZoneNoiseStrength, smoothTime);
+        res.WhirlpoolTaper = Mathf.SmoothDamp(current.WhirlpoolTaper, target.WhirlpoolTaper, ref vel.WhirlpoolTaper, smoothTime);
+        res.WhirlpoolDarkRadiusMult = Mathf.SmoothDamp(current.WhirlpoolDarkRadiusMult, target.WhirlpoolDarkRadiusMult, ref vel.WhirlpoolDarkRadiusMult, smoothTime);
+        res.WhirlpoolDarkStrength = Mathf.SmoothDamp(current.WhirlpoolDarkStrength, target.WhirlpoolDarkStrength, ref vel.WhirlpoolDarkStrength, smoothTime);
+        res.WhirlpoolFalloffPower = Mathf.SmoothDamp(current.WhirlpoolFalloffPower, target.WhirlpoolFalloffPower, ref vel.WhirlpoolFalloffPower, smoothTime);
+        res.WaveStepRate = Mathf.SmoothDamp(current.WaveStepRate, target.WaveStepRate, ref vel.WaveStepRate, smoothTime);
+        
+        // Specialized LERPs for Colors/Vectors (Damping approach)
+        float t = (1f / Mathf.Max(smoothTime, 0.01f)) * Time.deltaTime;
+        res.BaseColor = Color.Lerp(current.BaseColor, target.BaseColor, t);
+        res.LightDirection = Vector3.Lerp(current.LightDirection, target.LightDirection, t);
+        res.FoamColor = Color.Lerp(current.FoamColor, target.FoamColor, t);
+        res.DepthColour = Color.Lerp(current.DepthColour, target.DepthColour, t);
+
+        res.FoamDitherSize = Mathf.SmoothDamp(current.FoamDitherSize, target.FoamDitherSize, ref vel.FoamDitherSize, smoothTime);
+        res.FoamDistanceDepth = Mathf.SmoothDamp(current.FoamDistanceDepth, target.FoamDistanceDepth, ref vel.FoamDistanceDepth, smoothTime);
+        res.FoamDepthFade = Mathf.SmoothDamp(current.FoamDepthFade, target.FoamDepthFade, ref vel.FoamDepthFade, smoothTime);
+        res.FoamLine = Mathf.SmoothDamp(current.FoamLine, target.FoamLine, ref vel.FoamLine, smoothTime);
+        res.DepthFade = Mathf.SmoothDamp(current.DepthFade, target.DepthFade, ref vel.DepthFade, smoothTime);
+        res.DistanceDepth = Mathf.SmoothDamp(current.DistanceDepth, target.DistanceDepth, ref vel.DistanceDepth, smoothTime);
+        
+        res.NormalTexture = target.NormalTexture;
+        res.ZoneTexture = target.ZoneTexture;
+        
+        return res;
     }
 
     private void ApplyCombinedState()
@@ -112,6 +188,8 @@ public class WaveMaterialController : MonoBehaviour
         waveMaterial.SetFloat("_Frequency",   currentGlobalState.Frequency);
         waveMaterial.SetFloat("_Speed",       currentGlobalState.Speed);
         waveMaterial.SetFloat("_RippleDepth", currentGlobalState.RippleDepth);
+        
+        Shader.SetGlobalFloat("_WavePhase", _accumulatedPhase);
 
         // Global properties
         waveMaterial.SetFloat("_Smoothness",   currentGlobalState.Smoothness);
@@ -129,6 +207,7 @@ public class WaveMaterialController : MonoBehaviour
         waveMaterial.SetFloat("_WhirlpoolAreaTwirlStrength", currentGlobalState.WhirlpoolAreaTwirlStrength);
         waveMaterial.SetFloat("_SoulFishTwirlStrength",      currentGlobalState.SoulFishTwirlStrength);
         waveMaterial.SetFloat("_SoulFishMaskStrength",       currentGlobalState.SoulFishMaskStrength);
+        waveMaterial.SetFloat("_SoulFishBrightness1",       currentGlobalState.SoulFishBrightness1);
         waveMaterial.SetVector("_ZoneTiling",               currentGlobalState.ZoneTiling);
         waveMaterial.SetFloat("_ZoneScrollSpeed",           currentGlobalState.ZoneScrollSpeed);
         waveMaterial.SetFloat("_ZoneNoiseStrength",         currentGlobalState.ZoneNoiseStrength);
@@ -155,52 +234,6 @@ public class WaveMaterialController : MonoBehaviour
         if (mapWaveRenderer) CopyWaveValuesTo(mapWaveRenderer);
     }
 
-    private WaveState LerpWaveState(WaveState a, WaveState b, float t)
-    {
-        WaveState res = new WaveState();
-        res.Frequency = Mathf.MoveTowards(a.Frequency, b.Frequency, t);
-        res.Speed     = Mathf.MoveTowards(a.Speed, b.Speed, t);
-        res.RippleDepth = Mathf.MoveTowards(a.RippleDepth, b.RippleDepth, t);
-        res.Smoothness = Mathf.MoveTowards(a.Smoothness, b.Smoothness, t);
-        res.Transparency = Mathf.MoveTowards(a.Transparency, b.Transparency, t);
-        res.Strength = Mathf.MoveTowards(a.Strength, b.Strength, t);
-        res.TroughRingWave1Brightness = Mathf.MoveTowards(a.TroughRingWave1Brightness, b.TroughRingWave1Brightness, t);
-        res.PeakRingWave2Brightness = Mathf.MoveTowards(a.PeakRingWave2Brightness, b.PeakRingWave2Brightness, t);
-        res.TwirlBaseStrength = Mathf.MoveTowards(a.TwirlBaseStrength, b.TwirlBaseStrength, t);
-        res.TwirlSlopeBoost = Mathf.MoveTowards(a.TwirlSlopeBoost, b.TwirlSlopeBoost, t);
-        res.TwirlScale = Mathf.MoveTowards(a.TwirlScale, b.TwirlScale, t);
-        res.DepthTwirlStrength = Mathf.MoveTowards(a.DepthTwirlStrength, b.DepthTwirlStrength, t);
-        res.DepthFadeStrength = Mathf.MoveTowards(a.DepthFadeStrength, b.DepthFadeStrength, t);
-        res.DepthFadeLine = Mathf.MoveTowards(a.DepthFadeLine, b.DepthFadeLine, t);
-        res.WhirlpoolTwirlStrength = Mathf.MoveTowards(a.WhirlpoolTwirlStrength, b.WhirlpoolTwirlStrength, t);
-        res.WhirlpoolAreaTwirlStrength = Mathf.MoveTowards(a.WhirlpoolAreaTwirlStrength, b.WhirlpoolAreaTwirlStrength, t);
-        res.SoulFishTwirlStrength = Mathf.MoveTowards(a.SoulFishTwirlStrength, b.SoulFishTwirlStrength, t);
-        res.SoulFishMaskStrength = Mathf.MoveTowards(a.SoulFishMaskStrength, b.SoulFishMaskStrength, t);
-        res.SoulFishRadius = Mathf.MoveTowards(a.SoulFishRadius, b.SoulFishRadius, t);
-        res.ZoneTiling = Vector2.MoveTowards(a.ZoneTiling, b.ZoneTiling, t);
-        res.ZoneScrollSpeed = Mathf.MoveTowards(a.ZoneScrollSpeed, b.ZoneScrollSpeed, t);
-        res.ZoneNoiseStrength = Mathf.MoveTowards(a.ZoneNoiseStrength, b.ZoneNoiseStrength, t);
-        res.ZoneTexture = b.ZoneTexture;
-        res.WhirlpoolTaper = Mathf.MoveTowards(a.WhirlpoolTaper, b.WhirlpoolTaper, t);
-        res.WhirlpoolDarkRadiusMult = Mathf.MoveTowards(a.WhirlpoolDarkRadiusMult, b.WhirlpoolDarkRadiusMult, t);
-        res.WhirlpoolDarkStrength = Mathf.MoveTowards(a.WhirlpoolDarkStrength, b.WhirlpoolDarkStrength, t);
-        res.WhirlpoolFalloffPower = Mathf.MoveTowards(a.WhirlpoolFalloffPower, b.WhirlpoolFalloffPower, t);
-        res.WaveStepRate = Mathf.MoveTowards(a.WaveStepRate, b.WaveStepRate, t);
-        res.BaseColor = Color.Lerp(a.BaseColor, b.BaseColor, t);
-        res.LightDirection = Vector3.MoveTowards(a.LightDirection, b.LightDirection, t);
-        res.FoamDitherSize = Mathf.MoveTowards(a.FoamDitherSize, b.FoamDitherSize, t);
-        res.FoamDistanceDepth = Mathf.MoveTowards(a.FoamDistanceDepth, b.FoamDistanceDepth, t);
-        res.FoamDepthFade = Mathf.MoveTowards(a.FoamDepthFade, b.FoamDepthFade, t);
-        res.FoamColor = Color.Lerp(a.FoamColor, b.FoamColor, t);
-        res.FoamLine = Mathf.MoveTowards(a.FoamLine, b.FoamLine, t);
-        res.DepthFade = Mathf.MoveTowards(a.DepthFade, b.DepthFade, t);
-        res.DepthColour = Color.Lerp(a.DepthColour, b.DepthColour, t);
-        res.DistanceDepth = Mathf.MoveTowards(a.DistanceDepth, b.DistanceDepth, t);
-        res.NormalTexture = b.NormalTexture;
-        res.WaveCenter = Vector4.MoveTowards(a.WaveCenter, b.WaveCenter, t);
-        return res;
-    }
-
     public void SetModifierBoost(bool active, Vector4 center, float freq, float speed, float ripple)
     {
         isModifierActive = active;
@@ -213,7 +246,14 @@ public class WaveMaterialController : MonoBehaviour
     public void ApplyStateInstant(WaveState state)
     {
         targetGlobalState = state;
+        _baselineState = state;
         currentGlobalState = state;
+        _modifierIntensity = 0f;
+        _modIntensityVel = 0f;
+        _speedVel = 0f;
+        _freqVel = 0f;
+        _rippleVel = 0f;
+        _generalVel = new WaveState();
         ApplyCombinedState();
     }
 
@@ -253,6 +293,7 @@ public class WaveMaterialController : MonoBehaviour
     public IEnumerator TransitionToState(WaveState targetState, float duration)
     {
         targetGlobalState = targetState;
+        generalSmoothTime = duration;
         yield break;
     }
 
@@ -286,6 +327,7 @@ public class WaveMaterialController : MonoBehaviour
         s.WhirlpoolAreaTwirlStrength = waveMaterial.GetFloat("_WhirlpoolAreaTwirlStrength");
         s.SoulFishTwirlStrength      = waveMaterial.GetFloat("_SoulFishTwirlStrength");
         s.SoulFishMaskStrength       = waveMaterial.GetFloat("_SoulFishMaskStrength");
+        s.SoulFishBrightness1        = waveMaterial.GetFloat("_SoulFishBrightness1");
         s.SoulFishRadius             = soulFishRadius;
         s.ZoneTiling         = waveMaterial.GetVector("_ZoneTiling");
         s.ZoneScrollSpeed    = waveMaterial.GetFloat("_ZoneScrollSpeed");

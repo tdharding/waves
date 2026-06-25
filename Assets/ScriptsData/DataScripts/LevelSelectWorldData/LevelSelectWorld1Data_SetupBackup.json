@@ -77,6 +77,14 @@
             "value": "bbbf8fae451ede54099f8b840c7f35f3"
         },
         {
+            "key": "portalConfirmUIScriptPrefab",
+            "value": "50d0c938afb39ff46804f74b97ba6334"
+        },
+        {
+            "key": "videoPlayerControllerPrefab",
+            "value": "91ac232e9d3af38488cc6119a5e54bc8"
+        },
+        {
             "key": "canvasParentPrefab",
             "value": "101379c0820e7ea4482066818e3876df"
         },
@@ -95,6 +103,10 @@
         {
             "key": "orbsCounterPrefab",
             "value": "f7834076e3f155f479d6773e68cb88a6"
+        },
+        {
+            "key": "shopTooltipPrefab",
+            "value": "98f47fd9a15190a4ba4ad6d946e45e4c"
         },
         {
             "key": "dataControllerPrefab",
