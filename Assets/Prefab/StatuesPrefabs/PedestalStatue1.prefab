@@ -79,6 +79,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PrefabBaselineAlignment
   showDebug: 1
+  useForwardOverride: 0
+  forwardEuler: {x: 0, y: 0, z: 0}
+  useUpOverride: 0
+  upEuler: {x: 0, y: 0, z: 0}
 --- !u!1 &769472885775738039
 GameObject:
   m_ObjectHideFlags: 0
@@ -547,6 +551,7 @@ GameObject:
   m_Component:
   - component: {fileID: 8805359748898946739}
   - component: {fileID: 523572985466244663}
+  - component: {fileID: 2167188711620994779}
   m_Layer: 0
   m_Name: PedestalStatue1
   m_TagString: Untagged
@@ -590,6 +595,24 @@ MonoBehaviour:
   upwardsModifier: 0.2
   randomTorque: 3.8
   destroyDelay: 5
+--- !u!114 &2167188711620994779
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2720298257398297881}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7373f614fe199d2439dbf00dcaf6a9d5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::StatueBehaviour
+  attractionRadius: 1.15
+  orbitRadius: 0.2
+  orbitSpeed: 0.46
+  moveTowardSpeed: 0.34
+  returnSpeed: 2
+  returnThreshold: 0.3
 --- !u!1 &3027780031792327035
 GameObject:
   m_ObjectHideFlags: 0

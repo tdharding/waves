@@ -100,6 +100,23 @@ public class LevelSoulTracker : MonoBehaviour
         Debug.Log($"[LevelSoulTracker] Soul #{soulIdentity} removed. Total: {soulsOnBoat}");
     }
 
+    /// <summary>
+    /// Re-inserts a soul that was placed in a slot but returned without being used.
+    /// The display icon is handled by the slot's RemoveSoul — this only restores tracker state.
+    /// </summary>
+    public void ReinsertSoul(int linkID, int soulIdentity)
+    {
+        if (sessionCaughtSoulIdentities.Contains(soulIdentity)) return;
+
+        sessionCaughtSoulIdentities.Add(soulIdentity);
+        sessionCaughtLinkIDs.Add(linkID >= 0 ? linkID : -1);
+        soulsOnBoat = sessionCaughtSoulIdentities.Count;
+
+        GameProgressData.SaveSoulsToBoat(sessionCaughtSoulIdentities, sessionCaughtLinkIDs);
+
+        Debug.Log($"[LevelSoulTracker] Soul #{soulIdentity} reinserted. Total: {soulsOnBoat}");
+    }
+
     // ─────────────────────────────────────────────
     // LOOKUP
     // ─────────────────────────────────────────────

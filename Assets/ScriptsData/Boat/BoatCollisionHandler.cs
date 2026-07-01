@@ -8,6 +8,11 @@ public class BoatCollisionHandler : MonoBehaviour
     public float crashCooldown = 0.75f;
     public CrashSFXPlayer crashSFXPlayer;
 
+    [Header("Collision Speed Response")]
+    [Tooltip("Fraction of current speed retained on wall impact. 0 = full stop, 0.2 = keep 20%.")]
+    [Range(0f, 1f)]
+    public float collisionSpeedRetain = 0.1f;
+
     [Header("Soul Loss")]
     [Range(0f, 1f)]
     public float loseSoulChance = 0.5f;
@@ -35,6 +40,7 @@ public class BoatCollisionHandler : MonoBehaviour
 
     private bool canCrash = true;
     private Coroutine materialRoutine;
+    private BoatMovement boatMovement;
 
     // ─────────────────────────────────────────────
     // AWAKE
@@ -42,6 +48,8 @@ public class BoatCollisionHandler : MonoBehaviour
 
     void Awake()
     {
+        boatMovement = GetComponent<BoatMovement>();
+
         if (collisionMaterial != null)
         {
             collisionMaterial.SetFloat(FactorID, 0f);
@@ -67,6 +75,7 @@ public class BoatCollisionHandler : MonoBehaviour
 
         if (!hasValidTag || !canCrash) return;
 
+        boatMovement?.BleedSpeedOnCollision(collisionSpeedRetain);
         crashSFXPlayer?.PlayRandomCrash();
         StartCoroutine(CrashCooldown());
 

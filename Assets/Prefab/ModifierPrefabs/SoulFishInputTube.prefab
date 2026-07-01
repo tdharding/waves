@@ -143,6 +143,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PrefabBaselineAlignment
   showDebug: 1
+  useForwardOverride: 1
+  forwardEuler: {x: 0, y: -90.71, z: 0}
+  useUpOverride: 0
+  upEuler: {x: 0, y: 0, z: 0}
 --- !u!1 &5377434632076762627
 GameObject:
   m_ObjectHideFlags: 0
@@ -194,6 +198,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SoulFishInputTube
   localSpline: {fileID: 1220300225781093163}
   targetModifier: {fileID: 0}
+  targetLockHub: {fileID: 0}
   fishingController: {fileID: 0}
   fishPrefab: {fileID: 1019405579569507755, guid: c9a7a1fabeb26f04ab236a92e309a60b, type: 3}
   tubeExtrudePrefab: {fileID: 2215127129855429466, guid: fbff2a76bfebe0c4a8574cfa0da02282, type: 3}

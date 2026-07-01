@@ -70,6 +70,11 @@ MonoBehaviour:
     perimeterAngle: 0
     tierSlot: -1
     spawnRadius: 2
+    isLocked: 0
+    lockHubPrefab: {fileID: 0}
+    lockHubAngle: 0
+    tubePath: []
+    tubeSubdivisions: 3
     targetSegmentID: Branch_02_A
     targetProgress: 0.96933436
     targetIsLeftPath: 1
@@ -822,6 +827,7 @@ MonoBehaviour:
     prefab: {fileID: 4089478517322769272, guid: 1a032652afd70634ab2638a21f129895, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+  linkedPairs: []
   tiers: []
   whirlpools: []
   whirlpoolDepth: 5
@@ -830,3 +836,4 @@ MonoBehaviour:
   - 
   slotColors: []
   arenaProfile: {fileID: 11400000, guid: 72edee6e35d2a4f47afa3484ef153ba2, type: 2}
+  splineWallPaths: []

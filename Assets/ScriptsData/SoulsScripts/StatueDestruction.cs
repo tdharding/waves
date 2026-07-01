@@ -40,6 +40,10 @@ public class StatueDestruction : MonoBehaviour
             }
         }
 
+        // Release any fish orbiting this statue
+        var statueBehaviour = GetComponent<StatueBehaviour>();
+        if (statueBehaviour != null) statueBehaviour.enabled = false;
+
         if (intactRoot != null)  Destroy(intactRoot,  destroyDelay);
         if (brokenRoot != null)  Destroy(brokenRoot,  destroyDelay);
     }

@@ -1,14 +1,16 @@
 using UnityEngine;
 
-public enum BoatTool { WhirlSucker, Catapult, Lure }
+public enum BoatTool { WhirlSucker, Catapult, Lure, Boost }
 
 public class BoatToolManager : MonoBehaviour
 {
     [Header("Refs")]
     public GameObject boatCatapultRoot;
+    public GameObject boatBoostRoot;
     public GameObject crossMastRoot;
     public BoatMovement boatMovement;
     public LureController lureController;
+    public BoostController boostController;
 
     public BoatTool CurrentTool { get; private set; } = BoatTool.WhirlSucker;
 
@@ -16,6 +18,7 @@ public class BoatToolManager : MonoBehaviour
     public bool whirlUnlocked    = true;
     public bool catapultUnlocked = true;
     public bool lureUnlocked     = true;
+    public bool boostUnlocked    = true;
 
     [Header("Lure")]
     public int amountOfLures = 3;
@@ -24,6 +27,7 @@ public class BoatToolManager : MonoBehaviour
     public static bool EditorOverrideWhirl     = true;
     public static bool EditorOverrideCatapult  = true;
     public static bool EditorOverrideLure      = true;
+    public static bool EditorOverrideBoost     = true;
 #endif
 
     public bool IsToolUnlocked(BoatTool tool)
@@ -33,6 +37,7 @@ public class BoatToolManager : MonoBehaviour
             case BoatTool.WhirlSucker: return whirlUnlocked;
             case BoatTool.Catapult:    return catapultUnlocked;
             case BoatTool.Lure:        return lureUnlocked && (lureController == null || lureController.HasLureAvailable);
+            case BoatTool.Boost:       return boostUnlocked;
             default: return false;
         }
     }
@@ -43,6 +48,7 @@ public class BoatToolManager : MonoBehaviour
         whirlUnlocked    = EditorOverrideWhirl;
         catapultUnlocked = EditorOverrideCatapult;
         lureUnlocked     = EditorOverrideLure;
+        boostUnlocked    = EditorOverrideBoost;
 #endif
         if (lureController != null)
         {
@@ -90,17 +96,24 @@ public class BoatToolManager : MonoBehaviour
     {
         bool catapultActive = tool == BoatTool.Catapult;
         bool lureActive     = tool == BoatTool.Lure;
+        bool boostActive    = tool == BoatTool.Boost;
 
         if (boatCatapultRoot != null)
             boatCatapultRoot.SetActive(catapultActive);
 
+        if (boatBoostRoot != null)
+            boatBoostRoot.SetActive(boostActive);
+
         if (crossMastRoot != null)
-            crossMastRoot.SetActive(!catapultActive && !lureActive);
+            crossMastRoot.SetActive(!catapultActive && !lureActive && !boostActive);
 
         if (boatMovement != null)
             boatMovement.SetCatapultSlow(catapultActive);
 
         if (lureController != null)
             lureController.SetLoadedLureVisible(lureActive && lureController.HasLureAvailable);
+
+        if (boostController != null)
+            boostController.SetActive(boostActive);
     }
 }

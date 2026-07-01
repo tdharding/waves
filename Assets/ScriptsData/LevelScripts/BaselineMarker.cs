@@ -17,6 +17,56 @@ public class BaselineMarker : MonoBehaviour
     public float MaskFadeStartRadius => discRadius * maskFadeStartPct;
     public float MaskFadeEndRadius   => discRadius * maskFadeEndPct;
 
+    [System.Serializable]
+    public struct SpawnTier
+    {
+        public string name;
+        public float  height;
+    }
+
+    [Header("Spawn Tiers")]
+    [Tooltip("Per-tier absolute world Y heights and disc radii, indexed by yOffsetSlot. Leave empty to use TierConfig offsets (default behaviour unchanged).")]
+    public SpawnTier[] spawnTiers;
+
+    // Returns the absolute world Y for a given tier slot. Returns false if spawnTiers not defined for this slot.
+    public bool TryGetTierHeight(int slot, out float h)
+    {
+        if (spawnTiers != null && slot >= 0 && slot < spawnTiers.Length)
+        { h = spawnTiers[slot].height; return true; }
+        h = 0f; return false;
+    }
+
+    // Called when the component is first added or Reset is chosen in the inspector.
+    void Reset() => PopulateDefaultTiers();
+
+    // G slot height always mirrors the baseline height field.
+    void OnValidate()
+    {
+        if (spawnTiers == null) return;
+        for (int i = 0; i < spawnTiers.Length; i++)
+        {
+            if (spawnTiers[i].name == "G")
+            {
+                var t = spawnTiers[i];
+                t.height = height;
+                spawnTiers[i] = t;
+            }
+        }
+    }
+
+    void PopulateDefaultTiers()
+    {
+        spawnTiers = new SpawnTier[]
+        {
+            new SpawnTier { name = "F2",  height = height },
+            new SpawnTier { name = "F1",  height = height },
+            new SpawnTier { name = "G",   height = height },
+            new SpawnTier { name = "B-1", height = height },
+            new SpawnTier { name = "B-2", height = height },
+            new SpawnTier { name = "B-3", height = height },
+        };
+    }
+
 #if UNITY_EDITOR
     void OnDrawGizmos()
     {
@@ -46,6 +96,24 @@ public class BaselineMarker : MonoBehaviour
 
         Handles.color = new Color(0f, 0.9f, 0.5f, 0.8f);
         Handles.Label(centre + Vector3.up * 3.6f, $"Baseline  y={height:F2}");
+
+        // Per-tier discs (additive — only drawn when spawnTiers is populated)
+        if (spawnTiers != null)
+        {
+            for (int i = 0; i < spawnTiers.Length; i++)
+            {
+                var st = spawnTiers[i];
+                Vector3 tc = new Vector3(transform.position.x, st.height, transform.position.z);
+                Color c = Color.HSVToRGB((i * 0.15f) % 1f, 0.7f, 1f);
+                c.a = 0.55f;
+                Handles.color = c;
+                Handles.DrawWireDisc(tc, Vector3.up, discRadius);
+                c.a = 0.85f;
+                Handles.color = c;
+                string label = string.IsNullOrEmpty(st.name) ? $"Tier{i}" : st.name;
+                Handles.Label(tc + Vector3.up * 0.3f, $"{label}  y={st.height:F2}");
+            }
+        }
     }
 
     internal static void DrawArrow(Vector3 origin, Vector3 direction, float length)

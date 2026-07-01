@@ -45,7 +45,6 @@ public class LevelSelectDesignerWindow : EditorWindow
         if (_sourceData != null)
         {
             EditorPrefs.SetString(K_DataPath, AssetDatabase.GetAssetPath(_sourceData));
-            TryOpenLinkedScene();
         }
     }
 
@@ -54,7 +53,9 @@ public class LevelSelectDesignerWindow : EditorWindow
         if (_sourceData == null || _data == null) return;
 
         Undo.RecordObject(_sourceData, "Save Level Select Designer Changes");
+        string originalName = _sourceData.name;
         EditorUtility.CopySerialized(_data, _sourceData);
+        _sourceData.name = originalName;
         EditorUtility.SetDirty(_sourceData);
         AssetDatabase.SaveAssets();
 

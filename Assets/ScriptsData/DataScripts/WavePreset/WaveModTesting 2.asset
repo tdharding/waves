@@ -13,9 +13,9 @@ MonoBehaviour:
   m_Name: WaveModTesting 2
   m_EditorClassIdentifier: Assembly-CSharp::WavePreset
   state:
-    Frequency: 1
-    Speed: 0.1
-    RippleDepth: 0.06
+    Frequency: 1.55
+    Speed: 0.41300002
+    RippleDepth: 0.15
     Smoothness: 0
     Transparency: 1
     Strength: 6

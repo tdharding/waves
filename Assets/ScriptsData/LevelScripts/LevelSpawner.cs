@@ -71,6 +71,9 @@ public class LevelSpawner : MonoBehaviour
     public float GetBaselineWaterY() => spawnedBaselineWaterY;
     private BaselineMarker activeBaselineMarker;
     public BaselineMarker GetBaselineMarker() => activeBaselineMarker;
+    // Absolute world-Y per tier slot. Populated from BaselineMarker.spawnTiers when defined;
+    // null otherwise so all existing TierConfig paths run unchanged.
+    private float[] absoluteTierHeights;
 
     // =====================================================
     // GRID DATA INJECTION
@@ -144,6 +147,16 @@ float   tileZ  = b.size.z / GridData.GridSize;
 
         if (baselineMarker != null) sonarController?.SetBaselineMarker(baselineMarker);
 
+        // Build absolute tier heights from BaselineMarker.spawnTiers when defined.
+        // Left null if not defined — all downstream tier code falls back to TierConfig offsets unchanged.
+        absoluteTierHeights = null;
+        if (baselineMarker?.spawnTiers != null && baselineMarker.spawnTiers.Length > 0)
+        {
+            absoluteTierHeights = new float[baselineMarker.spawnTiers.Length];
+            for (int i = 0; i < absoluteTierHeights.Length; i++)
+                absoluteTierHeights[i] = baselineMarker.spawnTiers[i].height;
+        }
+
         // ── Reality Layer — orbs / water / wave modifiers ──
         var  waveModAlign    = waveModifierPrefab != null ? waveModifierPrefab.GetComponentInChildren<PrefabBaselineAlignment>() : null;
         bool waveModHasAlign = waveModAlign != null;
@@ -173,8 +186,17 @@ float   tileZ  = b.size.z / GridData.GridSize;
                     activeGridData.waterLevelModifierCellIndices.Contains(index) && waterLevelModifierPrefab)
                 {
                     var go = Instantiate(waterLevelModifierPrefab, pos, Quaternion.identity, spawnParent);
-                    float[] offsets0 = tierConfig?.offsets;
-                    go.GetComponent<WaterLevelModifier>()?.Init(FindGroundFloorSlot(offsets0), offsets0, "G", spawnedBaselineWaterY);
+                    if (absoluteTierHeights != null)
+                    {
+                        int gSlot = FindGroundFloorSlot(absoluteTierHeights, spawnedBaselineWaterY);
+                        float[] rel = ToRelativeOffsets(absoluteTierHeights, spawnedBaselineWaterY);
+                        go.GetComponent<WaterLevelModifier>()?.Init(gSlot, rel, "G", spawnedBaselineWaterY);
+                    }
+                    else
+                    {
+                        float[] offsets0 = tierConfig?.offsets;
+                        go.GetComponent<WaterLevelModifier>()?.Init(FindGroundFloorSlot(offsets0), offsets0, "G", spawnedBaselineWaterY);
+                    }
                 }
 
                 if (activeGridData.waveModifierCellIndices != null &&
@@ -226,8 +248,18 @@ float   tileZ  = b.size.z / GridData.GridSize;
             {
                 var tier = activeGridData.tiers[ti];
                 float[] offsets = tierConfig?.offsets;
-                float yOff = (offsets != null && tier.yOffsetSlot < offsets.Length)
-                    ? offsets[tier.yOffsetSlot] : tier.yOffset;
+                float tierAbsY;
+                float yOff;
+                if (absoluteTierHeights != null && tier.yOffsetSlot < absoluteTierHeights.Length)
+                {
+                    tierAbsY = absoluteTierHeights[tier.yOffsetSlot];
+                    yOff     = tierAbsY - spawnedBaselineWaterY;
+                }
+                else
+                {
+                    yOff     = (offsets != null && tier.yOffsetSlot < offsets.Length) ? offsets[tier.yOffsetSlot] : tier.yOffset;
+                    tierAbsY = spawnedBaselineWaterY + yOff;
+                }
 
                 for (int y = 0; y < GridData.GridSize; y++)
                 {
@@ -247,7 +279,15 @@ float   tileZ  = b.size.z / GridData.GridSize;
                             tier.waterLevelModifierCellIndices.Contains(index) && waterLevelModifierPrefab)
                         {
                             var go = Instantiate(waterLevelModifierPrefab, pos, Quaternion.identity, spawnParent);
-                            go.GetComponent<WaterLevelModifier>()?.Init(tier.yOffsetSlot, offsets, tier.name, spawnedBaselineWaterY);
+                            if (absoluteTierHeights != null)
+                            {
+                                float[] rel = ToRelativeOffsets(absoluteTierHeights, spawnedBaselineWaterY);
+                                go.GetComponent<WaterLevelModifier>()?.Init(tier.yOffsetSlot, rel, tier.name, spawnedBaselineWaterY);
+                            }
+                            else
+                            {
+                                go.GetComponent<WaterLevelModifier>()?.Init(tier.yOffsetSlot, offsets, tier.name, spawnedBaselineWaterY);
+                            }
                         }
 
                         if (tier.waveModifierCellIndices != null &&
@@ -486,6 +526,7 @@ float   tileZ  = b.size.z / GridData.GridSize;
                 
                 if (controller != null && tube != null)
                 {
+                    FaceTubeTowardTarget(tubeGo, modGo.transform.position);
                     tube.SetTargetModifier(controller);
                     tube.SetFishingController(fishingController);
                     if (trigger != null) controller.SetTrigger(trigger);
@@ -513,6 +554,27 @@ else if (controller != null)
         return best;
     }
 
+    // Overload for absolute heights — finds slot whose height is closest to the baseline Y.
+    private static int FindGroundFloorSlot(float[] absoluteHeights, float baselineY)
+    {
+        if (absoluteHeights == null || absoluteHeights.Length == 0) return 0;
+        int best = 0; float bestDist = float.MaxValue;
+        for (int i = 0; i < absoluteHeights.Length; i++)
+        {
+            float d = Mathf.Abs(absoluteHeights[i] - baselineY);
+            if (d < bestDist) { bestDist = d; best = i; }
+        }
+        return best;
+    }
+
+    // Converts absolute tier heights to relative offsets so WaterLevelModifier.Init stays unchanged.
+    private static float[] ToRelativeOffsets(float[] absoluteHeights, float baselineY)
+    {
+        var rel = new float[absoluteHeights.Length];
+        for (int i = 0; i < rel.Length; i++) rel[i] = absoluteHeights[i] - baselineY;
+        return rel;
+    }
+
     // =====================================================
     // ARENA PORTAL SPAWN
     // =====================================================
@@ -528,7 +590,14 @@ else if (controller != null)
             cachedArenaBounds.center.z
         );
 
-        float[] tierOffsets = tierConfig?.offsets;
+        // Grid-to-world conversion values (mirrors SpawnMaze computation)
+        float r      = activeArenaProfile != null ? activeArenaProfile.WorldArenaRadius : 20f;
+        float tileX  = (r * 2f) / GridData.GridSize;
+        float tileZ  = (r * 2f) / GridData.GridSize;
+        Vector3 gridOrigin = new Vector3(-r, 0f, -r);
+
+        // Pass absolute heights to SpawnPortalPrefab when available; otherwise raw TierConfig offsets (existing behaviour).
+        float[] tierOffsets = absoluteTierHeights ?? tierConfig?.offsets;
 
         // ── Entrances ──
         if (activeGridData.entrances != null)
@@ -546,8 +615,86 @@ else if (controller != null)
                 );
                 if (instance != null)
                 {
-                    var controller = instance.GetComponent<LevelExitController>();
-                    if (controller != null) controller.portalIndex = i;
+                    var exitController = instance.GetComponent<LevelExitController>();
+                    if (exitController != null) exitController.portalIndex = i;
+
+                    var doorCtrl = instance.GetComponent<LockedDoorController>();
+                    if (doorCtrl != null)
+                    {
+                        doorCtrl.entranceID = entrance.id;
+                        doorCtrl.isLocked   = entrance.isLocked;
+                    }
+                }
+
+                // ── Spawn DoorLockHub ──
+                if (entrance.isLocked && entrance.lockHubPrefab != null)
+                {
+                    GameObject hub = SpawnPortalPrefab(
+                        prefab:      entrance.lockHubPrefab,
+                        angle:       entrance.lockHubAngle,
+                        tierSlot:    entrance.tierSlot,
+                        spawnRadius: 0f,
+                        centre:      centre,
+                        tierOffsets: tierOffsets
+                    );
+
+                    if (hub != null && instance != null)
+                    {
+                        var hubCtrl  = hub.GetComponent<DoorLockHubController>();
+                        var doorCtrl = instance.GetComponent<LockedDoorController>();
+
+                        if (hubCtrl != null && doorCtrl != null)
+                            hubCtrl.linkedDoor = doorCtrl;
+
+                        // ── Spawn input tube and build spline from authored grid waypoints ──
+                        if (entrance.tubePath != null && entrance.tubePath.Count >= 2 && soulFishInputTubePrefab != null)
+                        {
+                            // Compute Y and rotation using PrefabBaselineAlignment (same as prefabPlacements)
+                            var tubeAlign      = soulFishInputTubePrefab.GetComponentInChildren<PrefabBaselineAlignment>();
+                            float contactOffsetY = tubeAlign != null ? tubeAlign.transform.localPosition.y : 0f;
+                            float tubeSpawnY     = spawnedBaselineWaterY - contactOffsetY;
+
+                            Quaternion baselineRot = activeBaselineMarker != null
+                                ? Quaternion.LookRotation(activeBaselineMarker.transform.forward, Vector3.up)
+                                : Quaternion.identity;
+                            Quaternion tubeRot = tubeAlign != null ? baselineRot : spawnParent.rotation;
+
+                            // Spawn tube prefab at the first waypoint (input tube position)
+                            var firstCell  = entrance.tubePath[0];
+                            int firstIndex = firstCell.y * GridData.GridSize + firstCell.x;
+                            Vector3 tubePos = CellToWorldPos(firstIndex, gridOrigin, tileX, tileZ);
+                            tubePos.y = tubeSpawnY;
+                            GameObject tubeGo = Instantiate(soulFishInputTubePrefab, tubePos, tubeRot, spawnParent);
+
+                            var tube = tubeGo.GetComponent<SoulFishInputTube>();
+                            if (tube != null)
+                            {
+                                // Waypoints: all tubePath nodes except first (tube spawn) and last (hub anchor).
+                                // InitializeSystem inserts them between the local spline start and the hub pipeConnector.
+                                int lastNode = entrance.tubePath.Count - 1;
+                                var waypoints = new List<Vector3>(lastNode - 1);
+                                for (int wi = 1; wi < lastNode; wi++)
+                                {
+                                    var cell      = entrance.tubePath[wi];
+                                    int cellIndex = cell.y * GridData.GridSize + cell.x;
+                                    Vector3 wp    = CellToWorldPos(cellIndex, gridOrigin, tileX, tileZ);
+                                    waypoints.Add(wp);
+                                }
+                                tube.SetWaypoints(waypoints);
+                                tube.SetFishingController(fishingController);
+                                FaceTubeTowardTarget(tubeGo, hub.transform.position);
+                                tube.SetTargetLockHub(hubCtrl);
+                            }
+                            else
+                            {
+                                Debug.LogWarning($"[LevelSpawner] soulFishInputTubePrefab has no SoulFishInputTube component — tube not connected for entrance {i}.");
+                            }
+                        }
+                        else if (entrance.tubePath != null && entrance.tubePath.Count >= 2 && soulFishInputTubePrefab == null)
+                        {
+                            Debug.LogWarning($"[LevelSpawner] soulFishInputTubePrefab not assigned — cannot spawn input tube for locked entrance {i}.");
+                        }
+                    }
                 }
             }
         }
@@ -569,9 +716,19 @@ else if (controller != null)
         if (tierSlot >= 0 && activeGridData.tiers != null && tierSlot < activeGridData.tiers.Count)
         {
             var tier = activeGridData.tiers[tierSlot];
-            y += (tierOffsets != null && tier.yOffsetSlot < tierOffsets.Length)
-                 ? tierOffsets[tier.yOffsetSlot]
-                 : tier.yOffset;
+            if (absoluteTierHeights != null && tier.yOffsetSlot < absoluteTierHeights.Length)
+            {
+                // Replace the spawnedBaselineWaterY base with this tier's absolute height
+                y = absoluteTierHeights[tier.yOffsetSlot];
+                var baseline2 = prefab.GetComponentInChildren<PrefabBaselineAlignment>();
+                if (baseline2 != null) y -= baseline2.transform.position.y;
+            }
+            else
+            {
+                y += (tierOffsets != null && tier.yOffsetSlot < tierOffsets.Length)
+                     ? tierOffsets[tier.yOffsetSlot]
+                     : tier.yOffset;
+            }
         }
 
         Vector3 pos;
@@ -587,8 +744,19 @@ else if (controller != null)
             pos = new Vector3(centre.x, y, centre.z);
         }
 
-        Quaternion rot = Quaternion.Euler(0f, angle, 0f);
-if (applyMinus90XRotation) rot *= Quaternion.Euler(-90f, 0f, 0f);
+        var align = prefab.GetComponentInChildren<PrefabBaselineAlignment>();
+        Quaternion rot;
+        if (align != null && align.UseForwardOverride)
+        {
+            Vector3 fwd = align.LocalForward;
+            Vector3 up  = align.UseUpOverride ? align.LocalUp : Vector3.up;
+            rot = Quaternion.Euler(0f, angle, 0f) * Quaternion.LookRotation(fwd, up);
+        }
+        else
+        {
+            rot = Quaternion.Euler(0f, angle, 0f);
+            if (applyMinus90XRotation) rot *= Quaternion.Euler(-90f, 0f, 0f);
+        }
         return Instantiate(prefab, pos, rot, spawnParent);
     }
 
@@ -906,6 +1074,26 @@ if (applyMinus90XRotation) rot *= Quaternion.Euler(-90f, 0f, 0f);
 
         pos.y = mazeEndY;
         spawnParent.position = pos;
+    }
+
+    // Rotates a spawned tube instance so its PrefabBaselineAlignment.LocalForward faces the target (XZ only).
+    // No-ops if the tube has no PrefabBaselineAlignment or UseForwardOverride is false.
+    // Must be called BEFORE SetTargetModifier / SetTargetLockHub so the pipe is built from the correct orientation.
+    private void FaceTubeTowardTarget(GameObject tubeGo, Vector3 targetWorldPos)
+    {
+        var align = tubeGo.GetComponentInChildren<PrefabBaselineAlignment>();
+        if (align == null || !align.UseForwardOverride) return;
+
+        Vector3 toTarget = targetWorldPos - tubeGo.transform.position;
+        toTarget.y = 0f;
+        if (toTarget.sqrMagnitude < 0.001f) return;
+
+        Vector3 currentWorldFwd = tubeGo.transform.rotation * align.LocalForward;
+        currentWorldFwd.y = 0f;
+        if (currentWorldFwd.sqrMagnitude < 0.001f) return;
+
+        Quaternion delta = Quaternion.FromToRotation(currentWorldFwd.normalized, toTarget.normalized);
+        tubeGo.transform.rotation = delta * tubeGo.transform.rotation;
     }
 
     public GameObject SpawnConditionals(int visitCount)

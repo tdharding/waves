@@ -11,6 +11,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
+#pragma warning disable UDR0001
 
 using UnityEngine;
 using System.Linq;
@@ -20,18 +21,18 @@ namespace PluginMaster
     public class ComponentSaveListWindow : UnityEditor.EditorWindow
     {
         private GameObject _targetObject;
-        private (Component comp, PlayModeSave.SaveDataValue data)[] _components;
+        private (Component comp, SaveDataValue data)[] _components;
         private System.Collections.Generic.
-            Dictionary<PlayModeSave.ComponentSaveDataKey, PlayModeSave.SaveDataValue> _compData;
+            Dictionary<ComponentSaveDataKey, SaveDataValue> _compData;
         private static ComponentSaveListWindow _instance = null;
 
         private Texture _cancelIcon;
 #if UNITY_6000_3_OR_NEWER
         public static void Show(System.Collections.Generic.
-           Dictionary<PlayModeSave.ComponentSaveDataKey, PlayModeSave.SaveDataValue> compData, EntityId objId)
+           Dictionary<ComponentSaveDataKey, SaveDataValue> compData, EntityId objId)
 #else
         public static void Show(System.Collections.Generic.
-            Dictionary<PlayModeSave.ComponentSaveDataKey, PlayModeSave.SaveDataValue> compData, int objId)
+            Dictionary<ComponentSaveDataKey, SaveDataValue> compData, int objId)
 #endif
         {
             _instance = GetWindow<ComponentSaveListWindow>(utility: true, "Component Save List");
@@ -40,27 +41,27 @@ namespace PluginMaster
         }
 #if UNITY_6000_3_OR_NEWER
         public static void Update(System.Collections.Generic.
-           Dictionary<PlayModeSave.ComponentSaveDataKey, PlayModeSave.SaveDataValue> compData, EntityId objId)
+           Dictionary<ComponentSaveDataKey, SaveDataValue> compData, EntityId objId)
 #else
         public static void Update(System.Collections.Generic.
-           Dictionary<PlayModeSave.ComponentSaveDataKey, PlayModeSave.SaveDataValue> compData, int objId)
+           Dictionary<ComponentSaveDataKey, SaveDataValue> compData, int objId)
 #endif
         {
             if (_instance != null) _instance.UpdateComponentList(compData, objId);
         }
 #if UNITY_6000_3_OR_NEWER
         private void UpdateComponentList(System.Collections.Generic.
-            Dictionary<PlayModeSave.ComponentSaveDataKey, PlayModeSave.SaveDataValue> compData, EntityId objId)
+            Dictionary<ComponentSaveDataKey, SaveDataValue> compData, EntityId objId)
 #else
         private void UpdateComponentList(System.Collections.Generic.
-            Dictionary<PlayModeSave.ComponentSaveDataKey, PlayModeSave.SaveDataValue> compData, int objId)
+            Dictionary<ComponentSaveDataKey, SaveDataValue> compData, int objId)
 #endif
         {
             _compData = compData
                 .Where(pair => pair.Key.objKey.objId == objId)
                 .ToDictionary(pair => pair.Key, pair => pair.Value);
 
-            PlayModeSave.ObjectDataKey objKey = null;
+            ObjectDataKey objKey = null;
             if (_compData.Count > 0)
             {
                 objKey = _compData.First().Key.objKey;
@@ -73,7 +74,7 @@ namespace PluginMaster
 #else
                 _targetObject = UnityEditor.EditorUtility.InstanceIDToObject(objId) as GameObject;
 #endif
-                objKey = new PlayModeSave.ObjectDataKey(_targetObject);
+                objKey = new ObjectDataKey(_targetObject);
             }
             if (objKey == null) return;
             _targetObject = objKey != null
@@ -90,12 +91,12 @@ namespace PluginMaster
 #else
                         var key = _compData.Keys.FirstOrDefault(k => k.compId == comp.GetInstanceID());
 #endif
-                        PlayModeSave.SaveDataValue saveDataValue = null;
+                        SaveDataValue saveDataValue = null;
                         if (key != null) _compData.TryGetValue(key, out saveDataValue);
                         return (comp, saveDataValue);
                     })
                     .ToArray()
-                : System.Array.Empty<(Component, PlayModeSave.SaveDataValue)>();
+                : System.Array.Empty<(Component, SaveDataValue)>();
         }
 
         private void OnEnable()
@@ -173,3 +174,4 @@ namespace PluginMaster
         }
     }
 }
+#pragma warning restore UDR0001

@@ -144,6 +144,10 @@ public class SonarController : MonoBehaviour
         if (generator != null && waterTransform != null)
             generator.UpdateSurfaceY(waterTransform.position.y);
 
+        // Keep waveMaskBias in sync with the current water Y (covers tween mid-frames too).
+        if (waterTransform != null)
+            waveMaskBias = 1.04124f * waterTransform.position.y + 0.5806f;
+
         if (waterTransform != null && waterMaterial != null)
         {
             WaveUtils.WaveParams wp = WaveUtils.ReadParams(waterTransform, waterMaterial);

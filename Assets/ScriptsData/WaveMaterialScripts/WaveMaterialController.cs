@@ -169,6 +169,7 @@ public class WaveMaterialController : MonoBehaviour
         res.LightDirection = Vector3.Lerp(current.LightDirection, target.LightDirection, t);
         res.FoamColor = Color.Lerp(current.FoamColor, target.FoamColor, t);
         res.DepthColour = Color.Lerp(current.DepthColour, target.DepthColour, t);
+        res.WaveCenter = Vector4.Lerp(current.WaveCenter, target.WaveCenter, t);
 
         res.FoamDitherSize = Mathf.SmoothDamp(current.FoamDitherSize, target.FoamDitherSize, ref vel.FoamDitherSize, smoothTime);
         res.FoamDistanceDepth = Mathf.SmoothDamp(current.FoamDistanceDepth, target.FoamDistanceDepth, ref vel.FoamDistanceDepth, smoothTime);

@@ -13,25 +13,26 @@ MonoBehaviour:
   m_Name: NewRockyWaves
   m_EditorClassIdentifier: Assembly-CSharp::WavePreset
   state:
-    Frequency: 13
-    Speed: 1.5
-    RippleDepth: 0.15
+    Frequency: 1.08
+    Speed: 0.91
+    RippleDepth: 0.67
     Smoothness: 0.063
     Transparency: 0.993
     Strength: 0.56
-    TroughRingWave1Brightness: 16.2
-    PeakRingWave2Brightness: -0.6
-    TwirlBaseStrength: 1.87
+    TroughRingWave1Brightness: 53.2
+    PeakRingWave2Brightness: -0.51
+    TwirlBaseStrength: 3
     TwirlSlopeBoost: 1.18
-    TwirlScale: 11.52
-    DepthTwirlStrength: 4.89
+    TwirlScale: 5.36
+    DepthTwirlStrength: 5.8
     DepthFadeStrength: 1.8
     DepthFadeLine: 4.11
     WhirlpoolTwirlStrength: 4.33
     WhirlpoolAreaTwirlStrength: -1.75
     SoulFishTwirlStrength: 0.65
     SoulFishMaskStrength: 0
-    SoulFishRadius: 0
+    SoulFishRadius: 0.7
+    SoulFishBrightness1: 0
     ZoneTiling: {x: 0, y: 0}
     ZoneScrollSpeed: 0
     ZoneNoiseStrength: 0
@@ -52,11 +53,8 @@ MonoBehaviour:
     DepthColour: {r: 1, g: 1, b: 1, a: 0}
     DistanceDepth: 0.87
     NormalTexture: {fileID: 2800000, guid: 51ac2df266ae63944938104912d2a50c, type: 3}
-    WaveCenter: {x: 0, y: 0, z: 0, w: 0}
+    WaveCenter: {x: 8.22, y: 0, z: 0, w: 0}
   sonarEnabled: 0
   musicIntro: {fileID: 8300000, guid: bc29a421e592ef34ba4acc9ee430a2b0, type: 3}
   musicLoop: {fileID: 8300000, guid: bc29a421e592ef34ba4acc9ee430a2b0, type: 3}
-  lights:
-  - color: {r: 1, g: 1, b: 1, a: 1}
-    intensity: 16.4
-    range: 8.75
+  lights: []

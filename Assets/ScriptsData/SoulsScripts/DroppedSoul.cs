@@ -37,6 +37,7 @@ public class DroppedSoul : MonoBehaviour
     private Material  mat;
 
     private LinkIdentityLabel identityLabel;
+    private EntityId cachedEntityId;
 
     private Vector3 arenaCentre;
     private float   arenaBoundsRadius;
@@ -49,13 +50,14 @@ public class DroppedSoul : MonoBehaviour
     void Awake()
     {
         identityLabel = GetComponent<LinkIdentityLabel>();
+        cachedEntityId = GetEntityId();
         ActiveDroppedSouls.Add(this);
     }
 
     void OnDestroy()
     {
         ActiveDroppedSouls.Remove(this);
-        UIMapController.Instance?.HideDroppedSoulMarker(GetInstanceID());
+        UIMapController.Instance?.HideDroppedSoulMarker(cachedEntityId);
     }
 
     // ─────────────────────────────────────────────
@@ -83,7 +85,7 @@ public class DroppedSoul : MonoBehaviour
 
     void Start()
     {
-        UIMapController.Instance?.ShowDroppedSoulMarker(GetInstanceID(), transform.position);
+        UIMapController.Instance?.ShowDroppedSoulMarker(cachedEntityId, transform.position);
 
         if (LevelDataController.Instance == null) return;
 

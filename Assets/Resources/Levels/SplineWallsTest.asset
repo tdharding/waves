@@ -35,6 +35,11 @@ MonoBehaviour:
     perimeterAngle: 0
     tierSlot: -1
     spawnRadius: 0
+    isLocked: 0
+    lockHubPrefab: {fileID: 0}
+    lockHubAngle: 0
+    tubePath: []
+    tubeSubdivisions: 3
     targetSegmentID: 
     targetProgress: 0
     targetIsLeftPath: 0
@@ -75,7 +80,7 @@ MonoBehaviour:
   tiers: []
   whirlpools:
   - cellIndex: 741
-    radius: 0.3
+    radius: 0.9
   whirlpoolDepth: 5
   whirlpoolSwirl: 1.59
   slotNotes:
@@ -98,6 +103,6 @@ MonoBehaviour:
     - {x: 0.026041666, y: 0.21817128}
     - {x: -0.177662, y: 0.2934028}
     isClosed: 0
-    isCurved: 0
+    segmentCurved: 
     tileSpacing: 0.1
     prefabOverride: {fileID: 101384417285704880, guid: b4c222fbda622d34aa403df08beaaa59, type: 3}

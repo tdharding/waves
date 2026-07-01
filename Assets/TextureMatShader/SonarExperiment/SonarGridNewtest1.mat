@@ -52,7 +52,7 @@ Material:
     m_Ints: []
     m_Floats:
     - _ArenaFadeStart: 0.7
-    - _ArenaRadius: 4.78
+    - _ArenaRadius: 21.1
     - _DisplaceRadiusOffset: 0.3
     - _DisplaceStrength: 0.2
     - _GridDensity: -5
@@ -82,9 +82,9 @@ Material:
     - _WhirlRadius: 0
     m_Colors:
     - _ArenMask: {r: 0, g: 0, b: 0, a: 0}
-    - _ArenaMask: {r: 0, g: -1.47, b: 0, a: 0}
+    - _ArenaMask: {r: 0, g: -11.89, b: 0, a: 0}
     - _GridOffset: {r: -1.1216216, g: 2.6324322, b: 0, a: 0}
-    - _MouthWorldPos: {r: 4.449051, g: -1.4920871, b: -0.5227846, a: 0}
+    - _MouthWorldPos: {r: 4.742987, g: -11.315202, b: 7.7746606, a: 0}
     - _PulseOrigin: {r: -5.58, g: -47.5, b: 2.3, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

@@ -131,6 +131,7 @@ public class AbilityWheelUI : MonoBehaviour
             case BoatTool.WhirlSucker: return "Whirl";
             case BoatTool.Catapult: return "Catapult";
             case BoatTool.Lure: return "Lure";
+            case BoatTool.Boost: return "Boost";
             default: return tool.ToString();
         }
     }

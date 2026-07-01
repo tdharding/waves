@@ -159,6 +159,7 @@ public class GameTesterTool : EditorWindow
         DrawLevelCompletionsSection();
         DrawCaughtSoulsSection();
         DrawObstaclesSection();
+        DrawSoulAssetCleanupSection();
         DrawDangerZone();
 
         EditorGUILayout.EndScrollView();
@@ -530,6 +531,79 @@ public class GameTesterTool : EditorWindow
         }
 
         EditorGUILayout.Space(6);
+    }
+
+    private void DrawSoulAssetCleanupSection()
+    {
+        EditorGUILayout.Space(4);
+        EditorGUILayout.LabelField("— Soul Asset Cleanup —", EditorStyles.centeredGreyMiniLabel);
+        EditorGUILayout.Space(2);
+        EditorGUILayout.HelpBox(
+            "Rebuilds allocated/allocatedToLevelID on every SoulData asset from the actual soulZones in each GridData level asset. Fixes stale entries left when souls are removed from a zone.",
+            MessageType.None);
+
+        if (GUILayout.Button("Fix Soul Allocation Fields", _warningButton))
+            RunSoulAllocationCleanup();
+
+        EditorGUILayout.Space(6);
+    }
+
+    private void RunSoulAllocationCleanup()
+    {
+        // Build map: soul asset instance ID -> levelID it actually lives in
+        var soulToLevel = new Dictionary<SoulData, string>();
+
+        var levelGuids = AssetDatabase.FindAssets("t:GridData", new[] { "Assets/Resources/Levels" });
+        foreach (string guid in levelGuids)
+        {
+            var gridData = AssetDatabase.LoadAssetAtPath<GridData>(AssetDatabase.GUIDToAssetPath(guid));
+            if (gridData == null || string.IsNullOrEmpty(gridData.levelID)) continue;
+
+            foreach (var zone in gridData.soulZones)
+            {
+                if (zone.souls == null) continue;
+                foreach (var soul in zone.souls)
+                {
+                    if (soul != null)
+                        soulToLevel[soul] = gridData.levelID;
+                }
+            }
+        }
+
+        // Fix every SoulData asset
+        var soulGuids = AssetDatabase.FindAssets("t:SoulData", new[] { "Assets/Resources/Souls" });
+        int fixed_ = 0, cleared = 0;
+
+        foreach (string guid in soulGuids)
+        {
+            var soul = AssetDatabase.LoadAssetAtPath<SoulData>(AssetDatabase.GUIDToAssetPath(guid));
+            if (soul == null) continue;
+
+            if (soulToLevel.TryGetValue(soul, out string levelID))
+            {
+                if (!soul.allocated || soul.allocatedToLevelID != levelID)
+                {
+                    soul.allocated          = true;
+                    soul.allocatedToLevelID = levelID;
+                    EditorUtility.SetDirty(soul);
+                    fixed_++;
+                }
+            }
+            else
+            {
+                if (soul.allocated || !string.IsNullOrEmpty(soul.allocatedToLevelID))
+                {
+                    soul.allocated          = false;
+                    soul.allocatedToLevelID = "";
+                    EditorUtility.SetDirty(soul);
+                    cleared++;
+                }
+            }
+        }
+
+        AssetDatabase.SaveAssets();
+        Debug.Log($"[SoulCleanup] Done. Fixed: {fixed_}, Cleared stale: {cleared}");
+        EditorUtility.DisplayDialog("Soul Cleanup", $"Fixed: {fixed_}\nCleared stale: {cleared}", "OK");
     }
 
     private void DrawDangerZone()

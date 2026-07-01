@@ -17,6 +17,6 @@ MonoBehaviour:
   homeLevelID: 
   associatedWavePreset: {fileID: 11400000, guid: 3c3129a581286d74a943d52187bb2e54, type: 2}
   allocated: 1
-  allocatedToLevelID: 
+  allocatedToLevelID: Level2Big
   soulName: Soul #8
   videoClip: {fileID: 32900000, guid: bc8d98bbc6a3d8b4cb8d2be12508ec14, type: 3}

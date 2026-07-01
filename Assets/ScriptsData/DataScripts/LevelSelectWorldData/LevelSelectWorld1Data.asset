@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 88b6f058feac51f46a3f56ed88db9a43, type: 3}
-  m_Name: LevelSelectWorld1Data (Workspace) (Workspace) (Workspace) (Workspace) (Workspace)
+  m_Name: LevelSelectWorld1Data
   m_EditorClassIdentifier: 
   hillPoints:
   - id: 2ce12732-fe5f-4b7d-a23d-a36643212d5e
@@ -196,13 +196,13 @@ MonoBehaviour:
     worldPosition: {x: 19.498663, y: 0, z: -43.72526}
     type: 0
   - id: d86057c2-d5d8-4d1e-8cf3-aca27df45463
-    worldPosition: {x: 50.912533, y: 0, z: -45.04762}
+    worldPosition: {x: 49.64533, y: 0, z: -49.892826}
     type: 0
   - id: 6e80d699-9518-4038-9894-b1703af41238
     worldPosition: {x: 50.57192, y: 0, z: -58.77673}
     type: 2
   - id: 42d269e4-b405-49ab-b6c3-741fe862ad7a
-    worldPosition: {x: 49.668354, y: 0, z: -70.10738}
+    worldPosition: {x: 49.697777, y: 0, z: -69.97586}
     type: 2
   - id: 49c1d47e-5de4-49fe-8b55-50311c8db4f0
     worldPosition: {x: 73.06753, y: 2, z: -20.134197}
@@ -244,7 +244,7 @@ MonoBehaviour:
     worldPosition: {x: 74.42018, y: 7, z: -5.2645493}
     type: 0
   - id: 1efbbfc3-3907-423b-803d-510d6c112e10
-    worldPosition: {x: 71.02595, y: 0, z: -60.701576}
+    worldPosition: {x: 74.91592, y: 0, z: -62.974167}
     type: 2
   - id: d4bf991a-9bd4-4932-9603-f4747318f0b1
     worldPosition: {x: 72.527504, y: 0, z: -73.47877}
@@ -271,16 +271,16 @@ MonoBehaviour:
     worldPosition: {x: 46.932896, y: 0, z: -13.974857}
     type: 0
   - id: 59eb2d0a-c5ff-4b96-92c4-54a21e6eb279
-    worldPosition: {x: 46.19828, y: 0, z: -30.43651}
+    worldPosition: {x: 46.605057, y: 0, z: -29.867027}
     type: 2
   - id: c3ebdf81-1b15-4158-b94a-aed422e7842e
-    worldPosition: {x: 41.928574, y: 0, z: -40.36386}
+    worldPosition: {x: 45.821465, y: 0, z: -41.20957}
     type: 2
   - id: 569c26a4-1755-43b0-9c07-d7cb0791387a
-    worldPosition: {x: 43.65459, y: 0, z: -44.10935}
+    worldPosition: {x: 42.98372, y: 0, z: -47.687347}
     type: 1
   - id: 70e436a6-e2eb-4cca-9efc-d474cefa5fe9
-    worldPosition: {x: 44.836525, y: 0, z: -38.182255}
+    worldPosition: {x: 44.165653, y: 0, z: -45.114628}
     type: 0
   - id: 2ac99bee-fdeb-4983-ac0e-8e45e609b9a8
     worldPosition: {x: 69.44211, y: 0, z: -45.98147}
@@ -783,7 +783,7 @@ MonoBehaviour:
   musicLoop: {fileID: 8300000, guid: 1ff10eeae8633404da517dacc2021e9e, type: 3}
   musicController: {fileID: 0}
   openingSequence: {fileID: 0}
-  targetScenePath: Assets/Scenes/LevelSelectWorlds/LevelSelectWorld1a.unity
+  targetScenePath: Assets/LevelSelectWorld1a.unity
   useOpeningSequence: 1
   openingSequenceStartPos: {x: 143.3325, y: 0, z: -12.623}
   openingSequencePrefab: {fileID: 7575765240899787153, guid: ac17943291d2d9d42b50db647d5bfb47, type: 3}

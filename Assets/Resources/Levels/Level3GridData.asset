@@ -32,9 +32,14 @@ MonoBehaviour:
   - id: entrance_0
     prefab: {fileID: 0}
     soulPrefab: {fileID: 0}
-    perimeterAngle: 240
+    perimeterAngle: -117.57
     tierSlot: -1
     spawnRadius: 0
+    isLocked: 0
+    lockHubPrefab: {fileID: 0}
+    lockHubAngle: 0
+    tubePath: []
+    tubeSubdivisions: 3
     targetSegmentID: 
     targetProgress: 0
     targetIsLeftPath: 0
@@ -42,9 +47,14 @@ MonoBehaviour:
   - id: entrance_1
     prefab: {fileID: 0}
     soulPrefab: {fileID: 0}
-    perimeterAngle: 265
+    perimeterAngle: -96.01
     tierSlot: -1
-    spawnRadius: 2
+    spawnRadius: 0
+    isLocked: 0
+    lockHubPrefab: {fileID: 0}
+    lockHubAngle: 0
+    tubePath: []
+    tubeSubdivisions: 3
     targetSegmentID: 
     targetProgress: 0
     targetIsLeftPath: 0
@@ -56,495 +66,660 @@ MonoBehaviour:
   - cellIndex: 833
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 834
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 835
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 836
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 837
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 838
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 839
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 840
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 841
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 842
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 843
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 844
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 845
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 846
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 847
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 848
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 849
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 850
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 851
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 852
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 853
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 854
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 855
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 856
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 857
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 858
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 859
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 860
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 861
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 862
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 640
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 641
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 642
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 643
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 644
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 645
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 647
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 646
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 648
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 649
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 650
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 651
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 652
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 653
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 654
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 657
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 655
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 656
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 658
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 659
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 660
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 661
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 662
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 663
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 664
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 671
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 670
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 461
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 462
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 463
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 464
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 465
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 466
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 467
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 468
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 469
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 470
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 471
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 472
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 473
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 474
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 475
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 476
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 477
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 478
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 479
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 453
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 452
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 449
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 448
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 290
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 289
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 288
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 293
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 294
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 295
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 297
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 298
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 299
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 300
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 301
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 302
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 303
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 304
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 305
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 309
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 310
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 311
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 306
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 307
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 308
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 318
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 319
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 145
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 146
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 149
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 147
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 148
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 150
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 151
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 152
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 153
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 154
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 155
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 135
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 134
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 131
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 130
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 132
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 133
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 139
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 138
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 156
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 614
     prefab: {fileID: 4089478517322769272, guid: 0eec1f0ed68522d41a7349c142808e4d, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 582
     prefab: {fileID: 4089478517322769272, guid: 0eec1f0ed68522d41a7349c142808e4d, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 550
     prefab: {fileID: 4089478517322769272, guid: 0eec1f0ed68522d41a7349c142808e4d, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 518
     prefab: {fileID: 4089478517322769272, guid: 0eec1f0ed68522d41a7349c142808e4d, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 486
     prefab: {fileID: 4089478517322769272, guid: 0eec1f0ed68522d41a7349c142808e4d, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 454
     prefab: {fileID: 4089478517322769272, guid: 0eec1f0ed68522d41a7349c142808e4d, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 455
     prefab: {fileID: 4089478517322769272, guid: 0eec1f0ed68522d41a7349c142808e4d, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 423
     prefab: {fileID: 4089478517322769272, guid: 0eec1f0ed68522d41a7349c142808e4d, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 391
     prefab: {fileID: 4089478517322769272, guid: 0eec1f0ed68522d41a7349c142808e4d, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 359
     prefab: {fileID: 4089478517322769272, guid: 0eec1f0ed68522d41a7349c142808e4d, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 327
     prefab: {fileID: 4089478517322769272, guid: 0eec1f0ed68522d41a7349c142808e4d, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 328
     prefab: {fileID: 4089478517322769272, guid: 0eec1f0ed68522d41a7349c142808e4d, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 296
     prefab: {fileID: 4089478517322769272, guid: 0eec1f0ed68522d41a7349c142808e4d, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 265
     prefab: {fileID: 4089478517322769272, guid: 0eec1f0ed68522d41a7349c142808e4d, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 266
     prefab: {fileID: 4089478517322769272, guid: 0eec1f0ed68522d41a7349c142808e4d, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 234
     prefab: {fileID: 4089478517322769272, guid: 0eec1f0ed68522d41a7349c142808e4d, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 235
     prefab: {fileID: 4089478517322769272, guid: 0eec1f0ed68522d41a7349c142808e4d, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 203
     prefab: {fileID: 4089478517322769272, guid: 0eec1f0ed68522d41a7349c142808e4d, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 171
     prefab: {fileID: 4089478517322769272, guid: 0eec1f0ed68522d41a7349c142808e4d, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 172
     prefab: {fileID: 4089478517322769272, guid: 0eec1f0ed68522d41a7349c142808e4d, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 140
     prefab: {fileID: 4089478517322769272, guid: 0eec1f0ed68522d41a7349c142808e4d, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 665
     prefab: {fileID: 4089478517322769272, guid: 10988ab1c420968479dfafafe486a4d8, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 666
     prefab: {fileID: 4089478517322769272, guid: 10988ab1c420968479dfafafe486a4d8, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 667
     prefab: {fileID: 4089478517322769272, guid: 10988ab1c420968479dfafafe486a4d8, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 668
     prefab: {fileID: 4089478517322769272, guid: 10988ab1c420968479dfafafe486a4d8, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 669
     prefab: {fileID: 4089478517322769272, guid: 10988ab1c420968479dfafafe486a4d8, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 312
     prefab: {fileID: 4089478517322769272, guid: 10988ab1c420968479dfafafe486a4d8, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 313
     prefab: {fileID: 4089478517322769272, guid: 10988ab1c420968479dfafafe486a4d8, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 314
     prefab: {fileID: 4089478517322769272, guid: 10988ab1c420968479dfafafe486a4d8, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 315
     prefab: {fileID: 4089478517322769272, guid: 10988ab1c420968479dfafafe486a4d8, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 316
     prefab: {fileID: 4089478517322769272, guid: 10988ab1c420968479dfafafe486a4d8, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 317
     prefab: {fileID: 4089478517322769272, guid: 10988ab1c420968479dfafafe486a4d8, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 456
     prefab: {fileID: 4089478517322769272, guid: 037a61fbcb27d9e4190ae8509e08146c, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 457
     prefab: {fileID: 4089478517322769272, guid: 037a61fbcb27d9e4190ae8509e08146c, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 458
     prefab: {fileID: 4089478517322769272, guid: 037a61fbcb27d9e4190ae8509e08146c, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 459
     prefab: {fileID: 4089478517322769272, guid: 037a61fbcb27d9e4190ae8509e08146c, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 460
     prefab: {fileID: 4089478517322769272, guid: 037a61fbcb27d9e4190ae8509e08146c, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 141
     prefab: {fileID: 4089478517322769272, guid: 037a61fbcb27d9e4190ae8509e08146c, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 142
     prefab: {fileID: 4089478517322769272, guid: 037a61fbcb27d9e4190ae8509e08146c, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 143
     prefab: {fileID: 4089478517322769272, guid: 037a61fbcb27d9e4190ae8509e08146c, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
   - cellIndex: 144
     prefab: {fileID: 4089478517322769272, guid: 037a61fbcb27d9e4190ae8509e08146c, type: 3}
     isCircle: 0
+    isWorldSpaceProp: 0
+  linkedPairs: []
   tiers: []
   whirlpools: []
   whirlpoolDepth: 5
@@ -553,3 +728,4 @@ MonoBehaviour:
   - 
   slotColors: []
   arenaProfile: {fileID: 11400000, guid: 72edee6e35d2a4f47afa3484ef153ba2, type: 2}
+  splineWallPaths: []

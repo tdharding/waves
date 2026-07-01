@@ -183,6 +183,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PrefabBaselineAlignment
   showDebug: 1
+  useForwardOverride: 0
+  forwardEuler: {x: 0, y: 0, z: 0}
+  useUpOverride: 0
+  upEuler: {x: 0, y: 0, z: 0}
 --- !u!1001 &4354548684047334882
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -268,6 +272,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 7f5d273315bef164083e80792dbf4cea, type: 3}
       insertIndex: -1
       addedObject: {fileID: 7969097171972764478}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 7f5d273315bef164083e80792dbf4cea, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8172801828995875024}
   m_SourcePrefab: {fileID: 100100000, guid: 7f5d273315bef164083e80792dbf4cea, type: 3}
 --- !u!1 &3508056878682996915 stripped
 GameObject:
@@ -310,6 +317,21 @@ MonoBehaviour:
   sceneToLoad: LevelSelect
   portalIndex: -1
   drawGizmo: 1
+--- !u!114 &8172801828995875024
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3508056878682996915}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 36d60193d80045840aec8dfa57d86d99, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LockedDoorController
+  isLocked: 1
+  emissionRenderer: {fileID: 4264018643656649429}
+  unlockedEmission: {r: 8, g: 8, b: 8, a: 8}
 --- !u!4 &4315802532719122953 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 7f5d273315bef164083e80792dbf4cea, type: 3}

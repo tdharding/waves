@@ -170,6 +170,7 @@ public class FishFishingBehaviour : MonoBehaviour
     bool IsEligibleForAttraction()
     {
         if (fishing == null || whirlDirection == null) return false;
+        if (_lureAttractable != null && !_lureAttractable.IsCatchable) return false;
         return whirlDirection.IsInSector(transform.position);
     }
 
@@ -268,7 +269,8 @@ public class FishFishingBehaviour : MonoBehaviour
     {
         if (!hasCachedSplinePos) return;
 
-        if (_lureAttractable != null && _lureAttractable.CurrentState == LureAttractable.State.Attracted)
+        if (_lureAttractable != null && (_lureAttractable.CurrentState == LureAttractable.State.Attracted
+            || _lureAttractable.CurrentState == LureAttractable.State.StatueAttracted))
         {
             hasCachedSplinePos = false;
             return;

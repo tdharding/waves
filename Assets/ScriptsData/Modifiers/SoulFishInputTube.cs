@@ -13,6 +13,7 @@ public class SoulFishInputTube : MonoBehaviour
     [Header("References")]
     [SerializeField] private SplineContainer localSpline;
     [SerializeField] private LevelWaveModifierControllerTypeB targetModifier;
+    [SerializeField] private DoorLockHubController targetLockHub;
     [SerializeField] private FishingController fishingController;
     [SerializeField] private GameObject fishPrefab;
     [SerializeField] private GameObject tubeExtrudePrefab;
@@ -32,6 +33,7 @@ public class SoulFishInputTube : MonoBehaviour
     private SplineContainer combinedSpline;
     private GameObject extrudedTube;
     private bool isInitialized = false;
+    private List<Vector3> _waypoints;
 
     private void Awake()
     {
@@ -66,9 +68,39 @@ public class SoulFishInputTube : MonoBehaviour
         }
     }
 
+    public void SetTargetLockHub(DoorLockHubController hub)
+    {
+        targetLockHub = hub;
+        InitializeSystem();
+    }
+
+    public void SetLocalSpline(SplineContainer spline)
+    {
+        localSpline = spline;
+    }
+
+    public void SetWaypoints(List<Vector3> worldPositions)
+    {
+        _waypoints = worldPositions;
+    }
+
+    private SplineContainer GetTargetSplineReceiver()
+    {
+        if (targetModifier != null) return targetModifier.splineReceiver;
+        if (targetLockHub != null) return targetLockHub.pipeConnector;
+        return null;
+    }
+
+    private Transform GetTargetPipeConnector()
+    {
+        if (targetModifier != null) return targetModifier.pipeConnector;
+        return null;
+    }
+
     private void InitializeSystem()
     {
-        if (targetModifier == null || localSpline == null || isInitialized) return;
+        bool hasTarget = targetModifier != null || targetLockHub != null;
+        if (!hasTarget || localSpline == null || isInitialized) return;
 
         TryFindFishingController();
 
@@ -87,40 +119,57 @@ public class SoulFishInputTube : MonoBehaviour
             targetPath.Add(new BezierKnot((Unity.Mathematics.float3)localPos), TangentMode.AutoSmooth);
         }
 
-        // 3. Join with targetModifier's spline receiver or pipe connector
-        if (targetModifier.splineReceiver != null)
+        // 3. Insert optional intermediate waypoints (e.g. lock tube arena path)
+        if (_waypoints != null && _waypoints.Count > 0)
+        {
+            float startY     = combinedSpline.transform.TransformPoint((Vector3)targetPath[targetPath.Count - 1].Position).y;
+            float targetY    = startY - 0.5f;
+            foreach (var pt in _waypoints)
+            {
+                Vector3 wp   = pt;
+                wp.y         = targetY;
+                targetPath.Add(new BezierKnot((Unity.Mathematics.float3)combinedSpline.transform.InverseTransformPoint(wp)), TangentMode.AutoSmooth);
+            }
+        }
+
+        // 4. Join with target spline receiver or pipe connector
+        var splineReceiver = GetTargetSplineReceiver();
+        var pipeConnector  = GetTargetPipeConnector();
+
+        if (splineReceiver != null)
         {
             // Join with the receiver spline in REVERSE order (Last Knot -> Knot 0)
-            var receiverSpline = targetModifier.splineReceiver.Spline;
-            Vector3 lastTubeKnotWorld = localSpline.transform.TransformPoint((Vector3)localSpline.Spline[localSpline.Spline.Count - 1].Position);
-            Vector3 receiverStartWorld = targetModifier.splineReceiver.transform.TransformPoint((Vector3)receiverSpline[receiverSpline.Count - 1].Position);
+            var receiverSpline = splineReceiver.Spline;
+            // Use the last knot already in targetPath (may be a waypoint, not just the local spline end)
+            Vector3 lastTubeKnotWorld  = combinedSpline.transform.TransformPoint((Vector3)targetPath[targetPath.Count - 1].Position);
+            Vector3 receiverStartWorld = splineReceiver.transform.TransformPoint((Vector3)receiverSpline[receiverSpline.Count - 1].Position);
 
-            // Generate joining knots to bridge the gap smoothly to the LAST knot of the receiver
             int segments = joinKnotCount + 1;
+            bool hasWaypoints = _waypoints != null && _waypoints.Count > 0;
             for (int i = 1; i <= joinKnotCount; i++)
             {
                 float t = (float)i / segments;
-                Vector3 worldPt = Vector3.Lerp(lastTubeKnotWorld, receiverStartWorld, t)
-                                + Vector3.up * Mathf.Sin(t * Mathf.PI) * curveStrength;
-                worldPt.y = Mathf.Min(worldPt.y, receiverStartWorld.y);
+                Vector3 worldPt = Vector3.Lerp(lastTubeKnotWorld, receiverStartWorld, t);
+                if (!hasWaypoints)
+                {
+                    worldPt += Vector3.up * Mathf.Sin(t * Mathf.PI) * curveStrength;
+                    worldPt.y = Mathf.Min(worldPt.y, receiverStartWorld.y);
+                }
                 targetPath.Add(new BezierKnot((Unity.Mathematics.float3)combinedSpline.transform.InverseTransformPoint(worldPt)), TangentMode.AutoSmooth);
             }
 
-            // Append receiver knots in REVERSE (Last -> 0)
             for (int i = receiverSpline.Count - 1; i >= 0; i--)
             {
-                Vector3 worldPos = targetModifier.splineReceiver.transform.TransformPoint((Vector3)receiverSpline[i].Position);
+                Vector3 worldPos = splineReceiver.transform.TransformPoint((Vector3)receiverSpline[i].Position);
                 Vector3 localPos = combinedSpline.transform.InverseTransformPoint(worldPos);
                 targetPath.Add(new BezierKnot((Unity.Mathematics.float3)localPos), TangentMode.AutoSmooth);
             }
-            Debug.Log($"[SoulFishInputTube] Merged with target modifier spline receiver (Reverse: {receiverSpline.Count - 1} -> 0).");
+            Debug.Log($"[SoulFishInputTube] Merged with spline receiver (Reverse: {receiverSpline.Count - 1} -> 0).");
         }
-        else if (targetModifier.pipeConnector != null)
+        else if (pipeConnector != null)
         {
-            // Fallback to generating joining knots to the pipeConnector transform
-            Vector3 lastKnotWorld = localSpline.transform.TransformPoint(
-                (Vector3)localSpline.Spline[localSpline.Spline.Count - 1].Position);
-            Vector3 connectorWorld = targetModifier.pipeConnector.position;
+            Vector3 lastKnotWorld  = combinedSpline.transform.TransformPoint((Vector3)targetPath[targetPath.Count - 1].Position);
+            Vector3 connectorWorld = pipeConnector.position;
 
             int segments = joinKnotCount + 1;
             for (int i = 1; i <= joinKnotCount; i++)
@@ -244,7 +293,10 @@ public class SoulFishInputTube : MonoBehaviour
             }
         }
 
-        // 5. Cleanup
+        // 5. Notify lock hub on arrival (wave modifier is notified via physics trigger on the fish)
+        targetLockHub?.OnSoulArrived();
+
+        // 6. Cleanup
         if (fishingController != null && tracker != null)
             fishingController.UnregisterTubeDelivery(tracker.transform);
         

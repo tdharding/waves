@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 88b6f058feac51f46a3f56ed88db9a43, type: 3}
-  m_Name: LevelSelectWorld3Data (Workspace) (Workspace) (Workspace) (Workspace)
+  m_Name: LevelSelectWorld3Data
   m_EditorClassIdentifier: Assembly-CSharp::LevelSelectDesignerData
   hillPoints: []
   nodes:

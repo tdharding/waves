@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 133fd3b04594d4844bdd4a74cf67f5f7
+TextScriptImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 177452
+  packageName: Play Mode Save
+  packageVersion: 4.1.7
+  assetPath: Assets/PluginMaster/PlayModeSave/Editor/Resources/PMSData.txt
+  uploadId: 918808

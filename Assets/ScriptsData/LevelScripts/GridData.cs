@@ -159,6 +159,22 @@ public class GridData : ScriptableObject
 
         public float spawnRadius = 0f;
 
+        [Header("Lock")]
+        [Tooltip("If true, this entrance spawns locked (emission off) and requires a soul via the tube to unlock.")]
+        public bool isLocked = false;
+
+        [Tooltip("The DoorLockHub prefab to spawn at lockHubAngle when isLocked is true.")]
+        public GameObject lockHubPrefab;
+
+        [Tooltip("Perimeter angle (degrees Y) where the DoorLockHub spawns. 0 = forward (+Z).")]
+        public float lockHubAngle;
+
+        [Tooltip("Grid-cell waypoints (col, row) drawn in the Grid Designer. Converted to world positions at runtime to build the soul tube spline.")]
+        public List<UnityEngine.Vector2Int> tubePath = new List<UnityEngine.Vector2Int>();
+
+        [Tooltip("Number of intermediate nodes auto-generated between the first and last tube waypoints.")]
+        public int tubeSubdivisions = 3;
+
         [Header("River Routing")]
         [Tooltip("Set automatically by LevelSelectArenaController at runtime. " +
                  "The RiverSegmentID.SegmentID of the level-select path that leads to this entrance.")]

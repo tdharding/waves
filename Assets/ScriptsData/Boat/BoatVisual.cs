@@ -5,6 +5,10 @@ public class BoatVisual : MonoBehaviour
     [Header("Assign the water plane (wave mesh)")]
     public Transform waterTransform;
 
+    [Header("Airborne (Boost tool)")]
+    [Tooltip("If assigned, wave-snapping is suspended while this is airborne.")]
+    public BoatMovement boatMovement;
+
     [Header("Wave Settings")]
     public float extraYOffset = 0f;
     public float sampleOffset = 0.2f;
@@ -29,6 +33,7 @@ public class BoatVisual : MonoBehaviour
     void LateUpdate()
     {
         if (waterTransform == null || mat == null) return;
+        if (boatMovement != null && boatMovement.IsAirborne) return;
         ApplyWaveAlignment();
     }
 

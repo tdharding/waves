@@ -34,7 +34,13 @@ class GridSnapshot
                 {
                     id = e.id, prefab = e.prefab, soulPrefab = e.soulPrefab,
                     perimeterAngle = e.perimeterAngle, tierSlot = e.tierSlot,
-                    spawnRadius = e.spawnRadius
+                    spawnRadius = e.spawnRadius,
+                    isLocked = e.isLocked, lockHubPrefab = e.lockHubPrefab,
+                    lockHubAngle = e.lockHubAngle,
+                    tubeSubdivisions = e.tubeSubdivisions,
+                    tubePath = e.tubePath != null
+                        ? new List<UnityEngine.Vector2Int>(e.tubePath)
+                        : new List<UnityEngine.Vector2Int>()
                 });
 
         orbIndices = new List<int>(orbs);
@@ -186,6 +192,26 @@ public class GridDesignerWindow : EditorWindow
     int  _dragSplinePathIdx   = -1;
     int  _dragSplineNodeIdx   = -1;
 
+    // ── Tube path modes ──
+    int _tubePlacingEntranceIndex = -1; // -1 = not in placement mode
+    int _tubeDrawEntranceIndex    = -1; // -1 = not in edit/drag mode
+    int _dragTubeNodeIndex        = -1; // index within tubePath being dragged
+    int _selectedTubeNodeIndex    = -1; // highlighted node
+
+    // ── Grid navigation ──
+    float   _gridZoom      = 1f;
+    Vector2 _gridPanOffset = Vector2.zero;
+    bool    _isPanningGrid = false;
+
+    float EffCell       => CellSize * _gridZoom;
+    float ZoomedGridSize => GridPixelSize * _gridZoom;
+
+    // ── Grid display settings (persisted via EditorPrefs) ──
+    float _gridLineOpacity    = 1f;
+    float _backdropBrightness = 0.08f;
+    const string PrefKeyGridOpacity    = "GridDesigner_GridLineOpacity";
+    const string PrefKeyBackdropBright = "GridDesigner_BackdropBrightness";
+
     Stack<GridSnapshot> undoStack = new Stack<GridSnapshot>();
     const int MaxUndoSteps = 50;
 
@@ -228,8 +254,10 @@ public class GridDesignerWindow : EditorWindow
     void OnEnable()
     {
         RefreshDiscoveredGrids();
-        prefabFolderPath = EditorPrefs.GetString("GridDesigner_PrefabFolder", "Assets/Prefab/MazePieces");
-        iconsFolderPath  = EditorPrefs.GetString("GridDesigner_IconsFolder",  "");
+        prefabFolderPath    = EditorPrefs.GetString("GridDesigner_PrefabFolder", "Assets/Prefab/MazePieces");
+        iconsFolderPath     = EditorPrefs.GetString("GridDesigner_IconsFolder",  "");
+        _gridLineOpacity    = EditorPrefs.GetFloat(PrefKeyGridOpacity,    1f);
+        _backdropBrightness = EditorPrefs.GetFloat(PrefKeyBackdropBright, 0.08f);
         ScanPrefabFolder();
         ScanSetPiecesLib();
         ScanStatuesLib();
@@ -697,7 +725,6 @@ public class GridDesignerWindow : EditorWindow
             DrawTimeTrialSection();
             DrawPrefabsSection();
             DrawStartRitualSection();
-            DrawSoulZonesSection();
             DrawWhirlpoolsSection();
         }
 
@@ -1973,6 +2000,7 @@ public class GridDesignerWindow : EditorWindow
         for (int i = 0; i < loadedData.entrances.Count; i++)
         {
             var ent = loadedData.entrances[i];
+            bool wasLocked = ent.isLocked;
             EditorGUI.BeginChangeCheck();
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
 
@@ -1987,19 +2015,179 @@ public class GridDesignerWindow : EditorWindow
             EditorGUIUtility.labelWidth = prevLabelWidth;
 
             EditorGUILayout.LabelField("°", GUILayout.Width(10));
+            GUI.backgroundColor = new Color(0.4f, 0.8f, 1f);
+            if (GUILayout.Button("↺", GUILayout.Width(22)))
+            {
+                Undo.RecordObject(loadedData, "Reset Entrance");
+                loadedData.entrances[i] = new GridData.ArenaEntrance
+                {
+                    id             = ent.id,
+                    perimeterAngle = ent.perimeterAngle,
+                };
+                EditorUtility.SetDirty(loadedData);
+            }
             GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
             if (GUILayout.Button("✕", GUILayout.Width(22))) entToRemove = i;
             GUI.backgroundColor = Color.white;
             EditorGUILayout.EndHorizontal();
 
-            // Row 2: Tier / SpawnRadius
+            // Row 2: Tier
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField("Tier", GUILayout.Width(28));
             int entTierPopup   = EditorGUILayout.Popup(Mathf.Clamp(ent.tierSlot + 1, 0, tierLabels.Length - 1), tierLabels, GUILayout.Width(72));
             int newEntTierSlot = entTierPopup - 1;
-            
             EditorGUILayout.EndHorizontal();
 
+            // Row 3: Locked toggle + hub angle
+            EditorGUILayout.BeginHorizontal();
+            bool newIsLocked = EditorGUILayout.ToggleLeft("Locked", ent.isLocked, GUILayout.Width(62));
+            float newHubAngle = ent.lockHubAngle;
+            GameObject newHubPrefab = ent.lockHubPrefab;
+            if (newIsLocked)
+            {
+                float prevLW2 = EditorGUIUtility.labelWidth;
+                EditorGUIUtility.labelWidth = 46f;
+                newHubAngle = EditorGUILayout.FloatField("Hub °", ent.lockHubAngle, GUILayout.Width(88));
+                EditorGUIUtility.labelWidth = prevLW2;
+            }
+            EditorGUILayout.EndHorizontal();
+
+            if (newIsLocked)
+            {
+                // Row 4: Hub prefab
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.LabelField("Hub Prefab", GUILayout.Width(70));
+                newHubPrefab = (GameObject)EditorGUILayout.ObjectField(ent.lockHubPrefab, typeof(GameObject), false);
+                EditorGUILayout.EndHorizontal();
+
+                // Row 5: Subdivisions + Regenerate
+                if (ent.tubePath == null) ent.tubePath = new List<UnityEngine.Vector2Int>();
+                EditorGUILayout.BeginHorizontal();
+                float prevLW3 = EditorGUIUtility.labelWidth;
+                EditorGUIUtility.labelWidth = 72f;
+                int newSubs = EditorGUILayout.IntField("Subdivisions", ent.tubeSubdivisions, GUILayout.Width(120));
+                EditorGUIUtility.labelWidth = prevLW3;
+                if (newSubs != ent.tubeSubdivisions)
+                {
+                    Undo.RecordObject(loadedData, "Set Tube Subdivisions");
+                    ent.tubeSubdivisions = Mathf.Max(0, newSubs);
+                    EditorUtility.SetDirty(loadedData);
+                }
+                GUI.enabled = ent.tubePath.Count >= 2;
+                if (GUILayout.Button("+", GUILayout.Width(22)))
+                {
+                    Undo.RecordObject(loadedData, "Subdivide Tube Path");
+                    var old = ent.tubePath;
+                    var subdivided = new List<UnityEngine.Vector2Int>();
+                    for (int si = 0; si < old.Count - 1; si++)
+                    {
+                        subdivided.Add(old[si]);
+                        var mid = new UnityEngine.Vector2Int(
+                            Mathf.RoundToInt((old[si].x + old[si + 1].x) * 0.5f),
+                            Mathf.RoundToInt((old[si].y + old[si + 1].y) * 0.5f));
+                        subdivided.Add(mid);
+                    }
+                    subdivided.Add(old[old.Count - 1]);
+                    ent.tubePath = subdivided;
+                    EditorUtility.SetDirty(loadedData);
+                }
+                if (GUILayout.Button("Regenerate", GUILayout.Width(78)))
+                    GenerateTubePath(i);
+                GUI.enabled = true;
+                EditorGUILayout.EndHorizontal();
+
+                // Row 6: Place / Edit / Clear
+                bool isPlacingThis = _tubePlacingEntranceIndex == i;
+                bool isEditingThis = _tubeDrawEntranceIndex == i;
+                EditorGUILayout.BeginHorizontal();
+                GUI.backgroundColor = isPlacingThis ? new Color(0.4f, 1f, 0.6f) : Color.white;
+                if (GUILayout.Button(isPlacingThis ? "● Placing…" : "Place Input Tube", GUILayout.Width(110)))
+                {
+                    if (isPlacingThis)
+                    {
+                        _tubePlacingEntranceIndex = -1;
+                    }
+                    else
+                    {
+                        _tubePlacingEntranceIndex = i;
+                        _tubeDrawEntranceIndex    = -1;
+                        _dragTubeNodeIndex        = -1;
+                        _selectedTubeNodeIndex    = -1;
+                    }
+                }
+                GUI.backgroundColor = Color.white;
+                if (ent.tubePath.Count > 0)
+                {
+                    GUI.backgroundColor = isEditingThis ? new Color(0.5f, 0.8f, 1f) : Color.white;
+                    if (GUILayout.Button(isEditingThis ? "● Editing" : "Edit Nodes", GUILayout.Width(76)))
+                    {
+                        if (isEditingThis)
+                        {
+                            _tubeDrawEntranceIndex = -1;
+                            _dragTubeNodeIndex     = -1;
+                            _selectedTubeNodeIndex = -1;
+                        }
+                        else
+                        {
+                            _tubeDrawEntranceIndex    = i;
+                            _tubePlacingEntranceIndex = -1;
+                        }
+                    }
+                    GUI.backgroundColor = Color.white;
+                }
+                GUI.backgroundColor = new Color(1f, 0.5f, 0.5f);
+                if (GUILayout.Button("✕", GUILayout.Width(24)))
+                {
+                    Undo.RecordObject(loadedData, "Clear Tube Path");
+                    ent.tubePath           = new List<UnityEngine.Vector2Int>();
+                    _tubePlacingEntranceIndex = -1;
+                    _tubeDrawEntranceIndex    = -1;
+                    _dragTubeNodeIndex        = -1;
+                    _selectedTubeNodeIndex    = -1;
+                    EditorUtility.SetDirty(loadedData);
+                }
+                GUI.backgroundColor = Color.white;
+                EditorGUILayout.LabelField($"{ent.tubePath.Count} nodes", GUILayout.Width(52));
+                EditorGUILayout.EndHorizontal();
+
+                // ── Knot breakdown ──
+                if (ent.tubePath != null && ent.tubePath.Count >= 2)
+                {
+                    int tubeKnots = 0;
+                    int hubKnots  = 0;
+                    const int bridgeKnots = 3; // SoulFishInputTube.joinKnotCount default
+
+                    var tubePrefabAsset = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefab/ModifierPrefabs/SoulFishInputTube.prefab");
+                    if (tubePrefabAsset != null)
+                    {
+                        var sc = tubePrefabAsset.GetComponentInChildren<UnityEngine.Splines.SplineContainer>();
+                        if (sc != null) tubeKnots = sc.Spline.Count;
+                    }
+
+                    if (ent.lockHubPrefab != null)
+                    {
+                        var hubPrefabPath = AssetDatabase.GetAssetPath(ent.lockHubPrefab);
+                        var hubAsset      = AssetDatabase.LoadAssetAtPath<GameObject>(hubPrefabPath);
+                        if (hubAsset != null)
+                        {
+                            var sc = hubAsset.GetComponentInChildren<UnityEngine.Splines.SplineContainer>();
+                            if (sc != null) hubKnots = sc.Spline.Count;
+                        }
+                    }
+
+                    int waypointKnots = Mathf.Max(0, ent.tubePath.Count - 2);
+                    int total         = tubeKnots + waypointKnots + bridgeKnots + hubKnots;
+
+                    EditorGUILayout.LabelField(
+                        $"Knots — tube:{tubeKnots}  path:{waypointKnots}  bridge:{bridgeKnots}  hub:{hubKnots}  = {total}",
+                        EditorStyles.miniLabel);
+                }
+            }
+            else
+            {
+                if (_tubeDrawEntranceIndex    == i) _tubeDrawEntranceIndex    = -1;
+                if (_tubePlacingEntranceIndex == i) _tubePlacingEntranceIndex = -1;
+            }
 
             EditorGUILayout.EndVertical();
 
@@ -2009,6 +2197,19 @@ public class GridDesignerWindow : EditorWindow
                 ent.id             = newEntID;
                 ent.perimeterAngle = newEntAngle;
                 ent.tierSlot       = newEntTierSlot;
+                ent.isLocked       = newIsLocked;
+                ent.lockHubAngle   = newHubAngle;
+                ent.lockHubPrefab  = newHubPrefab;
+
+                // When first locking an entrance, default hub angle to the door's own angle
+                if (newIsLocked && !wasLocked)
+                    ent.lockHubAngle = ent.perimeterAngle;
+
+                // Auto-assign default lock hub prefab when locking an entrance
+                if (newIsLocked && ent.lockHubPrefab == null)
+                    ent.lockHubPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                        "Assets/Prefab/LevelPrefabs/DoorLockHub.prefab");
+
                 EditorUtility.SetDirty(loadedData);
                 Repaint();
             }
@@ -2018,6 +2219,10 @@ public class GridDesignerWindow : EditorWindow
         {
             Undo.RecordObject(loadedData, "Remove Entrance");
             loadedData.entrances.RemoveAt(entToRemove);
+            if (_tubeDrawEntranceIndex    == entToRemove) { _tubeDrawEntranceIndex    = -1; _dragTubeNodeIndex = -1; _selectedTubeNodeIndex = -1; }
+            else if (_tubeDrawEntranceIndex    > entToRemove) _tubeDrawEntranceIndex--;
+            if (_tubePlacingEntranceIndex == entToRemove)   _tubePlacingEntranceIndex = -1;
+            else if (_tubePlacingEntranceIndex > entToRemove) _tubePlacingEntranceIndex--;
             EditorUtility.SetDirty(loadedData);
         }
 
@@ -2044,6 +2249,25 @@ public class GridDesignerWindow : EditorWindow
     void DrawRightPanel()
     {
         EditorGUILayout.BeginVertical(GUILayout.ExpandWidth(false));
+
+        // ── Grid display controls ──
+        EditorGUILayout.BeginHorizontal();
+        float prevLW = EditorGUIUtility.labelWidth;
+        EditorGUIUtility.labelWidth = 80f;
+        EditorGUI.BeginChangeCheck();
+        float newOpacity    = EditorGUILayout.Slider("Grid Lines", _gridLineOpacity,    0f, 1f);
+        float newBrightness = EditorGUILayout.Slider("Backdrop",   _backdropBrightness, 0f, 1f);
+        if (EditorGUI.EndChangeCheck())
+        {
+            _gridLineOpacity    = newOpacity;
+            _backdropBrightness = newBrightness;
+            EditorPrefs.SetFloat(PrefKeyGridOpacity,    _gridLineOpacity);
+            EditorPrefs.SetFloat(PrefKeyBackdropBright, _backdropBrightness);
+            Repaint();
+        }
+        EditorGUIUtility.labelWidth = prevLW;
+        EditorGUILayout.EndHorizontal();
+
         DrawGrid();
         EditorGUILayout.EndVertical();
         DrawRightPanelResizeHandle();
@@ -2271,6 +2495,7 @@ public class GridDesignerWindow : EditorWindow
         DrawToolButtons();
         DrawPrefabLibrarySection();
         if (loadedData != null) DrawSplineWallsSection();
+        if (loadedData != null) DrawSoulZonesSection();
 
         if (loadedData != null && loadedData.linkedPairs != null && loadedData.linkedPairs.Count > 0)
         {
@@ -2334,15 +2559,53 @@ public class GridDesignerWindow : EditorWindow
 
     void DrawGrid()
     {
-        Rect rect = GUILayoutUtility.GetRect(GridPixelSize, GridPixelSize,
+        // Fixed viewport — layout size never changes
+        Rect viewRect = GUILayoutUtility.GetRect(GridPixelSize, GridPixelSize,
             GUILayout.ExpandWidth(false), GUILayout.ExpandHeight(false));
 
-        Handles.BeginGUI();
-        Handles.color = new Color(1f, 1f, 1f, 0.08f);
-        Handles.DrawSolidDisc(rect.center, Vector3.forward, GridPixelSize * 0.5f);
-        Handles.EndGUI();
-
         Event e = Event.current;
+
+        // ── Navigation ──
+        if (viewRect.Contains(e.mousePosition))
+        {
+            if (e.type == EventType.ScrollWheel)
+            {
+                float prevZoom = _gridZoom;
+                _gridZoom = Mathf.Clamp(_gridZoom - e.delta.y * 0.05f, 0.3f, 4f);
+                // Zoom around mouse position
+                Vector2 mouseLocal = e.mousePosition - viewRect.position - _gridPanOffset;
+                _gridPanOffset    -= mouseLocal * (_gridZoom / prevZoom - 1f);
+                e.Use();
+                Repaint();
+            }
+            if (e.type == EventType.MouseDown && e.button == 2)
+            {
+                _isPanningGrid = true;
+                e.Use();
+            }
+        }
+        if (e.type == EventType.MouseDrag && e.button == 2 && _isPanningGrid)
+        {
+            _gridPanOffset += e.delta;
+            e.Use();
+            Repaint();
+        }
+        if (e.type == EventType.MouseUp && e.button == 2)
+        {
+            _isPanningGrid = false;
+            e.Use();
+        }
+
+        // Draw rect — panned and zoomed, may extend beyond viewport
+        Rect rect = new Rect(
+            viewRect.x + _gridPanOffset.x,
+            viewRect.y + _gridPanOffset.y,
+            ZoomedGridSize, ZoomedGridSize);
+
+        Handles.BeginGUI();
+        Handles.color = new Color(1f, 1f, 1f, _backdropBrightness);
+        Handles.DrawSolidDisc(rect.center, Vector3.forward, ZoomedGridSize * 0.5f);
+        Handles.EndGUI();
 
         // Spline wall input — handled at rect level before cell loop so nodes are free-floating
         if (_drawSplineWall && loadedData != null)
@@ -2352,12 +2615,21 @@ public class GridDesignerWindow : EditorWindow
         if (drawSelect && loadedData != null)
             HandleSelectSplineWallInput(rect, e);
 
+        // Tube path placement mode — mouse preview + click to place
+        if (_tubePlacingEntranceIndex >= 0 && loadedData != null)
+            HandleTubePlacementInput(rect, e);
+
+        // Tube path edit/drag mode
+        if (_tubeDrawEntranceIndex >= 0 && loadedData != null)
+            HandleTubePathInput(rect, e);
+
         for (int y = 0; y < GridSize; y++)
         {
             for (int x = 0; x < GridSize; x++)
             {
                 int  index = y * GridSize + x;
-                Rect cell  = new Rect(rect.x + x * CellSize, rect.y + y * CellSize, CellSize, CellSize);
+                Rect cell  = new Rect(rect.x + x * EffCell, rect.y + y * EffCell, EffCell, EffCell);
+                if (!viewRect.Overlaps(cell)) continue; // skip cells outside viewport
 
                 // Base layer alpha: full when active or no tiers exist, faint when a tier is active
                 float baseAlpha = (!baseLayerVisible) ? 0f :
@@ -2377,7 +2649,7 @@ public class GridDesignerWindow : EditorWindow
                     {
                         Color c = slotColors[circ - 1]; c.a = baseAlpha;
                         Handles.color = c;
-                        Handles.DrawSolidDisc(cell.center, Vector3.forward, CellSize * 0.3f);
+                        Handles.DrawSolidDisc(cell.center, Vector3.forward, EffCell * 0.3f);
                     }
 
                     // Soul zones — draw node markers and connecting lines
@@ -2393,7 +2665,7 @@ public class GridDesignerWindow : EditorWindow
                             if (nodeIdx >= 0)
                             {
                                 Handles.color = zc;
-                                Handles.DrawSolidDisc(cell.center, Vector3.forward, CellSize * 0.38f);
+                                Handles.DrawSolidDisc(cell.center, Vector3.forward, EffCell * 0.38f);
                                 Handles.color = new Color(0f, 0f, 0f, baseAlpha);
                                 Handles.Label(cell.center - new Vector2(4f, 6f), $"Z{zi}");
                             }
@@ -2403,7 +2675,7 @@ public class GridDesignerWindow : EditorWindow
                     if (_isDrawingSoulArea && _drawingNodes.Contains(index))
                     {
                         Handles.color = new Color(1f, 1f, 1f, baseAlpha * 0.7f);
-                        Handles.DrawSolidDisc(cell.center, Vector3.forward, CellSize * 0.3f);
+                        Handles.DrawSolidDisc(cell.center, Vector3.forward, EffCell * 0.3f);
                     }
 
                     // Selection highlight (removed from loop, moved to overlay)
@@ -2419,13 +2691,13 @@ public class GridDesignerWindow : EditorWindow
                                 && endZone.nodes[_bridgeEndNodeIndex] == index)
                             {
                                 Handles.color = new Color(0.4f, 0.8f, 1f, baseAlpha);
-                                Handles.DrawWireDisc(cell.center, Vector3.forward, CellSize * 0.44f);
+                                Handles.DrawWireDisc(cell.center, Vector3.forward, EffCell * 0.44f);
                             }
                         }
                         if (_bridgeNodes.Contains(index))
                         {
                             Handles.color = new Color(0.4f, 0.8f, 1f, baseAlpha * 0.6f);
-                            Handles.DrawSolidDisc(cell.center, Vector3.forward, CellSize * 0.28f);
+                            Handles.DrawSolidDisc(cell.center, Vector3.forward, EffCell * 0.28f);
                         }
                     }
 
@@ -2433,14 +2705,14 @@ public class GridDesignerWindow : EditorWindow
                     if (loadedData?.orbCellIndices != null && loadedData.orbCellIndices.Contains(index))
                     {
                         Handles.color = new Color(1f, 1f, 0f, baseAlpha);
-                        Handles.DrawWireDisc(cell.center, Vector3.forward, CellSize * 0.35f);
+                        Handles.DrawWireDisc(cell.center, Vector3.forward, EffCell * 0.35f);
                     }
 
                     // Water Level Modifier
                     if (loadedData?.waterLevelModifierCellIndices != null && loadedData.waterLevelModifierCellIndices.Contains(index))
                     {
                         Handles.color = new Color(0.4f, 0.8f, 1f, baseAlpha);
-                        Handles.DrawSolidDisc(cell.center, Vector3.forward, CellSize * 0.38f);
+                        Handles.DrawSolidDisc(cell.center, Vector3.forward, EffCell * 0.38f);
                         Handles.color = new Color(1f, 1f, 1f, baseAlpha);
                         Handles.Label(cell.center - new Vector2(4f, 6f), "W");
                     }
@@ -2449,7 +2721,7 @@ public class GridDesignerWindow : EditorWindow
                     if (loadedData?.waveModifierCellIndices != null && loadedData.waveModifierCellIndices.Contains(index))
                     {
                         Handles.color = new Color(0.4f, 1f, 0.4f, baseAlpha);
-                        Handles.DrawSolidDisc(cell.center, Vector3.forward, CellSize * 0.38f);
+                        Handles.DrawSolidDisc(cell.center, Vector3.forward, EffCell * 0.38f);
                         Handles.color = new Color(0f, 0f, 0f, baseAlpha);
                         Handles.Label(cell.center - new Vector2(4f, 6f), "~");
                     }
@@ -2458,7 +2730,7 @@ public class GridDesignerWindow : EditorWindow
                     if (loadedData?.whirlpools != null && loadedData.whirlpools.Exists(w => w.cellIndex == index))
                     {
                         Handles.color = new Color(0.6f, 0.2f, 1f, baseAlpha);
-                        Handles.DrawSolidDisc(cell.center, Vector3.forward, CellSize * 0.38f);
+                        Handles.DrawSolidDisc(cell.center, Vector3.forward, EffCell * 0.38f);
                         Handles.color = new Color(1f, 1f, 1f, baseAlpha);
                         Handles.Label(cell.center - new Vector2(4f, 6f), "〇");
                     }
@@ -2506,7 +2778,7 @@ public class GridDesignerWindow : EditorWindow
                                 Color c = slotColors[tc - 1]; c.a = a;
                                 float inset = 2f;
                                 EditorGUI.DrawRect(new Rect(cell.x + inset, cell.y + inset,
-                                    CellSize - inset * 2, CellSize - inset * 2), c);
+                                    EffCell - inset * 2, EffCell - inset * 2), c);
                                 if (isActive)
                                 {
                                     Handles.color = Color.white;
@@ -2519,7 +2791,7 @@ public class GridDesignerWindow : EditorWindow
                         if (tier.waterLevelModifierCellIndices != null && tier.waterLevelModifierCellIndices.Contains(index))
                         {
                             Handles.color = new Color(0.4f, 0.8f, 1f, a);
-                            Handles.DrawSolidDisc(cell.center, Vector3.forward, CellSize * 0.38f);
+                            Handles.DrawSolidDisc(cell.center, Vector3.forward, EffCell * 0.38f);
                             Handles.color = new Color(1f, 1f, 1f, a);
                             Handles.Label(cell.center - new Vector2(4f, 6f), "W");
                         }
@@ -2528,7 +2800,7 @@ public class GridDesignerWindow : EditorWindow
                         if (tier.waveModifierCellIndices != null && tier.waveModifierCellIndices.Contains(index))
                         {
                             Handles.color = new Color(0.4f, 1f, 0.4f, a);
-                            Handles.DrawSolidDisc(cell.center, Vector3.forward, CellSize * 0.38f);
+                            Handles.DrawSolidDisc(cell.center, Vector3.forward, EffCell * 0.38f);
                             Handles.color = new Color(0f, 0f, 0f, a);
                             Handles.Label(cell.center - new Vector2(4f, 6f), "~");
                         }
@@ -2654,8 +2926,12 @@ public class GridDesignerWindow : EditorWindow
                 }
                 }
 
-                EditorGUI.DrawRect(new Rect(cell.x, cell.y, CellSize, 1), Color.black);
-                EditorGUI.DrawRect(new Rect(cell.x, cell.y, 1, CellSize), Color.black);
+                if (_gridLineOpacity > 0f)
+                {
+                    Color gridLineCol = new Color(0f, 0f, 0f, _gridLineOpacity);
+                    EditorGUI.DrawRect(new Rect(cell.x, cell.y, EffCell, 1), gridLineCol);
+                    EditorGUI.DrawRect(new Rect(cell.x, cell.y, 1, EffCell), gridLineCol);
+                }
             }
         }
 
@@ -2757,11 +3033,11 @@ public class GridDesignerWindow : EditorWindow
                 }
 
                 Handles.color = Color.white;
-                Handles.DrawWireDisc(center, Vector3.forward, CellSize * 0.55f, 3.5f);
+                Handles.DrawWireDisc(center, Vector3.forward, EffCell * 0.55f, 3.5f);
 
                 if (_currentSelection.type == SelectionType.SoulZoneNode)
                 {
-                    Handles.DrawSolidDisc(center, Vector3.forward, CellSize * 0.2f);
+                    Handles.DrawSolidDisc(center, Vector3.forward, EffCell * 0.2f);
                 }
             }
 
@@ -2788,6 +3064,12 @@ public class GridDesignerWindow : EditorWindow
                     Handles.DrawLine(a, b, 1.5f);
                 }
             }
+
+            // Entrance + lock hub markers on the arena circumference
+            DrawEntranceOverlay(rect);
+
+            // Tube path overlays — one colour per entrance, active entrance highlighted
+            DrawTubePathOverlay(rect);
 
             // Spline wall overlay — drawn on top of all other overlays
             DrawSplineWallOverlay(rect);
@@ -2865,6 +3147,22 @@ public class GridDesignerWindow : EditorWindow
                         Repaint();
                     }
                 }
+            }
+        }
+
+        // Tube modes — consume Enter/Escape before GUI sees them (prevents toggling Locked checkbox)
+        if (loadedData != null && (_tubePlacingEntranceIndex >= 0 || _tubeDrawEntranceIndex >= 0))
+        {
+            Event te = Event.current;
+            if (te.type == EventType.KeyDown &&
+                (te.keyCode == KeyCode.Return || te.keyCode == KeyCode.KeypadEnter || te.keyCode == KeyCode.Escape))
+            {
+                _tubePlacingEntranceIndex = -1;
+                _tubeDrawEntranceIndex    = -1;
+                _dragTubeNodeIndex        = -1;
+                _selectedTubeNodeIndex    = -1;
+                te.Use();
+                Repaint();
             }
         }
 
@@ -2958,8 +3256,8 @@ public class GridDesignerWindow : EditorWindow
     {
         int x = cellIndex % GridSize;
         int y = cellIndex / GridSize;
-        return new Vector2(gridRect.x + x * CellSize + CellSize * 0.5f,
-                           gridRect.y + y * CellSize + CellSize * 0.5f);
+        return new Vector2(gridRect.x + x * EffCell + EffCell * 0.5f,
+                           gridRect.y + y * EffCell + EffCell * 0.5f);
     }
 
     // Derives how many grid pixels equal one world unit, using the arena profile's
@@ -2973,12 +3271,12 @@ public class GridDesignerWindow : EditorWindow
 
         if (worldWidth <= 0f) return -1f;
 
-        return (CellSize * GridSize) / worldWidth;
+        return (EffCell * GridSize) / worldWidth;
     }
 
     void DrawPortalOverlay(Rect gridRect)
 {
-        const float ringRadius   = GridPixelSize * 0.5f + 14f;
+        float ringRadius   = ZoomedGridSize * 0.5f + 14f;
         const float arrowLen     = 10f;
         const float dotRadius    = 5f;
         Vector2     centre       = gridRect.center;
@@ -3077,6 +3375,11 @@ public class GridDesignerWindow : EditorWindow
         GUI.backgroundColor = new Color(0.4f, 1f, 0.5f);
         if (GUILayout.Button("Test Level"))
             GameTesterTool.LaunchScene("Waves1", loadedData, null);
+        if (GUILayout.Button("Test Level (Fresh Save)"))
+        {
+            GameProgressData.ClearUnlocks();
+            GameTesterTool.LaunchScene("Waves1", loadedData, null);
+        }
         GUI.backgroundColor = Color.white;
         EditorGUI.EndDisabledGroup();
     }
@@ -3131,7 +3434,13 @@ public class GridDesignerWindow : EditorWindow
                 {
                     id = e.id, prefab = e.prefab, soulPrefab = e.soulPrefab,
                     perimeterAngle = e.perimeterAngle, tierSlot = e.tierSlot,
-                    spawnRadius = e.spawnRadius
+                    spawnRadius = e.spawnRadius,
+                    isLocked = e.isLocked, lockHubPrefab = e.lockHubPrefab,
+                    lockHubAngle = e.lockHubAngle,
+                    tubeSubdivisions = e.tubeSubdivisions,
+                    tubePath = e.tubePath != null
+                        ? new List<UnityEngine.Vector2Int>(e.tubePath)
+                        : new List<UnityEngine.Vector2Int>()
                 });
 
         data.soulSpawnPoints = new List<GridData.SoulSpawnPoint>();
@@ -3557,6 +3866,266 @@ public class GridDesignerWindow : EditorWindow
         }
     }
 
+    // Converts a perimeter angle (degrees, 0=forward/+Z, clockwise) to a pixel position on the canvas circumference
+    Vector2 AngleToCircumferencePixel(Rect gridRect, float angleDeg, float radiusScale = 1f)
+    {
+        float rad    = angleDeg * Mathf.Deg2Rad;
+        float radius = ZoomedGridSize * 0.5f * radiusScale;
+        return new Vector2(gridRect.center.x + Mathf.Sin(rad) * radius,
+                           gridRect.center.y - Mathf.Cos(rad) * radius);
+    }
+
+    void DrawEntranceOverlay(Rect rect)
+    {
+        if (loadedData?.entrances == null) return;
+
+        foreach (var ent in loadedData.entrances)
+        {
+            if (!ent.isLocked) continue;
+
+            Vector2 lockPt = AngleToCircumferencePixel(rect, ent.lockHubAngle, 1f);
+            Handles.color = Color.black;
+            Handles.DrawSolidDisc(lockPt, Vector3.forward, 6f);
+            Handles.color = new Color(1f, 0.85f, 0.1f);
+            Handles.DrawSolidDisc(lockPt, Vector3.forward, 3.5f);
+            Handles.Label(lockPt + new Vector2(5f, -8f), "[L]");
+        }
+    }
+
+    // Returns the pixel-center of a grid cell
+    Vector2 CellToGridPixel(Rect rect, int cx, int cy) =>
+        new Vector2(rect.x + cx * EffCell + EffCell * 0.5f,
+                    rect.y + cy * EffCell + EffCell * 0.5f);
+
+    // Converts an angle+radius on the arena circumference to the nearest clamped grid cell
+    UnityEngine.Vector2Int HubAngleToGridCell(Rect rect, float angleDeg)
+    {
+        Vector2 px = AngleToCircumferencePixel(rect, angleDeg, 1f);
+        int cx = Mathf.Clamp(Mathf.FloorToInt((px.x - rect.x) / EffCell), 0, GridSize - 1);
+        int cy = Mathf.Clamp(Mathf.FloorToInt((px.y - rect.y) / EffCell), 0, GridSize - 1);
+        return new UnityEngine.Vector2Int(cx, cy);
+    }
+
+    void HandleTubePlacementInput(Rect rect, Event e)
+    {
+        // Repaint every frame so the preview follows the mouse
+        if (e.type == EventType.MouseMove || e.type == EventType.MouseDrag)
+            Repaint();
+
+        if (!rect.Contains(e.mousePosition)) return;
+
+        if (e.type == EventType.MouseDown && e.button == 0)
+        {
+            int mx = Mathf.Clamp(Mathf.FloorToInt((e.mousePosition.x - rect.x) / EffCell), 0, GridSize - 1);
+            int my = Mathf.Clamp(Mathf.FloorToInt((e.mousePosition.y - rect.y) / EffCell), 0, GridSize - 1);
+
+            var ent = loadedData.entrances[_tubePlacingEntranceIndex];
+            var tubeCell = new UnityEngine.Vector2Int(mx, my);
+            var hubCell  = HubAngleToGridCell(rect, ent.lockHubAngle);
+
+            Undo.RecordObject(loadedData, "Place Input Tube");
+            ent.tubePath = new List<UnityEngine.Vector2Int>();
+
+            // Path: input tube → intermediate nodes → hub
+            ent.tubePath.Add(tubeCell);
+            int total = ent.tubeSubdivisions + 2;
+            for (int si = 1; si < total - 1; si++)
+            {
+                float t  = (float)si / (total - 1);
+                int   cx = Mathf.RoundToInt(Mathf.Lerp(tubeCell.x, hubCell.x, t));
+                int   cy = Mathf.RoundToInt(Mathf.Lerp(tubeCell.y, hubCell.y, t));
+                ent.tubePath.Add(new UnityEngine.Vector2Int(cx, cy));
+            }
+            ent.tubePath.Add(hubCell);
+
+            _tubePlacingEntranceIndex = -1;
+            _selectedTubeNodeIndex    = -1;
+            EditorUtility.SetDirty(loadedData);
+            e.Use();
+            Repaint();
+        }
+    }
+
+    void GenerateTubePath(int entranceIndex)
+    {
+        var ent = loadedData.entrances[entranceIndex];
+        if (ent.tubePath == null || ent.tubePath.Count < 2) return;
+
+        Undo.RecordObject(loadedData, "Generate Tube Path");
+        var first = ent.tubePath[0];
+        var last  = ent.tubePath[ent.tubePath.Count - 1];
+
+        ent.tubePath.Clear();
+        ent.tubePath.Add(first);
+
+        int total = ent.tubeSubdivisions + 2; // first + subdivisions + last
+        for (int si = 1; si < total - 1; si++)
+        {
+            float t  = (float)si / (total - 1);
+            int   cx = Mathf.RoundToInt(Mathf.Lerp(first.x, last.x, t));
+            int   cy = Mathf.RoundToInt(Mathf.Lerp(first.y, last.y, t));
+            ent.tubePath.Add(new UnityEngine.Vector2Int(cx, cy));
+        }
+
+        ent.tubePath.Add(last);
+        _selectedTubeNodeIndex = -1;
+        EditorUtility.SetDirty(loadedData);
+        Repaint();
+    }
+
+    void HandleTubePathInput(Rect rect, Event e)
+    {
+        if (!rect.Contains(e.mousePosition)) return;
+
+        int x = Mathf.FloorToInt((e.mousePosition.x - rect.x) / EffCell);
+        int y = Mathf.FloorToInt((e.mousePosition.y - rect.y) / EffCell);
+        if (x < 0 || x >= GridSize || y < 0 || y >= GridSize) return;
+
+        var entrance = loadedData.entrances[_tubeDrawEntranceIndex];
+        if (entrance.tubePath == null) entrance.tubePath = new List<UnityEngine.Vector2Int>();
+
+        var cell = new UnityEngine.Vector2Int(x, y);
+
+        int lockedIdx = entrance.tubePath.Count - 1; // last node is locked to hub position
+
+        if (e.type == EventType.MouseDown && e.button == 0)
+        {
+            int hitNode = entrance.tubePath.IndexOf(cell);
+            if (hitNode >= 0 && hitNode != lockedIdx)
+            {
+                _dragTubeNodeIndex     = hitNode;
+                _selectedTubeNodeIndex = hitNode;
+                e.Use();
+                Repaint();
+            }
+        }
+        else if (e.type == EventType.MouseDrag && e.button == 0 && _dragTubeNodeIndex >= 0)
+        {
+            if (_dragTubeNodeIndex < entrance.tubePath.Count && entrance.tubePath[_dragTubeNodeIndex] != cell)
+            {
+                Undo.RecordObject(loadedData, "Move Tube Waypoint");
+                entrance.tubePath[_dragTubeNodeIndex] = cell;
+                _selectedTubeNodeIndex = _dragTubeNodeIndex;
+                EditorUtility.SetDirty(loadedData);
+                e.Use();
+                Repaint();
+            }
+        }
+        else if (e.type == EventType.MouseUp && e.button == 0)
+        {
+            _dragTubeNodeIndex = -1;
+            e.Use();
+        }
+    }
+
+    void DrawTubePathOverlay(Rect rect)
+    {
+        if (loadedData?.entrances == null) return;
+
+        Color[] tubePalette =
+        {
+            new Color(1f,   0.5f, 0f,   1f),
+            new Color(0.2f, 0.8f, 1f,   1f),
+            new Color(0.8f, 0.3f, 1f,   1f),
+            new Color(0.3f, 1f,   0.4f, 1f),
+        };
+
+        // ── Placement preview ──────────────────────────────────────────
+        if (_tubePlacingEntranceIndex >= 0 && _tubePlacingEntranceIndex < loadedData.entrances.Count
+            && rect.Contains(Event.current.mousePosition))
+        {
+            var  ent  = loadedData.entrances[_tubePlacingEntranceIndex];
+            Color pc  = tubePalette[_tubePlacingEntranceIndex % tubePalette.Length];
+
+            // Hub position on canvas
+            Vector2 hubPx = AngleToCircumferencePixel(rect, ent.lockHubAngle, 1f);
+
+            // Mouse position snapped to cell center
+            int mx = Mathf.Clamp(Mathf.FloorToInt((Event.current.mousePosition.x - rect.x) / EffCell), 0, GridSize - 1);
+            int my = Mathf.Clamp(Mathf.FloorToInt((Event.current.mousePosition.y - rect.y) / EffCell), 0, GridSize - 1);
+            Vector2 tubePx = CellToGridPixel(rect, mx, my);
+
+            // Draw preview line hub → tube
+            Handles.color = new Color(pc.r, pc.g, pc.b, 0.5f);
+            Handles.DrawDottedLine(hubPx, tubePx, 4f);
+
+            // Intermediate node previews
+            int total = ent.tubeSubdivisions + 2;
+            for (int si = 1; si < total - 1; si++)
+            {
+                float t = (float)si / (total - 1);
+                Vector2 np = Vector2.Lerp(tubePx, hubPx, t);
+                Handles.color = new Color(pc.r, pc.g, pc.b, 0.7f);
+                Handles.DrawSolidDisc(np, Vector3.forward, EffCell * 0.22f);
+            }
+
+            // Input tube dot at cursor (bright)
+            Handles.color = pc;
+            Handles.DrawSolidDisc(tubePx, Vector3.forward, EffCell * 0.35f);
+            Handles.color = Color.white;
+            Handles.DrawWireDisc(tubePx, Vector3.forward, EffCell * 0.45f, 2f);
+            Handles.Label(tubePx + new Vector2(6f, -8f), "Input Tube");
+        }
+
+        // ── Sync last node of each path to current hub position ────────
+        foreach (var ent in loadedData.entrances)
+        {
+            if (!ent.isLocked || ent.tubePath == null || ent.tubePath.Count < 2) continue;
+            var hubCell = HubAngleToGridCell(rect, ent.lockHubAngle);
+            if (ent.tubePath[ent.tubePath.Count - 1] != hubCell)
+            {
+                ent.tubePath[ent.tubePath.Count - 1] = hubCell;
+                EditorUtility.SetDirty(loadedData);
+            }
+        }
+
+        // ── Placed paths ───────────────────────────────────────────────
+        for (int ei = 0; ei < loadedData.entrances.Count; ei++)
+        {
+            var ent = loadedData.entrances[ei];
+            if (!ent.isLocked || ent.tubePath == null || ent.tubePath.Count == 0) continue;
+
+            bool active = _tubeDrawEntranceIndex == ei;
+            Color c = tubePalette[ei % tubePalette.Length];
+            c.a = active ? 1f : 0.55f;
+            Handles.color = c;
+
+            // Connecting lines
+            for (int pi = 0; pi < ent.tubePath.Count - 1; pi++)
+            {
+                Vector2 a = CellToGridPixel(rect, ent.tubePath[pi].x,     ent.tubePath[pi].y);
+                Vector2 b = CellToGridPixel(rect, ent.tubePath[pi + 1].x, ent.tubePath[pi + 1].y);
+                Handles.DrawLine(a, b, active ? 2.5f : 1.5f);
+            }
+
+            // Node dots + labels
+            for (int pi = 0; pi < ent.tubePath.Count; pi++)
+            {
+                Vector2 center = CellToGridPixel(rect, ent.tubePath[pi].x, ent.tubePath[pi].y);
+                float radius   = pi == 0 ? EffCell * 0.35f : EffCell * 0.25f; // input tube slightly larger
+                Handles.color = c;
+                Handles.DrawSolidDisc(center, Vector3.forward, radius);
+
+                if (active && pi == _selectedTubeNodeIndex)
+                {
+                    Handles.color = Color.white;
+                    Handles.DrawWireDisc(center, Vector3.forward, radius + EffCell * 0.1f, 2f);
+                }
+
+                Handles.color = Color.black;
+                Handles.Label(center - new Vector2(3f, 6f), pi.ToString());
+            }
+
+            // Label first node as input tube
+            if (ent.tubePath.Count > 0)
+            {
+                Vector2 labelPos = CellToGridPixel(rect, ent.tubePath[0].x, ent.tubePath[0].y);
+                Handles.color = Color.white;
+                Handles.Label(labelPos + new Vector2(6f, -8f), $"[Tube] {ent.id}");
+            }
+        }
+    }
+
     void HandleSplineWallInput(Rect rect, Event e)
     {
         if (loadedData.splineWallPaths == null)
@@ -3677,31 +4246,49 @@ public class GridDesignerWindow : EditorWindow
             int n        = path.nodes.Count;
             int segCount = path.isClosed ? n : n - 1;
 
-            // Draw spline curve or straight segments (per-segment)
+            // Draw spline curve or straight segments — black outline pass then white fill pass
             if (n >= 2)
             {
-                Handles.color = col;
-                float lineW = isActive ? 2.5f : 1.5f;
                 const int samplesPerSeg = 16;
+                float outlineW = isActive ? 7f : 5f;
+                float fillW    = isActive ? 4f : 2.5f;
 
+                // Build one continuous polyline across all segments, then draw outline then fill
+                var polyPoints = new List<Vector3>();
                 for (int seg = 0; seg < segCount; seg++)
                 {
                     bool curved = path.IsSegmentCurved(seg);
                     int  i2     = path.isClosed ? (seg + 1) % n : seg + 1;
+                    if (seg == 0)
+                    {
+                        Vector2 start = curved
+                            ? WorldXZToPixel(rect, SplineWallSample(path.nodes, seg, 0f, path.isClosed))
+                            : WorldXZToPixel(rect, path.nodes[0]);
+                        polyPoints.Add((Vector3)start);
+                    }
                     if (curved)
                     {
-                        Vector2 prev2d = WorldXZToPixel(rect, SplineWallSample(path.nodes, seg, 0f, path.isClosed));
                         for (int s = 1; s <= samplesPerSeg; s++)
                         {
-                            Vector2 next = WorldXZToPixel(rect, SplineWallSample(path.nodes, seg, (float)s / samplesPerSeg, path.isClosed));
-                            Handles.DrawLine(prev2d, next, lineW);
-                            prev2d = next;
+                            Vector2 pt = WorldXZToPixel(rect, SplineWallSample(path.nodes, seg, (float)s / samplesPerSeg, path.isClosed));
+                            polyPoints.Add((Vector3)pt);
                         }
                     }
                     else
                     {
-                        Handles.DrawLine(WorldXZToPixel(rect, path.nodes[seg]), WorldXZToPixel(rect, path.nodes[i2]), lineW);
+                        polyPoints.Add((Vector3)WorldXZToPixel(rect, path.nodes[i2]));
                     }
+                }
+                if (path.isClosed && polyPoints.Count > 1)
+                    polyPoints.Add(polyPoints[0]);
+
+                if (polyPoints.Count >= 2)
+                {
+                    Vector3[] pts = polyPoints.ToArray();
+                    Handles.color = Color.black;
+                    Handles.DrawAAPolyLine(outlineW, pts);
+                    Handles.color = Color.white;
+                    Handles.DrawAAPolyLine(fillW, pts);
                 }
             }
 
@@ -3712,19 +4299,25 @@ public class GridDesignerWindow : EditorWindow
                 bool    isDragNode  = pi == _dragSplinePathIdx && ni == _dragSplineNodeIdx;
                 float   r           = isActive ? 5f : 3.5f;
 
-                Handles.color = isDragNode ? Color.white : col;
-                Handles.DrawSolidDisc(px, Vector3.forward, r);
+                float nodeOuter = isActive ? 8f : 6f;
+                float nodeInner = isActive ? 5.5f : 4f;
+                Handles.color = Color.black;
+                Handles.DrawSolidDisc(px, Vector3.forward, nodeOuter);
+                Handles.color = isDragNode ? new Color(1f, 0.4f, 0f) : Color.white;
+                Handles.DrawSolidDisc(px, Vector3.forward, nodeInner);
 
                 if (ni == 0)
                 {
-                    Handles.color = new Color(col.r, col.g, col.b, col.a * 0.55f);
-                    Handles.DrawWireDisc(px, Vector3.forward, r + 2.5f, 1.5f);
+                    Handles.color = Color.black;
+                    Handles.DrawWireDisc(px, Vector3.forward, nodeOuter + 2.5f, 2f);
                 }
 
                 if (isActive && n <= 30)
                 {
-                    Handles.color = Color.white;
-                    Handles.Label(px + new Vector2(6f, -8f), ni.ToString(), EditorStyles.miniLabel);
+                    // Label in the opposite colour so it reads on both white and black paths
+                    Color labelCol = (col == Color.white) ? Color.black : Color.white;
+                    GUIStyle labelStyle = new GUIStyle(EditorStyles.miniLabel) { normal = { textColor = labelCol } };
+                    Handles.Label(px + new Vector2(6f, -8f), ni.ToString(), labelStyle);
                 }
             }
         }
@@ -3755,29 +4348,22 @@ public class GridDesignerWindow : EditorWindow
 
     Color GetSplineWallColor(int pathIdx)
     {
-        Color[] palette = {
-            new Color(1.0f, 0.55f, 0.1f),
-            new Color(0.9f, 0.9f, 0.1f),
-            new Color(0.2f, 1.0f, 0.5f),
-            new Color(0.1f, 0.8f, 1.0f),
-            new Color(0.9f, 0.2f, 1.0f),
-            new Color(1.0f, 0.3f, 0.3f),
-        };
-        return palette[pathIdx % palette.Length];
+        // Alternate black/white so multiple paths remain distinguishable without colour
+        return (pathIdx % 2 == 0) ? Color.white : Color.black;
     }
 
     // Nodes are stored in normalised grid space (-0.5..0.5), independent of arena size.
     // Multiply by arenaWorldWidth at runtime to get world positions.
     Vector2 WorldXZToPixel(Rect gridRect, Vector2 normXZ)
     {
-        float gridPx = CellSize * GridSize;
+        float gridPx = EffCell * GridSize;
         return new Vector2(gridRect.center.x + normXZ.x * gridPx,
                            gridRect.center.y - normXZ.y * gridPx);
     }
 
     Vector2 PixelToWorldXZ(Rect gridRect, Vector2 pixel)
     {
-        float gridPx = CellSize * GridSize;
+        float gridPx = EffCell * GridSize;
         return new Vector2( (pixel.x - gridRect.center.x) / gridPx,
                            -(pixel.y - gridRect.center.y) / gridPx);
     }

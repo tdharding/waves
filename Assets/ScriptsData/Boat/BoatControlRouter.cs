@@ -12,6 +12,7 @@ public class BoatControlRouter : MonoBehaviour
     public BoatToolManager toolManager;
     public CatapultController catapult;
     public LureController lureController;
+    public BoostController boostController;
 
     private bool spaceWasPressedAfterSonar = false;
 
@@ -72,6 +73,23 @@ public class BoatControlRouter : MonoBehaviour
 
             if (fishing.IsFishingActive)
                 fishing.SetFishingActive(false);
+
+            return;
+        }
+
+        // --- BOOST TOOL ---
+        if (toolManager.CurrentTool == BoatTool.Boost)
+        {
+            catapult.CancelArm();
+            if (fishing.IsFishingActive)
+                fishing.SetFishingActive(false);
+
+            boatMovement.SetSonarSlow(false);
+
+            if (boostController != null)
+                boostController.Tick(spaceHeld);
+            else
+                boatMovement.SetBoosting(spaceHeld);
 
             return;
         }

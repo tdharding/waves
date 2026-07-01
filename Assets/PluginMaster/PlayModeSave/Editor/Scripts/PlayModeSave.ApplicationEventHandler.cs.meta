@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 6740836c6588c16469af79d160f81cd1
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 177452
+  packageName: Play Mode Save
+  packageVersion: 4.1.7
+  assetPath: Assets/PluginMaster/PlayModeSave/Editor/Scripts/PlayModeSave.ApplicationEventHandler.cs
+  uploadId: 918808

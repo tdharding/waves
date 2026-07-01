@@ -57,6 +57,7 @@ public class CatapultController : MonoBehaviour
     private void Awake()
     {
         soulSlot.onFilled.AddListener(OnSoulLoaded);
+        soulSlot.onEmptied.AddListener(OnSoulEjected);
         if (armTransform != null)
             _armRestEulers = armTransform.localEulerAngles;
     }
@@ -64,6 +65,7 @@ public class CatapultController : MonoBehaviour
     private void OnDestroy()
     {
         soulSlot.onFilled.RemoveListener(OnSoulLoaded);
+        soulSlot.onEmptied.RemoveListener(OnSoulEjected);
     }
 
     // ─────────────────────────────────────────────
@@ -76,7 +78,18 @@ public class CatapultController : MonoBehaviour
         _loadedLinkID = -1;
 
         if (LevelSoulTracker.Instance != null)
+        {
             _loadedLinkID = LevelSoulTracker.Instance.GetLinkIDForIdentity(soulIdentity);
+            LevelSoulTracker.Instance.RemoveTemporarySoul(soulIdentity);
+        }
+    }
+
+    private void OnSoulEjected(int soulIdentity)
+    {
+        // When the soul is returned to the boat (not fired), restore the tracker state.
+        // The slot's own RemoveSoul already handles GameProgressData and the display icon.
+        if (!_firing && soulIdentity >= 0 && LevelSoulTracker.Instance != null)
+            LevelSoulTracker.Instance.ReinsertSoul(_loadedLinkID, soulIdentity);
     }
 
     // ─────────────────────────────────────────────
@@ -157,8 +170,6 @@ public class CatapultController : MonoBehaviour
 
     private void LaunchSoul()
     {
-        LevelSoulTracker.Instance?.RemoveTemporarySoul(_loadedSoulIdentity);
-
         Vector3 fireDirection = transform.TransformDirection(fireDirectionLocal.normalized);
         Vector3 startPos      = launchPoint != null ? launchPoint.position : transform.position;
 

@@ -13,6 +13,6 @@ AssetOrigin:
   serializedVersion: 1
   productId: 177452
   packageName: Play Mode Save
-  packageVersion: 4.1.4
+  packageVersion: 4.1.7
   assetPath: Assets/PluginMaster/PlayModeSave/Editor/Scripts/ComponentSaveListWindow.cs
-  uploadId: 849396
+  uploadId: 918808

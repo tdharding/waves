@@ -61,10 +61,23 @@ public class BoatMovement : MonoBehaviour
 
     // External control flags
     private bool boosting = false;
+    private float boostSpeedOverride = -1f;
+    private float boostAccelOverride = -1f;
+    private float boostDecelOverride = -1f;
     private bool sonarSlow = false;
     private bool abilityWheelSlow = false;
     private bool catapultActiveSlow = false;
     private bool steeringBlocked = false;
+
+    // Airborne state (set by BoostController via LaunchBoat)
+    private bool isAirborne = false;
+    private float airGravityMultiplier;
+    private float airControlFactor;
+    private float airTimer;
+    private float maxAirTime;
+
+    public bool IsAirborne => isAirborne;
+    public float CurrentSpeed => currentSpeed;
 
     // --------------------------------------------------
     // UNITY
@@ -110,16 +123,93 @@ public class BoatMovement : MonoBehaviour
             fixedY = waterTransform.position.y;
 
         HandleSteering();
-        HandleMovement();
-        ApplyWhirlpoolPull();
+
+        if (isAirborne)
+            HandleAirborne();
+        else
+        {
+            HandleMovement();
+            ApplyWhirlpoolPull();
+        }
+
+        DebugPostLand();
     }
 
     private void ApplyVelocity(Vector3 move)
     {
         rb.linearVelocity = new Vector3(move.x, rb.linearVelocity.y, move.z);
-        Vector3 pos = rb.position;
-        pos.y = fixedY;
-        rb.position = pos;
+        if (!isAirborne)
+        {
+            Vector3 pos = rb.position;
+            pos.y = fixedY;
+            rb.position = pos;
+        }
+    }
+
+    // --------------------------------------------------
+    // AIRBORNE (Boost tool launch)
+    // --------------------------------------------------
+
+    void HandleAirborne()
+    {
+        airTimer += Time.fixedDeltaTime;
+
+        // rb.useGravity is off (the boat is normally Y-pinned every frame), so apply the
+        // full intended gravity ourselves rather than assuming engine gravity is already active.
+        rb.AddForce(Physics.gravity * airGravityMultiplier, ForceMode.Acceleration);
+
+        // Light forward air control so the boat doesn't feel completely ballistic.
+        Vector3 vel = rb.linearVelocity;
+        float thrust = (boosting ? boostedMoveSpeed : baseMoveSpeed) * airControlFactor;
+        Vector3 nudge = transform.forward * thrust * Time.fixedDeltaTime;
+        rb.linearVelocity = new Vector3(vel.x + nudge.x, vel.y, vel.z + nudge.z);
+
+        if (airTimer >= maxAirTime || rb.position.y <= fixedY + SampleWaveHeightAt(rb.position))
+        {
+            bool timedOut = airTimer >= maxAirTime;
+            Debug.Log($"[BoatMovement] Landed ({(timedOut ? "max air time reached" : "reached water")}), airTime={airTimer:F2}s");
+            Land();
+        }
+    }
+
+    float SampleWaveHeightAt(Vector3 worldPos)
+    {
+        if (waterTransform == null || waterMaterial == null) return 0f;
+        var p = WaveUtils.ReadParams(waterTransform, waterMaterial);
+        return WaveUtils.SampleHeightSmooth(worldPos, p);
+    }
+
+    void Land()
+    {
+        isAirborne = false;
+        Vector3 vel = rb.linearVelocity;
+        float waveHeight = SampleWaveHeightAt(rb.position);
+        Debug.Log($"[BoatMovement] Land() — rb.position.y={rb.position.y:F3}, fixedY={fixedY:F3}, waveHeight={waveHeight:F3}, " +
+                  $"landingTarget={fixedY + waveHeight:F3}, vel.y={vel.y:F3}");
+        vel.y = 0f;
+        rb.linearVelocity = vel;
+        _postLandFrames = 10;
+    }
+
+    private int _postLandFrames = 0;
+    private void DebugPostLand()
+    {
+        if (_postLandFrames <= 0) return;
+        _postLandFrames--;
+        float waveHeight = SampleWaveHeightAt(rb.position);
+        Debug.Log($"[BoatMovement] PostLand frame {10 - _postLandFrames} — rb.y={rb.position.y:F3}, " +
+                  $"fixedY={fixedY:F3}, waveH={waveHeight:F3}, pinnedTarget={fixedY:F3}, vel.y={rb.linearVelocity.y:F3}");
+    }
+
+    // Called by BoostController to launch the boat off a wave.
+    public void LaunchBoat(Vector3 launchVelocity, float gravityMultiplier, float airControl, float maxAirborneTime)
+    {
+        isAirborne = true;
+        airGravityMultiplier = gravityMultiplier;
+        airControlFactor = airControl;
+        maxAirTime = maxAirborneTime;
+        airTimer = 0f;
+        rb.linearVelocity = launchVelocity;
     }
 
     // --------------------------------------------------
@@ -180,8 +270,10 @@ public class BoatMovement : MonoBehaviour
 
     void HandleMovement()
     {
-        float targetSpeed = boosting ? boostedMoveSpeed : baseMoveSpeed;
-        float accelRate = boosting ? acceleration : deceleration;
+        float targetSpeed = boosting ? (boostSpeedOverride > 0f ? boostSpeedOverride : boostedMoveSpeed) : baseMoveSpeed;
+        float accelRate = boosting
+            ? (boostAccelOverride > 0f ? boostAccelOverride : acceleration)
+            : (boostDecelOverride > 0f ? boostDecelOverride : deceleration);
 
         if (sonarSlow)
             targetSpeed *= sonarSpeedMultiplier;
@@ -289,7 +381,22 @@ public class BoatMovement : MonoBehaviour
     public void SetBoosting(bool value)
     {
         boosting = value;
+        boostSpeedOverride = -1f;
+        boostAccelOverride = -1f;
+        boostDecelOverride = -1f;
     }
+
+    // Used by BoostController so the Boost tool's speed/acceleration/deceleration are tunable
+    // independently of the defaults shared by other tools.
+    public void SetBoosting(bool value, float speedOverride, float accelOverride = -1f, float decelOverride = -1f)
+    {
+        boosting = value;
+        boostSpeedOverride = speedOverride;
+        boostAccelOverride = accelOverride;
+        boostDecelOverride = decelOverride;
+    }
+
+    public void BleedSpeedOnCollision(float retain) => currentSpeed *= retain;
 
     public void SetSonarSlow(bool value)        => sonarSlow = value;
     public void SetAbilityWheelSlow(bool value) => abilityWheelSlow = value;

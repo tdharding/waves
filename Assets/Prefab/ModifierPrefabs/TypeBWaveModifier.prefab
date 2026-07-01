@@ -98,6 +98,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PrefabBaselineAlignment
   showDebug: 1
+  useForwardOverride: 0
+  forwardEuler: {x: 0, y: 0, z: 0}
+  useUpOverride: 0
+  upEuler: {x: 0, y: 0, z: 0}
 --- !u!1 &7677057366641282449
 GameObject:
   m_ObjectHideFlags: 0
@@ -452,13 +456,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LevelWaveModifierControllerTypeB
   speedBoost: 1.5
-  frequencyBoost: 10
-  rippleDepthBoost: 0.1
+  frequencyBoost: 2.06
+  rippleDepthBoost: 0.42
   pipeConnector: {fileID: 1651782632757782487}
   splineReceiver: {fileID: 8391440120334083790}
   showDebug: 1
-  debugWorldPosition: {x: 0, y: 0, z: 0}
-  debugWaveCenterSent: {x: 0, y: 0, z: 0, w: 0}
+  debugWorldPosition: {x: 1.990625, y: -1.359, z: 0.45937485}
+  debugWaveCenterSent: {x: 1.990625, y: 0, z: 0.4593749, w: 0}
   debugMaterialWaveCenter: {x: 0, y: 0, z: 0, w: 0}
   plungerAnimator: {fileID: 1860385019852395316}
   animationTrigger: Active

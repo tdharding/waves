@@ -10,8 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 88b6f058feac51f46a3f56ed88db9a43, type: 3}
-  m_Name: LevelSelectWorld2Data (Workspace) (Workspace) (Workspace) (Workspace) (Workspace)
-    (Workspace) (Workspace) (Workspace) (Workspace) (Workspace) (Workspace)
+  m_Name: LevelSelectWorld2Data
   m_EditorClassIdentifier: 
   hillPoints:
   - id: 2ce12732-fe5f-4b7d-a23d-a36643212d5e

@@ -360,10 +360,23 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b7acdab1d4756024984e27ed95d4e527, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BaselineMarker
-  height: -1.47
-  discRadius: 4.78
-  maskFadeStartPct: 0.655
-  maskFadeEndPct: 0.827
+  height: -1.23
+  discRadius: 4.9
+  maskFadeStartPct: 0.677
+  maskFadeEndPct: 0.9
+  spawnTiers:
+  - name: F2
+    height: 2.43
+  - name: F1
+    height: 0.49
+  - name: G
+    height: -1.23
+  - name: B-1
+    height: -3.11
+  - name: B-2
+    height: -5.17
+  - name: B-3
+    height: -8.35
 --- !u!1 &7923946534364195739
 GameObject:
   m_ObjectHideFlags: 0

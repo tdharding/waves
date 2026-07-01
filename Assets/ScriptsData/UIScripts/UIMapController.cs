@@ -66,8 +66,8 @@ public class UIMapController : MonoBehaviour
     private BadGuySnakeMovement snakeMovement;
     private GridData activeGridData;
 
-    private readonly Dictionary<int, GameObject> _soulMarkers  = new Dictionary<int, GameObject>();
-    private readonly Dictionary<int, Vector3>    _pendingSouls = new Dictionary<int, Vector3>();
+    private readonly Dictionary<EntityId, GameObject> _soulMarkers  = new Dictionary<EntityId, GameObject>();
+    private readonly Dictionary<EntityId, Vector3>    _pendingSouls = new Dictionary<EntityId, Vector3>();
 
     // ─────────────────────────────────────────
     // INITIALISE
@@ -258,7 +258,7 @@ public void UpdateWaveCenter()
     // DROPPED SOUL MARKERS
     // ─────────────────────────────────────────
 
-    public void ShowDroppedSoulMarker(int key, Vector3 worldPos)
+    public void ShowDroppedSoulMarker(EntityId key, Vector3 worldPos)
     {
         HideDroppedSoulMarker(key);
 
@@ -270,7 +270,7 @@ public void UpdateWaveCenter()
             _pendingSouls[key] = worldPos;
     }
 
-    public void HideDroppedSoulMarker(int key)
+    public void HideDroppedSoulMarker(EntityId key)
     {
         _pendingSouls.Remove(key);
 
@@ -281,7 +281,7 @@ public void UpdateWaveCenter()
         }
     }
 
-    private void SpawnDroppedSoulMarkerNow(int key, Vector3 worldPos)
+    private void SpawnDroppedSoulMarkerNow(EntityId key, Vector3 worldPos)
     {
         GameObject marker = Instantiate(droppedSoulMarkerPrefab, droppedSoulMarkerParent);
         marker.transform.position      = MapProjection.WorldToMap(worldPos);
