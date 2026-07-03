@@ -110,6 +110,32 @@ public class LevelSpawner : MonoBehaviour
         }
     }
 
+    // Applies per-placement TypeB overrides (speed / frequency / ripple depth boost)
+    // set in the Grid Designer. When the placement doesn't override, the prefab's
+    // own default values are left untouched.
+    private void ApplyModifierOverrides(GameObject go, GridData.PrefabPlacement pp)
+    {
+        if (pp == null || !pp.overrideModifierSettings) return;
+
+        var controllerB = go.GetComponent<LevelWaveModifierControllerTypeB>();
+        if (controllerB == null) return;
+
+        controllerB.speedBoost       = pp.speedBoost;
+        controllerB.frequencyBoost   = pp.frequencyBoost;
+        controllerB.rippleDepthBoost = pp.rippleDepthBoost;
+    }
+
+    // Applies the designer-authored uniform scale to a spawned placement instance.
+    // A stored scale of 0 (legacy placements from before the field existed) is
+    // treated as 1 so existing levels are unaffected.
+    private void ApplyPlacementScale(GameObject go, GridData.PrefabPlacement pp)
+    {
+        if (go == null || pp == null) return;
+        float s = pp.scale > 0f ? pp.scale : 1f;
+        if (!Mathf.Approximately(s, 1f))
+            go.transform.localScale *= s;
+    }
+
     // =====================================================
     // SPAWN
     // =====================================================
@@ -226,7 +252,10 @@ float   tileZ  = b.size.z / GridData.GridSize;
                 Transform par = (pp.isCircle && soulSpawnParent) ? soulSpawnParent : spawnParent;
                 var  baselineAlign    = pp.prefab.GetComponentInChildren<PrefabBaselineAlignment>();
                 bool hasBaselineAlign = baselineAlign != null;
-                float contactOffsetY  = baselineAlign != null ? baselineAlign.transform.position.y : 0f;
+                float placementScale  = pp.scale > 0f ? pp.scale : 1f;
+                // The baseline contact offset scales with the object, so the waterline
+                // stays aligned when the placement is scaled up/down.
+                float contactOffsetY  = baselineAlign != null ? baselineAlign.transform.position.y * placementScale : 0f;
                 float baselineSpawnY  = spawnedBaselineWaterY - contactOffsetY;
                 float spawnY          = (pp.isWorldSpaceProp || hasBaselineAlign) ? baselineSpawnY : par.position.y;
                 Vector3 pos   = new Vector3(
@@ -236,8 +265,10 @@ float   tileZ  = b.size.z / GridData.GridSize;
                 );
                 Quaternion rot = hasBaselineAlign ? baselineRot : par.rotation;
                 var instance = Instantiate(pp.prefab, pos, rot, par);
+                ApplyPlacementScale(instance, pp);
                 spawnedByCell[$"-1_{pp.cellIndex}"] = instance;
                 InitializeWaveModifier(instance);
+                ApplyModifierOverrides(instance, pp);
             }
         }
 
@@ -311,7 +342,8 @@ float   tileZ  = b.size.z / GridData.GridSize;
                         int cellY    = pp.cellIndex / GridData.GridSize;
                         int flippedY = GridData.GridSize - 1 - cellY;
                         var  tierAlign      = pp.prefab.GetComponentInChildren<PrefabBaselineAlignment>();
-                        float tierContactY  = tierAlign != null ? tierAlign.transform.position.y : 0f;
+                        float tierScale     = pp.scale > 0f ? pp.scale : 1f;
+                        float tierContactY  = tierAlign != null ? tierAlign.transform.position.y * tierScale : 0f;
                         Vector3 pos2 = new Vector3(
                             origin.x + cellX    * tileX + tileX * 0.5f,
                             spawnedBaselineWaterY + yOff - tierContactY,
@@ -320,8 +352,10 @@ float   tileZ  = b.size.z / GridData.GridSize;
                         Quaternion rot2 = spawnParent.rotation;
                         if (applyMinus90XRotation) rot2 *= Quaternion.Euler(-90f, 0f, 0f);
                         var instance = Instantiate(pp.prefab, pos2, rot2, spawnParent);
+                        ApplyPlacementScale(instance, pp);
                         spawnedByCell[$"{ti}_{pp.cellIndex}"] = instance;
                         InitializeWaveModifier(instance);
+                        ApplyModifierOverrides(instance, pp);
                     }
                 }
             }
@@ -526,7 +560,10 @@ float   tileZ  = b.size.z / GridData.GridSize;
                 
                 if (controller != null && tube != null)
                 {
-                    FaceTubeTowardTarget(tubeGo, modGo.transform.position);
+                    // Tube faces the modifier; modifier faces back toward the pipe so its
+                    // wave (forward-aligned via PrefabBaselineAlignment) drives toward the pipe.
+                    FaceForwardTowardTarget(tubeGo, modGo.transform.position);
+                    FaceForwardTowardTarget(modGo, tubeGo.transform.position);
                     tube.SetTargetModifier(controller);
                     tube.SetFishingController(fishingController);
                     if (trigger != null) controller.SetTrigger(trigger);
@@ -682,7 +719,7 @@ else if (controller != null)
                                 }
                                 tube.SetWaypoints(waypoints);
                                 tube.SetFishingController(fishingController);
-                                FaceTubeTowardTarget(tubeGo, hub.transform.position);
+                                FaceForwardTowardTarget(tubeGo, hub.transform.position);
                                 tube.SetTargetLockHub(hubCtrl);
                             }
                             else
@@ -1076,24 +1113,25 @@ else if (controller != null)
         spawnParent.position = pos;
     }
 
-    // Rotates a spawned tube instance so its PrefabBaselineAlignment.LocalForward faces the target (XZ only).
-    // No-ops if the tube has no PrefabBaselineAlignment or UseForwardOverride is false.
-    // Must be called BEFORE SetTargetModifier / SetTargetLockHub so the pipe is built from the correct orientation.
-    private void FaceTubeTowardTarget(GameObject tubeGo, Vector3 targetWorldPos)
+    // Rotates a spawned instance so its PrefabBaselineAlignment.LocalForward faces the target (XZ only).
+    // No-ops if the object has no PrefabBaselineAlignment or UseForwardOverride is false.
+    // For the input tube this must be called BEFORE SetTargetModifier / SetTargetLockHub so the pipe
+    // is built from the correct orientation.
+    private void FaceForwardTowardTarget(GameObject go, Vector3 targetWorldPos)
     {
-        var align = tubeGo.GetComponentInChildren<PrefabBaselineAlignment>();
+        var align = go.GetComponentInChildren<PrefabBaselineAlignment>();
         if (align == null || !align.UseForwardOverride) return;
 
-        Vector3 toTarget = targetWorldPos - tubeGo.transform.position;
+        Vector3 toTarget = targetWorldPos - go.transform.position;
         toTarget.y = 0f;
         if (toTarget.sqrMagnitude < 0.001f) return;
 
-        Vector3 currentWorldFwd = tubeGo.transform.rotation * align.LocalForward;
+        Vector3 currentWorldFwd = go.transform.rotation * align.LocalForward;
         currentWorldFwd.y = 0f;
         if (currentWorldFwd.sqrMagnitude < 0.001f) return;
 
         Quaternion delta = Quaternion.FromToRotation(currentWorldFwd.normalized, toTarget.normalized);
-        tubeGo.transform.rotation = delta * tubeGo.transform.rotation;
+        go.transform.rotation = delta * go.transform.rotation;
     }
 
     public GameObject SpawnConditionals(int visitCount)

@@ -68,7 +68,18 @@ class GridSnapshot
         var copy = new List<GridData.PrefabPlacement>();
         if (src == null) return copy;
         foreach (var p in src)
-            copy.Add(new GridData.PrefabPlacement { cellIndex = p.cellIndex, prefab = p.prefab, isCircle = p.isCircle });
+            copy.Add(new GridData.PrefabPlacement
+            {
+                cellIndex                = p.cellIndex,
+                prefab                   = p.prefab,
+                isCircle                 = p.isCircle,
+                isWorldSpaceProp         = p.isWorldSpaceProp,
+                scale                    = p.scale,
+                overrideModifierSettings = p.overrideModifierSettings,
+                speedBoost               = p.speedBoost,
+                frequencyBoost           = p.frequencyBoost,
+                rippleDepthBoost         = p.rippleDepthBoost
+            });
         return copy;
     }
 }
@@ -130,6 +141,7 @@ public class GridDesignerWindow : EditorWindow
     int  _selectedNodeIndex = -1;
     bool _isDraggingNode    = false;
     int  _dragCurrentCell   = -1;
+    bool _dragUndoPushed    = false; // one undo snapshot per drag, pushed on first move
 
     // Bridge mode state
     bool        _isBridgeMode        = false;
@@ -160,6 +172,9 @@ public class GridDesignerWindow : EditorWindow
     string                        iconsFolderPath     = "";
     List<GameObject>              scannedPrefabs      = new List<GameObject>();
     Dictionary<string, Texture2D> prefabIcons         = new Dictionary<string, Texture2D>();
+    // Caches the PrefabBaselineAlignment component per prefab asset so the scale-radius
+    // overlay does not run GetComponentInChildren every repaint.
+    Dictionary<GameObject, PrefabBaselineAlignment> _baselineAlignCache = new Dictionary<GameObject, PrefabBaselineAlignment>();
     int                           selectedPrefabIndex = -1;
     Vector2                       prefabScrollPos;
     List<GameObject>              scannedSetPiecesLib = new List<GameObject>();
@@ -225,6 +240,7 @@ public class GridDesignerWindow : EditorWindow
     bool _showStartRitual    = false;
     bool _showSoulSpawns     = true;
     bool _showWhirlpools     = true;
+    bool _showTypeBSettings  = true;
     bool drawWhirlpool       = false;
 
     // Soul dropdown state (cached per-load)
@@ -235,6 +251,7 @@ public class GridDesignerWindow : EditorWindow
     // ── Debug Console ──
     List<string> _debugLog        = new List<string>();
     Vector2      _debugLogScroll;
+    Vector2      _rightPanelScroll;
     const int    DebugLogMaxLines  = 200;
 
     // Set piece picker state
@@ -399,7 +416,7 @@ public class GridDesignerWindow : EditorWindow
             else
             {
                 hint.normal.textColor = new Color(0.6f, 0.6f, 0.6f);
-                GUILayout.Label("Click a soul zone node to select it", hint);
+                GUILayout.Label("Click to select — drag to move — click empty to deselect — Del to delete", hint);
             }
         }
     }
@@ -945,6 +962,18 @@ public class GridDesignerWindow : EditorWindow
         }
     }
 
+    // Returns the prefab's PrefabBaselineAlignment (cached), or null if it has none.
+    PrefabBaselineAlignment GetBaselineAlign(GameObject prefab)
+    {
+        if (prefab == null) return null;
+        if (!_baselineAlignCache.TryGetValue(prefab, out var align))
+        {
+            align = prefab.GetComponentInChildren<PrefabBaselineAlignment>(true);
+            _baselineAlignCache[prefab] = align;
+        }
+        return align;
+    }
+
     Color GetPrefabColor(GameObject prefab)
     {
         int idx = scannedPrefabs.IndexOf(prefab);
@@ -1052,6 +1081,7 @@ public class GridDesignerWindow : EditorWindow
         EditorGUI.BeginChangeCheck();
         var newGameplay = (WavePreset)EditorGUILayout.ObjectField(
             "Gameplay Preset", loadedData.gameplayWavePreset, typeof(WavePreset), false);
+        DrawWavePresetInfo(loadedData.gameplayWavePreset);
         var newGong     = (WavePreset)EditorGUILayout.ObjectField(
             "Gong Preset",     loadedData.gongWavePreset,     typeof(WavePreset), false);
         if (EditorGUI.EndChangeCheck())
@@ -1061,6 +1091,16 @@ public class GridDesignerWindow : EditorWindow
             loadedData.gongWavePreset     = newGong;
             EditorUtility.SetDirty(loadedData);
         }
+    }
+
+    // Small read-only summary of a wave preset's primary values, shown under its field.
+    void DrawWavePresetInfo(WavePreset preset)
+    {
+        if (preset == null) return;
+        var s = preset.state;
+        EditorGUILayout.LabelField(
+            $"Freq {s.Frequency:0.##}   Speed {s.Speed:0.##}   Ripple {s.RippleDepth:0.##}",
+            EditorStyles.miniLabel);
     }
 
     void DrawEnemySection()
@@ -1245,6 +1285,7 @@ public class GridDesignerWindow : EditorWindow
         _selectedNodeIndex = -1;
         _isDraggingNode    = false;
         _dragCurrentCell   = -1;
+        _dragUndoPushed    = false;
         _currentSelection  = new SelectionInfo { type = SelectionType.None };
         CancelBridge();
     }
@@ -1453,15 +1494,19 @@ public class GridDesignerWindow : EditorWindow
         }
     }
 
-    void MoveSelection(SelectionInfo info, int newCellIndex)
+    void MoveSelection(SelectionInfo info, int newCellIndex, bool pushUndo = true)
     {
         if (info.type == SelectionType.None || info.cellIndex == newCellIndex) return;
 
         Undo.RecordObject(loadedData, "Move Selection");
-        PushUndoSnapshot();
+        if (pushUndo) PushUndoSnapshot();
 
-        string tierStr = info.tierIndex == -1 ? "Base" : $"T{info.tierIndex + 1}";
-        GridLog($"Moved selection from {info.cellIndex} to {newCellIndex} ({tierStr})");
+        // Suppress the per-cell log while dragging (pushUndo == false) to avoid console spam.
+        if (pushUndo)
+        {
+            string tierStr = info.tierIndex == -1 ? "Base" : $"T{info.tierIndex + 1}";
+            GridLog($"Moved selection from {info.cellIndex} to {newCellIndex} ({tierStr})");
+        }
 
         switch (info.type)
         {
@@ -2491,6 +2536,7 @@ public class GridDesignerWindow : EditorWindow
     void DrawDebugConsole()
     {
         EditorGUILayout.BeginVertical(GUILayout.Width(_rightPanelWidth), GUILayout.ExpandHeight(true));
+        _rightPanelScroll = EditorGUILayout.BeginScrollView(_rightPanelScroll, GUILayout.ExpandHeight(true));
 
         DrawToolButtons();
         DrawPrefabLibrarySection();
@@ -2530,13 +2576,16 @@ public class GridDesignerWindow : EditorWindow
             }
         }
 
+        DrawTypeBModifierSettingsSection();
+        DrawSelectedPrefabScaleSection();
+
         EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
         EditorGUILayout.LabelField("Grid Debug", EditorStyles.boldLabel, GUILayout.ExpandWidth(true));
         if (GUILayout.Button("Clear", EditorStyles.toolbarButton, GUILayout.Width(42)))
             _debugLog.Clear();
         EditorGUILayout.EndHorizontal();
 
-        _debugLogScroll = EditorGUILayout.BeginScrollView(_debugLogScroll, GUILayout.ExpandHeight(true));
+        _debugLogScroll = EditorGUILayout.BeginScrollView(_debugLogScroll, GUILayout.Height(140));
 
         GUIStyle warnStyle = new GUIStyle(EditorStyles.miniLabel) { wordWrap = true };
         warnStyle.normal.textColor = new Color(1f, 0.85f, 0.3f);
@@ -2554,7 +2603,153 @@ public class GridDesignerWindow : EditorWindow
         }
 
         EditorGUILayout.EndScrollView();
+
+        EditorGUILayout.EndScrollView(); // right panel scroll
         EditorGUILayout.EndVertical();
+    }
+
+    // Per-modifier controls for TypeB wave modifiers placed in the grid. Only
+    // shown when at least one TypeB modifier is present. Values entered here
+    // override the prefab's default speed / frequency / ripple-depth boosts.
+    void DrawTypeBModifierSettingsSection()
+    {
+        if (loadedData == null) return;
+
+        var typeBPlacements = new List<(int tierIndex, GridData.PrefabPlacement placement)>();
+        CollectTypeBPlacements(-1, loadedData.prefabPlacements, typeBPlacements);
+        if (loadedData.tiers != null)
+        {
+            for (int ti = 0; ti < loadedData.tiers.Count; ti++)
+                CollectTypeBPlacements(ti, loadedData.tiers[ti].prefabPlacements, typeBPlacements);
+        }
+
+        if (typeBPlacements.Count == 0) return;
+
+        EditorGUILayout.Space(4);
+        _showTypeBSettings = EditorGUILayout.Foldout(_showTypeBSettings,
+            $"Wave Modifier Settings ({typeBPlacements.Count})", true, EditorStyles.foldoutHeader);
+        if (!_showTypeBSettings) return;
+
+        float prevLW = EditorGUIUtility.labelWidth;
+        EditorGUIUtility.labelWidth = 110f;
+
+        foreach (var (tierIndex, pp) in typeBPlacements)
+        {
+            var defaults = pp.prefab.GetComponent<LevelWaveModifierControllerTypeB>();
+            string tierLabel = tierIndex == -1 ? "Base" : $"Tier {tierIndex}";
+
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            EditorGUILayout.LabelField($"TypeB · {tierLabel} · Cell {pp.cellIndex}", EditorStyles.boldLabel);
+
+            EditorGUI.BeginChangeCheck();
+            bool ov = EditorGUILayout.ToggleLeft("Override defaults", pp.overrideModifierSettings);
+            if (EditorGUI.EndChangeCheck())
+            {
+                Undo.RecordObject(loadedData, "Toggle Wave Modifier Override");
+                pp.overrideModifierSettings = ov;
+                // Seed the custom values from the prefab defaults the moment
+                // override is switched on, so editing starts from a sensible base.
+                if (ov && defaults != null)
+                {
+                    pp.speedBoost       = defaults.speedBoost;
+                    pp.frequencyBoost   = defaults.frequencyBoost;
+                    pp.rippleDepthBoost = defaults.rippleDepthBoost;
+                }
+                EditorUtility.SetDirty(loadedData);
+            }
+
+            using (new EditorGUI.DisabledScope(!pp.overrideModifierSettings))
+            {
+                float dispSpeed  = pp.overrideModifierSettings ? pp.speedBoost       : (defaults != null ? defaults.speedBoost       : 0f);
+                float dispFreq   = pp.overrideModifierSettings ? pp.frequencyBoost   : (defaults != null ? defaults.frequencyBoost   : 0f);
+                float dispRipple = pp.overrideModifierSettings ? pp.rippleDepthBoost : (defaults != null ? defaults.rippleDepthBoost : 0f);
+
+                EditorGUI.BeginChangeCheck();
+                float newSpeed  = EditorGUILayout.FloatField("Speed Boost",        dispSpeed);
+                float newFreq   = EditorGUILayout.FloatField("Frequency Boost",    dispFreq);
+                float newRipple = EditorGUILayout.FloatField("Ripple Depth Boost", dispRipple);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    Undo.RecordObject(loadedData, "Edit Wave Modifier Settings");
+                    pp.speedBoost       = newSpeed;
+                    pp.frequencyBoost   = newFreq;
+                    pp.rippleDepthBoost = newRipple;
+                    EditorUtility.SetDirty(loadedData);
+                }
+            }
+
+            if (!pp.overrideModifierSettings)
+                EditorGUILayout.LabelField("Using prefab defaults", EditorStyles.miniLabel);
+
+            EditorGUILayout.EndVertical();
+        }
+
+        EditorGUIUtility.labelWidth = prevLW;
+    }
+
+    // Scale slider for the currently-selected prefab placement. Only shown when the
+    // selected prefab has a PrefabBaselineAlignment scale radius enabled.
+    void DrawSelectedPrefabScaleSection()
+    {
+        if (loadedData == null || _currentSelection.type != SelectionType.PrefabPlacement) return;
+
+        List<GridData.PrefabPlacement> placements =
+            _currentSelection.tierIndex == -1
+                ? loadedData.prefabPlacements
+                : (loadedData.tiers != null && _currentSelection.tierIndex < loadedData.tiers.Count
+                    ? loadedData.tiers[_currentSelection.tierIndex].prefabPlacements
+                    : null);
+
+        if (placements == null || _currentSelection.index < 0 || _currentSelection.index >= placements.Count) return;
+
+        var pp = placements[_currentSelection.index];
+        if (pp?.prefab == null) return;
+
+        var align = GetBaselineAlign(pp.prefab);
+        if (align == null || !align.UseScaleRadius) return;
+
+        float prevLW = EditorGUIUtility.labelWidth;
+        EditorGUIUtility.labelWidth = 110f;
+
+        EditorGUILayout.Space(4);
+        EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+        EditorGUILayout.LabelField($"Scale · {pp.prefab.name}", EditorStyles.boldLabel);
+
+        float cur = pp.scale > 0f ? pp.scale : 1f;
+        EditorGUI.BeginChangeCheck();
+        float ns = EditorGUILayout.Slider("Scale", cur, 0.25f, 5f);
+        if (EditorGUI.EndChangeCheck())
+        {
+            Undo.RecordObject(loadedData, "Scale Prefab Placement");
+            pp.scale = ns;
+            EditorUtility.SetDirty(loadedData);
+            Repaint();
+        }
+
+        if (GUILayout.Button("Reset to 1", EditorStyles.miniButton))
+        {
+            Undo.RecordObject(loadedData, "Reset Prefab Scale");
+            pp.scale = 1f;
+            EditorUtility.SetDirty(loadedData);
+            Repaint();
+        }
+
+        EditorGUILayout.LabelField($"Footprint ≈ {align.ScaleRadius * cur:0.##} world units", EditorStyles.miniLabel);
+        EditorGUILayout.EndVertical();
+
+        EditorGUIUtility.labelWidth = prevLW;
+    }
+
+    void CollectTypeBPlacements(int tierIndex, List<GridData.PrefabPlacement> placements,
+        List<(int, GridData.PrefabPlacement)> results)
+    {
+        if (placements == null) return;
+        foreach (var pp in placements)
+        {
+            if (pp?.prefab == null) continue;
+            if (pp.prefab.GetComponent<LevelWaveModifierControllerTypeB>() != null)
+                results.Add((tierIndex, pp));
+        }
     }
 
     void DrawGrid()
@@ -2840,7 +3035,7 @@ public class GridDesignerWindow : EditorWindow
                         if (clicked.type != SelectionType.None)
                         {
                             // Shift+click another node in same zone → connect directly
-                            if (e.shift && clicked.type == SelectionType.SoulZoneNode && 
+                            if (e.shift && clicked.type == SelectionType.SoulZoneNode &&
                                 _currentSelection.type == SelectionType.SoulZoneNode &&
                                 clicked.index == _currentSelection.index && clicked.subIndex != _currentSelection.subIndex)
                             {
@@ -2848,54 +3043,43 @@ public class GridDesignerWindow : EditorWindow
                             }
                             else
                             {
+                                // Select and immediately arm a drag-to-move for any
+                                // movable item. Move only commits once the pointer
+                                // is dragged onto a different cell.
                                 _currentSelection    = clicked;
                                 _selectedZoneIndex   = (clicked.type == SelectionType.SoulZoneNode) ? clicked.index : -1;
                                 _selectedNodeIndex   = (clicked.type == SelectionType.SoulZoneNode) ? clicked.subIndex : -1;
                                 _activeSoulZoneIndex = (clicked.type == SelectionType.SoulZoneNode) ? clicked.index : _activeSoulZoneIndex;
-                                
-                                if (clicked.type == SelectionType.SoulZoneNode)
-                                {
-                                    _isDraggingNode  = true;
-                                    _dragCurrentCell = index;
-                                }
+                                LogSelection(_currentSelection);
+
+                                _isDraggingNode  = true;
+                                _dragCurrentCell = index;
+                                _dragUndoPushed  = false;
                             }
                         }
                         else
                         {
-                            // Click empty cell — move if we have a selection
-                            if (_currentSelection.type != SelectionType.None)
-                            {
-                                MoveSelection(_currentSelection, index);
-                            }
-                            else
-                            {
-                                ClearSelectState();
-                            }
+                            // Click empty cell — clear selection (no second-click move)
+                            ClearSelectState();
                         }
                         e.Use();
                         Repaint();
                     }
-                    else if (e.type == EventType.MouseDrag && _isDraggingNode && mouseOver && index != _dragCurrentCell)
+                    else if (e.type == EventType.MouseDrag && _isDraggingNode && mouseOver && index != _dragCurrentCell
+                             && _currentSelection.type != SelectionType.None)
                     {
-                        if (_currentSelection.type == SelectionType.SoulZoneNode)
-                        {
-                            var zone = loadedData.soulZones[_currentSelection.index];
-                            if (_currentSelection.subIndex < zone.nodes.Count)
-                            {
-                                Undo.RecordObject(loadedData, "Move Soul Zone Node");
-                                zone.nodes[_currentSelection.subIndex] = index;
-                                _dragCurrentCell = index;
-                                _currentSelection.cellIndex = index;
-                                EditorUtility.SetDirty(loadedData);
-                                Repaint();
-                            }
-                        }
+                        // Push a single undo snapshot for the whole drag, on first move.
+                        if (!_dragUndoPushed) { PushUndoSnapshot(); _dragUndoPushed = true; }
+                        MoveSelection(_currentSelection, index, pushUndo: false);
+                        _dragCurrentCell = index;
                         e.Use();
+                        Repaint();
                     }
                     else if (e.type == EventType.MouseUp && _isDraggingNode)
                     {
                         _isDraggingNode  = false;
                         _dragCurrentCell = -1;
+                        _dragUndoPushed  = false;
                         e.Use();
                     }
                 }
@@ -2968,6 +3152,16 @@ public class GridDesignerWindow : EditorWindow
                         Handles.DrawWireDisc(CellCenter(rect, wp.cellIndex), Vector3.forward, radiusPx, 2f);
                     }
                 }
+            }
+
+            // Prefab scale-radius footprint rings (base + visible tiers)
+            if (pxPerUnit > 0f)
+            {
+                DrawPrefabScaleRings(rect, loadedData.prefabPlacements, -1, pxPerUnit);
+                if (loadedData.tiers != null)
+                    for (int ti = 0; ti < loadedData.tiers.Count; ti++)
+                        if (ti < tierVisible.Count && tierVisible[ti])
+                            DrawPrefabScaleRings(rect, loadedData.tiers[ti].prefabPlacements, ti, pxPerUnit);
             }
 
             if (loadedData.soulZones != null)
@@ -3274,6 +3468,33 @@ public class GridDesignerWindow : EditorWindow
         return (EffCell * GridSize) / worldWidth;
     }
 
+    // Draws a world-proportional footprint ring for every placement whose prefab has
+    // a PrefabBaselineAlignment scale radius enabled. The ring grows with the
+    // placement's stored scale so the designer preview matches the spawned size.
+    void DrawPrefabScaleRings(Rect rect, List<GridData.PrefabPlacement> placements, int tierIndex, float pxPerUnit)
+    {
+        if (placements == null) return;
+        bool activeLayer = tierIndex == activeTierIndex;
+        foreach (var pp in placements)
+        {
+            if (pp?.prefab == null) continue;
+            var align = GetBaselineAlign(pp.prefab);
+            if (align == null || !align.UseScaleRadius) continue;
+
+            float s        = pp.scale > 0f ? pp.scale : 1f;
+            float radiusPx = align.ScaleRadius * s * pxPerUnit;
+            if (radiusPx <= 0f) continue;
+
+            bool isSelected = _currentSelection.type == SelectionType.PrefabPlacement
+                           && _currentSelection.tierIndex == tierIndex
+                           && _currentSelection.cellIndex == pp.cellIndex;
+
+            Color c = new Color(1f, 0.55f, 0.1f, activeLayer ? 0.75f : 0.2f);
+            Handles.color = c;
+            Handles.DrawWireDisc(CellCenter(rect, pp.cellIndex), Vector3.forward, radiusPx, isSelected ? 3.5f : 2f);
+        }
+    }
+
     void DrawPortalOverlay(Rect gridRect)
 {
         float ringRadius   = ZoomedGridSize * 0.5f + 14f;
@@ -3519,8 +3740,24 @@ public class GridDesignerWindow : EditorWindow
             for (int i = 0; i < Mathf.Min(slotColors.Count, loadedData.slotColors.Count); i++)
                 slotColors[i] = loadedData.slotColors[i];
 
+        // Normalise legacy placements: the scale field did not exist previously,
+        // so deserialisation leaves it at 0. Treat that as the default of 1.
+        NormalizePlacementScales(loadedData.prefabPlacements);
+        if (loadedData.tiers != null)
+            foreach (var tier in loadedData.tiers)
+                NormalizePlacementScales(tier.prefabPlacements);
+
+        _baselineAlignCache.Clear();
+
         activeSlot = 0; drawCircle = drawSoul = drawSoulArea = false;
         _isDrawingSoulArea = false; _drawingNodes.Clear();
+    }
+
+    static void NormalizePlacementScales(List<GridData.PrefabPlacement> placements)
+    {
+        if (placements == null) return;
+        foreach (var p in placements)
+            if (p != null && p.scale <= 0f) p.scale = 1f;
     }
 
     void RefreshDiscoveredGrids()

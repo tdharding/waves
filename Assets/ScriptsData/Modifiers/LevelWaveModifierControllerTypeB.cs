@@ -19,6 +19,7 @@ public class LevelWaveModifierControllerTypeB : MonoBehaviour
     [Header("Animation")]
     [SerializeField] private Animator plungerAnimator;
     [SerializeField] private string animationTrigger = "Active";
+    [SerializeField] private float idleAnimationSpeed = 0.5f; // speed the plunger animates at from spawn, before any input
     [SerializeField] private float speedIncreaseRate = 0.2f;
     [SerializeField] private float maxAnimationSpeed = 3f;
 
@@ -54,8 +55,7 @@ public class LevelWaveModifierControllerTypeB : MonoBehaviour
         
         if (plungerAnimator != null)
         {
-            currentAnimSpeed = 0.5f; 
-            plungerAnimator.speed = currentAnimSpeed;
+            // Already animating at idle speed since spawn — a soul arriving now ramps it up.
             plungerAnimator.SetBool(animationTrigger, true);
             isAnimating = true;
         }
@@ -93,6 +93,30 @@ public class LevelWaveModifierControllerTypeB : MonoBehaviour
     private void Start()
     {
         wavePlane = LevelDataController.Instance?.GetWaveTransform();
+
+        // Register the wave center immediately so the wave already emanates from this
+        // modifier at runtime, rather than only when a soul activates it.
+        RegisterWaveCenter();
+
+        // Begin the plunger animation at a slow idle speed from spawn. Input (a soul
+        // arriving) then ramps the speed up via the Update loop.
+        StartIdleAnimation();
+    }
+
+    private void RegisterWaveCenter()
+    {
+        if (!waveController) return;
+        ApplyWaveCenter();
+        waveController.SetModifierWaveCenter(modifierWaveCenterSent);
+    }
+
+    private void StartIdleAnimation()
+    {
+        if (plungerAnimator == null) return;
+        currentAnimSpeed = idleAnimationSpeed;
+        plungerAnimator.speed = currentAnimSpeed;
+        plungerAnimator.SetBool(animationTrigger, true);
+        isAnimating = false; // idle — not ramping until a soul arrives
     }
 
     private void Update()

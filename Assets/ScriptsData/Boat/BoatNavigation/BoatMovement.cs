@@ -75,6 +75,11 @@ public class BoatMovement : MonoBehaviour
     private float airControlFactor;
     private float airTimer;
     private float maxAirTime;
+    private float landingSpeedReduction;
+    // Wave height at the moment of launch. The rigidbody is pinned to the flat plane (fixedY),
+    // but the boat launches from the wave surface (fixedY + this). The landing check must offset
+    // by it, otherwise the boat counts as "underwater" the instant it leaves a crest.
+    private float launchWaveHeight;
 
     public bool IsAirborne => isAirborne;
     public float CurrentSpeed => currentSpeed;
@@ -164,7 +169,13 @@ public class BoatMovement : MonoBehaviour
         Vector3 nudge = transform.forward * thrust * Time.fixedDeltaTime;
         rb.linearVelocity = new Vector3(vel.x + nudge.x, vel.y, vel.z + nudge.z);
 
-        if (airTimer >= maxAirTime || rb.position.y <= fixedY + SampleWaveHeightAt(rb.position))
+        // The boat launched from the wave surface (fixedY + launchWaveHeight), so its landing
+        // target is offset by that. Only allow landing while descending — you can't re-enter the
+        // water on the way up, and this prevents an instant land on the launch frame.
+        float landTargetY = fixedY + SampleWaveHeightAt(rb.position) - launchWaveHeight;
+        bool descending = rb.linearVelocity.y < 0f;
+
+        if (airTimer >= maxAirTime || (descending && rb.position.y <= landTargetY))
         {
             bool timedOut = airTimer >= maxAirTime;
             Debug.Log($"[BoatMovement] Landed ({(timedOut ? "max air time reached" : "reached water")}), airTime={airTimer:F2}s");
@@ -188,6 +199,10 @@ public class BoatMovement : MonoBehaviour
                   $"landingTarget={fixedY + waveHeight:F3}, vel.y={vel.y:F3}");
         vel.y = 0f;
         rb.linearVelocity = vel;
+
+        // Shed a fraction of forward speed on touchdown (landingSpeedReduction of 0.3 = lose 30%).
+        currentSpeed *= (1f - landingSpeedReduction);
+
         _postLandFrames = 10;
     }
 
@@ -202,13 +217,15 @@ public class BoatMovement : MonoBehaviour
     }
 
     // Called by BoostController to launch the boat off a wave.
-    public void LaunchBoat(Vector3 launchVelocity, float gravityMultiplier, float airControl, float maxAirborneTime)
+    public void LaunchBoat(Vector3 launchVelocity, float gravityMultiplier, float airControl, float maxAirborneTime, float landingReduction)
     {
         isAirborne = true;
         airGravityMultiplier = gravityMultiplier;
         airControlFactor = airControl;
         maxAirTime = maxAirborneTime;
+        landingSpeedReduction = landingReduction;
         airTimer = 0f;
+        launchWaveHeight = SampleWaveHeightAt(rb.position);
         rb.linearVelocity = launchVelocity;
     }
 

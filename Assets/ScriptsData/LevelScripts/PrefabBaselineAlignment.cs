@@ -23,14 +23,33 @@ public class PrefabBaselineAlignment : MonoBehaviour
     [Tooltip("Euler angles applied to Vector3.up to define this prefab's up direction at spawn.")]
     [SerializeField] Vector3 upEuler = Vector3.zero;
 
+    [Header("Designer Scale Radius")]
+    [Tooltip("When enabled, the Grid Designer draws a proportional footprint ring for this prefab and lets you scale placements up/down.")]
+    [SerializeField] bool useScaleRadius = false;
+    [Tooltip("World-space radius of this object's footprint at scale 1. The Grid Designer proportions the placement against the arena baseline using this value.")]
+    [SerializeField] float scaleRadius = 3f;
+
     public bool UseForwardOverride => useForwardOverride;
     public bool UseUpOverride      => useUpOverride;
     public Vector3 LocalForward    => useForwardOverride ? Quaternion.Euler(forwardEuler) * Vector3.forward : Vector3.forward;
     public Vector3 LocalUp         => useUpOverride      ? Quaternion.Euler(upEuler)      * Vector3.up      : Vector3.up;
 
+    public bool  UseScaleRadius => useScaleRadius;
+    public float ScaleRadius    => scaleRadius;
+
 #if UNITY_EDITOR
     void OnDrawGizmos()
     {
+        // Scale-radius footprint ring — drawn independently of showDebug so the
+        // designer footprint is always visible when the feature is enabled.
+        if (useScaleRadius && scaleRadius > 0f)
+        {
+            Handles.color = new Color(1f, 0.55f, 0.1f, 0.85f);
+            Handles.DrawWireDisc(transform.position, Vector3.up, scaleRadius);
+            Handles.color = new Color(1f, 0.55f, 0.1f, 0.9f);
+            Handles.Label(transform.position + Vector3.right * scaleRadius, $"scale r={scaleRadius:0.##}");
+        }
+
         if (!showDebug) return;
 
         Vector3 pos = transform.position;

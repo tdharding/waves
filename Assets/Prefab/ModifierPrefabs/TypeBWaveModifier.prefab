@@ -98,10 +98,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PrefabBaselineAlignment
   showDebug: 1
-  useForwardOverride: 0
-  forwardEuler: {x: 0, y: 0, z: 0}
+  useForwardOverride: 1
+  forwardEuler: {x: 0, y: 181.3, z: 0}
   useUpOverride: 0
   upEuler: {x: 0, y: 0, z: 0}
+  useScaleRadius: 1
+  scaleRadius: 0.25
 --- !u!1 &7677057366641282449
 GameObject:
   m_ObjectHideFlags: 0
@@ -466,6 +468,7 @@ MonoBehaviour:
   debugMaterialWaveCenter: {x: 0, y: 0, z: 0, w: 0}
   plungerAnimator: {fileID: 1860385019852395316}
   animationTrigger: Active
+  idleAnimationSpeed: 0.5
   speedIncreaseRate: 0.08
   maxAnimationSpeed: 0.5
 --- !u!95 &1860385019852395316

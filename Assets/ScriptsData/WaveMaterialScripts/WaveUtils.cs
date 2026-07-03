@@ -68,6 +68,29 @@ public static class WaveUtils
         return SampleWaveSmooth(worldPos, p, multiplier) - SampleWhirlpoolDepth(worldPos, p);
     }
 
+    // Exact analytic XZ gradient of SampleWaveSmooth (dy per world unit in x and z).
+    // No finite-difference sampling, so no aliasing/noise regardless of wavelength.
+    // Note: excludes whirlpool depressions.
+    public static Vector3 GetGradientSmooth(Vector3 worldPos, WaveParams p)
+    {
+        float dx   = (worldPos.x - p.origin.x) / p.meshScale;
+        float dz   = (worldPos.z - p.origin.z) / p.meshScale;
+        float dist = Mathf.Sqrt(dx * dx + dz * dz);
+        if (dist < 1e-5f) return Vector3.zero;
+
+        float phase   = Shader.GetGlobalFloat("_WavePhase");
+        // h = -sin(dist·f − φ)·r·s  →  ∂h/∂wx = -cos(dist·f − φ)·f·r·(dx/dist)
+        float dHdDist = -Mathf.Cos(dist * p.frequency - phase) * p.frequency * p.ripple;
+        return new Vector3(dHdDist * dx / dist, 0f, dHdDist * dz / dist);
+    }
+
+    // Exact surface normal built from the analytic gradient.
+    public static Vector3 GetNormalSmooth(Vector3 worldPos, WaveParams p)
+    {
+        Vector3 g = GetGradientSmooth(worldPos, p);
+        return new Vector3(-g.x, 1f, -g.z).normalized;
+    }
+
     public static Vector3 GetNormal(Vector3 worldPos, WaveParams p, float sampleOffset = 0.1f)
     {
         Vector3 p0 = worldPos;

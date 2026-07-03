@@ -86,6 +86,10 @@ public class WaveMaterialController : MonoBehaviour
 
     private bool isModifierActive = false;
     private Vector4 modWaveCenter;
+    // Persistent wave center, registered by a modifier at spawn so the wave already
+    // emanates from it before it is activated. Independent of the boost-active state.
+    private Vector4 persistentWaveCenter;
+    private bool hasPersistentWaveCenter = false;
     private float modFreqBoost;
     private float modSpeedBoost;
     private float modRippleBoost;
@@ -120,8 +124,11 @@ public class WaveMaterialController : MonoBehaviour
         currentGlobalState.Frequency   += modFreqBoost   * _modifierIntensity;
         currentGlobalState.RippleDepth += modRippleBoost * _modifierIntensity;
         
-        // 4. Update WaveCenter (Instant swap when active)
-        currentGlobalState.WaveCenter = isModifierActive ? modWaveCenter : _baselineState.WaveCenter;
+        // 4. Update WaveCenter (Instant swap when active). When a modifier has registered
+        //    a persistent center at spawn, use it while idle instead of the baseline center.
+        currentGlobalState.WaveCenter = isModifierActive ? modWaveCenter
+                                      : hasPersistentWaveCenter ? persistentWaveCenter
+                                      : _baselineState.WaveCenter;
 
         // 5. Accumulate phase for smooth vertex animation
         _accumulatedPhase += currentGlobalState.Speed * Time.deltaTime;
@@ -242,6 +249,15 @@ public class WaveMaterialController : MonoBehaviour
         modFreqBoost = freq;
         modSpeedBoost = speed;
         modRippleBoost = ripple;
+    }
+
+    // Registers a wave center that is applied immediately (at modifier spawn), independent
+    // of whether the modifier has been activated. Used so the wave already originates from
+    // the modifier at runtime rather than only once a soul arrives.
+    public void SetModifierWaveCenter(Vector4 center)
+    {
+        persistentWaveCenter = center;
+        hasPersistentWaveCenter = true;
     }
 
     public void ApplyStateInstant(WaveState state)

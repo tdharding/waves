@@ -13,12 +13,14 @@ public static class WaveEditorLauncher
         var win3 = EditorWindow.GetWindow<LevelSelectDesignerWindow>("Level Select Designer", typeof(GameTesterTool));
         var win4 = EditorWindow.GetWindow<WaveEffectsLiveTuner>("Wave Tuner", typeof(GameTesterTool));
         var win5 = EditorWindow.GetWindow<SonarGridEditorWindow>("Sonar Grid Editor", typeof(GameTesterTool));
+        var win6 = EditorWindow.GetWindow<GizmoManagerWindow>("Gizmo Manager", typeof(GameTesterTool));
 
         win1.Show();
         win2.Show();
         win3.Show();
         win4.Show();
         win5.Show();
+        win6.Show();
 
         win1.Focus();
     }

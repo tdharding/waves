@@ -220,6 +220,19 @@ public class GridData : ScriptableObject
         public GameObject prefab;
         public bool       isCircle;        // true = soul/overlay plane
         public bool       isWorldSpaceProp; // true = statue/world prop — skips grid rotation, uses baseline height
+
+        // Uniform scale multiplier applied to the spawned instance. Driven by the
+        // Grid Designer when the prefab has a PrefabBaselineAlignment scale radius.
+        // 1 = prefab default. 0 (legacy/unset) is treated as 1 everywhere it is read.
+        public float scale = 1f;
+
+        // Per-modifier overrides for TypeB wave modifiers. When
+        // overrideModifierSettings is false the spawned prefab keeps its own
+        // default speed/frequency/ripple boost values.
+        public bool  overrideModifierSettings;
+        public float speedBoost;
+        public float frequencyBoost;
+        public float rippleDepthBoost;
     }
 
     public List<PrefabPlacement> prefabPlacements = new List<PrefabPlacement>();
