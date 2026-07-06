@@ -2,7 +2,7 @@
 %TAG !u! tag:unity3d.com,2011:
 --- !u!114 &-8872254583698201852
 MonoBehaviour:
-  m_ObjectHideFlags: 0
+  m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -15,9 +15,51 @@ MonoBehaviour:
   m_Active: 1
   injectionPoint: 550
   material: {fileID: 2100000, guid: ffd074326ef0af14aa61dcf3b333c532, type: 2}
+--- !u!114 &-8140663870232940065
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6b3d386ba5cd94485973aee1479b272e, type: 3}
+  m_Name: INDICATORS
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.RenderObjects
+  m_Active: 1
+  settings:
+    passTag: INDICATORS
+    Event: 500
+    filterSettings:
+      RenderQueueType: 1
+      LayerMask:
+        serializedVersion: 2
+        m_Bits: 131072
+      PassNames: []
+    overrideMaterial: {fileID: 0}
+    overrideMaterialPassIndex: 0
+    overrideShader: {fileID: 0}
+    overrideShaderPassIndex: 0
+    overrideMode: 0
+    overrideDepthState: 1
+    depthCompareFunction: 2
+    enableWrite: 1
+    stencilSettings:
+      overrideStencilState: 0
+      stencilReference: 0
+      stencilCompareFunction: 8
+      passOperation: 0
+      failOperation: 0
+      zFailOperation: 0
+    cameraSettings:
+      overrideCamera: 0
+      restoreCamera: 1
+      offset: {x: 0, y: 0, z: 0, w: 0}
+      cameraFieldOfView: 87
 --- !u!114 &-7882423734558799429
 MonoBehaviour:
-  m_ObjectHideFlags: 0
+  m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -59,7 +101,7 @@ MonoBehaviour:
       cameraFieldOfView: 60
 --- !u!114 &-7833884852205820185
 MonoBehaviour:
-  m_ObjectHideFlags: 0
+  m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -77,7 +119,7 @@ MonoBehaviour:
       RenderQueueType: 1
       LayerMask:
         serializedVersion: 2
-        m_Bits: 8192
+        m_Bits: 65536
       PassNames: []
     overrideMaterial: {fileID: 2100000, guid: 009fb14dfae30684cb938e96bf4a3542, type: 2}
     overrideMaterialPassIndex: 0
@@ -101,7 +143,7 @@ MonoBehaviour:
       cameraFieldOfView: 60
 --- !u!114 &-7010519820637803867
 MonoBehaviour:
-  m_ObjectHideFlags: 0
+  m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -143,7 +185,7 @@ MonoBehaviour:
       cameraFieldOfView: 60
 --- !u!114 &-5751457783749936023
 MonoBehaviour:
-  m_ObjectHideFlags: 0
+  m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -185,7 +227,7 @@ MonoBehaviour:
       cameraFieldOfView: 60
 --- !u!114 &-5713407380964019498
 MonoBehaviour:
-  m_ObjectHideFlags: 0
+  m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -200,7 +242,7 @@ MonoBehaviour:
   material: {fileID: 2100000, guid: f01e1856af3df9f4fbfb78f5f4d4970a, type: 2}
 --- !u!114 &-1927081915486609398
 MonoBehaviour:
-  m_ObjectHideFlags: 0
+  m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -242,7 +284,7 @@ MonoBehaviour:
       cameraFieldOfView: 60
 --- !u!114 &-1566571695612846054
 MonoBehaviour:
-  m_ObjectHideFlags: 0
+  m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -257,7 +299,7 @@ MonoBehaviour:
   material: {fileID: 2100000, guid: 174b2731eede17f4d91c96123121c30c, type: 2}
 --- !u!114 &-1091044631912852561
 MonoBehaviour:
-  m_ObjectHideFlags: 0
+  m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -337,8 +379,8 @@ MonoBehaviour:
   - {fileID: -7010519820637803867}
   - {fileID: 5348527109056812781}
   - {fileID: -7833884852205820185}
-  m_RendererFeatureMap: ad6b866f10d7b46c0a60573e35a141e5afd3bc18b0d4dbf0bbc9835460019c927a8c2854aaecc5612e60e7ac50e1930069fced429eb72eb0a7c3160c60e7d84fe09818f8f3ecf21a0463d69d766bdf841aa0d0c7576b42ead6728b0842e6b5b0a56a0cd05da1b59eedd6e06611c9394ae766f58c3b734893
-  m_UseNativeRenderPass: 1
+  - {fileID: -8140663870232940065}
+  m_RendererFeatureMap: ad6b866f10d7b46c0a60573e35a141e5afd3bc18b0d4dbf0bbc9835460019c927a8c2854aaecc5612e60e7ac50e1930069fced429eb72eb0a7c3160c60e7d84fe09818f8f3ecf21a0463d69d766bdf841aa0d0c7576b42ead6728b0842e6b5b0a56a0cd05da1b59eedd6e06611c9394ae766f58c3b734893dfb1e852578d068f
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   m_AssetVersion: 3
@@ -366,9 +408,10 @@ MonoBehaviour:
   m_DepthTextureFormat: 0
   m_AccurateGbufferNormals: 0
   m_IntermediateTextureMode: 0
+  m_TileOnlyMode: 0
 --- !u!114 &41624558190944302
 MonoBehaviour:
-  m_ObjectHideFlags: 0
+  m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -410,7 +453,7 @@ MonoBehaviour:
       cameraFieldOfView: 60
 --- !u!114 &1941874921933674720
 MonoBehaviour:
-  m_ObjectHideFlags: 0
+  m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -452,7 +495,7 @@ MonoBehaviour:
       cameraFieldOfView: 60
 --- !u!114 &5348527109056812781
 MonoBehaviour:
-  m_ObjectHideFlags: 0
+  m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -494,7 +537,7 @@ MonoBehaviour:
       cameraFieldOfView: 60
 --- !u!114 &5753602923671503783
 MonoBehaviour:
-  m_ObjectHideFlags: 0
+  m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -509,7 +552,7 @@ MonoBehaviour:
     fullscreenMaterial: {fileID: 2100000, guid: 174b2731eede17f4d91c96123121c30c, type: 2}
 --- !u!114 &7045297408391548026
 MonoBehaviour:
-  m_ObjectHideFlags: 0
+  m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -551,7 +594,7 @@ MonoBehaviour:
       cameraFieldOfView: 60
 --- !u!114 &7833122117494664109
 MonoBehaviour:
-  m_ObjectHideFlags: 0
+  m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}

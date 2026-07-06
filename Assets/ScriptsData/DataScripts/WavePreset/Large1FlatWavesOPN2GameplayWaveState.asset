@@ -13,26 +13,26 @@ MonoBehaviour:
   m_Name: Large1FlatWavesOPN2GameplayWaveState
   m_EditorClassIdentifier: Assembly-CSharp::WavePreset
   state:
-    Frequency: 1.05
+    Frequency: 1.88
     Speed: 0.24
-    RippleDepth: 0.21
+    RippleDepth: 0.22
     Smoothness: 0
     Transparency: 1
-    Strength: 6
+    Strength: 0.28
     TroughRingWave1Brightness: 11
     PeakRingWave2Brightness: 1.45
-    TwirlBaseStrength: 6.61
-    TwirlSlopeBoost: -0.08
-    TwirlScale: 4.11
+    TwirlBaseStrength: 1.13
+    TwirlSlopeBoost: -3.05
+    TwirlScale: 5.12
     DepthTwirlStrength: 4.17
-    DepthFadeStrength: 1.8
-    DepthFadeLine: 3.42
+    DepthFadeStrength: 1.99
+    DepthFadeLine: 3.66
     WhirlpoolTwirlStrength: 11.52
     WhirlpoolAreaTwirlStrength: 14.55
     SoulFishTwirlStrength: 0.78
-    SoulFishMaskStrength: 0.1
-    SoulFishRadius: 1.26
-    SoulFishBrightness1: 131.99
+    SoulFishMaskStrength: 0.07
+    SoulFishRadius: 1.49
+    SoulFishBrightness1: 55.8
     ZoneTiling: {x: 17, y: 17}
     ZoneScrollSpeed: 0.1
     ZoneNoiseStrength: 0.106
@@ -42,16 +42,16 @@ MonoBehaviour:
     WhirlpoolDarkStrength: 1
     WhirlpoolFalloffPower: 0.23
     WaveStepRate: 4000
-    BaseColor: {r: 0.8301887, g: 0.8301887, b: 0.8301887, a: 1}
-    LightDirection: {x: -6.23, y: -102, z: 54.72}
-    FoamDitherSize: 3.09
-    FoamDistanceDepth: -0.37
-    FoamDepthFade: -0.25
+    BaseColor: {r: 0.9245283, g: 0.9245283, b: 0.9245283, a: 1}
+    LightDirection: {x: 1.85, y: -50.8, z: 54.72}
+    FoamDitherSize: 2.74
+    FoamDistanceDepth: -0.47
+    FoamDepthFade: -0.2
     FoamColor: {r: 0, g: 0, b: 0, a: 1}
-    FoamLine: 0.04
-    DepthFade: 1.36
+    FoamLine: 0.09
+    DepthFade: 1.13
     DepthColour: {r: 1, g: 1, b: 1, a: 0}
-    DistanceDepth: 0.9
+    DistanceDepth: 0.78
     NormalTexture: {fileID: 2800000, guid: aeb74d7691c0cd64ea8d5b9b54a45338, type: 3}
     WaveCenter: {x: 0, y: 0, z: 0, w: 0}
   sonarEnabled: 1

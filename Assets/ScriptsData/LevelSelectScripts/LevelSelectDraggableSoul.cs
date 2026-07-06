@@ -36,7 +36,10 @@ public class LevelSelectDraggableSoul : MonoBehaviour, IPointerClickHandler, IPo
     private void OnDestroy()
     {
         if (isHolding)
+        {
             Time.timeScale = 1f;
+            SoulPickupEvents.FireReleased();
+        }
     }
 
     // --- MOUSE OVER ---
@@ -78,6 +81,7 @@ public class LevelSelectDraggableSoul : MonoBehaviour, IPointerClickHandler, IPo
         justPickedUp = true;
         transform.SetAsLastSibling();
         Time.timeScale = heldTimeScale;
+        SoulPickupEvents.FirePickedUp();
     }
 
     private void TryPlaceSoul()
@@ -109,6 +113,15 @@ public class LevelSelectDraggableSoul : MonoBehaviour, IPointerClickHandler, IPo
             SoulEnterPipeTrigger pipeTrigger = hit.collider.GetComponent<SoulEnterPipeTrigger>();
             if (pipeTrigger != null)
             {
+                var indicator = pipeTrigger.GetComponent<SoulSlotIndicator>()
+                             ?? pipeTrigger.GetComponentInParent<SoulSlotIndicator>();
+                bool inRange = indicator == null || indicator.IsInRange();
+                if (!inRange)
+                {
+                    Debug.Log($"[DraggableSoul] SoulEnterPipeTrigger '{hit.collider.gameObject.name}' out of range — rejected.");
+                    ReturnToInventory();
+                    return;
+                }
                 bool inserted = pipeTrigger.TryInsertSoul(this.soulDataIdentity);
                 Debug.Log($"[DraggableSoul] SoulEnterPipeTrigger '{hit.collider.gameObject.name}' TryInsert → {inserted}");
                 if (inserted) { OnPlacedSuccessfully(); return; }
@@ -129,6 +142,7 @@ Debug.Log($"[DraggableSoul] Hit object has neither GameplaySoulSlot nor SoulSlot
     {
         Debug.Log($"[DraggableSoul] OnPlacedSuccessfully — identity={soulDataIdentity}");
         Time.timeScale = 1f;
+        SoulPickupEvents.FireReleased();
         GameProgressData.RemoveSoulFromBoat(soulDataIdentity);
         SoulsOnBoatDisplayManager.Instance?.ConsumeSoulFromDisplay(soulDataIdentity);
         Destroy(gameObject);
@@ -138,6 +152,7 @@ Debug.Log($"[DraggableSoul] Hit object has neither GameplaySoulSlot nor SoulSlot
     {
         isHolding = false;
         Time.timeScale = 1f;
+        SoulPickupEvents.FireReleased();
         transform.SetParent(startParent);
         rect.anchoredPosition = startPosition;
         UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(startParent.GetComponent<RectTransform>());

@@ -55,8 +55,8 @@ Material:
     - _ArenaRadius: 16.8
     - _DisplaceRadiusOffset: 0.3
     - _DisplaceStrength: 0.2
-    - _GridDensity: -5
-    - _GridWorldScale: -6.297229
+    - _GridDensity: 21
+    - _GridWorldScale: 26.448362
     - _LineWidth: 0.02
     - _LureRadius: 0
     - _LureStrength: 0
@@ -84,7 +84,7 @@ Material:
     - _ArenMask: {r: 0, g: 0, b: 0, a: 0}
     - _ArenaMask: {r: 0, g: -5.5, b: 0, a: 0}
     - _GridOffset: {r: -1.1216216, g: 2.6324322, b: 0, a: 0}
-    - _MouthWorldPos: {r: -13.325235, g: -5.7162704, b: -1.5042009, a: 0}
+    - _MouthWorldPos: {r: -8.360175, g: -5.472987, b: -3.0384645, a: 0}
     - _PulseOrigin: {r: -5.58, g: -47.5, b: 2.3, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

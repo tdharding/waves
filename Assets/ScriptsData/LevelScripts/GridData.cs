@@ -35,6 +35,14 @@ public class GridData : ScriptableObject
     public WavePreset runtimeWavePresetOverride;
 
     // ─────────────────────────────────────────────
+    // SONAR GRID
+    // ─────────────────────────────────────────────
+
+    [Header("Sonar Grid")]
+    [Tooltip("Sonar grid formation loaded on level spawn. Null = keep the scene's default sonar formation.")]
+    public SonarGridType sonarGridType;
+
+    // ─────────────────────────────────────────────
     // ENEMY
     // ─────────────────────────────────────────────
 
@@ -108,17 +116,65 @@ public class GridData : ScriptableObject
     [System.Serializable]
     public class SoulZone
     {
-        [Tooltip("Ordered grid cell indices placed by designer. 1 node = circular area, 2+ = path.")]
+        [Tooltip("LEGACY grid cell indices. Migrated into nodePositions on load; kept only for back-compat.")]
         public List<int> nodes = new List<int>();
 
-        [Tooltip("Scatter/path radius for spline knot generation and wave mask.")]
-        public float radius = 3f;
+        [Tooltip("Free node positions in normalized grid space (-0.5..0.5 from centre), same space as SplineWallPath. 1 node = circular area, 2+ = path.")]
+        public List<Vector2> nodePositions = new List<Vector2>();
+
+        [Tooltip("True = the path closes back on itself into a loop.")]
+        public bool closedLoop = false;
+
+        [Tooltip("Scatter/path radius for spline knot generation and wave mask (fish swim-band width).")]
+        public float radius = 0.5f;
 
         [Tooltip("Number of spline knots to generate for fish swim path.")]
         public int knotCount = 8;
 
         [Tooltip("Soul identities in this zone. Each entry spawns one fish mesh instance.")]
         public List<SoulData> souls = new List<SoulData>();
+
+        // ── Statue link ──────────────────────────────────────
+        [Tooltip("True when this zone is a ring auto-created around a statue. Fish can't be caught until the statue is destroyed.")]
+        public bool statueGuarded = false;
+
+        [Tooltip("Matches PrefabPlacement.statueId of the guarding statue. Only meaningful when statueGuarded is true.")]
+        public int linkedStatueId = 0;
+
+        [Tooltip("Normalized-grid radius of the circular route around the statue. Only used when statueGuarded.")]
+        public float ringRadius = 0.08f;
+
+        // ── Fish-bowl tower link ─────────────────────────────
+        [Tooltip("True when this zone belongs to a FishBowlTower. The shoal container spawns aloft in " +
+                 "the bowl and drops into the water when the tower is destroyed; fish become catchable on landing. " +
+                 "The bowl height and swim radius are defined by the tower prefab's FishBowlTowerController — not stored here.")]
+        public bool towerGuarded = false;
+
+        // Back-compat: older assets stored grid-cell indices in `nodes`. Populate nodePositions
+        // from them once so existing levels keep their zones. No-op after first migration.
+        public void MigrateNodesIfNeeded()
+        {
+            if (nodePositions == null) nodePositions = new List<Vector2>();
+            if (nodePositions.Count > 0) return;
+            if (nodes == null || nodes.Count == 0) return;
+
+            var src = new List<int>(nodes);
+            // Old closed-loop convention: last node duplicated the first.
+            if (src.Count >= 3 && src[src.Count - 1] == src[0]) { closedLoop = true; src.RemoveAt(src.Count - 1); }
+            foreach (int cell in src)
+                nodePositions.Add(CellToNormalized(cell));
+
+            nodes.Clear(); // legacy list severed once migrated
+        }
+
+        // Grid cell index -> normalized grid coord (matches the designer's WorldXZToPixel space).
+        public static Vector2 CellToNormalized(int cell)
+        {
+            int col = cell % GridSize;
+            int row = cell / GridSize;
+            return new Vector2((col + 0.5f) / GridSize - 0.5f,
+                               0.5f - (row + 0.5f) / GridSize);
+        }
     }
 
     public List<SoulZone> soulZones = new List<SoulZone>();
@@ -221,6 +277,10 @@ public class GridData : ScriptableObject
         public bool       isCircle;        // true = soul/overlay plane
         public bool       isWorldSpaceProp; // true = statue/world prop — skips grid rotation, uses baseline height
 
+        // Non-zero when this placement is a statue that owns a guarded soul-fish zone.
+        // Stamped onto the spawned StatueBehaviour and matched by SoulZone.linkedStatueId.
+        public int        statueId;
+
         // Uniform scale multiplier applied to the spawned instance. Driven by the
         // Grid Designer when the prefab has a PrefabBaselineAlignment scale radius.
         // 1 = prefab default. 0 (legacy/unset) is treated as 1 everywhere it is read.
@@ -302,12 +362,21 @@ public class GridData : ScriptableObject
     {
         public List<Vector2> nodes         = new List<Vector2>();
         public bool          isClosed      = false;
-        public List<bool>    segmentCurved = new List<bool>(); // index i = curved flag for segment node[i]→node[i+1]; missing = true
-        public float         tileSpacing   = 0.2f;
-        public GameObject    prefabOverride; // null = use LevelSpawner.splineWallPrefab
+        public List<bool>    segmentCurved       = new List<bool>(); // index i = curved flag for segment node[i]→node[i+1]; missing = true
+        public List<bool>    segmentGap          = new List<bool>(); // index i = gap flag (no wall) for segment node[i]→node[i+1]; missing = false
+        public List<bool>    segmentDestructible = new List<bool>(); // index i = use destructiblePrefabOverride for segment node[i]→node[i+1]; missing = false
+        public float         tileSpacing         = 0.2f;
+        public GameObject    prefabOverride;             // null = use LevelSpawner.splineWallPrefab
+        public GameObject    destructiblePrefabOverride; // prefab (with DestructibleWall) used for segments flagged destructible
 
         public bool IsSegmentCurved(int seg) =>
             segmentCurved != null && seg < segmentCurved.Count ? segmentCurved[seg] : true;
+
+        public bool IsSegmentGap(int seg) =>
+            segmentGap != null && seg < segmentGap.Count && segmentGap[seg];
+
+        public bool IsSegmentDestructible(int seg) =>
+            segmentDestructible != null && seg < segmentDestructible.Count && segmentDestructible[seg];
     }
 
     public List<SplineWallPath> splineWallPaths = new List<SplineWallPath>();

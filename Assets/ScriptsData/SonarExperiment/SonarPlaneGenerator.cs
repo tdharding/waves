@@ -43,6 +43,15 @@ public class SonarPlaneGenerator : MonoBehaviour
 
     // ── configure (called by SonarController) ─────────────────────────────────
 
+    // Swaps the grid formation at runtime (e.g. LevelDataController applying the active
+    // level's SonarGridType on spawn). Rebuilds tiles with the current cell/level spacing.
+    public void SetGridType(SonarGridType type)
+    {
+        if (type == gridType) return;
+        gridType = type;
+        Generate();
+    }
+
     public void Configure(float cellSize, float levelSpacing, float waveSurfaceY)
     {
         _cellSize     = Mathf.Max(0.01f, cellSize);

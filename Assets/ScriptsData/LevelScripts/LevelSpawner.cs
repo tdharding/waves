@@ -136,6 +136,33 @@ public class LevelSpawner : MonoBehaviour
             go.transform.localScale *= s;
     }
 
+    // Statues spawned this pass, keyed by PrefabPlacement.statueId, so guarded soul-fish
+    // zones can find their statue to gate catchability. Cleared at the start of each spawn.
+    private readonly Dictionary<int, StatueBehaviour> _statuesById = new Dictionary<int, StatueBehaviour>();
+
+    // Stamps the placement's statueId onto the spawned StatueBehaviour and registers it.
+    private void RegisterStatue(GameObject go, GridData.PrefabPlacement pp)
+    {
+        if (go == null || pp == null || pp.statueId == 0) return;
+        var statue = go.GetComponent<StatueBehaviour>();
+        if (statue == null) return;
+        statue.statueId = pp.statueId;
+        _statuesById[pp.statueId] = statue;
+    }
+
+    // Fish-bowl towers spawned this pass, keyed by PrefabPlacement.statueId (reused as the guard id),
+    // so tower-guarded zones can find their tower to hand it the bowl container. Cleared each spawn.
+    private readonly Dictionary<int, FishBowlTowerController> _towersById = new Dictionary<int, FishBowlTowerController>();
+
+    // Registers a spawned FishBowlTower so its zone can link the aloft shoal container to it.
+    private void RegisterTower(GameObject go, GridData.PrefabPlacement pp)
+    {
+        if (go == null || pp == null || pp.statueId == 0) return;
+        var tower = go.GetComponentInChildren<FishBowlTowerController>(true);
+        if (tower == null) return;
+        _towersById[pp.statueId] = tower;
+    }
+
     // =====================================================
     // SPAWN
     // =====================================================
@@ -241,6 +268,9 @@ float   tileZ  = b.size.z / GridData.GridSize;
 
         // ── Direct Prefab Placements (base layer) ──
 
+        _statuesById.Clear();
+        _towersById.Clear();
+
         if (activeGridData.prefabPlacements != null)
         {
             foreach (var pp in activeGridData.prefabPlacements)
@@ -266,6 +296,8 @@ float   tileZ  = b.size.z / GridData.GridSize;
                 Quaternion rot = hasBaselineAlign ? baselineRot : par.rotation;
                 var instance = Instantiate(pp.prefab, pos, rot, par);
                 ApplyPlacementScale(instance, pp);
+                RegisterStatue(instance, pp);
+                RegisterTower(instance, pp);
                 spawnedByCell[$"-1_{pp.cellIndex}"] = instance;
                 InitializeWaveModifier(instance);
                 ApplyModifierOverrides(instance, pp);
@@ -353,6 +385,8 @@ float   tileZ  = b.size.z / GridData.GridSize;
                         if (applyMinus90XRotation) rot2 *= Quaternion.Euler(-90f, 0f, 0f);
                         var instance = Instantiate(pp.prefab, pos2, rot2, spawnParent);
                         ApplyPlacementScale(instance, pp);
+                        RegisterStatue(instance, pp);
+                        RegisterTower(instance, pp);
                         spawnedByCell[$"{ti}_{pp.cellIndex}"] = instance;
                         InitializeWaveModifier(instance);
                         ApplyModifierOverrides(instance, pp);
@@ -455,18 +489,26 @@ float   tileZ  = b.size.z / GridData.GridSize;
             var prefab = path.prefabOverride != null ? path.prefabOverride : splineWallPrefab;
             if (prefab == null) { Debug.LogWarning("[LevelSpawner] SplineWall: no prefab assigned."); continue; }
 
-            var align    = prefab.GetComponentInChildren<PrefabBaselineAlignment>();
-            float cY     = align != null ? align.transform.localPosition.y : defaultContactY;
-            float spawnY = spawnedBaselineWaterY - cY;
+            float spawnY = SplineWallSpawnY(prefab, spawnedBaselineWaterY, defaultContactY);
+
+            // Destructible segments spawn this prefab instead (falls back to the normal wall prefab if unassigned).
+            var   destructiblePrefab = path.destructiblePrefabOverride;
+            float destructibleSpawnY = destructiblePrefab != null
+                ? SplineWallSpawnY(destructiblePrefab, spawnedBaselineWaterY, defaultContactY)
+                : spawnY;
 
             // tileSpacing is world units; convert to normalised space for WalkSpline
             float normStep = Mathf.Max(0.001f, path.tileSpacing / arenaWidth);
 
-            WalkSpline(path.nodes, path.isClosed, path.IsSegmentCurved, normStep, (pos2d, tangent) =>
+            WalkSpline(path.nodes, path.isClosed, path.IsSegmentCurved, path.IsSegmentGap, normStep, (pos2d, tangent, seg) =>
             {
+                bool      destructible = destructiblePrefab != null && path.IsSegmentDestructible(seg);
+                GameObject tilePrefab  = destructible ? destructiblePrefab : prefab;
+                float      tileY        = destructible ? destructibleSpawnY : spawnY;
+
                 float   angle = Mathf.Atan2(tangent.x, tangent.y) * Mathf.Rad2Deg;
-                Vector3 pos   = new Vector3(pos2d.x * arenaWidth, spawnY, pos2d.y * arenaWidth);
-                Instantiate(prefab, pos, Quaternion.Euler(0f, angle, 0f), spawnParent);
+                Vector3 pos   = new Vector3(pos2d.x * arenaWidth, tileY, pos2d.y * arenaWidth);
+                Instantiate(tilePrefab, pos, Quaternion.Euler(0f, angle, 0f), spawnParent);
             });
 
             // Spawn node point markers at each control node
@@ -485,7 +527,14 @@ float   tileZ  = b.size.z / GridData.GridSize;
         }
     }
 
-    static void WalkSpline(List<Vector2> pts, bool closed, System.Func<int,bool> isCurvedSeg, float spacing, System.Action<Vector2, Vector2> onSpawn)
+    static float SplineWallSpawnY(GameObject prefab, float baselineWaterY, float defaultContactY)
+    {
+        var   align = prefab.GetComponentInChildren<PrefabBaselineAlignment>();
+        float cY    = align != null ? align.transform.localPosition.y : defaultContactY;
+        return baselineWaterY - cY;
+    }
+
+    static void WalkSpline(List<Vector2> pts, bool closed, System.Func<int,bool> isCurvedSeg, System.Func<int,bool> isGapSeg, float spacing, System.Action<Vector2, Vector2, int> onSpawn)
     {
         int       n        = pts.Count;
         int       segCount = closed ? n : n - 1;
@@ -498,6 +547,16 @@ float   tileZ  = b.size.z / GridData.GridSize;
 
         for (int seg = 0; seg < segCount; seg++)
         {
+            int i2End = closed ? (seg + 1) % n : Mathf.Min(seg + 1, n - 1);
+
+            // Gap segment: leave empty space, jump to the end node and resume spawning at the next segment.
+            if (isGapSeg != null && isGapSeg(seg))
+            {
+                prev      = pts[i2End];
+                nextSpawn = accumulated;
+                continue;
+            }
+
             bool curved      = isCurvedSeg(seg);
             int stepsThisSeg = curved ? steps : 1;
             for (int s = 1; s <= stepsThisSeg; s++)
@@ -514,7 +573,7 @@ float   tileZ  = b.size.z / GridData.GridSize;
                     float   frac    = dist > 0.0001f ? 1f - back / dist : 1f;
                     Vector2 spawnPt = Vector2.Lerp(prev, curr, frac);
                     Vector2 tangent = dist > 0.0001f ? (curr - prev).normalized : Vector2.up;
-                    onSpawn(spawnPt, tangent);
+                    onSpawn(spawnPt, tangent, seg);
                     nextSpawn += spacing;
                 }
                 prev = curr;
@@ -827,7 +886,8 @@ else if (controller != null)
         for (int zoneIndex = 0; zoneIndex < activeGridData.soulZones.Count; zoneIndex++)
         {
             var zone = activeGridData.soulZones[zoneIndex];
-            if (zone.nodes == null || zone.nodes.Count == 0)
+            zone.MigrateNodesIfNeeded();
+            if (zone.nodePositions == null || zone.nodePositions.Count == 0)
             {
                 Debug.Log($"[LevelSpawner]   Zone {zoneIndex} SKIPPED — no nodes.");
                 continue;
@@ -842,51 +902,62 @@ else if (controller != null)
             foreach (var s in zone.souls)
                 if (s != null) s.homeLevelID = levelID;
 
-            // Convert node cell indices → world positions (pre-rotation, for instantiation)
-            var nodeWorldPositions = new List<Vector3>(zone.nodes.Count);
-            foreach (int nodeCell in zone.nodes)
-                nodeWorldPositions.Add(CellToWorldPos(nodeCell, origin, tileX, tileZ));
+            // Convert normalized node positions → world positions (pre-rotation, for instantiation)
+            var nodeWorldPositions = new List<Vector3>(zone.nodePositions.Count);
+            foreach (var n in zone.nodePositions)
+                nodeWorldPositions.Add(NormalizedToWorldPos(n, origin, tileX, tileZ));
 
-            // Pre-compute post-rotation positions for material mask registration
+            // Pre-compute post-rotation positions for material mask registration.
+            // Kept at water level even for tower zones — this is where fish end up after the bowl lands.
             var nodeRegPositions = new List<Vector3>(nodeWorldPositions.Count);
             foreach (var p in nodeWorldPositions)
                 nodeRegPositions.Add(ComputeFinalNodePos(p));
 
-            // Detect closed loop: 3+ nodes and last == first
-            bool isClosedLoop = zone.nodes.Count >= 3
-                             && zone.nodes[zone.nodes.Count - 1] == zone.nodes[0];
+            // Fish-bowl tower: the bowl's TRUE world position and swim radius come from the tower
+            // prefab's FishBowlTowerController (bowlCenter transform + bowlRadius). Fish spawn at the
+            // real bowl location — no guessed height — and are contained within the radius. The
+            // container drops to the water plane (bowlWaterY) when the tower is smashed.
+            float bowlWaterY = nodeWorldPositions[0].y;
+            FishBowlTowerController bowlTower = null;
+            float   swimRadius   = zone.radius;
+            Vector3 containerPos = nodeWorldPositions[0];
+            if (zone.towerGuarded)
+            {
+                _towersById.TryGetValue(zone.linkedStatueId, out bowlTower);
+                if (bowlTower != null)
+                {
+                    containerPos = bowlTower.BowlCenterWorld;   // actual bowl position in the world
+                    swimRadius   = bowlTower.BowlWorldRadius;
+                }
+                else
+                {
+                    Debug.LogWarning($"[LevelSpawner]   Zone {zoneIndex} is towerGuarded but no FishBowlTower with id {zone.linkedStatueId} was spawned — using fallback.");
+                    containerPos = nodeWorldPositions[0] + Vector3.up * 6f;
+                    swimRadius   = 2f;
+                }
+            }
 
-            // Generate spline knots
+            bool isClosedLoop = zone.closedLoop && zone.nodePositions.Count >= 3;
+
+            // Generate spline knots — always a looping swim path
             List<Vector3> splineKnots;
-            bool closedSpline;
-            SplineAnimate.LoopMode loopMode;
+            bool closedSpline = true;
+            SplineAnimate.LoopMode loopMode = SplineAnimate.LoopMode.Loop;
 
-            if (zone.nodes.Count == 1)
-            {
-                splineKnots  = GenerateSingleNodeKnots(nodeWorldPositions[0], zone.radius, zone.knotCount);
-                closedSpline = true;
-                loopMode     = SplineAnimate.LoopMode.Loop;
-            }
-            else if (isClosedLoop)
-            {
-                var loopNodes = new List<Vector3>(nodeWorldPositions);
-                loopNodes.RemoveAt(loopNodes.Count - 1); // strip duplicate last node
-                splineKnots  = GenerateLoopingZoneKnots(loopNodes, zone.knotCount, zone.radius);
-                closedSpline = true;
-                loopMode     = SplineAnimate.LoopMode.Loop;
-            }
+            // Tower zones always swim a single contained disc around the real bowl centre, ignoring
+            // any authored node ring (older tower zones may still carry one in their data).
+            if (zone.towerGuarded)
+                splineKnots = GenerateSingleNodeKnots(containerPos, swimRadius, zone.knotCount);
+            else if (zone.nodePositions.Count == 1)
+                splineKnots = GenerateSingleNodeKnots(nodeWorldPositions[0], swimRadius, zone.knotCount);
             else
-            {
-                splineKnots  = GenerateLoopingZoneKnots(nodeWorldPositions, zone.knotCount, zone.radius);
-                closedSpline = true;
-                loopMode     = SplineAnimate.LoopMode.Loop;
-            }
+                splineKnots = GenerateLoopingZoneKnots(nodeWorldPositions, zone.knotCount, swimRadius);
 
-            // Spawn shoal container at first node — reality layer.
-            // No -90° X: SplineContainer must stay axis-aligned so
-            // InverseTransformPoint maps world XZ → local XZ without distortion.
+            // Spawn shoal container. For towers this is the true bowl position; for normal zones the
+            // first node. No -90° X: SplineContainer must stay axis-aligned so InverseTransformPoint
+            // maps world XZ → local XZ without distortion.
             GameObject containerInstance = Instantiate(
-                soulFishContainerPrefab, nodeWorldPositions[0], spawnParent.rotation, spawnParent);
+                soulFishContainerPrefab, containerPos, spawnParent.rotation, spawnParent);
 
             // Container-level identity label (zone-level, not registered individually)
             var containerLabel = containerInstance.GetComponent<LinkIdentityLabel>();
@@ -911,14 +982,37 @@ else if (controller != null)
             // Register post-rotation positions so the wave/map mask aligns with where fish actually swim
             SoulFishWaveLinker.RegisterZone(nodeRegPositions, isClosedLoop);
 
+            // Resolve the guarding statue for a statue-guarded zone (spawned earlier this pass)
+            StatueBehaviour guardStatue = null;
+            if (zone.statueGuarded)
+            {
+                _statuesById.TryGetValue(zone.linkedStatueId, out guardStatue);
+                if (guardStatue == null)
+                    Debug.LogWarning($"[LevelSpawner]   Zone {zoneIndex} is statueGuarded but no statue with id {zone.linkedStatueId} was spawned.");
+            }
+
             // Configure SoulShoalController
             var shoal = containerInstance.GetComponent<SoulShoalController>();
             if (shoal != null)
             {
                 shoal.splineContainer   = splineContainer;
                 shoal.fishingController = fishingController;
+                shoal.SetGuardStatue(guardStatue);
                 shoal.InitZone(nodeRegPositions);
                 shoal.SpawnFish(activeGridData.soulZones, zoneIndex, levelID);
+
+                // Block capture on each guarded fish until the statue is destroyed
+                if (guardStatue != null)
+                    foreach (var fishTransform in shoal.FishList)
+                        fishTransform?.GetComponent<FishFishingBehaviour>()?.SetGuardStatue(guardStatue);
+
+                // Fish-bowl tower: arm bowl mode (fish suppressed aloft) and hand the container to
+                // its tower so a catapult smash drops it. Catchability reopens on landing.
+                if (zone.towerGuarded)
+                {
+                    shoal.InitBowl(bowlWaterY);
+                    if (bowlTower != null) bowlTower.SetContainer(shoal);
+                }
             }
 
             // Register each spawned fish with the linking controller
@@ -936,7 +1030,7 @@ else if (controller != null)
                 }
             }
 
-            Debug.Log($"[LevelSpawner] Zone {zoneIndex} spawned — {zone.nodes.Count} node(s), {zone.souls.Count} soul(s), closed={isClosedLoop}.");
+            Debug.Log($"[LevelSpawner] Zone {zoneIndex} spawned — {zone.nodePositions.Count} node(s), {zone.souls.Count} soul(s), closed={isClosedLoop}.");
         }
     }
 
@@ -980,6 +1074,18 @@ else if (controller != null)
             knots.Add(new Vector3(center.x + circle.x, center.y, center.z + circle.y));
         }
         return knots;
+    }
+
+    // Normalized grid coord (-0.5..0.5 from centre) -> world position, in the same frame as
+    // CellToWorldPos so migrated soul-zone nodes land exactly where their old cells were.
+    private Vector3 NormalizedToWorldPos(Vector2 norm, Vector3 origin, float tileX, float tileZ)
+    {
+        float colF = (norm.x + 0.5f) * GridData.GridSize;
+        float rowF = (0.5f - norm.y) * GridData.GridSize;
+        return new Vector3(
+            origin.x + colF * tileX,
+            spawnParent.position.y,
+            origin.z + (GridData.GridSize - rowF) * tileZ);
     }
 
     // Distributes knots evenly around the node loop, then scatters each within radius on XZ.

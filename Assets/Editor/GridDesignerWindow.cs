@@ -108,7 +108,8 @@ public class GridDesignerWindow : EditorWindow
 
     // Soul zone drawing state
     int  _activeSoulZoneIndex = -1;
-    readonly List<int> _drawingNodes = new List<int>();
+    readonly List<Vector2> _drawingNodes = new List<Vector2>(); // normalized positions being drawn
+    int _drawingFirstCell = -1; // cell of the first drawn node, for close-loop detection
     bool _isDrawingSoulArea;
 
     // Select tool state
@@ -217,6 +218,8 @@ public class GridDesignerWindow : EditorWindow
     float   _gridZoom      = 1f;
     Vector2 _gridPanOffset = Vector2.zero;
     bool    _isPanningGrid = false;
+    bool    _spacePanHeld  = false; // Space held over the grid → drag pans like middle mouse
+    bool    _gridViewInit  = false; // one-time centring once the viewport size is known
 
     float EffCell       => CellSize * _gridZoom;
     float ZoomedGridSize => GridPixelSize * _gridZoom;
@@ -234,6 +237,7 @@ public class GridDesignerWindow : EditorWindow
     bool _showLevelIdentity  = true;
     bool _showCamera         = true;
     bool _showWavePresets    = true;
+    bool _showSonarGrid      = true;
     bool _showEnemy          = true;
     bool _showTimeTrial      = false;
     bool _showPrefabs        = false;
@@ -738,6 +742,7 @@ public class GridDesignerWindow : EditorWindow
         {
             DrawCameraSection();
             DrawWavePresetsSection();
+            DrawSonarGridSection();
             DrawEnemySection();
             DrawTimeTrialSection();
             DrawPrefabsSection();
@@ -762,6 +767,7 @@ public class GridDesignerWindow : EditorWindow
                 loadedData.waveModifierCellIndices?.Remove(index);
                 loadedData.whirlpools?.RemoveAll(w => w.cellIndex == index);
                 loadedData.soulSpawnPoints?.RemoveAll(s => s.cellIndex == index);
+                RemoveGuardedZonesForCell(index);
                 loadedData.prefabPlacements?.RemoveAll(p => p.cellIndex == index);
                 if (loadedData.tiers != null)
                     foreach (var tier in loadedData.tiers)
@@ -786,6 +792,7 @@ public class GridDesignerWindow : EditorWindow
                 loadedData.soulZones.Add(newZone);
                 _activeSoulZoneIndex = loadedData.soulZones.Count - 1;
                 _drawingNodes.Clear();
+                _drawingFirstCell  = -1;
                 _isDrawingSoulArea = true;
             }
 
@@ -793,15 +800,16 @@ public class GridDesignerWindow : EditorWindow
 
             var zone = loadedData.soulZones[_activeSoulZoneIndex];
 
-            // Close loop: 3+ nodes and user clicks the first node again
-            if (_drawingNodes.Count >= 3 && index == _drawingNodes[0])
+            // Close loop: 3+ nodes and user clicks the first node's cell again
+            if (_drawingNodes.Count >= 3 && index == _drawingFirstCell)
             {
-                _drawingNodes.Add(index);
+                zone.closedLoop = true;
                 CommitDrawingNodes(zone);
                 return;
             }
 
-            _drawingNodes.Add(index);
+            if (_drawingNodes.Count == 0) _drawingFirstCell = index;
+            _drawingNodes.Add(GridData.SoulZone.CellToNormalized(index));
             EditorUtility.SetDirty(loadedData);
             Repaint();
             return;
@@ -878,14 +886,18 @@ public class GridDesignerWindow : EditorWindow
 
             // First click (or normal placement)
             var placementsBase = GetActivePrefabPlacements();
+            RemoveGuardedZonesForCell(index); // clean up a prior statue's zone at this cell
             placementsBase.RemoveAll(p => p.cellIndex == index);
-            placementsBase.Add(new GridData.PrefabPlacement
+            var placement = new GridData.PrefabPlacement
             {
                 cellIndex           = index,
                 prefab              = _activePlacementPrefab,
                 isCircle            = drawCircle,
                 isWorldSpaceProp    = _activePlacementIsWorldSpaceProp,
-            });
+            };
+            placementsBase.Add(placement);
+            TryCreateStatueZone(placement);
+            TryCreateTowerZone(placement);
 
             if (_activePlacementPrefab.name == "TypeBWaveModifier")
             {
@@ -1008,6 +1020,170 @@ public class GridDesignerWindow : EditorWindow
         return loadedData.prefabPlacements;
     }
 
+    // ── Statue-guarded soul zones ────────────────────────────
+    const int StatueRingNodeCount = 8;
+
+    // If the placed prefab is a statue (has a StatueBehaviour), give the placement a
+    // unique id and auto-create a guarded multi-node ring zone linked to it.
+    void TryCreateStatueZone(GridData.PrefabPlacement placement)
+    {
+        if (placement?.prefab == null || loadedData == null) return;
+        if (placement.prefab.GetComponentInChildren<StatueBehaviour>(true) == null) return;
+
+        EnsureSoulZones();
+        if (placement.statueId == 0) placement.statueId = NextStatueId();
+
+        // Don't duplicate if a zone already links to this statue
+        if (loadedData.soulZones.Exists(z => z.statueGuarded && z.linkedStatueId == placement.statueId))
+            return;
+
+        var zone = new GridData.SoulZone
+        {
+            statueGuarded  = true,
+            linkedStatueId = placement.statueId,
+            ringRadius     = 0.08f,
+            radius         = 0.5f,
+            knotCount      = 8,
+        };
+        BuildRing(zone, GridData.SoulZone.CellToNormalized(placement.cellIndex), zone.ringRadius, StatueRingNodeCount);
+        loadedData.soulZones.Add(zone);
+        GridLog($"Auto-created guarded soul ring for statue #{placement.statueId} at cell {placement.cellIndex}. Assign souls to it in the Soul Zones panel.");
+        EditorUtility.SetDirty(loadedData);
+    }
+
+    // If the placed prefab is a fish-bowl tower (has a FishBowlTowerController), give the placement a
+    // unique id and auto-create a tower-guarded ring zone linked to it. The shoal container spawns
+    // aloft in the bowl and drops to this ring when the tower is destroyed.
+    void TryCreateTowerZone(GridData.PrefabPlacement placement)
+    {
+        if (placement?.prefab == null || loadedData == null) return;
+        if (placement.prefab.GetComponentInChildren<FishBowlTowerController>(true) == null) return;
+
+        EnsureSoulZones();
+        if (placement.statueId == 0) placement.statueId = NextStatueId();
+
+        // Don't duplicate if a zone already links to this tower
+        if (loadedData.soulZones.Exists(z => z.towerGuarded && z.linkedStatueId == placement.statueId))
+            return;
+
+        // Bowl height + swim radius live on the tower prefab's FishBowlTowerController — not here.
+        var zone = new GridData.SoulZone
+        {
+            towerGuarded   = true,
+            linkedStatueId = placement.statueId,
+            knotCount      = 8,
+            closedLoop     = false,
+        };
+        // A single anchor node co-located with the tower — the container spawns above this point.
+        // No authored ring is drawn: fish are contained within the bowl radius, not along a path.
+        zone.nodePositions = new List<Vector2> { GridData.SoulZone.CellToNormalized(placement.cellIndex) };
+        loadedData.soulZones.Add(zone);
+        GridLog($"Auto-created fish-bowl tower zone #{placement.statueId} at cell {placement.cellIndex}. Assign souls to it in the Soul Zones panel.");
+        EditorUtility.SetDirty(loadedData);
+    }
+
+    // Fills a zone with an evenly-spaced closed ring of `count` nodes around `center`.
+    static void BuildRing(GridData.SoulZone zone, Vector2 center, float radiusNorm, int count)
+    {
+        zone.nodePositions = new List<Vector2>(count);
+        for (int i = 0; i < count; i++)
+        {
+            float ang = (i / (float)count) * Mathf.PI * 2f;
+            zone.nodePositions.Add(center + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * radiusNorm);
+        }
+        zone.closedLoop = true;
+    }
+
+    static Vector2 Centroid(List<Vector2> pts)
+    {
+        if (pts == null || pts.Count == 0) return Vector2.zero;
+        Vector2 s = Vector2.zero;
+        foreach (var p in pts) s += p;
+        return s / pts.Count;
+    }
+
+    // Position for a node inserted next to `idx` in direction `dir` (+1 after, -1 before):
+    // midpoint to the neighbour, wrapping on closed loops, else a small offset off the end.
+    static Vector2 InsertedNodePos(GridData.SoulZone zone, int idx, int dir)
+    {
+        var pts = zone.nodePositions;
+        Vector2 a = pts[idx];
+        int nbr = idx + dir;
+        if (nbr >= 0 && nbr < pts.Count) return (a + pts[nbr]) * 0.5f;
+        if (zone.closedLoop && pts.Count > 1)
+            return (a + pts[(nbr + pts.Count) % pts.Count]) * 0.5f;
+        return a + new Vector2(0.02f * dir, 0f);
+    }
+
+    // Smallest unused positive statue id across base + tier placements.
+    int NextStatueId()
+    {
+        int max = 0;
+        if (loadedData.prefabPlacements != null)
+            foreach (var p in loadedData.prefabPlacements) max = Mathf.Max(max, p.statueId);
+        if (loadedData.tiers != null)
+            foreach (var t in loadedData.tiers)
+                if (t.prefabPlacements != null)
+                    foreach (var p in t.prefabPlacements) max = Mathf.Max(max, p.statueId);
+        return max + 1;
+    }
+
+    // Removes any statue-guarded zone whose statue is being erased at this cell.
+    void RemoveGuardedZonesForCell(int index)
+    {
+        if (loadedData?.soulZones == null) return;
+        var ids = new HashSet<int>();
+        if (loadedData.prefabPlacements != null)
+            foreach (var p in loadedData.prefabPlacements)
+                if (p.cellIndex == index && p.statueId != 0) ids.Add(p.statueId);
+        if (loadedData.tiers != null)
+            foreach (var t in loadedData.tiers)
+                if (t.prefabPlacements != null)
+                    foreach (var p in t.prefabPlacements)
+                        if (p.cellIndex == index && p.statueId != 0) ids.Add(p.statueId);
+        if (ids.Count > 0)
+            loadedData.soulZones.RemoveAll(z =>
+                (z.statueGuarded || z.towerGuarded) && ids.Contains(z.linkedStatueId));
+    }
+
+    // Cell index (base or tier) of the placement carrying this guard id, or -1 if none.
+    int FindPlacementCellForStatueId(int statueId)
+    {
+        if (statueId == 0 || loadedData == null) return -1;
+        if (loadedData.prefabPlacements != null)
+            foreach (var p in loadedData.prefabPlacements)
+                if (p.statueId == statueId) return p.cellIndex;
+        if (loadedData.tiers != null)
+            foreach (var t in loadedData.tiers)
+                if (t.prefabPlacements != null)
+                    foreach (var p in t.prefabPlacements)
+                        if (p.statueId == statueId) return p.cellIndex;
+        return -1;
+    }
+
+    // Tower zones only need a single anchor node at their tower cell (the swim area + height come
+    // from the tower prefab). Collapses any legacy multi-node ring created by earlier versions.
+    void NormalizeTowerZones()
+    {
+        if (loadedData?.soulZones == null) return;
+        bool changed = false;
+        foreach (var z in loadedData.soulZones)
+        {
+            if (!z.towerGuarded) continue;
+            int cell = FindPlacementCellForStatueId(z.linkedStatueId);
+            Vector2 anchor = cell >= 0
+                ? GridData.SoulZone.CellToNormalized(cell)
+                : (z.nodePositions != null && z.nodePositions.Count > 0 ? Centroid(z.nodePositions) : Vector2.zero);
+
+            if (z.nodePositions == null || z.nodePositions.Count != 1 || z.nodePositions[0] != anchor)
+            {
+                z.nodePositions = new List<Vector2> { anchor };
+                changed = true;
+            }
+        }
+        if (changed) EditorUtility.SetDirty(loadedData);
+    }
+
     List<int> GetActiveTierWaterModifiers()
     {
         if (activeTierIndex >= 0 && loadedData?.tiers != null && activeTierIndex < loadedData.tiers.Count)
@@ -1101,6 +1277,39 @@ public class GridDesignerWindow : EditorWindow
         EditorGUILayout.LabelField(
             $"Freq {s.Frequency:0.##}   Speed {s.Speed:0.##}   Ripple {s.RippleDepth:0.##}",
             EditorStyles.miniLabel);
+    }
+
+    void DrawSonarGridSection()
+    {
+        _showSonarGrid = EditorGUILayout.Foldout(_showSonarGrid, "Sonar Grid", true, EditorStyles.foldoutHeader);
+        if (!_showSonarGrid) return;
+
+        EditorGUI.BeginChangeCheck();
+        var newType = (SonarGridType)EditorGUILayout.ObjectField(
+            "Grid Type", loadedData.sonarGridType, typeof(SonarGridType), false);
+        if (EditorGUI.EndChangeCheck())
+        {
+            Undo.RecordObject(loadedData, "Set Sonar Grid Type");
+            loadedData.sonarGridType = newType;
+            EditorUtility.SetDirty(loadedData);
+        }
+
+        if (loadedData.sonarGridType != null)
+        {
+            var st = loadedData.sonarGridType;
+            EditorGUILayout.LabelField(
+                $"{st.columns}×{st.rows} tiles   {st.levels} levels   mat: {(st.planeMaterial != null ? st.planeMaterial.name : "none")}",
+                EditorStyles.miniLabel);
+        }
+        else
+        {
+            EditorGUILayout.HelpBox(
+                "No sonar grid type — level keeps the scene's default sonar formation.", MessageType.None);
+        }
+
+        if (GUILayout.Button(loadedData.sonarGridType != null
+                ? "Edit in Sonar Grid Editor" : "Open Sonar Grid Editor…"))
+            SonarGridEditorWindow.OpenWith(loadedData.sonarGridType);
     }
 
     void DrawEnemySection()
@@ -1622,10 +1831,11 @@ public class GridDesignerWindow : EditorWindow
     {
         if (_drawingNodes.Count > 0)
         {
-            zone.nodes = new List<int>(_drawingNodes);
+            zone.nodePositions = new List<Vector2>(_drawingNodes);
             EditorUtility.SetDirty(loadedData);
         }
         _drawingNodes.Clear();
+        _drawingFirstCell  = -1;
         _isDrawingSoulArea = false;
         Repaint();
     }
@@ -1636,7 +1846,7 @@ public class GridDesignerWindow : EditorWindow
         if (_activeSoulZoneIndex >= 0 && _activeSoulZoneIndex < loadedData.soulZones.Count)
         {
             var zone = loadedData.soulZones[_activeSoulZoneIndex];
-            if (zone.nodes == null || zone.nodes.Count == 0)
+            if (zone.nodePositions == null || zone.nodePositions.Count == 0)
             {
                 loadedData.soulZones.RemoveAt(_activeSoulZoneIndex);
                 EditorUtility.SetDirty(loadedData);
@@ -1700,10 +1910,8 @@ public class GridDesignerWindow : EditorWindow
             GUI.contentColor = zc;
             EditorGUILayout.LabelField($"● Zone {zi}", EditorStyles.boldLabel, GUILayout.Width(70));
             GUI.contentColor = prev;
-            bool zoneIsClosed = zone.nodes != null && zone.nodes.Count >= 3
-                             && zone.nodes[zone.nodes.Count - 1] == zone.nodes[0];
-            string closedLabel = zoneIsClosed ? "● CLOSED" : "○ OPEN";
-            EditorGUILayout.LabelField($"{zone.nodes?.Count ?? 0} node(s)   {zone.souls?.Count ?? 0} soul(s)   {closedLabel}", GUILayout.ExpandWidth(true));
+            string closedLabel = zone.closedLoop ? "● CLOSED" : "○ OPEN";
+            EditorGUILayout.LabelField($"{zone.nodePositions?.Count ?? 0} node(s)   {zone.souls?.Count ?? 0} soul(s)   {closedLabel}", GUILayout.ExpandWidth(true));
 
             if (GUILayout.Button("Select", GUILayout.Width(52)))
             {
@@ -1718,15 +1926,59 @@ public class GridDesignerWindow : EditorWindow
 
             if (isSelected)
             {
-                EditorGUI.BeginChangeCheck();
-                float newRadius = EditorGUILayout.Slider("Radius", zone.radius, 0.5f, 30f);
-                int   newKnots  = EditorGUILayout.IntSlider("Knot Count", zone.knotCount, 3, 32);
-                if (EditorGUI.EndChangeCheck())
+                if (zone.statueGuarded)
+                    EditorGUILayout.HelpBox(
+                        $"Guarded by statue #{zone.linkedStatueId} — fish here can't be caught until the statue is destroyed.",
+                        MessageType.Info);
+                else if (zone.towerGuarded)
+                    EditorGUILayout.HelpBox(
+                        $"Fish-bowl tower #{zone.linkedStatueId} — fish swim in the bowl aloft and can't be caught until the tower is smashed and the bowl drops into the water.",
+                        MessageType.Info);
+
+                // Tower zones take their swim area + height from the tower prefab, so no radius/knot
+                // sliders here — just souls. Everything else authors radius/knots as normal.
+                if (zone.towerGuarded)
                 {
-                    Undo.RecordObject(loadedData, "Edit Soul Zone");
-                    zone.radius     = newRadius;
-                    zone.knotCount  = newKnots;
-                    EditorUtility.SetDirty(loadedData);
+                    EditorGUILayout.LabelField("Bowl size & height are set on the tower prefab (FishBowlTowerController).", EditorStyles.miniLabel);
+                }
+                else
+                {
+                    EditorGUI.BeginChangeCheck();
+                    string scatterLabel = zone.statueGuarded ? "Scatter" : "Radius";
+                    float newRadius = EditorGUILayout.Slider(scatterLabel, zone.radius, 0.1f, 30f);
+                    int   newKnots  = EditorGUILayout.IntSlider("Knot Count", zone.knotCount, 3, 32);
+                    if (EditorGUI.EndChangeCheck())
+                    {
+                        Undo.RecordObject(loadedData, "Edit Soul Zone");
+                        zone.radius     = newRadius;
+                        zone.knotCount  = newKnots;
+                        EditorUtility.SetDirty(loadedData);
+                    }
+                }
+
+                if (zone.statueGuarded)
+                {
+                    EditorGUI.BeginChangeCheck();
+                    float newRing = EditorGUILayout.Slider("Ring Radius", zone.ringRadius, 0.02f, 0.4f);
+                    if (EditorGUI.EndChangeCheck())
+                    {
+                        // Regenerate the ring around its current centre (nodes stay editable after)
+                        Undo.RecordObject(loadedData, "Edit Guard Ring");
+                        zone.ringRadius = newRing;
+                        BuildRing(zone, Centroid(zone.nodePositions), newRing, StatueRingNodeCount);
+                        EditorUtility.SetDirty(loadedData);
+                    }
+                }
+                else if (!zone.towerGuarded)
+                {
+                    EditorGUI.BeginChangeCheck();
+                    bool newClosed = EditorGUILayout.Toggle("Closed Loop", zone.closedLoop);
+                    if (EditorGUI.EndChangeCheck())
+                    {
+                        Undo.RecordObject(loadedData, "Toggle Closed Loop");
+                        zone.closedLoop = newClosed;
+                        EditorUtility.SetDirty(loadedData);
+                    }
                 }
 
                 // Souls list
@@ -1790,35 +2042,37 @@ public class GridDesignerWindow : EditorWindow
                     EditorUtility.SetDirty(loadedData);
                 }
 
+                // Tower zones have a single fixed anchor node co-located with the tower —
+                // no path/node editing UI (fish are contained by the bowl radius).
+                if (!zone.towerGuarded)
+                {
                 EditorGUILayout.Space(2);
-                bool isClosed = zone.nodes != null && zone.nodes.Count >= 3
-                             && zone.nodes[zone.nodes.Count - 1] == zone.nodes[0];
-                GUI.contentColor = isClosed ? Color.green : Color.yellow;
+                int nodeCount = zone.nodePositions?.Count ?? 0;
+                GUI.contentColor = zone.closedLoop ? Color.green : Color.yellow;
                 EditorGUILayout.LabelField(
-                    isClosed ? $"Nodes: {zone.nodes.Count}  ● CLOSED LOOP" : $"Nodes: {zone.nodes?.Count ?? 0}  ○ OPEN PATH",
+                    zone.closedLoop ? $"Nodes: {nodeCount}  ● CLOSED LOOP" : $"Nodes: {nodeCount}  ○ OPEN PATH",
                     EditorStyles.miniLabel);
                 GUI.contentColor = Color.white;
 
                 // Selected node controls
                 if (_selectedZoneIndex == zi && _selectedNodeIndex >= 0
-                    && zone.nodes != null && _selectedNodeIndex < zone.nodes.Count)
+                    && zone.nodePositions != null && _selectedNodeIndex < zone.nodePositions.Count)
                 {
                     EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-                    EditorGUILayout.LabelField($"Selected: Node {_selectedNodeIndex + 1} of {zone.nodes.Count}  (cell {zone.nodes[_selectedNodeIndex]})", EditorStyles.miniLabel);
+                    EditorGUILayout.LabelField($"Selected: Node {_selectedNodeIndex + 1} of {zone.nodePositions.Count}", EditorStyles.miniLabel);
                     EditorGUILayout.BeginHorizontal();
 
                     if (GUILayout.Button("Insert Before", GUILayout.Height(20)))
                     {
                         Undo.RecordObject(loadedData, "Insert Node Before");
-                        zone.nodes.Insert(_selectedNodeIndex, zone.nodes[_selectedNodeIndex]);
+                        zone.nodePositions.Insert(_selectedNodeIndex, InsertedNodePos(zone, _selectedNodeIndex, -1));
                         EditorUtility.SetDirty(loadedData);
                     }
                     if (GUILayout.Button("Insert After", GUILayout.Height(20)))
                     {
                         Undo.RecordObject(loadedData, "Insert Node After");
                         int insertIdx = _selectedNodeIndex + 1;
-                        int cellToInsert = insertIdx < zone.nodes.Count ? zone.nodes[insertIdx] : zone.nodes[_selectedNodeIndex];
-                        zone.nodes.Insert(insertIdx, cellToInsert);
+                        zone.nodePositions.Insert(insertIdx, InsertedNodePos(zone, _selectedNodeIndex, +1));
                         _selectedNodeIndex = insertIdx;
                         EditorUtility.SetDirty(loadedData);
                     }
@@ -1826,17 +2080,15 @@ public class GridDesignerWindow : EditorWindow
                     if (GUILayout.Button("Delete", GUILayout.Width(52), GUILayout.Height(20)))
                     {
                         Undo.RecordObject(loadedData, "Delete Node");
-                        zone.nodes.RemoveAt(_selectedNodeIndex);
-                        _selectedNodeIndex = Mathf.Clamp(_selectedNodeIndex - 1, -1, zone.nodes.Count - 1);
+                        zone.nodePositions.RemoveAt(_selectedNodeIndex);
+                        _selectedNodeIndex = Mathf.Clamp(_selectedNodeIndex - 1, -1, zone.nodePositions.Count - 1);
                         EditorUtility.SetDirty(loadedData);
                     }
                     GUI.backgroundColor = Color.white;
                     EditorGUILayout.EndHorizontal();
-
-                    EditorGUILayout.LabelField("Shift+click another node to connect directly", EditorStyles.miniLabel);
                     EditorGUILayout.EndVertical();
                 }
-                bool hasNodes = zone.nodes != null && zone.nodes.Count > 0;
+                bool hasNodes = zone.nodePositions != null && zone.nodePositions.Count > 0;
                 string drawBtnLabel = hasNodes ? "Redraw Nodes" : "Add Nodes";
                 if (GUILayout.Button(drawBtnLabel))
                 {
@@ -1848,6 +2100,7 @@ public class GridDesignerWindow : EditorWindow
                     drawSoul = drawCircle = drawOrb = drawSelect = false;
                     ClearSelectState();
                 }
+                } // end if (!zone.towerGuarded)
             }
 
             EditorGUILayout.EndVertical();
@@ -2293,7 +2546,7 @@ public class GridDesignerWindow : EditorWindow
 
     void DrawRightPanel()
     {
-        EditorGUILayout.BeginVertical(GUILayout.ExpandWidth(false));
+        EditorGUILayout.BeginVertical(GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
 
         // ── Grid display controls ──
         EditorGUILayout.BeginHorizontal();
@@ -2578,6 +2831,7 @@ public class GridDesignerWindow : EditorWindow
 
         DrawTypeBModifierSettingsSection();
         DrawSelectedPrefabScaleSection();
+        DrawSelectedTowerZoneInfo();
 
         EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
         EditorGUILayout.LabelField("Grid Debug", EditorStyles.boldLabel, GUILayout.ExpandWidth(true));
@@ -2740,6 +2994,79 @@ public class GridDesignerWindow : EditorWindow
         EditorGUIUtility.labelWidth = prevLW;
     }
 
+    // Returns the currently-selected prefab placement, or null if the selection isn't a placement.
+    GridData.PrefabPlacement GetSelectedPlacement()
+    {
+        if (loadedData == null || _currentSelection.type != SelectionType.PrefabPlacement) return null;
+        var placements = _currentSelection.tierIndex == -1
+            ? loadedData.prefabPlacements
+            : (loadedData.tiers != null && _currentSelection.tierIndex < loadedData.tiers.Count
+                ? loadedData.tiers[_currentSelection.tierIndex].prefabPlacements : null);
+        if (placements == null || _currentSelection.index < 0 || _currentSelection.index >= placements.Count) return null;
+        return placements[_currentSelection.index];
+    }
+
+    // Finds the tower-guarded soul zone linked to a placement (by shared guard id), plus its index.
+    GridData.SoulZone FindTowerZoneForPlacement(GridData.PrefabPlacement pp, out int zoneIndex)
+    {
+        zoneIndex = -1;
+        if (pp == null || pp.statueId == 0 || loadedData?.soulZones == null) return null;
+        for (int zi = 0; zi < loadedData.soulZones.Count; zi++)
+        {
+            var z = loadedData.soulZones[zi];
+            if (z.towerGuarded && z.linkedStatueId == pp.statueId) { zoneIndex = zi; return z; }
+        }
+        return null;
+    }
+
+    // True when the given tower zone belongs to the currently-selected tower placement.
+    // Used to highlight the bowl footprint in the grid only while its tower is selected.
+    bool IsSelectedTowerZone(GridData.SoulZone zone)
+    {
+        if (zone == null || !zone.towerGuarded || zone.linkedStatueId == 0) return false;
+        var pp = GetSelectedPlacement();
+        return pp != null && pp.statueId == zone.linkedStatueId;
+    }
+
+    // Info box under the Scale section: when a fish-bowl tower is selected, shows which soul-fish
+    // zone it owns and a shortcut to select it in the Soul Zones panel.
+    void DrawSelectedTowerZoneInfo()
+    {
+        var pp = GetSelectedPlacement();
+        if (pp?.prefab == null) return;
+        var ctrl = pp.prefab.GetComponentInChildren<FishBowlTowerController>(true);
+        if (ctrl == null) return;
+
+        var zone = FindTowerZoneForPlacement(pp, out int zi);
+
+        EditorGUILayout.Space(4);
+        EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+        EditorGUILayout.LabelField($"Fish Bowl · {pp.prefab.name}", EditorStyles.boldLabel);
+
+        // Bowl comes from the prefab controller: fish spawn at the bowlCenter transform, contained
+        // within bowlRadius. No height stored on the zone.
+        string bowlPos = ctrl.bowlCenter != null ? "bowlCenter transform" : "tower root (no bowlCenter assigned)";
+        EditorGUILayout.LabelField($"Bowl Radius: {ctrl.bowlRadius:0.##}   ·   Spawns at: {bowlPos}", EditorStyles.miniLabel);
+
+        if (zone == null)
+        {
+            EditorGUILayout.HelpBox("No linked soul-fish zone found for this tower.", MessageType.Warning);
+            EditorGUILayout.EndVertical();
+            return;
+        }
+
+        int soulCount = zone.souls?.Count ?? 0;
+        EditorGUILayout.LabelField($"Soul Fish Zone: #{zi}  (id {zone.linkedStatueId})   ·   Souls: {soulCount}", EditorStyles.miniLabel);
+
+        if (GUILayout.Button("Select Zone in Soul Zones panel", EditorStyles.miniButton))
+        {
+            _activeSoulZoneIndex = zi;
+            Repaint();
+        }
+
+        EditorGUILayout.EndVertical();
+    }
+
     void CollectTypeBPlacements(int tierIndex, List<GridData.PrefabPlacement> placements,
         List<(int, GridData.PrefabPlacement)> results)
     {
@@ -2754,14 +3081,45 @@ public class GridDesignerWindow : EditorWindow
 
     void DrawGrid()
     {
-        // Fixed viewport — layout size never changes
+        // Viewport fills the central column between the side panels; GridPixelSize is
+        // only the minimum size. The grid content is panned/zoomed inside it.
         Rect viewRect = GUILayoutUtility.GetRect(GridPixelSize, GridPixelSize,
-            GUILayout.ExpandWidth(false), GUILayout.ExpandHeight(false));
+            GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
 
         Event e = Event.current;
+        bool mouseInView = viewRect.Contains(e.mousePosition);
 
-        // ── Navigation ──
-        if (viewRect.Contains(e.mousePosition))
+        // Fit + centre the grid within the viewport the first time we know its real size.
+        if (!_gridViewInit && e.type != EventType.Layout && viewRect.width > 1f && viewRect.height > 1f)
+        {
+            float fit = Mathf.Min(viewRect.width, viewRect.height) / GridPixelSize * 0.95f;
+            _gridZoom = Mathf.Clamp(fit, 0.3f, 4f);
+            _gridPanOffset = new Vector2(
+                (viewRect.width  - ZoomedGridSize) * 0.5f,
+                (viewRect.height - ZoomedGridSize) * 0.5f);
+            _gridViewInit = true;
+        }
+
+        // ── Navigation (handled in absolute window space, before the clip) ──
+        // Space held over the grid arms a pan gesture; left-drag then pans like MMB.
+        if (e.type == EventType.KeyDown && e.keyCode == KeyCode.Space && mouseInView && !_spacePanHeld)
+        {
+            _spacePanHeld = true;
+            e.Use();
+            Repaint();
+        }
+        else if (e.type == EventType.KeyUp && e.keyCode == KeyCode.Space)
+        {
+            _spacePanHeld = false;
+            if (!_isPanningGrid) e.Use();
+            Repaint();
+        }
+
+        // While armed, show the pan cursor over the whole viewport.
+        if (_spacePanHeld || _isPanningGrid)
+            EditorGUIUtility.AddCursorRect(viewRect, MouseCursor.Pan);
+
+        if (mouseInView)
         {
             if (e.type == EventType.ScrollWheel)
             {
@@ -2773,34 +3131,51 @@ public class GridDesignerWindow : EditorWindow
                 e.Use();
                 Repaint();
             }
-            if (e.type == EventType.MouseDown && e.button == 2)
+            // Middle mouse, or Space+left mouse, begins a pan.
+            if (e.type == EventType.MouseDown && (e.button == 2 || (e.button == 0 && _spacePanHeld)))
             {
                 _isPanningGrid = true;
                 e.Use();
             }
         }
-        if (e.type == EventType.MouseDrag && e.button == 2 && _isPanningGrid)
+        if (e.type == EventType.MouseDrag && _isPanningGrid)
         {
             _gridPanOffset += e.delta;
             e.Use();
             Repaint();
         }
-        if (e.type == EventType.MouseUp && e.button == 2)
+        if (e.type == EventType.MouseUp && _isPanningGrid)
         {
             _isPanningGrid = false;
             e.Use();
         }
 
-        // Draw rect — panned and zoomed, may extend beyond viewport
+        // Clip everything below to the viewport so the panned/zoomed grid and its
+        // overlays never bleed over the side panels. Inside the clip, coordinates
+        // are relative to the viewport's top-left, so the draw rect drops viewRect.position.
+        GUI.BeginClip(viewRect);
+        Rect localView = new Rect(0f, 0f, viewRect.width, viewRect.height);
+        try
+        {
+
+        // Draw rect — panned and zoomed, may extend beyond viewport (clip-local space)
         Rect rect = new Rect(
-            viewRect.x + _gridPanOffset.x,
-            viewRect.y + _gridPanOffset.y,
+            _gridPanOffset.x,
+            _gridPanOffset.y,
             ZoomedGridSize, ZoomedGridSize);
 
         Handles.BeginGUI();
         Handles.color = new Color(1f, 1f, 1f, _backdropBrightness);
         Handles.DrawSolidDisc(rect.center, Vector3.forward, ZoomedGridSize * 0.5f);
         Handles.EndGUI();
+
+        // Selected prefab footprint — opaque fill drawn before the cell loop so the
+        // prefab icon (and any icons within the footprint) render on top of it.
+        DrawSelectedPrefabScaleFill(rect, GetPixelsPerWorldUnit());
+
+        // Migrate legacy cell-index soul zones to free positions once, before any input.
+        if (loadedData?.soulZones != null)
+            foreach (var z in loadedData.soulZones) z.MigrateNodesIfNeeded();
 
         // Spline wall input — handled at rect level before cell loop so nodes are free-floating
         if (_drawSplineWall && loadedData != null)
@@ -2809,6 +3184,10 @@ public class GridDesignerWindow : EditorWindow
         // Select tool — spline wall node picking (pixel-based, before cell loop)
         if (drawSelect && loadedData != null)
             HandleSelectSplineWallInput(rect, e);
+
+        // Select tool — soul zone node picking + free drag (pixel-based, before cell loop)
+        if (drawSelect && loadedData != null)
+            HandleSelectSoulNodeInput(rect, e);
 
         // Tube path placement mode — mouse preview + click to place
         if (_tubePlacingEntranceIndex >= 0 && loadedData != null)
@@ -2824,7 +3203,7 @@ public class GridDesignerWindow : EditorWindow
             {
                 int  index = y * GridSize + x;
                 Rect cell  = new Rect(rect.x + x * EffCell, rect.y + y * EffCell, EffCell, EffCell);
-                if (!viewRect.Overlaps(cell)) continue; // skip cells outside viewport
+                if (!localView.Overlaps(cell)) continue; // skip cells outside viewport
 
                 // Base layer alpha: full when active or no tiers exist, faint when a tier is active
                 float baseAlpha = (!baseLayerVisible) ? 0f :
@@ -2847,54 +3226,8 @@ public class GridDesignerWindow : EditorWindow
                         Handles.DrawSolidDisc(cell.center, Vector3.forward, EffCell * 0.3f);
                     }
 
-                    // Soul zones — draw node markers and connecting lines
-                    if (loadedData?.soulZones != null)
-                    {
-                        for (int zi = 0; zi < loadedData.soulZones.Count; zi++)
-                        {
-                            var zone = loadedData.soulZones[zi];
-                            if (zone.nodes == null) continue;
-                            Color zc = ZonePalette[zi % ZonePalette.Length];
-                            zc.a = baseAlpha;
-                            int nodeIdx = zone.nodes.IndexOf(index);
-                            if (nodeIdx >= 0)
-                            {
-                                Handles.color = zc;
-                                Handles.DrawSolidDisc(cell.center, Vector3.forward, EffCell * 0.38f);
-                                Handles.color = new Color(0f, 0f, 0f, baseAlpha);
-                                Handles.Label(cell.center - new Vector2(4f, 6f), $"Z{zi}");
-                            }
-                        }
-                    }
-                    // In-progress drawing nodes
-                    if (_isDrawingSoulArea && _drawingNodes.Contains(index))
-                    {
-                        Handles.color = new Color(1f, 1f, 1f, baseAlpha * 0.7f);
-                        Handles.DrawSolidDisc(cell.center, Vector3.forward, EffCell * 0.3f);
-                    }
-
-                    // Selection highlight (removed from loop, moved to overlay)
-
-
-                    // Bridge mode — highlight endpoint and in-progress cells
-                    if (_isBridgeMode)
-                    {
-                        if (_bridgeEndZoneIndex >= 0 && _bridgeEndZoneIndex < loadedData.soulZones.Count)
-                        {
-                            var endZone = loadedData.soulZones[_bridgeEndZoneIndex];
-                            if (endZone.nodes != null && _bridgeEndNodeIndex < endZone.nodes.Count
-                                && endZone.nodes[_bridgeEndNodeIndex] == index)
-                            {
-                                Handles.color = new Color(0.4f, 0.8f, 1f, baseAlpha);
-                                Handles.DrawWireDisc(cell.center, Vector3.forward, EffCell * 0.44f);
-                            }
-                        }
-                        if (_bridgeNodes.Contains(index))
-                        {
-                            Handles.color = new Color(0.4f, 0.8f, 1f, baseAlpha * 0.6f);
-                            Handles.DrawSolidDisc(cell.center, Vector3.forward, EffCell * 0.28f);
-                        }
-                    }
+                    // Soul-zone node markers are free-positioned now — drawn at rect level
+                    // (see the soul-zone drawing block after the cell loop), not per-cell.
 
                     // Orb
                     if (loadedData?.orbCellIndices != null && loadedData.orbCellIndices.Contains(index))
@@ -3113,8 +3446,10 @@ public class GridDesignerWindow : EditorWindow
                 if (_gridLineOpacity > 0f)
                 {
                     Color gridLineCol = new Color(0f, 0f, 0f, _gridLineOpacity);
-                    EditorGUI.DrawRect(new Rect(cell.x, cell.y, EffCell, 1), gridLineCol);
-                    EditorGUI.DrawRect(new Rect(cell.x, cell.y, 1, EffCell), gridLineCol);
+                    // Line thickness tracks zoom so the grid reads consistently at any scale.
+                    float lw = Mathf.Max(1f, Mathf.Round(_gridZoom));
+                    EditorGUI.DrawRect(new Rect(cell.x, cell.y, EffCell, lw), gridLineCol);
+                    EditorGUI.DrawRect(new Rect(cell.x, cell.y, lw, EffCell), gridLineCol);
                 }
             }
         }
@@ -3128,18 +3463,35 @@ public class GridDesignerWindow : EditorWindow
             float pxPerUnit = GetPixelsPerWorldUnit();
             if (pxPerUnit > 0f && loadedData.soulZones != null)
             {
-                // Soul fish zone radii
+                // Soul fish zone scatter radii (drawn around each free node)
                 for (int zi = 0; zi < loadedData.soulZones.Count; zi++)
                 {
                     var zone = loadedData.soulZones[zi];
-                    if (zone.nodes == null || zone.nodes.Count == 0) continue;
+                    zone.MigrateNodesIfNeeded();
+                    if (zone.nodePositions == null || zone.nodePositions.Count == 0) continue;
+                    // Fish-bowl tower zones are hidden (represented by the tower + bowl), EXCEPT when
+                    // their tower is selected — then highlight the bowl footprint so the link is clear.
+                    if (zone.towerGuarded)
+                    {
+                        if (!IsSelectedTowerZone(zone)) continue;
+                        // ONE footprint disc at the tower cell (top-down), sized to the prefab's bowl
+                        // radius — never per authored node (older tower zones may still hold a ring).
+                        var selPP  = GetSelectedPlacement();
+                        var selCtrl = selPP?.prefab != null ? selPP.prefab.GetComponentInChildren<FishBowlTowerController>(true) : null;
+                        float bowlR = selCtrl != null ? selCtrl.bowlRadius : 2f;
+                        Vector2 c = CellCenter(rect, selPP.cellIndex);
+                        Handles.color = new Color(0.35f, 0.85f, 1f, 0.85f);
+                        Handles.DrawWireDisc(c, Vector3.forward, bowlR * pxPerUnit, 3f);
+                        Handles.DrawSolidDisc(c, Vector3.forward, EffCell * 0.2f);
+                        continue;
+                    }
                     bool isActive = zi == _activeSoulZoneIndex;
                     Color rc = ZonePalette[zi % ZonePalette.Length];
                     rc.a = isActive ? 0.55f : 0.18f;
                     Handles.color = rc;
                     float radiusPx = zone.radius * pxPerUnit;
-                    foreach (int node in zone.nodes)
-                        Handles.DrawWireDisc(CellCenter(rect, node), Vector3.forward, radiusPx, 2f);
+                    foreach (var np in zone.nodePositions)
+                        Handles.DrawWireDisc(WorldXZToPixel(rect, np), Vector3.forward, radiusPx, 2f);
                 }
 
                 // Whirlpool radii
@@ -3169,15 +3521,33 @@ public class GridDesignerWindow : EditorWindow
                 for (int zi = 0; zi < loadedData.soulZones.Count; zi++)
                 {
                     var zone = loadedData.soulZones[zi];
-                    if (zone.nodes == null || zone.nodes.Count < 2) continue;
+                    var pts  = zone.nodePositions;
+                    if (pts == null || pts.Count == 0) continue;
+                    // Tower zones have no visible authored nodes — the tower/bowl represents them.
+                    if (zone.towerGuarded) continue;
                     Color lc = ZonePalette[zi % ZonePalette.Length];
-                    lc.a = 0.85f;
-                    Handles.color = lc;
-                    for (int ni = 0; ni < zone.nodes.Count - 1; ni++)
+
+                    // Connecting lines (+ closing segment for loops)
+                    if (pts.Count >= 2)
                     {
-                        Vector2 a = CellCenter(rect, zone.nodes[ni]);
-                        Vector2 b = CellCenter(rect, zone.nodes[ni + 1]);
-                        Handles.DrawLine(a, b, 3f);
+                        lc.a = 0.85f;
+                        Handles.color = lc;
+                        for (int ni = 0; ni < pts.Count - 1; ni++)
+                            Handles.DrawLine(WorldXZToPixel(rect, pts[ni]), WorldXZToPixel(rect, pts[ni + 1]), 3f);
+                        if (zone.closedLoop && pts.Count >= 3)
+                            Handles.DrawLine(WorldXZToPixel(rect, pts[pts.Count - 1]), WorldXZToPixel(rect, pts[0]), 3f);
+                    }
+
+                    // Free node markers
+                    for (int ni = 0; ni < pts.Count; ni++)
+                    {
+                        Vector2 p   = WorldXZToPixel(rect, pts[ni]);
+                        bool    sel = _selectedZoneIndex == zi && _selectedNodeIndex == ni;
+                        Color   mc  = lc; mc.a = 1f;
+                        Handles.color = sel ? Color.white : mc;
+                        Handles.DrawSolidDisc(p, Vector3.forward, EffCell * (sel ? 0.34f : 0.26f));
+                        Handles.color = new Color(0f, 0f, 0f, 0.9f);
+                        Handles.Label(p - new Vector2(4f, 6f), $"Z{zi}");
                     }
                 }
             }
@@ -3221,6 +3591,15 @@ public class GridDesignerWindow : EditorWindow
                         ? WorldXZToPixel(rect, wPath.nodes[_currentSelection.subIndex])
                         : rect.center;
                 }
+                else if (_currentSelection.type == SelectionType.SoulZoneNode
+                    && loadedData?.soulZones != null
+                    && _currentSelection.index < loadedData.soulZones.Count)
+                {
+                    var pts = loadedData.soulZones[_currentSelection.index].nodePositions;
+                    center = (pts != null && _currentSelection.subIndex < pts.Count)
+                        ? WorldXZToPixel(rect, pts[_currentSelection.subIndex])
+                        : rect.center;
+                }
                 else
                 {
                     center = CellCenter(rect, _currentSelection.cellIndex);
@@ -3235,28 +3614,17 @@ public class GridDesignerWindow : EditorWindow
                 }
             }
 
-            // Bridge mode lines
-            if (_isBridgeMode && _selectedZoneIndex >= 0 && _bridgeNodes.Count >= 1)
-            {
-                Handles.color = new Color(0.4f, 0.8f, 1f, 0.8f);
-                var selZ = loadedData.soulZones[_selectedZoneIndex];
-                Vector2 startPt = CellCenter(rect, selZ.nodes[_selectedNodeIndex]);
-                var allBridge = new List<int> { selZ.nodes[_selectedNodeIndex] };
-                allBridge.AddRange(_bridgeNodes);
-                for (int bi = 0; bi < allBridge.Count - 1; bi++)
-                    Handles.DrawLine(CellCenter(rect, allBridge[bi]), CellCenter(rect, allBridge[bi + 1]), 1.5f);
-            }
+            // Bridge mode removed (incompatible with free nodes).
 
-            // In-progress drawing lines
-            if (_isDrawingSoulArea && _drawingNodes.Count >= 2)
+            // In-progress drawing lines + node dots
+            if (_isDrawingSoulArea && _drawingNodes.Count >= 1)
             {
                 Handles.color = new Color(1f, 1f, 1f, 0.7f);
                 for (int ni = 0; ni < _drawingNodes.Count - 1; ni++)
-                {
-                    Vector2 a = CellCenter(rect, _drawingNodes[ni]);
-                    Vector2 b = CellCenter(rect, _drawingNodes[ni + 1]);
-                    Handles.DrawLine(a, b, 1.5f);
-                }
+                    Handles.DrawLine(WorldXZToPixel(rect, _drawingNodes[ni]),
+                                     WorldXZToPixel(rect, _drawingNodes[ni + 1]), 1.5f);
+                foreach (var np in _drawingNodes)
+                    Handles.DrawSolidDisc(WorldXZToPixel(rect, np), Vector3.forward, EffCell * 0.22f);
             }
 
             // Entrance + lock hub markers on the arena circumference
@@ -3294,11 +3662,17 @@ public class GridDesignerWindow : EditorWindow
                         {
                             case SelectionType.SoulZoneNode:
                                 var zone = loadedData.soulZones[_currentSelection.index];
-                                zone.nodes.RemoveAt(_currentSelection.subIndex);
+                                if (zone.nodePositions != null && _currentSelection.subIndex < zone.nodePositions.Count)
+                                    zone.nodePositions.RemoveAt(_currentSelection.subIndex);
                                 break;
                             case SelectionType.PrefabPlacement:
                                 var placements = _currentSelection.tierIndex == -1 ? loadedData.prefabPlacements : loadedData.tiers[_currentSelection.tierIndex].prefabPlacements;
+                                var removedPlacement = _currentSelection.index < placements.Count ? placements[_currentSelection.index] : null;
                                 placements.RemoveAt(_currentSelection.index);
+                                // Also drop any statue/tower guarded soul zone linked to this placement.
+                                if (removedPlacement != null && removedPlacement.statueId != 0 && loadedData.soulZones != null)
+                                    loadedData.soulZones.RemoveAll(z =>
+                                        (z.statueGuarded || z.towerGuarded) && z.linkedStatueId == removedPlacement.statueId);
                                 break;
                             case SelectionType.Whirlpool:
                                 loadedData.whirlpools.RemoveAt(_currentSelection.index);
@@ -3330,6 +3704,10 @@ public class GridDesignerWindow : EditorWindow
                                         wp.nodes.RemoveAt(delIdx);
                                         if (wp.segmentCurved != null && delIdx < wp.segmentCurved.Count)
                                             wp.segmentCurved.RemoveAt(delIdx);
+                                        if (wp.segmentGap != null && delIdx < wp.segmentGap.Count)
+                                            wp.segmentGap.RemoveAt(delIdx);
+                                        if (wp.segmentDestructible != null && delIdx < wp.segmentDestructible.Count)
+                                            wp.segmentDestructible.RemoveAt(delIdx);
                                     }
                                 }
                                 break;
@@ -3410,6 +3788,10 @@ public class GridDesignerWindow : EditorWindow
                         activePath.nodes.RemoveAt(lastIdx);
                         if (activePath.segmentCurved != null && lastIdx < activePath.segmentCurved.Count)
                             activePath.segmentCurved.RemoveAt(lastIdx);
+                        if (activePath.segmentGap != null && lastIdx < activePath.segmentGap.Count)
+                            activePath.segmentGap.RemoveAt(lastIdx);
+                        if (activePath.segmentDestructible != null && lastIdx < activePath.segmentDestructible.Count)
+                            activePath.segmentDestructible.RemoveAt(lastIdx);
                         EditorUtility.SetDirty(loadedData);
                         sw.Use();
                         Repaint();
@@ -3430,6 +3812,12 @@ public class GridDesignerWindow : EditorWindow
                 ke.Use();
                 Repaint();
             }
+        }
+
+        }
+        finally
+        {
+            GUI.EndClip();
         }
     }
 
@@ -3466,6 +3854,37 @@ public class GridDesignerWindow : EditorWindow
         if (worldWidth <= 0f) return -1f;
 
         return (EffCell * GridSize) / worldWidth;
+    }
+
+    // Opaque footprint fill for the currently selected prefab placement. Called before
+    // the cell loop so the prefab icon renders on top of it. Radius logic mirrors
+    // DrawPrefabScaleRings so the fill and the outline ring stay aligned.
+    void DrawSelectedPrefabScaleFill(Rect rect, float pxPerUnit)
+    {
+        if (pxPerUnit <= 0f || loadedData == null) return;
+        if (_currentSelection.type != SelectionType.PrefabPlacement) return;
+
+        int tierIndex = _currentSelection.tierIndex;
+        List<GridData.PrefabPlacement> placements =
+            tierIndex == -1 ? loadedData.prefabPlacements
+            : (loadedData.tiers != null && tierIndex >= 0 && tierIndex < loadedData.tiers.Count
+                ? loadedData.tiers[tierIndex].prefabPlacements : null);
+        if (placements == null) return;
+
+        var pp = placements.Find(p => p.cellIndex == _currentSelection.cellIndex);
+        if (pp?.prefab == null) return;
+
+        var align = GetBaselineAlign(pp.prefab);
+        if (align == null || !align.UseScaleRadius) return;
+
+        float s        = pp.scale > 0f ? pp.scale : 1f;
+        float radiusPx = align.ScaleRadius * s * pxPerUnit;
+        if (radiusPx <= 0f) return;
+
+        Handles.BeginGUI();
+        Handles.color = new Color(1f, 0.55f, 0.1f, 1f); // opaque footprint fill
+        Handles.DrawSolidDisc(CellCenter(rect, pp.cellIndex), Vector3.forward, radiusPx);
+        Handles.EndGUI();
     }
 
     // Draws a world-proportional footprint ring for every placement whose prefab has
@@ -3725,6 +4144,7 @@ public class GridDesignerWindow : EditorWindow
         _isDrawingSoulArea   = false;
         _drawingNodes.Clear();
         EnsureSoulZones(); // run legacy migration if needed
+        NormalizeTowerZones(); // collapse tower zones to a single node at their tower cell
 
         squareGrid = (int[])loadedData.cells.Clone();
         circleGrid = loadedData.overlayCells != null
@@ -3919,6 +4339,17 @@ public class GridDesignerWindow : EditorWindow
                     EditorUtility.SetDirty(loadedData);
                 }
 
+                // Destructible prefab — used for segments flagged destructible (the "D" toggle below)
+                EditorGUI.BeginChangeCheck();
+                var newDestructiblePrefab = (GameObject)EditorGUILayout.ObjectField(
+                    "Destructible Prefab", path.destructiblePrefabOverride, typeof(GameObject), false);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    Undo.RecordObject(loadedData, "Set Spline Wall Destructible Prefab");
+                    path.destructiblePrefabOverride = newDestructiblePrefab;
+                    EditorUtility.SetDirty(loadedData);
+                }
+
                 // Node list
                 int nodeCount = path.nodes?.Count ?? 0;
                 EditorGUILayout.LabelField($"Nodes  ({nodeCount})", EditorStyles.miniBoldLabel);
@@ -3966,6 +4397,10 @@ public class GridDesignerWindow : EditorWindow
                             path.nodes.RemoveAt(ni);
                             if (path.segmentCurved != null && ni < path.segmentCurved.Count)
                                 path.segmentCurved.RemoveAt(ni);
+                            if (path.segmentGap != null && ni < path.segmentGap.Count)
+                                path.segmentGap.RemoveAt(ni);
+                            if (path.segmentDestructible != null && ni < path.segmentDestructible.Count)
+                                path.segmentDestructible.RemoveAt(ni);
                             EditorUtility.SetDirty(loadedData);
                             EditorGUILayout.EndHorizontal();
                             break;
@@ -3986,16 +4421,51 @@ public class GridDesignerWindow : EditorWindow
                                 insertAfter = ni;
                             GUI.backgroundColor = Color.white;
 
-                            // Per-segment curve toggle
+                            // Per-segment gap flag (space = no wall between these nodes)
+                            if (path.segmentGap == null) path.segmentGap = new List<bool>();
+                            while (path.segmentGap.Count <= ni) path.segmentGap.Add(false);
+                            bool segGap = path.segmentGap[ni];
+
+                            // Per-segment curve toggle (disabled while the segment is a gap)
                             if (path.segmentCurved == null) path.segmentCurved = new List<bool>();
                             while (path.segmentCurved.Count <= ni) path.segmentCurved.Add(true);
-                            bool segCurved    = path.segmentCurved[ni];
-                            bool newSegCurved = GUILayout.Toggle(segCurved, new GUIContent(segCurved ? "~" : "—", segCurved ? "Curved segment" : "Straight segment"), EditorStyles.miniButton, GUILayout.Width(22));
-                            if (newSegCurved != segCurved)
+                            bool segCurved = path.segmentCurved[ni];
+                            using (new EditorGUI.DisabledScope(segGap))
                             {
-                                Undo.RecordObject(loadedData, "Toggle Segment Curve");
-                                path.segmentCurved[ni] = newSegCurved;
+                                bool newSegCurved = GUILayout.Toggle(segCurved, new GUIContent(segCurved ? "~" : "—", segCurved ? "Curved segment" : "Straight segment"), EditorStyles.miniButton, GUILayout.Width(22));
+                                if (newSegCurved != segCurved)
+                                {
+                                    Undo.RecordObject(loadedData, "Toggle Segment Curve");
+                                    path.segmentCurved[ni] = newSegCurved;
+                                    EditorUtility.SetDirty(loadedData);
+                                }
+                            }
+
+                            GUI.backgroundColor = segGap ? new Color(0.4f, 0.7f, 1f) : Color.white;
+                            bool newSegGap = GUILayout.Toggle(segGap, new GUIContent("··", segGap ? "Gap (no wall) — click for wall" : "Wall — click for gap (no wall)"), EditorStyles.miniButton, GUILayout.Width(22));
+                            GUI.backgroundColor = Color.white;
+                            if (newSegGap != segGap)
+                            {
+                                Undo.RecordObject(loadedData, "Toggle Segment Gap");
+                                path.segmentGap[ni] = newSegGap;
                                 EditorUtility.SetDirty(loadedData);
+                            }
+
+                            // Per-segment destructible flag (uses the path's Destructible Prefab; disabled while a gap)
+                            if (path.segmentDestructible == null) path.segmentDestructible = new List<bool>();
+                            while (path.segmentDestructible.Count <= ni) path.segmentDestructible.Add(false);
+                            bool segDestr = path.segmentDestructible[ni];
+                            using (new EditorGUI.DisabledScope(segGap))
+                            {
+                                GUI.backgroundColor = segDestr ? new Color(1f, 0.5f, 0.2f) : Color.white;
+                                bool newSegDestr = GUILayout.Toggle(segDestr, new GUIContent("D", segDestr ? "Destructible wall — click for normal wall" : "Normal wall — click for destructible"), EditorStyles.miniButton, GUILayout.Width(22));
+                                GUI.backgroundColor = Color.white;
+                                if (newSegDestr != segDestr)
+                                {
+                                    Undo.RecordObject(loadedData, "Toggle Segment Destructible");
+                                    path.segmentDestructible[ni] = newSegDestr;
+                                    EditorUtility.SetDirty(loadedData);
+                                }
                             }
 
                             EditorGUILayout.EndHorizontal();
@@ -4012,6 +4482,16 @@ public class GridDesignerWindow : EditorWindow
                         while (path.segmentCurved.Count <= insertAfter) path.segmentCurved.Add(true);
                         bool inheritedCurve = path.segmentCurved[insertAfter];
                         path.segmentCurved.Insert(insertAfter + 1, inheritedCurve);
+                        // New segment inherits the gap state of the split segment; original becomes a wall again.
+                        if (path.segmentGap == null) path.segmentGap = new List<bool>();
+                        while (path.segmentGap.Count <= insertAfter) path.segmentGap.Add(false);
+                        bool inheritedGap = path.segmentGap[insertAfter];
+                        path.segmentGap.Insert(insertAfter + 1, inheritedGap);
+                        // New segment inherits the destructible state of the split segment.
+                        if (path.segmentDestructible == null) path.segmentDestructible = new List<bool>();
+                        while (path.segmentDestructible.Count <= insertAfter) path.segmentDestructible.Add(false);
+                        bool inheritedDestr = path.segmentDestructible[insertAfter];
+                        path.segmentDestructible.Insert(insertAfter + 1, inheritedDestr);
                         EditorUtility.SetDirty(loadedData);
                     }
                 }
@@ -4097,6 +4577,73 @@ public class GridDesignerWindow : EditorWindow
         }
         else if (e.type == EventType.MouseUp && e.button == 0
                  && _currentSelection.type == SelectionType.SplineWallNode)
+        {
+            _isDraggingNode = false;
+            e.Use();
+        }
+    }
+
+    // Select-tool free move for soul zone nodes — pick by pixel proximity, drag anywhere.
+    void HandleSelectSoulNodeInput(Rect rect, Event e)
+    {
+        if (loadedData?.soulZones == null || loadedData.soulZones.Count == 0) return;
+
+        const float pickRadius = 10f;
+
+        if (e.type == EventType.MouseDown && e.button == 0 && rect.Contains(e.mousePosition))
+        {
+            int   hitZone = -1, hitNode = -1;
+            float best    = pickRadius;
+            for (int zi = 0; zi < loadedData.soulZones.Count; zi++)
+            {
+                // Tower zones aren't hand-editable — their node is fixed to the tower.
+                if (loadedData.soulZones[zi].towerGuarded) continue;
+                var pts = loadedData.soulZones[zi].nodePositions;
+                if (pts == null) continue;
+                for (int ni = 0; ni < pts.Count; ni++)
+                {
+                    float d = Vector2.Distance(WorldXZToPixel(rect, pts[ni]), e.mousePosition);
+                    if (d < best) { best = d; hitZone = zi; hitNode = ni; }
+                }
+            }
+
+            if (hitZone >= 0)
+            {
+                _currentSelection = new SelectionInfo
+                {
+                    type      = SelectionType.SoulZoneNode,
+                    index     = hitZone,
+                    subIndex  = hitNode,
+                    cellIndex = -1,
+                };
+                _selectedZoneIndex   = hitZone;
+                _selectedNodeIndex   = hitNode;
+                _activeSoulZoneIndex = hitZone;
+                _isDraggingNode      = true;
+                e.Use();
+                Repaint();
+            }
+        }
+        else if (e.type == EventType.MouseDrag && e.button == 0
+                 && _isDraggingNode && _currentSelection.type == SelectionType.SoulZoneNode)
+        {
+            int zi = _currentSelection.index;
+            int ni = _currentSelection.subIndex;
+            if (zi < loadedData.soulZones.Count)
+            {
+                var pts = loadedData.soulZones[zi].nodePositions;
+                if (pts != null && ni < pts.Count)
+                {
+                    Undo.RecordObject(loadedData, "Move Soul Zone Node");
+                    pts[ni] = PixelToWorldXZ(rect, e.mousePosition);
+                    EditorUtility.SetDirty(loadedData);
+                }
+            }
+            e.Use();
+            Repaint();
+        }
+        else if (e.type == EventType.MouseUp && e.button == 0
+                 && _currentSelection.type == SelectionType.SoulZoneNode)
         {
             _isDraggingNode = false;
             e.Use();
@@ -4490,42 +5037,49 @@ public class GridDesignerWindow : EditorWindow
                 float outlineW = isActive ? 7f : 5f;
                 float fillW    = isActive ? 4f : 2.5f;
 
-                // Build one continuous polyline across all segments, then draw outline then fill
-                var polyPoints = new List<Vector3>();
+                // Build one polyline per (non-gap) segment so gaps leave a visible break,
+                // then draw all outlines, then all fills. Destructible segments fill orange.
+                var segPolys = new List<Vector3[]>();
+                var segDestr = new List<bool>();
                 for (int seg = 0; seg < segCount; seg++)
                 {
+                    if (path.IsSegmentGap(seg)) continue;
+
                     bool curved = path.IsSegmentCurved(seg);
                     int  i2     = path.isClosed ? (seg + 1) % n : seg + 1;
-                    if (seg == 0)
-                    {
-                        Vector2 start = curved
-                            ? WorldXZToPixel(rect, SplineWallSample(path.nodes, seg, 0f, path.isClosed))
-                            : WorldXZToPixel(rect, path.nodes[0]);
-                        polyPoints.Add((Vector3)start);
-                    }
+                    var  line   = new List<Vector3>();
+
+                    Vector2 start = curved
+                        ? WorldXZToPixel(rect, SplineWallSample(path.nodes, seg, 0f, path.isClosed))
+                        : WorldXZToPixel(rect, path.nodes[seg]);
+                    line.Add((Vector3)start);
+
                     if (curved)
                     {
                         for (int s = 1; s <= samplesPerSeg; s++)
                         {
                             Vector2 pt = WorldXZToPixel(rect, SplineWallSample(path.nodes, seg, (float)s / samplesPerSeg, path.isClosed));
-                            polyPoints.Add((Vector3)pt);
+                            line.Add((Vector3)pt);
                         }
                     }
                     else
                     {
-                        polyPoints.Add((Vector3)WorldXZToPixel(rect, path.nodes[i2]));
+                        line.Add((Vector3)WorldXZToPixel(rect, path.nodes[i2]));
                     }
-                }
-                if (path.isClosed && polyPoints.Count > 1)
-                    polyPoints.Add(polyPoints[0]);
 
-                if (polyPoints.Count >= 2)
+                    segPolys.Add(line.ToArray());
+                    segDestr.Add(path.IsSegmentDestructible(seg));
+                }
+
+                Handles.color = Color.black;
+                foreach (var poly in segPolys)
+                    if (poly.Length >= 2) Handles.DrawAAPolyLine(outlineW, poly);
+                var destrFill = new Color(1f, 0.5f, 0.2f);
+                for (int p = 0; p < segPolys.Count; p++)
                 {
-                    Vector3[] pts = polyPoints.ToArray();
-                    Handles.color = Color.black;
-                    Handles.DrawAAPolyLine(outlineW, pts);
-                    Handles.color = Color.white;
-                    Handles.DrawAAPolyLine(fillW, pts);
+                    if (segPolys[p].Length < 2) continue;
+                    Handles.color = segDestr[p] ? destrFill : Color.white;
+                    Handles.DrawAAPolyLine(fillW, segPolys[p]);
                 }
             }
 

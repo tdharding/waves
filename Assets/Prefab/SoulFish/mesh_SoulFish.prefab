@@ -248,6 +248,7 @@ MonoBehaviour:
   heightMultiplier: 1
   activeDistance: 25
   fishing: {fileID: 0}
+  BowlSuppressed: 0
 --- !u!210 &5888994491461129825
 SortingGroup:
   m_ObjectHideFlags: 0

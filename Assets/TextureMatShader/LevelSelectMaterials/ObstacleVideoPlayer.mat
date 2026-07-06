@@ -50,6 +50,7 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _FresnalPower: 3.41
     - _Power: 4.61
     - _QueueControl: 0
     - _QueueOffset: 0

@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -10,6 +11,7 @@ public class CatapultProjectile : MonoBehaviour
     [HideInInspector] public float arcDuration;
     [HideInInspector] public float arcPeakHeight;
     [HideInInspector] public float obstacleCheckRadius;
+    [HideInInspector] public float wallDestructionRadius;
     [HideInInspector] public string[] collidableTags;
     [HideInInspector] public float extraYOffset;
     [HideInInspector] public float heightMultiplier;
@@ -116,6 +118,13 @@ public class CatapultProjectile : MonoBehaviour
                 return true;
             }
 
+            // Destructible wall: stop here; the area-of-effect shatter runs in OnObstacleHit.
+            if (col.GetComponentInParent<DestructibleWall>() != null)
+            {
+                Debug.Log($"[CatapultProjectile] DESTRUCTIBLE WALL HIT on '{col.name}' — exploding.");
+                return true;
+            }
+
             foreach (string tag in collidableTags)
             {
                 if (col.CompareTag(tag))
@@ -153,7 +162,35 @@ public class CatapultProjectile : MonoBehaviour
     {
         if (explosionVFXPrefab != null)
             Instantiate(explosionVFXPrefab, transform.position, Quaternion.identity);
+
+        ShatterWallsInRadius(transform.position);
+
         Destroy(gameObject);
+    }
+
+    /// <summary>
+    /// Blast-radius destruction: shatters every DestructibleWall piece whose collider
+    /// overlaps a sphere of wallDestructionRadius around the impact point. This is what
+    /// clears a gap through a densely-tiled spline wall from a single hit.
+    /// </summary>
+    private void ShatterWallsInRadius(Vector3 centre)
+    {
+        if (wallDestructionRadius <= 0f) return;
+
+        Collider[] hits = Physics.OverlapSphere(centre, wallDestructionRadius);
+        DrawDebugSphere(centre, wallDestructionRadius, Color.magenta);
+
+        // A single piece can own several colliders — shatter each piece only once.
+        var shattered = new HashSet<DestructibleWall>();
+        foreach (Collider col in hits)
+        {
+            DestructibleWall wall = col.GetComponentInParent<DestructibleWall>();
+            if (wall != null && shattered.Add(wall))
+                wall.Shatter(centre);
+        }
+
+        if (shattered.Count > 0)
+            Debug.Log($"[CatapultProjectile] Blast shattered {shattered.Count} wall piece(s) within r={wallDestructionRadius}.");
     }
 
     private void OnLand()

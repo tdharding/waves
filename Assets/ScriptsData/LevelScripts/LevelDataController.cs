@@ -235,13 +235,19 @@ Vector3 centre = GetArenaCentre();
 
             if (arenaProfile != null)
             {
+                var sonarGen = sonarGridParent.GetComponentInChildren<SonarPlaneGenerator>();
+
+                // Load this level's sonar grid formation (set in the Grid Designer).
+                // Null keeps whatever formation is already on the scene generator.
+                if (sonarGen != null && activeGridData != null && activeGridData.sonarGridType != null)
+                    sonarGen.SetGridType(activeGridData.sonarGridType);
+
                 if (sonarController != null)
                 {
                     float sonarScale = arenaProfile.WorldArenaWidth * arenaProfile.wavePlaneCoverageMultiplier;
                     sonarController.SetGridArea(sonarScale, 5f);
                 }
 
-                var sonarGen = sonarGridParent.GetComponentInChildren<SonarPlaneGenerator>();
                 Material sonarMat = sonarGen?.GridType?.planeMaterial;
                 if (sonarMat != null)
                 {

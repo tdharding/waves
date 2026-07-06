@@ -57,7 +57,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _NormalMap:
-        m_Texture: {fileID: 2800000, guid: ffd53540626d141419cc1573da1ca14d, type: 3}
+        m_Texture: {fileID: 2800000, guid: 0fd56d854a1588c4494c035243723bd5, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _OcclusionMap:
@@ -73,6 +73,10 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _Texture2D2:
+        m_Texture: {fileID: 2800000, guid: 0fd56d854a1588c4494c035243723bd5, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Texture2D2_1:
         m_Texture: {fileID: 2800000, guid: ffd53540626d141419cc1573da1ca14d, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
@@ -95,20 +99,25 @@ Material:
     - _AlphaToMask: 0
     - _Blend: 0
     - _BlendModePreserveSpecular: 1
+    - _BoatRadiusShadow: 20.8
+    - _BoatRadiusShadowSoftness: 9.8
     - _BumpScale: 1
     - _ClearCoatMask: 0
     - _ClearCoatSmoothness: 0
     - _Cull: 2
     - _Cutoff: 0.5
+    - _DestructableFactor: 1
     - _DetailAlbedoMapScale: 1
     - _DetailNormalMapScale: 1
     - _DitherFactor1: 0.24
+    - _DitherFactor11: 2.5
     - _DitherMult2: 63.67
     - _DstBlend: 0
     - _DstBlendAlpha: 0
     - _Edge1: 2.2
     - _Edge2: 0.28
     - _EnvironmentReflections: 0
+    - _Float: 0
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
@@ -120,6 +129,7 @@ Material:
     - _ReceiveShadows: 1
     - _RockSonarFactor: 1.1
     - _ShadowIntensity2: -12.65
+    - _ShadowIntensity2_1: -7
     - _Smoothness: 0
     - _SmoothnessTextureChannel: 0
     - _SonarRadius: 0
@@ -127,20 +137,24 @@ Material:
     - _SrcBlend: 1
     - _SrcBlendAlpha: 1
     - _Surface: 0
+    - _VertexColorMultiplier: 1
     - _WorkflowMode: 1
     - _XRMotionVectorsPass: 1
     - _ZWrite: 1
     m_Colors:
     - _BaseColor: {r: 0.57232696, g: 0.57232696, b: 0.57232696, a: 1}
     - _BaseColour: {r: 0.16981131, g: 0.16981131, b: 0.16981131, a: 1}
+    - _BoatCenter: {r: 0, g: 0, b: 0, a: 0}
+    - _BoatWorldCenter: {r: 0, g: 0, b: 0, a: 0}
     - _Color: {r: 0.5723269, g: 0.5723269, b: 0.5723269, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _InMinMax1: {r: 0.2, g: -1.19, b: 0, a: 0}
     - _LightAngle1: {r: -4.7, g: 35.7, b: 41.8, a: 0}
     - _LightAngle2: {r: -4.7, g: 19.62, b: 465.8, a: 0}
-    - _SonarCenter: {r: 0.49993637, g: 0.49994528, b: 0, a: 0}
+    - _SonarCenter: {r: 0.5001743, g: 0.49967128, b: 0, a: 0}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
     - _Tiling: {r: 1, g: 1, b: 0, a: 0}
+    - _Tiling_1: {r: 1, g: 1, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
 --- !u!114 &8044509818295189235

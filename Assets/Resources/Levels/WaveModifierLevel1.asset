@@ -126,7 +126,7 @@ MonoBehaviour:
     speedBoost: 0
     frequencyBoost: 0
     rippleDepthBoost: 0
-  - cellIndex: 24
+  - cellIndex: 580
     prefab: {fileID: 4089478517322769272, guid: 0ad9522f599f9b64d8410dc3a60b232a, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0

@@ -23,6 +23,11 @@ public Camera mainCamera;
     public string boatForwardProperty  = "_BoatForward";
     public string boatRightProperty    = "_BoatRight";
 
+    [Header("Maze Rock Darkness Mask")]
+    [Tooltip("Global vector reference name matching the BoatCenter property on MazeRockShaderGraph. " +
+             "Fed the boat's world-space position so the rock shader can build a light/darkness mask around the boat.")]
+    public string boatCenterProperty = "_BoatWorldCenter";
+
     public string foamSizeProperty     = "_BoatFoamSize";
     public string trailWidthProperty   = "_BoatTrailWidth";
     public string rippleFreqProperty   = "_BoatRippleFrequency";
@@ -105,6 +110,10 @@ public Camera mainCamera;
         waterMaterial.SetVector(boatPositionProperty, foamOrigin);
         Vector3 visualPos = boatVisual != null ? boatVisual.transform.position : boat.position;
         Shader.SetGlobalVector(boatPositionProperty, visualPos);
+
+        // Feed the boat's world-space centre to MazeRockShaderGraph (and every maze-rock
+        // material that uses it) for the light/darkness mask around the boat.
+        Shader.SetGlobalVector(boatCenterProperty, visualPos);
 
         if (mainCamera != null)
         {

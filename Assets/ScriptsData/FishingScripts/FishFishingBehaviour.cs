@@ -52,6 +52,18 @@ public class FishFishingBehaviour : MonoBehaviour
     private LinkIdentityLabel identity;
     private LureAttractable   _lureAttractable;
 
+    // Set by LevelSpawner for fish in a statue-guarded zone. While the guarding statue
+    // is alive this fish can't be caught; when the statue is destroyed the reference goes
+    // (Unity-)null and the fish becomes catchable. Null = not guarded.
+    private StatueBehaviour   _guardStatue;
+    public void SetGuardStatue(StatueBehaviour statue) => _guardStatue = statue;
+    public bool IsStatueGuarded => _guardStatue != null;
+
+    // Set by SoulShoalController for fish that live in a FishBowlTower's bowl. While true the fish
+    // is aloft in the bowl: it can't be caught and must NOT snap to the water surface. Cleared by
+    // the shoal controller the moment the dropped container lands in the water.
+    public bool BowlSuppressed;
+
     private Transform _waterTransform;
     private Transform _boatRoot;
     private Material  _waterMat;
@@ -170,7 +182,10 @@ public class FishFishingBehaviour : MonoBehaviour
     bool IsEligibleForAttraction()
     {
         if (fishing == null || whirlDirection == null) return false;
-        if (_lureAttractable != null && !_lureAttractable.IsCatchable) return false;
+        // aloft in a fish bowl — not catchable until the container has dropped and landed
+        if (BowlSuppressed) return false;
+        // guarded — the statue must be destroyed first (null = already gone)
+        if (_guardStatue != null && !_guardStatue.IsDestroyed) return false;
         return whirlDirection.IsInSector(transform.position);
     }
 
@@ -254,6 +269,8 @@ public class FishFishingBehaviour : MonoBehaviour
     void LateUpdate()
     {
         if (_travelingTube) return;
+        // Aloft in the bowl — don't pull the fish down to the water surface yet.
+        if (BowlSuppressed) return;
         if (IsBeingAttracted) return;
         if (_waterTransform == null || _boatRoot == null || _waterMat == null) return;
         if ((_boatRoot.position - transform.position).sqrMagnitude > activeDistance * activeDistance) return;
@@ -269,8 +286,7 @@ public class FishFishingBehaviour : MonoBehaviour
     {
         if (!hasCachedSplinePos) return;
 
-        if (_lureAttractable != null && (_lureAttractable.CurrentState == LureAttractable.State.Attracted
-            || _lureAttractable.CurrentState == LureAttractable.State.StatueAttracted))
+        if (_lureAttractable != null && _lureAttractable.CurrentState == LureAttractable.State.Attracted)
         {
             hasCachedSplinePos = false;
             return;

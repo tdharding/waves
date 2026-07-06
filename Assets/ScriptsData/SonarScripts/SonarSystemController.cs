@@ -8,6 +8,7 @@ public class SonarSystemController : MonoBehaviour
     [SerializeField] private Material rockMaterial;
       [SerializeField] private Material statueMaterial;
     [SerializeField] private Material rockSonarMaterial;
+    [SerializeField] private Material splineWallMaterial;
     [SerializeField] private Material waveplaneMaterial;
     [SerializeField] private Material arenafloorMaterial;
     [SerializeField] public Transform boat;
@@ -89,6 +90,9 @@ public class SonarSystemController : MonoBehaviour
             //rockSonarMaterial.SetFloat(rockSonarFactorProperty, 0f);
             rockSonarMaterial.SetFloat(rockSonarRadiusProperty, 0f);
         }
+
+        if (splineWallMaterial != null)
+            splineWallMaterial.SetFloat(rockSonarRadiusProperty, 0f);
 
         if (arenafloorMaterial != null)
             arenaFloorOriginalColor = arenafloorMaterial.GetColor(BaseColorID);
@@ -240,6 +244,9 @@ public class SonarSystemController : MonoBehaviour
             rockSonarMaterial.SetFloat(rockSonarRadiusProperty,   value * rockSonarRadiusTarget);
             statueMaterial.SetFloat(rockSonarFactorProperty, value * rockSonarMaskTarget);
         }
+
+        if (splineWallMaterial != null)
+            splineWallMaterial.SetFloat(rockSonarRadiusProperty, value * rockSonarRadiusTarget);
 
         if (waveplaneMaterial != null)
             waveplaneMaterial.SetFloat(SonarRadius, value * sonarradiusTarget);

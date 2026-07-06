@@ -16,7 +16,7 @@ MonoBehaviour:
   fishPrefab: {fileID: 253525322543634003, guid: 33e03828ca8448643a20c3e33023a29a, type: 3}
   homeLevelID: 
   associatedWavePreset: {fileID: 11400000, guid: 0151d8cd3861fdc49a30b84f3291c2b1, type: 2}
-  allocated: 0
-  allocatedToLevelID: 
+  allocated: 1
+  allocatedToLevelID: LargeLevel1
   soulName: Soul #80
   videoClip: {fileID: 32900000, guid: db3fe6226d4b3bf4eb0fb92d4a5fa6c7, type: 3}

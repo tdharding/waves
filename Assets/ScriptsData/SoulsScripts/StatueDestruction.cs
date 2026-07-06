@@ -19,6 +19,10 @@ public class StatueDestruction : MonoBehaviour
 
     private bool _triggered;
 
+    // Fired when this object is smashed (after the break physics are applied). A FishBowlTowerController
+    // subscribes to this to release its bowl container. Statues leave it unsubscribed (no-op).
+    public event System.Action<Vector3> OnTriggered;
+
     public void Trigger(Vector3 hitPosition)
     {
         if (_triggered) return;
@@ -40,11 +44,14 @@ public class StatueDestruction : MonoBehaviour
             }
         }
 
-        // Release any fish orbiting this statue
+        // Open the catch gate on this statue's guarded soul-fish zone
         var statueBehaviour = GetComponent<StatueBehaviour>();
-        if (statueBehaviour != null) statueBehaviour.enabled = false;
+        if (statueBehaviour != null) statueBehaviour.MarkDestroyed();
 
         if (intactRoot != null)  Destroy(intactRoot,  destroyDelay);
         if (brokenRoot != null)  Destroy(brokenRoot,  destroyDelay);
+
+        // Notify any listener (e.g. FishBowlTowerController) that the structure has broken.
+        OnTriggered?.Invoke(hitPosition);
     }
 }

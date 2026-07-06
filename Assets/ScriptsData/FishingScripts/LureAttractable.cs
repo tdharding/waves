@@ -18,14 +18,9 @@ public class LureAttractable : MonoBehaviour
     private float                _returnSpeed     = 2f;
     private float                _returnThreshold = 0.3f;
 
-    public enum State { Free, Attracted, Returning, StatueAttracted }
+    public enum State { Free, Attracted, Returning }
     public State CurrentState => _state;
     private State _state = State.Free;
-
-    // False only when attracted to a statue — blocks whirl fishing capture
-    public bool IsCatchable => _state != State.StatueAttracted;
-
-    private StatueBehaviour _targetStatue;
 
     void Awake()
     {
@@ -42,68 +37,6 @@ public class LureAttractable : MonoBehaviour
             if (_state == State.Attracted)
                 BeginReturn();
             return;
-        }
-
-        // Statue attraction — takes priority over lures; fish held until statue is destroyed
-        if (_state == State.StatueAttracted)
-        {
-            if (_targetStatue != null && StatueBehaviour.ActiveStatues.Contains(_targetStatue))
-            {
-                float orbitRadius     = _targetStatue.orbitRadius;
-                float orbitSpeed      = _targetStatue.orbitSpeed;
-                float moveTowardSpeed = _targetStatue.moveTowardSpeed;
-
-                float angle    = _orbitAngleOffset + Time.time * orbitSpeed;
-                Vector3 target = _targetStatue.transform.position
-                               + new Vector3(Mathf.Cos(angle) * orbitRadius, 0f, Mathf.Sin(angle) * orbitRadius);
-
-                float distToOrbit = Vector3.Distance(transform.position, target);
-                float speed       = distToOrbit > orbitRadius ? moveTowardSpeed : orbitSpeed * orbitRadius;
-
-                transform.position = Vector3.MoveTowards(transform.position, target, speed * Time.deltaTime);
-
-                Vector3 dir = target - transform.position;
-                if (dir.sqrMagnitude > 0.001f)
-                    transform.rotation = Quaternion.Slerp(transform.rotation,
-                        Quaternion.LookRotation(dir.normalized), Time.deltaTime * 5f);
-            }
-            else
-            {
-                if (_targetStatue != null)
-                {
-                    _returnSpeed     = _targetStatue.returnSpeed;
-                    _returnThreshold = _targetStatue.returnThreshold;
-                }
-                _targetStatue = null;
-                BeginReturn();
-            }
-            return;
-        }
-
-        // Check for nearby statues before considering lures (statue attraction locks fish in)
-        if (_state == State.Free || _state == State.Returning)
-        {
-            StatueBehaviour nearestStatue     = null;
-            float           nearestStatueDist = float.MaxValue;
-            foreach (var statue in StatueBehaviour.ActiveStatues)
-            {
-                if (statue == null) continue;
-                float d = Vector3.Distance(transform.position, statue.transform.position);
-                if (d <= statue.attractionRadius && d < nearestStatueDist)
-                {
-                    nearestStatueDist = d;
-                    nearestStatue     = statue;
-                }
-            }
-            if (nearestStatue != null)
-            {
-                _targetStatue = nearestStatue;
-                _state        = State.StatueAttracted;
-                if (_splineAnimate != null && _splineAnimate.IsPlaying)
-                    _splineAnimate.Pause();
-                Debug.Log($"[LureAttractable] {name} STATUE-ATTRACTED to {nearestStatue.name}");
-                return;
-            }
         }
 
         // Find nearest active lure.
@@ -256,9 +189,8 @@ public class LureAttractable : MonoBehaviour
     void OnDrawGizmosSelected()
     {
         float orbitRadius = (_targetLure != null) ? _targetLure.orbitRadius : 1.2f;
-        Color discColor   = _state == State.Attracted        ? new Color(1f, 0.6f, 0f, 0.8f)
-                          : _state == State.Returning         ? new Color(0.4f, 1f, 0.4f, 0.8f)
-                          : _state == State.StatueAttracted   ? new Color(0.6f, 0.2f, 1f, 0.8f)
+        Color discColor   = _state == State.Attracted ? new Color(1f, 0.6f, 0f, 0.8f)
+                          : _state == State.Returning  ? new Color(0.4f, 1f, 0.4f, 0.8f)
                           : new Color(0.4f, 0.8f, 1f, 0.4f);
 
         Handles.color = discColor;
@@ -269,12 +201,6 @@ public class LureAttractable : MonoBehaviour
             Handles.color = new Color(1f, 0.6f, 0f, 0.9f);
             Handles.DrawDottedLine(transform.position, _targetLure.transform.position, 3f);
             Handles.Label(transform.position + Vector3.up * 0.4f, "Attracted");
-        }
-        else if (_state == State.StatueAttracted && _targetStatue != null)
-        {
-            Handles.color = new Color(0.6f, 0.2f, 1f, 0.9f);
-            Handles.DrawDottedLine(transform.position, _targetStatue.transform.position, 3f);
-            Handles.Label(transform.position + Vector3.up * 0.4f, "StatueAttracted");
         }
         else if (_state == State.Returning)
         {

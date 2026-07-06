@@ -49,6 +49,12 @@ public class BoatControlRouter : MonoBehaviour
             spaceWasPressedAfterSonar = false;
 
             if (spaceDown) catapult.Fire();
+
+            // Hold Up/Down to slide the loading point out/in, extending the trajectory.
+            float distAxis = 0f;
+            if (Input.GetKey(KeyCode.UpArrow))   distAxis += 1f;
+            if (Input.GetKey(KeyCode.DownArrow)) distAxis -= 1f;
+            catapult.AdjustLaunchDistance(distAxis);
             return;
         }
 
