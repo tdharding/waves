@@ -237,8 +237,12 @@ MonoBehaviour:
   forwardEuler: {x: 0, y: -90.71, z: 0}
   useUpOverride: 0
   upEuler: {x: 0, y: 0, z: 0}
+  useWallDepth: 0
+  wallDepth: 0
   useScaleRadius: 0
   scaleRadius: 3
+  usePrefabTopMarker: 0
+  prefabTopHeight: 3
 --- !u!1 &5377434632076762627
 GameObject:
   m_ObjectHideFlags: 0
@@ -292,11 +296,12 @@ MonoBehaviour:
   localSpline: {fileID: 1220300225781093163}
   targetModifier: {fileID: 0}
   targetLockHub: {fileID: 0}
+  targetWaterExit: {fileID: 0}
   fishingController: {fileID: 0}
   fishPrefab: {fileID: 1019405579569507755, guid: c9a7a1fabeb26f04ab236a92e309a60b, type: 3}
   tubeExtrudePrefab: {fileID: 2215127129855429466, guid: fbff2a76bfebe0c4a8574cfa0da02282, type: 3}
   tubeMaterial: {fileID: 2100000, guid: 44fb2336382538743a3e39d5a2f5824b, type: 2}
-  travelSpeed: 0.4
+  travelSpeed: 1.5
   curveStrength: 4.57
   joinKnotCount: 3
   tubeGlowRadius: 0.05
@@ -561,7 +566,7 @@ PrefabInstance:
     - target: {fileID: -774230119497415286, guid: 89dcfbee9b6b07d40ba49c41e8be639d, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: 4075bc73f35557e459d7e66a033677cb, type: 2}
+      objectReference: {fileID: 2100000, guid: 258b11099042abe43bbb626cd95f20fd, type: 2}
     - target: {fileID: 919132149155446097, guid: 89dcfbee9b6b07d40ba49c41e8be639d, type: 3}
       propertyPath: m_Name
       value: SoulFishTubeInput1
@@ -573,7 +578,7 @@ PrefabInstance:
     - target: {fileID: 2693853905388621090, guid: 89dcfbee9b6b07d40ba49c41e8be639d, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: 4075bc73f35557e459d7e66a033677cb, type: 2}
+      objectReference: {fileID: 2100000, guid: 258b11099042abe43bbb626cd95f20fd, type: 2}
     - target: {fileID: 5992273285613035240, guid: 89dcfbee9b6b07d40ba49c41e8be639d, type: 3}
       propertyPath: m_LocalPosition.x
       value: -0.09

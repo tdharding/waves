@@ -72,6 +72,11 @@ public class WhirlFXController : MonoBehaviour
         fishingController?.SetFishingActive(true);
     }
 
+    public void OnRetractNetComplete()
+    {
+        fishingController?.OnRetractComplete();
+    }
+
     // ----------------------------
     // EXPLICIT API
     // ----------------------------

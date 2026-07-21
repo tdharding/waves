@@ -224,6 +224,12 @@ MonoBehaviour:
   forwardEuler: {x: 0, y: -89.6, z: 0}
   useUpOverride: 1
   upEuler: {x: 0, y: 0, z: 0}
+  useWallDepth: 1
+  wallDepth: -0.18
+  useScaleRadius: 0
+  scaleRadius: 3
+  usePrefabTopMarker: 0
+  prefabTopHeight: 3
 --- !u!1001 &581535612396768548
 PrefabInstance:
   m_ObjectHideFlags: 0

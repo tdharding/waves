@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "illustration-site",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "5599", "--directory", "C:/Users/tomdh/Desktop/FILES/ART/2026_ART/tomhardingillustration"],
+      "port": 5599
+    }
+  ]
+}

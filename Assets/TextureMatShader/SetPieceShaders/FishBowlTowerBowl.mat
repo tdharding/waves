@@ -59,11 +59,11 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _FresnalPower: 1.33
-    - _Power: 4.61
+    - _FresnalPower: 0.97
+    - _Power: 11.95
     - _QueueControl: 0
     - _QueueOffset: 0
-    - _SmoothStep2: 0
+    - _SmoothStep2: 1.35
     - _VideoBlend: 0
     - _VideoScale: -0.39
     m_Colors:

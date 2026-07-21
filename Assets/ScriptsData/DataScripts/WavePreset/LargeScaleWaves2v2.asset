@@ -1,0 +1,65 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3e8c5527e5cf59d468851ded0a7e0ff3, type: 3}
+  m_Name: LargeScaleWaves2v2
+  m_EditorClassIdentifier: Assembly-CSharp::WavePreset
+  state:
+    Frequency: 1.26
+    Speed: 0.12
+    RippleDepth: -0.08
+    Smoothness: 0.208
+    Transparency: 1
+    Strength: 0.01
+    TroughRingWave1Brightness: 32.4
+    PeakRingWave2Brightness: 1.45
+    TwirlBaseStrength: 0.67
+    TwirlSlopeBoost: 0.66
+    TwirlScale: 70.8
+    DepthTwirlStrength: 4.17
+    DepthFadeStrength: 1.99
+    DepthFadeLine: 3.66
+    WhirlpoolTwirlStrength: 11.52
+    WhirlpoolAreaTwirlStrength: 14.55
+    SoulFishTwirlStrength: 0.78
+    SoulFishMaskStrength: 0.328
+    SoulFishRadius: 1.49
+    SoulFishBrightness1: 1.12
+    SoulFishFadeStart: 0.903
+    SoulFishEdgeNoiseStrength: 0.16
+    SoulFishEdgeNoiseScale: 2.53
+    SoulFishEdgeNoiseScale2: 93.8
+    SoulFishEdgeNoiseSpeed: 0.92
+    ZoneTiling: {x: -0.16, y: 0.98}
+    ZoneScrollSpeed: 0.04
+    ZoneNoiseStrength: 0.109
+    ZoneTexture: {fileID: 2800000, guid: f0208073e7e1ff74f8d935f89de3e807, type: 3}
+    WhirlpoolTaper: 1.49
+    WhirlpoolDarkRadiusMult: 2.25
+    WhirlpoolDarkStrength: 1
+    WhirlpoolFalloffPower: 0.23
+    WaveStepRate: 4000
+    BaseColor: {r: 0.9245283, g: 0.9245283, b: 0.9245283, a: 1}
+    LightDirection: {x: 1.85, y: -50.8, z: 54.72}
+    FoamDitherSize: 2.74
+    FoamDistanceDepth: -0.47
+    FoamDepthFade: -0.2
+    FoamColor: {r: 0, g: 0, b: 0, a: 1}
+    FoamLine: 0.09
+    DepthFade: 1.13
+    DepthColour: {r: 1, g: 1, b: 1, a: 0}
+    DistanceDepth: 0.78
+    NormalTexture: {fileID: 2800000, guid: df38cf9d91960914390da89498cd9566, type: 3}
+    WaveCenter: {x: 0, y: 0, z: 0, w: 0}
+  sonarEnabled: 1
+  musicIntro: {fileID: 8300000, guid: 081a1e16b36f40b429370dd58d482701, type: 3}
+  musicLoop: {fileID: 8300000, guid: 081a1e16b36f40b429370dd58d482701, type: 3}
+  lights: []

@@ -9,8 +9,9 @@ public class SoulDataGenerator : EditorWindow
     private string savePath = "Assets/Data/Souls";
     private string videoPath = "Assets/Resources/Videos";
     private string assetBaseName = "SoulData_";
+    private int soulCount = 100;
 
-    [MenuItem("Tools/Soul System/Generate 100 Souls")]
+    [MenuItem("Tools/Soul System/Generate Souls")]
     public static void ShowWindow()
     {
         GetWindow<SoulDataGenerator>("Soul Generator");
@@ -19,12 +20,14 @@ public class SoulDataGenerator : EditorWindow
     private void OnGUI()
     {
         GUILayout.Label("Soul Data Bulk Generator", EditorStyles.boldLabel);
-        
+
         savePath = EditorGUILayout.TextField("Save Destination", savePath);
         videoPath = EditorGUILayout.TextField("Video Source Folder", videoPath);
         assetBaseName = EditorGUILayout.TextField("Base File Name", assetBaseName);
+        soulCount = EditorGUILayout.IntField("Number of Souls", soulCount);
+        soulCount = Mathf.Max(1, soulCount);
 
-        if (GUILayout.Button("Generate 100 Soul Assets"))
+        if (GUILayout.Button($"Generate {soulCount} Soul Assets"))
         {
             GenerateSouls();
         }
@@ -54,11 +57,11 @@ public class SoulDataGenerator : EditorWindow
         }
 
         // 3. Generation Loop
-        for (int i = 1; i <= 100; i++)
+        for (int i = 1; i <= soulCount; i++)
         {
             SoulData newSoul = ScriptableObject.CreateInstance<SoulData>();
-            
-            // Assign Identity (1-100)
+
+            // Assign Identity (1-N)
             newSoul.soulDataIdentity = i;
             newSoul.soulName = $"Soul #{i}";
 
@@ -76,6 +79,6 @@ public class SoulDataGenerator : EditorWindow
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
         
-        Debug.Log($"Successfully generated 100 SoulData assets in {savePath}");
+        Debug.Log($"Successfully generated {soulCount} SoulData assets in {savePath}");
     }
 }

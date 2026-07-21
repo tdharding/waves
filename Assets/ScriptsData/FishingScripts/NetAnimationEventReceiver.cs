@@ -11,4 +11,10 @@ public class NetAnimationEventReceiver : MonoBehaviour
     {
         whirlFX?.OnDeployNetComplete();
     }
+
+    // Called by the RetractNetBoat animation event (last frame)
+    public void OnRetractNetComplete()
+    {
+        whirlFX?.OnRetractNetComplete();
+    }
 }

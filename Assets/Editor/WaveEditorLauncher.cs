@@ -14,6 +14,7 @@ public static class WaveEditorLauncher
         var win4 = EditorWindow.GetWindow<WaveEffectsLiveTuner>("Wave Tuner", typeof(GameTesterTool));
         var win5 = EditorWindow.GetWindow<SonarGridEditorWindow>("Sonar Grid Editor", typeof(GameTesterTool));
         var win6 = EditorWindow.GetWindow<GizmoManagerWindow>("Gizmo Manager", typeof(GameTesterTool));
+        var win7 = EditorWindow.GetWindow<RecentAssetsWindow>("Recent", typeof(GameTesterTool));
 
         win1.Show();
         win2.Show();
@@ -21,6 +22,7 @@ public static class WaveEditorLauncher
         win4.Show();
         win5.Show();
         win6.Show();
+        win7.Show();
 
         win1.Focus();
     }

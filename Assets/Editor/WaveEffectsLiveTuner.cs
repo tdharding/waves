@@ -51,6 +51,11 @@ public class WaveEffectsLiveTuner : EditorWindow
     [SerializeField] float     soulFishMaskStrength = 1f;
     [SerializeField] float     soulFishRadius       = 2f;
     [SerializeField] float     soulFishBrightness1  = 1f;
+    [SerializeField] float     soulFishFadeStart         = 0.35f;
+    [SerializeField] float     soulFishEdgeNoiseStrength = 0.25f;
+    [SerializeField] float     soulFishEdgeNoiseScale    = 1f;
+    [SerializeField] float     soulFishEdgeNoiseScale2   = 4f;
+    [SerializeField] float     soulFishEdgeNoiseSpeed    = 0.2f;
     [SerializeField] Vector2   zoneTiling           = new Vector2(0.5f, 0.5f);
     [SerializeField] float     zoneScrollSpeed      = 0.05f;
     [SerializeField] float     zoneNoiseStrength    = 0.3f;
@@ -480,9 +485,17 @@ public class WaveEffectsLiveTuner : EditorWindow
 
         EditorGUILayout.Space(4);
         EditorGUILayout.LabelField("Soul Fish Zone", EditorStyles.boldLabel);
-        soulFishMaskStrength = EditorGUILayout.FloatField("Mask Strength",           soulFishMaskStrength);
-        soulFishRadius       = EditorGUILayout.FloatField("Radius",                  soulFishRadius);
+        soulFishMaskStrength = EditorGUILayout.Slider(   "Mask Strength",           soulFishMaskStrength, 0f, 1f);
+        // Radius removed from the tuner — zone radius is authored per-zone in the Grid Designer and
+        // baked per-point at spawn. _SoulFishRadius now only serves as the loose-fish fallback,
+        // set at runtime by WaveMaterialController.
         soulFishBrightness1  = EditorGUILayout.FloatField("Brightness 1",            soulFishBrightness1);
+        EditorGUILayout.LabelField("Edge Noise", EditorStyles.miniBoldLabel);
+        soulFishFadeStart         = EditorGUILayout.Slider(    "Fade Start",         soulFishFadeStart, 0f, 1f);
+        soulFishEdgeNoiseStrength = EditorGUILayout.FloatField("Edge Noise Strength",  soulFishEdgeNoiseStrength);
+        soulFishEdgeNoiseScale    = EditorGUILayout.FloatField("Edge Noise Scale (base)", soulFishEdgeNoiseScale);
+        soulFishEdgeNoiseScale2   = EditorGUILayout.FloatField("Edge Noise Scale (fine)", soulFishEdgeNoiseScale2);
+        soulFishEdgeNoiseSpeed    = EditorGUILayout.FloatField("Edge Noise Speed",     soulFishEdgeNoiseSpeed);
         zoneTiling           = EditorGUILayout.Vector2Field("Zone Tiling",            zoneTiling);
         zoneScrollSpeed      = EditorGUILayout.FloatField("Scroll Speed",            zoneScrollSpeed);
         zoneNoiseStrength    = EditorGUILayout.Slider(    "Noise Strength",          zoneNoiseStrength, 0f, 1f);
@@ -745,6 +758,11 @@ public class WaveEffectsLiveTuner : EditorWindow
         waveMaterial.SetFloat("_SoulFishMaskStrength",      soulFishMaskStrength);
         waveMaterial.SetFloat("_SoulFishRadius",            soulFishRadius);
         waveMaterial.SetFloat("_SoulFishBrightness1",       soulFishBrightness1);
+        waveMaterial.SetFloat("_SoulFishFadeStart",         soulFishFadeStart);
+        waveMaterial.SetFloat("_SoulFishEdgeNoiseStrength", soulFishEdgeNoiseStrength);
+        waveMaterial.SetFloat("_SoulFishEdgeNoiseScale",    soulFishEdgeNoiseScale);
+        waveMaterial.SetFloat("_SoulFishEdgeNoiseScale2",   soulFishEdgeNoiseScale2);
+        waveMaterial.SetFloat("_SoulFishEdgeNoiseSpeed",    soulFishEdgeNoiseSpeed);
         waveMaterial.SetVector("_ZoneTiling",              zoneTiling);
         waveMaterial.SetFloat("_ZoneScrollSpeed",          zoneScrollSpeed);
         waveMaterial.SetFloat("_ZoneNoiseStrength",        zoneNoiseStrength);
@@ -824,6 +842,17 @@ public class WaveEffectsLiveTuner : EditorWindow
         soulFishRadius = s.SoulFishRadius > 0f
             ? s.SoulFishRadius
             : (waveMaterial != null ? waveMaterial.GetFloat("_SoulFishRadius") : soulFishRadius);
+        // Edge-noise wasn't in older presets either — a zero noise scale marks "unset",
+        // so keep the tuner's current values rather than zeroing the effect (same
+        // pattern as the SoulFishRadius fallback above).
+        if (s.SoulFishEdgeNoiseScale > 0f)
+        {
+            soulFishFadeStart         = s.SoulFishFadeStart;
+            soulFishEdgeNoiseStrength = s.SoulFishEdgeNoiseStrength;
+            soulFishEdgeNoiseScale    = s.SoulFishEdgeNoiseScale;
+            soulFishEdgeNoiseScale2   = s.SoulFishEdgeNoiseScale2;
+            soulFishEdgeNoiseSpeed    = s.SoulFishEdgeNoiseSpeed;
+        }
         zoneTiling              = s.ZoneTiling;
         zoneScrollSpeed         = s.ZoneScrollSpeed;
         zoneNoiseStrength       = s.ZoneNoiseStrength;
@@ -995,6 +1024,11 @@ public class WaveEffectsLiveTuner : EditorWindow
         SoulFishMaskStrength      = soulFishMaskStrength,
         SoulFishRadius            = soulFishRadius,
         SoulFishBrightness1       = soulFishBrightness1,
+        SoulFishFadeStart         = soulFishFadeStart,
+        SoulFishEdgeNoiseStrength = soulFishEdgeNoiseStrength,
+        SoulFishEdgeNoiseScale    = soulFishEdgeNoiseScale,
+        SoulFishEdgeNoiseScale2   = soulFishEdgeNoiseScale2,
+        SoulFishEdgeNoiseSpeed    = soulFishEdgeNoiseSpeed,
         ZoneTiling                = zoneTiling,
         ZoneScrollSpeed           = zoneScrollSpeed,
         ZoneNoiseStrength         = zoneNoiseStrength,

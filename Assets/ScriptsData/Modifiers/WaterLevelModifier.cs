@@ -52,12 +52,6 @@ public class WaterLevelModifier : MonoBehaviour
         if (debugLog) Debug.Log($"[WaterLevelModifier] Init — tier='{spawnedTierName}' floor={spawnedFloorLabel} slot={spawnedTierSlot} y={spawnedTierY}, raise={raiseAmount}, lower={lowerAmount}, hasAbove={hasAbove}, hasBelow={hasBelow}");
     }
 
-    private Transform sonarGridParent;
-
-    private static readonly int ArenaMaskID = Shader.PropertyToID("_ArenaMask");
-
-    private Transform wavePlane;
-    private Material  waveMaterial;
     private float     baselineY;
     private float     raiseOffset;
     private float     lowerOffset;
@@ -65,19 +59,10 @@ public class WaterLevelModifier : MonoBehaviour
 
     private void Start()
     {
-        wavePlane       = LevelDataController.Instance?.GetWaveTransform();
-        sonarGridParent = LevelDataController.Instance?.GetSonarGridParent();
-
-        if (wavePlane != null)
-        {
-            // Use the tier's authored Y as baseline, not the wave plane's current position.
-            // The wave plane starts at 0 for all tiers, so capturing position.y here
-            // would give every modifier a baseline of 0 regardless of which floor they're on.
-            baselineY    = spawnedTierY;
-            var renderer = wavePlane.GetComponent<Renderer>();
-            if (renderer != null)
-                waveMaterial = renderer.sharedMaterial;
-        }
+        // Use the tier's authored Y as baseline, not the wave plane's current position.
+        // The wave plane starts at 0 for all tiers, so capturing position.y here
+        // would give every modifier a baseline of 0 regardless of which floor they're on.
+        baselineY = spawnedTierY;
 
         if (raiseSlot != null)
         {
@@ -108,74 +93,19 @@ public class WaterLevelModifier : MonoBehaviour
 
     private void TweenToTarget()
     {
-        if (wavePlane == null)
-        {
-            Debug.LogWarning("[WaterLevelModifier] TweenToTarget called but wavePlane is null!");
-            return;
-        }
-
         float targetY = baselineY + raiseOffset + lowerOffset;
 
         if (tweenRoutine != null)
             StopCoroutine(tweenRoutine);
 
-        float fromGridY = sonarGridParent != null ? sonarGridParent.position.y : 0f;
-        float toGridY   = fromGridY + (targetY - wavePlane.position.y);
-        tweenRoutine = StartCoroutine(TweenY(wavePlane.position.y, targetY, fromGridY, toGridY));
+        // Shared tween keeps all four water-height targets in lockstep (incl. the sonar
+        // material mask this class previously missed). See WaveLevelTween.
+        tweenRoutine = StartCoroutine(RunTween(targetY));
     }
 
-    private IEnumerator TweenY(float fromY, float toY, float fromGridY, float toGridY)
+    private IEnumerator RunTween(float targetY)
     {
-        float elapsed = 0f;
-
-        // Anchor mask values to the actual wave Y positions so they stay in sync
-        // regardless of which tier's baseline initiated the tween.
-        Vector4 maskBase = waveMaterial != null
-            ? waveMaterial.GetVector(ArenaMaskID)
-            : Vector4.zero;
-
-        Vector4 maskFrom = maskBase;
-        maskFrom.y = fromY;
-
-        Vector4 maskTo = maskBase;
-        maskTo.y = toY;
-
-        while (elapsed < transitionDuration)
-        {
-            elapsed += Time.deltaTime;
-            float t = Mathf.SmoothStep(0f, 1f, elapsed / transitionDuration);
-
-            Vector3 pos = wavePlane.position;
-            pos.y = Mathf.Lerp(fromY, toY, t);
-            wavePlane.position = pos;
-
-            if (waveMaterial != null)
-                waveMaterial.SetVector(ArenaMaskID, Vector4.Lerp(maskFrom, maskTo, t));
-
-            if (sonarGridParent != null)
-            {
-                Vector3 gp = sonarGridParent.position;
-                gp.y = Mathf.Lerp(fromGridY, toGridY, t);
-                sonarGridParent.position = gp;
-            }
-
-            yield return null;
-        }
-
-        Vector3 final = wavePlane.position;
-        final.y = toY;
-        wavePlane.position = final;
-
-        if (waveMaterial != null)
-            waveMaterial.SetVector(ArenaMaskID, maskTo);
-
-        if (sonarGridParent != null)
-        {
-            Vector3 gFinal = sonarGridParent.position;
-            gFinal.y = toGridY;
-            sonarGridParent.position = gFinal;
-        }
-
+        yield return WaveLevelTween.To(targetY, transitionDuration);
         tweenRoutine = null;
     }
 

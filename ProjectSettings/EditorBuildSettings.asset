@@ -12,6 +12,12 @@ EditorBuildSettings:
     path: Assets/Scenes/LevelSelect.unity
     guid: 1c84e09a6c578d14da1dac0185f8b59c
   - enabled: 1
+    path: Assets/Scenes/LevelSelectWorlds/LevelSelectWorld2.unity
+    guid: 75d8ada57d588024bb0e20899004fcd8
+  - enabled: 1
+    path: Assets/LevelSelectWorld1a.unity
+    guid: 925e5e9a30ba2494392fedfe8074a76d
+  - enabled: 1
     path: Assets/Scenes/Waves1.unity
     guid: 5deeedd361fd0c0419299dcdba03ae03
   - enabled: 1
@@ -22,4 +28,3 @@ EditorBuildSettings:
     guid: 72054a206a08f264d9fec452fdc3b4a4
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
-  m_UseUCBPForAssetBundles: 0

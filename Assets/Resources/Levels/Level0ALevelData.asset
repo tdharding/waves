@@ -18,6 +18,7 @@ MonoBehaviour:
   gameplayWavePreset: {fileID: 11400000, guid: 11c3470aaeb04154095dfa419589ba46, type: 2}
   gongWavePreset: {fileID: 0}
   runtimeWavePresetOverride: {fileID: 0}
+  sonarGridType: {fileID: 0}
   enemyProfile: {fileID: 11400000, guid: 718748a4a460a624fb526d3db325b604, type: 2}
   isTimeTrial: 0
   timeLimitSeconds: 60
@@ -29,15 +30,15 @@ MonoBehaviour:
   soulSpawnPoints: []
   soulZones:
   - nodes: 56010000
+    nodePositions: []
+    closedLoop: 0
     radius: 0.8
     knotCount: 8
-    souls:
-    - {fileID: 11400000, guid: 200a0606aaa2c4f4c9d2fd9b11754ea6, type: 2}
-    - {fileID: 11400000, guid: d28f26c27e043fc489d44691d4e3231d, type: 2}
-    - {fileID: 11400000, guid: 1a9e0a7a6064a6743b6bff8778390e73, type: 2}
-    - {fileID: 11400000, guid: 3462f2508744eb04abe54140a942edc3, type: 2}
-    - {fileID: 11400000, guid: bfaf8f3a25734b548865906efe26439b, type: 2}
-    - {fileID: 11400000, guid: 77091ae1b0f2d4a4496f5cbbfcd028fb, type: 2}
+    souls: []
+    statueGuarded: 0
+    linkedStatueId: 0
+    ringRadius: 0.08
+    towerGuarded: 0
   entrances:
   - id: entrance_0
     prefab: {fileID: 0}
@@ -45,6 +46,11 @@ MonoBehaviour:
     perimeterAngle: 0
     tierSlot: -1
     spawnRadius: 0
+    isLocked: 0
+    lockHubPrefab: {fileID: 0}
+    lockHubAngle: 0
+    tubePath: []
+    tubeSubdivisions: 3
     targetSegmentID: Branch_05_A
     targetProgress: 0.9174951
     targetIsLeftPath: 0
@@ -57,358 +63,892 @@ MonoBehaviour:
     prefab: {fileID: 4089478517322769272, guid: 1a032652afd70634ab2638a21f129895, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 776
     prefab: {fileID: 4089478517322769272, guid: 1a032652afd70634ab2638a21f129895, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 555
     prefab: {fileID: 4089478517322769272, guid: 1a032652afd70634ab2638a21f129895, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 882
     prefab: {fileID: 4089478517322769272, guid: 1a032652afd70634ab2638a21f129895, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 562
     prefab: {fileID: 4089478517322769272, guid: 1a032652afd70634ab2638a21f129895, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 697
     prefab: {fileID: 4089478517322769272, guid: 1a032652afd70634ab2638a21f129895, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 200
     prefab: {fileID: 4089478517322769272, guid: 1a032652afd70634ab2638a21f129895, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 365
     prefab: {fileID: 4089478517322769272, guid: 1a032652afd70634ab2638a21f129895, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 462
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 464
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 465
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 466
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 469
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 473
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 477
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 479
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 478
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 475
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 474
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 472
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 470
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 468
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 467
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 471
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 476
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 236
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 237
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 238
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 240
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 241
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 242
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 243
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 244
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 245
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 246
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 247
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 248
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 249
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 250
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 251
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 252
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 253
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 254
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 255
     prefab: {fileID: 4089478517322769272, guid: ea30bfc8daaf0d44f862b69d39f9b8c3, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 239
     prefab: {fileID: 4089478517322769272, guid: e24834ab5529b6a46b554fe155862a94, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 271
     prefab: {fileID: 4089478517322769272, guid: e24834ab5529b6a46b554fe155862a94, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 303
     prefab: {fileID: 4089478517322769272, guid: e24834ab5529b6a46b554fe155862a94, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 335
     prefab: {fileID: 4089478517322769272, guid: e24834ab5529b6a46b554fe155862a94, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 367
     prefab: {fileID: 4089478517322769272, guid: e24834ab5529b6a46b554fe155862a94, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 399
     prefab: {fileID: 4089478517322769272, guid: e24834ab5529b6a46b554fe155862a94, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 431
     prefab: {fileID: 4089478517322769272, guid: e24834ab5529b6a46b554fe155862a94, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 463
     prefab: {fileID: 4089478517322769272, guid: e24834ab5529b6a46b554fe155862a94, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 293
     prefab: {fileID: 4089478517322769272, guid: e24834ab5529b6a46b554fe155862a94, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 325
     prefab: {fileID: 4089478517322769272, guid: e24834ab5529b6a46b554fe155862a94, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 357
     prefab: {fileID: 4089478517322769272, guid: e24834ab5529b6a46b554fe155862a94, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 389
     prefab: {fileID: 4089478517322769272, guid: e24834ab5529b6a46b554fe155862a94, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 421
     prefab: {fileID: 4089478517322769272, guid: e24834ab5529b6a46b554fe155862a94, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 453
     prefab: {fileID: 4089478517322769272, guid: e24834ab5529b6a46b554fe155862a94, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 485
     prefab: {fileID: 4089478517322769272, guid: e24834ab5529b6a46b554fe155862a94, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 517
     prefab: {fileID: 4089478517322769272, guid: e24834ab5529b6a46b554fe155862a94, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 549
     prefab: {fileID: 4089478517322769272, guid: e24834ab5529b6a46b554fe155862a94, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 581
     prefab: {fileID: 4089478517322769272, guid: e24834ab5529b6a46b554fe155862a94, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 613
     prefab: {fileID: 4089478517322769272, guid: e24834ab5529b6a46b554fe155862a94, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 645
     prefab: {fileID: 4089478517322769272, guid: e24834ab5529b6a46b554fe155862a94, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 677
     prefab: {fileID: 4089478517322769272, guid: e24834ab5529b6a46b554fe155862a94, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 709
     prefab: {fileID: 4089478517322769272, guid: e24834ab5529b6a46b554fe155862a94, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 741
     prefab: {fileID: 4089478517322769272, guid: e24834ab5529b6a46b554fe155862a94, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 773
     prefab: {fileID: 4089478517322769272, guid: e24834ab5529b6a46b554fe155862a94, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 903
     prefab: {fileID: 4423831070835596896, guid: f932f106ca264b040adcf21352e116b8, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 936
     prefab: {fileID: 4423831070835596896, guid: f932f106ca264b040adcf21352e116b8, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 969
     prefab: {fileID: 4423831070835596896, guid: f932f106ca264b040adcf21352e116b8, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 970
     prefab: {fileID: 4423831070835596896, guid: f932f106ca264b040adcf21352e116b8, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 971
     prefab: {fileID: 4423831070835596896, guid: f932f106ca264b040adcf21352e116b8, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 1004
     prefab: {fileID: 4423831070835596896, guid: f932f106ca264b040adcf21352e116b8, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 1005
     prefab: {fileID: 4423831070835596896, guid: f932f106ca264b040adcf21352e116b8, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 1008
     prefab: {fileID: 4423831070835596896, guid: f932f106ca264b040adcf21352e116b8, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 1010
     prefab: {fileID: 4423831070835596896, guid: f932f106ca264b040adcf21352e116b8, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 979
     prefab: {fileID: 4423831070835596896, guid: f932f106ca264b040adcf21352e116b8, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 981
     prefab: {fileID: 4423831070835596896, guid: f932f106ca264b040adcf21352e116b8, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 950
     prefab: {fileID: 4423831070835596896, guid: f932f106ca264b040adcf21352e116b8, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 919
     prefab: {fileID: 4423831070835596896, guid: f932f106ca264b040adcf21352e116b8, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 889
     prefab: {fileID: 4423831070835596896, guid: f932f106ca264b040adcf21352e116b8, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 857
     prefab: {fileID: 4423831070835596896, guid: f932f106ca264b040adcf21352e116b8, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 826
     prefab: {fileID: 4423831070835596896, guid: f932f106ca264b040adcf21352e116b8, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 838
     prefab: {fileID: 4089478517322769272, guid: 037a61fbcb27d9e4190ae8509e08146c, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 880
     prefab: {fileID: 4089478517322769272, guid: 037a61fbcb27d9e4190ae8509e08146c, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 638
     prefab: {fileID: 4089478517322769272, guid: 037a61fbcb27d9e4190ae8509e08146c, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 199
     prefab: {fileID: 4089478517322769272, guid: 037a61fbcb27d9e4190ae8509e08146c, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 514
     prefab: {fileID: 4089478517322769272, guid: 037a61fbcb27d9e4190ae8509e08146c, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   linkedPairs: []
   tiers: []
   whirlpools: []
@@ -418,3 +958,5 @@ MonoBehaviour:
   - 
   slotColors: []
   arenaProfile: {fileID: 11400000, guid: e994703f879b4884592643ead302d7c6, type: 2}
+  splineWallPaths: []
+  cubeBuildings: []

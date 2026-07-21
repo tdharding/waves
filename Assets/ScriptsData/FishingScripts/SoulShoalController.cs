@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Splines;
@@ -33,14 +34,12 @@ public class SoulShoalController : MonoBehaviour
     public void SetGuardStatue(StatueBehaviour statue) => _guardStatue = statue;
 
     // ── Fish-bowl tower mode ─────────────────────────────
-    // When _bowlMode is true this container is the "bowl" atop a FishBowlTower: it spawns aloft,
-    // fish swim their ring in the air (uncatchable, no water-snap), and it physics-drops when the
-    // tower is smashed. Fishing + water-snap reopen the instant it lands (_bowlLanded).
-    private bool      _bowlMode;
-    private bool      _bowlReleased;
-    private bool      _bowlLanded;
-    private float     _bowlTargetY;
-    private Rigidbody _bowlBody;
+    // When _bowlMode is true this shoal lives inside a FishBowlTower's bowl (it's parented under the
+    // bowl object). Fish swim uncatchable and un-water-snapped while aloft. The BOWL owns the drop
+    // physics (see FishBowlTowerController); when it lands, the controller calls BeginSettle() and
+    // the fish become catchable + start following the water.
+    private bool _bowlMode;
+    private bool _bowlLanded;
 
     public bool IsBowlLanded => _bowlLanded;
 
@@ -127,66 +126,60 @@ public class SoulShoalController : MonoBehaviour
     // FISH-BOWL TOWER MODE
     // ---------------------------------------------------------
 
-    // Called by LevelSpawner for a tower zone, after SpawnFish. Puts the container in bowl mode:
-    // a kinematic Rigidbody holds it aloft, and every spawned fish is suppressed (uncatchable and
-    // not water-snapped) until the container drops and lands at targetWaterY.
-    public void InitBowl(float targetWaterY)
+    // Called by LevelSpawner for a tower zone, after SpawnFish. Marks bowl mode and suppresses every
+    // fish (uncatchable + no water-snap) while the shoal rides the bowl aloft. The bowl object owns
+    // the drop physics; this shoal is just parented under it.
+    public void InitBowl()
     {
-        _bowlMode    = true;
-        _bowlLanded  = false;
-        _bowlTargetY = targetWaterY;
+        _bowlMode   = true;
+        _bowlLanded = false;
 
-        _bowlBody = GetComponent<Rigidbody>();
-        if (_bowlBody == null) _bowlBody = gameObject.AddComponent<Rigidbody>();
-        _bowlBody.isKinematic  = true;
-        _bowlBody.useGravity   = false;
-        _bowlBody.interpolation = RigidbodyInterpolation.Interpolate;
-
-        foreach (var f in _fishList)
+        foreach (var beh in FishBehaviours())
         {
-            var beh = f != null ? f.GetComponent<FishFishingBehaviour>() : null;
-            if (beh != null) beh.BowlSuppressed = true;
+            beh.CatchSuppressed = true;   // not catchable while aloft/falling/settling
+            beh.WaterSnapBlend  = 0f;     // ignore the water surface entirely while aloft
         }
 
-        Debug.Log($"[SoulShoalController] Bowl armed: '{gameObject.name}' aloft at Y={transform.position.y:F2}, target water Y={targetWaterY:F2}.");
+        Debug.Log($"[SoulShoalController] Bowl armed: '{gameObject.name}' — fish suppressed until the bowl settles.");
     }
 
-    // Called by FishBowlTowerController when the tower is smashed — cuts the bowl loose to fall.
-    public void ReleaseBowl()
+    // Called by FishBowlTowerController when the dropped bowl reaches the water. Ramps each fish's
+    // water-snap blend 0→1 over `duration` so they ease from the surface down to their exact wave
+    // depth (no pop), then makes them catchable. The shoal then behaves as a normal soul zone.
+    public void BeginSettle(float duration)
     {
-        if (!_bowlMode || _bowlReleased) return;
-        _bowlReleased = true;
+        if (!_bowlMode || _bowlLanded) return;
+        StartCoroutine(SettleRoutine(duration));
+    }
 
-        if (_bowlBody != null)
+    private IEnumerator SettleRoutine(float duration)
+    {
+        float e = 0f;
+        while (e < duration)
         {
-            _bowlBody.isKinematic = false;
-            _bowlBody.useGravity  = true;
+            e += Time.deltaTime;
+            float blend = duration > 0f ? Mathf.SmoothStep(0f, 1f, e / duration) : 1f;
+            foreach (var beh in FishBehaviours()) beh.WaterSnapBlend = blend;
+            yield return null;
         }
-        Debug.Log($"[SoulShoalController] Bowl released — dropping '{gameObject.name}' from Y={transform.position.y:F2}.");
-    }
 
-    // Freezes the container on its ring and reopens fishing + water-snap.
-    void LandBowl()
-    {
+        foreach (var beh in FishBehaviours())
+        {
+            beh.WaterSnapBlend  = 1f;
+            beh.CatchSuppressed = false;   // fully settled — catchable now
+        }
         _bowlLanded = true;
 
-        if (_bowlBody != null)
-        {
-            _bowlBody.isKinematic = true;
-            _bowlBody.useGravity  = false;
-        }
+        Debug.Log($"[SoulShoalController] Shoal settled — fish now catchable: '{gameObject.name}'.");
+    }
 
-        Vector3 p = transform.position;
-        p.y = _bowlTargetY;
-        transform.position = p;
-
+    private IEnumerable<FishFishingBehaviour> FishBehaviours()
+    {
         foreach (var f in _fishList)
         {
             var beh = f != null ? f.GetComponent<FishFishingBehaviour>() : null;
-            if (beh != null) beh.BowlSuppressed = false;
+            if (beh != null) yield return beh;
         }
-
-        Debug.Log($"[SoulShoalController] Bowl landed at Y={_bowlTargetY:F2} — fish now catchable: '{gameObject.name}'.");
     }
 
     // ---------------------------------------------------------
@@ -211,10 +204,6 @@ public class SoulShoalController : MonoBehaviour
     void Update()
     {
         if (!_fishSpawned) return;
-
-        // Bowl mode: once released, detect touchdown on the ring's water plane.
-        if (_bowlMode && _bowlReleased && !_bowlLanded && transform.position.y <= _bowlTargetY)
-            LandBowl();
 
         // Refresh boat ref lazily if it wasn't ready at Start
         if (_boat == null && fishingController != null && fishingController.boatTransform != null)

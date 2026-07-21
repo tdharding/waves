@@ -272,6 +272,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BaselineMarker
   height: -5.5
   discRadius: 16.8
+  useWallTopHeight: 1
+  wallTopHeight: 0
   maskFadeStartPct: 0.7
   maskFadeEndPct: 0.9
   spawnTiers: []
@@ -370,7 +372,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 2c21b2f33fc89854c82e531edec5ae0e, type: 2}
+  - {fileID: 2100000, guid: fd9f1baee1ce2834d88320c1b983a488, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0

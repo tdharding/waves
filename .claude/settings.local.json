@@ -35,7 +35,9 @@
       "Bash(grep \"\\\\.cs$\")",
       "Bash(dir \"C:\\\\Users\\\\tomdh\\\\Waves\\\\Assets\\\\TextureMatShader\\\\BoatTexturesMats\\\\SonarFX\\\\\")",
       "PowerShell(git lfs version 2>&1)",
-      "Bash(git restore *)"
+      "Bash(git restore *)",
+      "Bash(cp '/c/Users/tomdh/Desktop/FILES/ART/2026_ART/tomhardingillustration/boat bobbing 256.png' /c/Users/tomdh/Desktop/FILES/ART/2026_ART/tomhardingillustration/boat.png)",
+      "Read(//c/Users/tomdh/Desktop/FILES/ART/2026_ART/tomhardingillustration/**)"
     ]
   }
 }

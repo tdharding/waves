@@ -17,6 +17,13 @@ public class CameraController : MonoBehaviour
     [SerializeField] private Transform boatTarget;
     [SerializeField] private Transform orbitalCenter;
 
+    [Header("Follow Offset")]
+    [Tooltip("Vertical offset applied to the boat follow target. Positive = above the boat, negative = below.")]
+    [SerializeField] private float followVerticalOffset = 0f;
+
+    // Boat follow target position with the vertical offset applied.
+    private Vector3 BoatFollowPoint => boatTarget.position + Vector3.up * followVerticalOffset;
+
     private CameraProfile activeProfile;
     private bool orbitalActive = false;
 
@@ -87,7 +94,7 @@ private void LateUpdate()
     if (manualOrbitActive && boatTarget != null && boatFollowCam != null)
     {
         Quaternion rotation = Quaternion.Euler(_manualPitch, _manualYaw, 0f);
-        boatFollowCam.transform.position = boatTarget.position + rotation * (Vector3.back * _manualDistance);
+        boatFollowCam.transform.position = BoatFollowPoint + rotation * (Vector3.back * _manualDistance);
         boatFollowCam.transform.rotation = rotation;
         return;
     }
@@ -145,7 +152,7 @@ private void LateUpdate()
         UnityEditor.Undo.RecordObject(boatFollowCam.transform, "Preview Manual Orbit");
         
         Quaternion rotation = Quaternion.Euler(_manualPitch, _manualYaw, 0f);
-        boatFollowCam.transform.position = boatTarget.position + rotation * (Vector3.back * _manualDistance);
+        boatFollowCam.transform.position = BoatFollowPoint + rotation * (Vector3.back * _manualDistance);
         boatFollowCam.transform.rotation = rotation;
     }
 #endif

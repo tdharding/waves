@@ -59,10 +59,13 @@ public class FishFishingBehaviour : MonoBehaviour
     public void SetGuardStatue(StatueBehaviour statue) => _guardStatue = statue;
     public bool IsStatueGuarded => _guardStatue != null;
 
-    // Set by SoulShoalController for fish that live in a FishBowlTower's bowl. While true the fish
-    // is aloft in the bowl: it can't be caught and must NOT snap to the water surface. Cleared by
-    // the shoal controller the moment the dropped container lands in the water.
-    public bool BowlSuppressed;
+    // Fish-bowl tower support (set by SoulShoalController):
+    // CatchSuppressed — true while the fish is aloft/falling/settling, so it can't be caught yet.
+    // WaterSnapBlend  — 0 = fully aloft (ignore the water surface), 1 = normal water-following.
+    //   Ramped 0→1 on landing so the fish eases from the surface to its exact wave depth (no pop).
+    //   Defaults to 1 for all normal (non-bowl) fish.
+    public bool  CatchSuppressed;
+    public float WaterSnapBlend = 1f;
 
     private Transform _waterTransform;
     private Transform _boatRoot;
@@ -182,8 +185,8 @@ public class FishFishingBehaviour : MonoBehaviour
     bool IsEligibleForAttraction()
     {
         if (fishing == null || whirlDirection == null) return false;
-        // aloft in a fish bowl — not catchable until the container has dropped and landed
-        if (BowlSuppressed) return false;
+        // aloft in a fish bowl — not catchable until the bowl has dropped and the shoal has settled
+        if (CatchSuppressed) return false;
         // guarded — the statue must be destroyed first (null = already gone)
         if (_guardStatue != null && !_guardStatue.IsDestroyed) return false;
         return whirlDirection.IsInSector(transform.position);
@@ -269,16 +272,19 @@ public class FishFishingBehaviour : MonoBehaviour
     void LateUpdate()
     {
         if (_travelingTube) return;
-        // Aloft in the bowl — don't pull the fish down to the water surface yet.
-        if (BowlSuppressed) return;
+        // Fully aloft in the bowl — don't pull the fish toward the water surface at all yet.
+        if (WaterSnapBlend <= 0f) return;
         if (IsBeingAttracted) return;
         if (_waterTransform == null || _boatRoot == null || _waterMat == null) return;
         if ((_boatRoot.position - transform.position).sqrMagnitude > activeDistance * activeDistance) return;
 
-        var   p      = WaveUtils.ReadParams(_waterTransform, _waterMat);
-        float height = WaveUtils.SampleHeight(transform.position, p, heightMultiplier) + extraYOffset;
-        Vector3 pos  = transform.position;
-        pos.y        = p.origin.y + height;
+        var   p       = WaveUtils.ReadParams(_waterTransform, _waterMat);
+        float height  = WaveUtils.SampleHeight(transform.position, p, heightMultiplier) + extraYOffset;
+        float targetY = p.origin.y + height;
+        Vector3 pos   = transform.position;
+        // Blend toward the wave-follow depth. During the settle ramp (blend 0→1) the fish eases from
+        // the surface down to its exact underwater position; at blend 1 it snaps precisely each frame.
+        pos.y         = (WaterSnapBlend >= 1f) ? targetY : Mathf.Lerp(pos.y, targetY, WaterSnapBlend);
         transform.position = pos;
     }
 

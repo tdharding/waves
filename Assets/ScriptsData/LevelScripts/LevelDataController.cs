@@ -282,7 +282,11 @@ Vector3 centre = GetArenaCentre();
 
         if (mapPointer != null)
         {
+            mapPointer.SetSpawnFinalizeMatrix(levelSpawner.SpawnFinalizeMatrix);
+            mapPointer.PrepareMapContentRoot();
             mapPointer.BuildMazeWallMap();
+            mapPointer.BuildSplineWallMap();
+            mapPointer.BuildCubeBuildingMap();
             mapPointer.UpdateExitMarkers();
             mapPointer.UpdateEntranceMarkers();
         }
@@ -534,6 +538,22 @@ Vector3 centre = GetArenaCentre();
 
     public Transform GetWaveTransform()    => wavePlaneObject != null ? wavePlaneObject.transform : null;
     public Transform GetSonarGridParent() => sonarGridParent;
+
+    // Wave plane material — the same sharedMaterial whose _ArenaMask is set at spawn (see Setup).
+    public Material GetWaveMaterial()
+    {
+        var rend = wavePlaneObject != null ? wavePlaneObject.GetComponent<Renderer>() : null;
+        return rend != null ? rend.sharedMaterial : null;
+    }
+
+    // Sonar grid material — the SonarGridType.planeMaterial whose _ArenaMask is set alongside the
+    // wave material at spawn. Exposed so water-level changes can keep the sonar edge-mask in sync.
+    public Material GetSonarGridMaterial()
+    {
+        if (sonarGridParent == null) return null;
+        var sonarGen = sonarGridParent.GetComponentInChildren<SonarPlaneGenerator>();
+        return sonarGen != null && sonarGen.GridType != null ? sonarGen.GridType.planeMaterial : null;
+    }
 
     public Transform GetBoatRoot() => gameplayBoat != null ? gameplayBoat.transform : null;
 

@@ -18,6 +18,7 @@ MonoBehaviour:
   gameplayWavePreset: {fileID: 11400000, guid: 0151d8cd3861fdc49a30b84f3291c2b1, type: 2}
   gongWavePreset: {fileID: 0}
   runtimeWavePresetOverride: {fileID: 0}
+  sonarGridType: {fileID: 0}
   enemyProfile: {fileID: 0}
   isTimeTrial: 0
   timeLimitSeconds: 60
@@ -29,16 +30,15 @@ MonoBehaviour:
   soulSpawnPoints: []
   soulZones:
   - nodes: 9402000016020000b501000016010000d5000000d30000004e010000af0100008b010000260100008401000006020000ab0200004d0300005403000094020000
+    nodePositions: []
+    closedLoop: 0
     radius: 0.68
     knotCount: 21
-    souls:
-    - {fileID: 11400000, guid: f0fde1c27fa76b5469c3416714309fab, type: 2}
-    - {fileID: 11400000, guid: eed4535c7b603164fb54f550dce72635, type: 2}
-    - {fileID: 11400000, guid: 67fe7577c2720484491c6319c4f25f68, type: 2}
-    - {fileID: 11400000, guid: db1015651300305478703d265456abd7, type: 2}
-    - {fileID: 11400000, guid: 52095c6267e4955459decfb1c06c5bb0, type: 2}
-    - {fileID: 11400000, guid: 7d19bd7955f4cb848828ea1fecda42f0, type: 2}
-    - {fileID: 11400000, guid: f63647528c8386743b3e6c7fc5c7be37, type: 2}
+    souls: []
+    statueGuarded: 0
+    linkedStatueId: 0
+    ringRadius: 0.08
+    towerGuarded: 0
   entrances:
   - id: entrance_0
     prefab: {fileID: 0}
@@ -131,34 +131,82 @@ MonoBehaviour:
     prefab: {fileID: 4089478517322769272, guid: 0ad9522f599f9b64d8410dc3a60b232a, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 275
     prefab: {fileID: 4089478517322769272, guid: 0ad9522f599f9b64d8410dc3a60b232a, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 369
     prefab: {fileID: 4089478517322769272, guid: 0ad9522f599f9b64d8410dc3a60b232a, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 391
     prefab: {fileID: 4089478517322769272, guid: 0ad9522f599f9b64d8410dc3a60b232a, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 524
     prefab: {fileID: 4089478517322769272, guid: 0ad9522f599f9b64d8410dc3a60b232a, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 752
     prefab: {fileID: 4089478517322769272, guid: 0ad9522f599f9b64d8410dc3a60b232a, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 679
     prefab: {fileID: 4089478517322769272, guid: 0ad9522f599f9b64d8410dc3a60b232a, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   - cellIndex: 497
     prefab: {fileID: 4089478517322769272, guid: 0ad9522f599f9b64d8410dc3a60b232a, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   linkedPairs: []
   tiers: []
   whirlpools: []
@@ -172,5 +220,9 @@ MonoBehaviour:
   - nodes: []
     isClosed: 0
     segmentCurved: 
+    segmentGap: 
+    segmentDestructible: 
     tileSpacing: 0.2
     prefabOverride: {fileID: 101384417285704880, guid: b4c222fbda622d34aa403df08beaaa59, type: 3}
+    destructiblePrefabOverride: {fileID: 0}
+  cubeBuildings: []

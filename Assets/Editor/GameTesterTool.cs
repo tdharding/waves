@@ -545,7 +545,78 @@ public class GameTesterTool : EditorWindow
         if (GUILayout.Button("Fix Soul Allocation Fields", _warningButton))
             RunSoulAllocationCleanup();
 
+        EditorGUILayout.Space(4);
+        EditorGUILayout.HelpBox(
+            "FULL WIPE: empties soulZones[].souls in every GridData level asset (zone geometry kept) and deallocates every SoulData. Frees all soul IDs for reassignment. Experimental reset — destroys existing soul assignments across all levels.",
+            MessageType.Warning);
+
+        if (GUILayout.Button("Clear All Soul IDs From Levels", _dangerButton))
+            ClearAllSoulIdsFromLevels();
+
         EditorGUILayout.Space(6);
+    }
+
+    private void ClearAllSoulIdsFromLevels()
+    {
+        if (!EditorUtility.DisplayDialog(
+                "Clear All Soul IDs From Levels",
+                "This empties the soul assignments in EVERY level and deallocates EVERY soul asset. "
+                + "Zone geometry is kept, but every soul ID becomes free again.\n\nThis cannot be undone. Continue?",
+                "Wipe Everything", "Cancel"))
+            return;
+
+        // 1. Clear soul references from every level's zones
+        var levelGuids = AssetDatabase.FindAssets("t:GridData", new[] { "Assets/Resources/Levels" });
+        if (levelGuids.Length == 0)
+            levelGuids = AssetDatabase.FindAssets("t:GridData"); // fallback: search everywhere
+
+        int levelsTouched = 0, zonesCleared = 0;
+        foreach (string guid in levelGuids)
+        {
+            var gridData = AssetDatabase.LoadAssetAtPath<GridData>(AssetDatabase.GUIDToAssetPath(guid));
+            if (gridData == null || gridData.soulZones == null) continue;
+
+            bool changed = false;
+            foreach (var zone in gridData.soulZones)
+            {
+                if (zone.souls != null && zone.souls.Count > 0)
+                {
+                    zone.souls.Clear();
+                    zonesCleared++;
+                    changed = true;
+                }
+            }
+
+            if (changed)
+            {
+                EditorUtility.SetDirty(gridData);
+                levelsTouched++;
+            }
+        }
+
+        // 2. Deallocate every SoulData asset
+        var soulGuids = AssetDatabase.FindAssets("t:SoulData");
+        int deallocated = 0;
+        foreach (string guid in soulGuids)
+        {
+            var soul = AssetDatabase.LoadAssetAtPath<SoulData>(AssetDatabase.GUIDToAssetPath(guid));
+            if (soul == null) continue;
+
+            if (soul.allocated || !string.IsNullOrEmpty(soul.allocatedToLevelID))
+            {
+                soul.allocated          = false;
+                soul.allocatedToLevelID = "";
+                EditorUtility.SetDirty(soul);
+                deallocated++;
+            }
+        }
+
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+
+        Debug.Log($"[SoulCleanup] Wiped soul IDs. Levels touched: {levelsTouched}, zones cleared: {zonesCleared}, souls deallocated: {deallocated}.");
+        EditorUtility.DisplayDialog("Clear All Soul IDs",
+            $"Levels touched: {levelsTouched}\nZones cleared: {zonesCleared}\nSouls deallocated: {deallocated}", "OK");
     }
 
     private void RunSoulAllocationCleanup()

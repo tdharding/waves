@@ -28,6 +28,15 @@ public class WaveMaterialController : MonoBehaviour
         public float SoulFishMaskStrength;
         public float SoulFishRadius;
         public float SoulFishBrightness1;
+        // Soul-fish zone edge fringe. Rides through presets like every other wave value.
+        // Legacy presets that predate these fields deserialize them as 0 — a zero noise
+        // scale is never a real configuration, so it is treated as "unset" and back-filled
+        // from the controller's inspector defaults (see NormalizeSoulFishEdgeNoise).
+        public float SoulFishFadeStart;
+        public float SoulFishEdgeNoiseStrength;
+        public float SoulFishEdgeNoiseScale;
+        public float SoulFishEdgeNoiseScale2;
+        public float SoulFishEdgeNoiseSpeed;
         public Vector2 ZoneTiling;
         public float ZoneScrollSpeed;
         public float ZoneNoiseStrength;
@@ -60,8 +69,34 @@ public class WaveMaterialController : MonoBehaviour
     public float soulFishRadius = 2f;
     public float soulFishStrength = 1f;
 
+    [Header("Soul Fish Edge Noise")]
+    [Tooltip("Fraction of the radius where the fade band begins. Below this the zone is solid.")]
+    [Range(0f, 1f)] public float soulFishFadeStart = 0.35f;
+    [Tooltip("How hard the animated noise erodes/extends the fade edge. 0 = clean edge.")]
+    public float soulFishEdgeNoiseStrength = 0.25f;
+    [Tooltip("World-space frequency of the large base octave (used at the inner fade).")]
+    public float soulFishEdgeNoiseScale = 1f;
+    [Tooltip("World-space frequency of the fine octave (used at the outer edge).")]
+    public float soulFishEdgeNoiseScale2 = 4f;
+    [Tooltip("Scroll speed of the animated edge fringe.")]
+    public float soulFishEdgeNoiseSpeed = 0.2f;
+
     [Header("Wave Material (Shared Instance)")]
     public Material waveMaterial;
+
+    [Header("Water Surface Broadcast")]
+    [Tooltip("Water plane transform. Publishes the wave surface as shader globals so other " +
+             "materials (walls, rocks) can compute the underwater waterline. Defaults to this " +
+             "GameObject's transform if left unset. Should match SonarController's waterTransform.")]
+    public Transform waterPlaneTransform;
+
+    // Globals consumed by WaterSurfaceHeight.hlsl. Distinct names from the sonar/water props
+    // so this broadcast is fully self-contained and cannot collide with presets or the tuner.
+    static readonly int SurfOriginID = Shader.PropertyToID("_WaterSurfaceOrigin");
+    static readonly int SurfScaleID  = Shader.PropertyToID("_WaterSurfaceScale");
+    static readonly int SurfFreqID   = Shader.PropertyToID("_WaterSurfaceFreq");
+    static readonly int SurfRippleID = Shader.PropertyToID("_WaterSurfaceRipple");
+    static readonly int SurfStepID   = Shader.PropertyToID("_WaterSurfaceStepRate");
 
     [Header("Transition Settings")]
     public float generalSmoothTime = 0.5f;
@@ -102,6 +137,8 @@ public class WaveMaterialController : MonoBehaviour
         currentGlobalState = GetCurrentStateFromMaterial();
         targetGlobalState = currentGlobalState;
         _baselineState = currentGlobalState;
+
+        if (waterPlaneTransform == null) waterPlaneTransform = transform;
     }
 
     private void Update()
@@ -160,6 +197,11 @@ public class WaveMaterialController : MonoBehaviour
         res.SoulFishMaskStrength = Mathf.SmoothDamp(current.SoulFishMaskStrength, target.SoulFishMaskStrength, ref vel.SoulFishMaskStrength, smoothTime);
         res.SoulFishRadius = Mathf.SmoothDamp(current.SoulFishRadius, target.SoulFishRadius, ref vel.SoulFishRadius, smoothTime);
         res.SoulFishBrightness1 = Mathf.SmoothDamp(current.SoulFishBrightness1, target.SoulFishBrightness1, ref vel.SoulFishBrightness1, smoothTime);
+        res.SoulFishFadeStart = Mathf.SmoothDamp(current.SoulFishFadeStart, target.SoulFishFadeStart, ref vel.SoulFishFadeStart, smoothTime);
+        res.SoulFishEdgeNoiseStrength = Mathf.SmoothDamp(current.SoulFishEdgeNoiseStrength, target.SoulFishEdgeNoiseStrength, ref vel.SoulFishEdgeNoiseStrength, smoothTime);
+        res.SoulFishEdgeNoiseScale = Mathf.SmoothDamp(current.SoulFishEdgeNoiseScale, target.SoulFishEdgeNoiseScale, ref vel.SoulFishEdgeNoiseScale, smoothTime);
+        res.SoulFishEdgeNoiseScale2 = Mathf.SmoothDamp(current.SoulFishEdgeNoiseScale2, target.SoulFishEdgeNoiseScale2, ref vel.SoulFishEdgeNoiseScale2, smoothTime);
+        res.SoulFishEdgeNoiseSpeed = Mathf.SmoothDamp(current.SoulFishEdgeNoiseSpeed, target.SoulFishEdgeNoiseSpeed, ref vel.SoulFishEdgeNoiseSpeed, smoothTime);
         res.ZoneTiling.x = Mathf.SmoothDamp(current.ZoneTiling.x, target.ZoneTiling.x, ref vel.ZoneTiling.x, smoothTime);
         res.ZoneTiling.y = Mathf.SmoothDamp(current.ZoneTiling.y, target.ZoneTiling.y, ref vel.ZoneTiling.y, smoothTime);
         res.ZoneScrollSpeed = Mathf.SmoothDamp(current.ZoneScrollSpeed, target.ZoneScrollSpeed, ref vel.ZoneScrollSpeed, smoothTime);
@@ -216,6 +258,14 @@ public class WaveMaterialController : MonoBehaviour
         waveMaterial.SetFloat("_SoulFishTwirlStrength",      currentGlobalState.SoulFishTwirlStrength);
         waveMaterial.SetFloat("_SoulFishMaskStrength",       currentGlobalState.SoulFishMaskStrength);
         waveMaterial.SetFloat("_SoulFishBrightness1",       currentGlobalState.SoulFishBrightness1);
+        // Edge-fringe uniforms are bare $Globals in SoulFishWaveMask.hlsl (not blackboard
+        // properties), so write them through both routes: per-material for the non-batched
+        // path and globally for the SRP-batched path.
+        SetGlobalsBackedFloat("_SoulFishFadeStart",         currentGlobalState.SoulFishFadeStart);
+        SetGlobalsBackedFloat("_SoulFishEdgeNoiseStrength", currentGlobalState.SoulFishEdgeNoiseStrength);
+        SetGlobalsBackedFloat("_SoulFishEdgeNoiseScale",    currentGlobalState.SoulFishEdgeNoiseScale);
+        SetGlobalsBackedFloat("_SoulFishEdgeNoiseScale2",   currentGlobalState.SoulFishEdgeNoiseScale2);
+        SetGlobalsBackedFloat("_SoulFishEdgeNoiseSpeed",    currentGlobalState.SoulFishEdgeNoiseSpeed);
         waveMaterial.SetVector("_ZoneTiling",               currentGlobalState.ZoneTiling);
         waveMaterial.SetFloat("_ZoneScrollSpeed",           currentGlobalState.ZoneScrollSpeed);
         waveMaterial.SetFloat("_ZoneNoiseStrength",         currentGlobalState.ZoneNoiseStrength);
@@ -239,7 +289,29 @@ public class WaveMaterialController : MonoBehaviour
 
         waveMaterial.SetVector("_WaveCenter", currentGlobalState.WaveCenter);
 
+        PublishSurfaceGlobals();
+
         if (mapWaveRenderer) CopyWaveValuesTo(mapWaveRenderer);
+    }
+
+    // Broadcasts the current wave surface as shader globals so any material (e.g. submerged
+    // walls/rocks) can reconstruct the world-space waterline. Read-only mirror of the live
+    // state — it never mutates presets, the material, or _WavePhase. Matches WaveUtils.SampleWave
+    // exactly (same origin, mesh scale, freq, ripple, step rate), minus whirlpools.
+    private void PublishSurfaceGlobals()
+    {
+        if (waterPlaneTransform == null) return;
+
+        // _WaveCenter is stored in wave-plane object space (x=localX, z=-localY, -90°X plane).
+        // TransformPoint returns the world-space origin; its Y is the flat base surface height.
+        Vector4 wc = currentGlobalState.WaveCenter;
+        Vector3 originWorld = waterPlaneTransform.TransformPoint(new Vector3(wc.x, -wc.z, 0f));
+
+        Shader.SetGlobalVector(SurfOriginID, new Vector4(originWorld.x, originWorld.y, originWorld.z, 0f));
+        Shader.SetGlobalFloat(SurfScaleID,  waterPlaneTransform.localScale.x);
+        Shader.SetGlobalFloat(SurfFreqID,   currentGlobalState.Frequency);
+        Shader.SetGlobalFloat(SurfRippleID, currentGlobalState.RippleDepth);
+        Shader.SetGlobalFloat(SurfStepID,   currentGlobalState.WaveStepRate);
     }
 
     public void SetModifierBoost(bool active, Vector4 center, float freq, float speed, float ripple)
@@ -260,8 +332,31 @@ public class WaveMaterialController : MonoBehaviour
         hasPersistentWaveCenter = true;
     }
 
+    private void SetGlobalsBackedFloat(string name, float value)
+    {
+        waveMaterial.SetFloat(name, value);
+        Shader.SetGlobalFloat(name, value);
+    }
+
+    // Legacy WavePresets predate the edge-noise fields and deserialize them as 0. A zero
+    // noise scale is never a real configuration (the noise degenerates to a constant), so
+    // treat it as "unset" and back-fill all five from the inspector defaults.
+    private WaveState NormalizeSoulFishEdgeNoise(WaveState s)
+    {
+        if (s.SoulFishEdgeNoiseScale <= 0f)
+        {
+            s.SoulFishFadeStart         = soulFishFadeStart;
+            s.SoulFishEdgeNoiseStrength = soulFishEdgeNoiseStrength;
+            s.SoulFishEdgeNoiseScale    = soulFishEdgeNoiseScale;
+            s.SoulFishEdgeNoiseScale2   = soulFishEdgeNoiseScale2;
+            s.SoulFishEdgeNoiseSpeed    = soulFishEdgeNoiseSpeed;
+        }
+        return s;
+    }
+
     public void ApplyStateInstant(WaveState state)
     {
+        state = NormalizeSoulFishEdgeNoise(state);
         targetGlobalState = state;
         _baselineState = state;
         currentGlobalState = state;
@@ -302,14 +397,14 @@ public class WaveMaterialController : MonoBehaviour
     {
         if (preset == null) yield break;
         LevelAudioController.Instance?.OnPresetChanged(preset);
-        targetGlobalState = preset.state;
+        targetGlobalState = NormalizeSoulFishEdgeNoise(preset.state);
         WaveLightController.Instance?.ApplyPreset(preset);
         yield break;
     }
 
     public IEnumerator TransitionToState(WaveState targetState, float duration)
     {
-        targetGlobalState = targetState;
+        targetGlobalState = NormalizeSoulFishEdgeNoise(targetState);
         generalSmoothTime = duration;
         yield break;
     }
@@ -319,6 +414,11 @@ public class WaveMaterialController : MonoBehaviour
         if (!waveMaterial) return;
         waveMaterial.SetFloat("_SoulFishRadius",   soulFishRadius);
         waveMaterial.SetFloat("_SoulFishStrength", soulFishStrength);
+        waveMaterial.SetFloat("_SoulFishFadeStart",         soulFishFadeStart);
+        waveMaterial.SetFloat("_SoulFishEdgeNoiseStrength", soulFishEdgeNoiseStrength);
+        waveMaterial.SetFloat("_SoulFishEdgeNoiseScale",    soulFishEdgeNoiseScale);
+        waveMaterial.SetFloat("_SoulFishEdgeNoiseScale2",   soulFishEdgeNoiseScale2);
+        waveMaterial.SetFloat("_SoulFishEdgeNoiseSpeed",    soulFishEdgeNoiseSpeed);
     }
 
     private WaveState GetCurrentStateFromMaterial()
@@ -346,6 +446,11 @@ public class WaveMaterialController : MonoBehaviour
         s.SoulFishMaskStrength       = waveMaterial.GetFloat("_SoulFishMaskStrength");
         s.SoulFishBrightness1        = waveMaterial.GetFloat("_SoulFishBrightness1");
         s.SoulFishRadius             = soulFishRadius;
+        s.SoulFishFadeStart          = soulFishFadeStart;
+        s.SoulFishEdgeNoiseStrength  = soulFishEdgeNoiseStrength;
+        s.SoulFishEdgeNoiseScale     = soulFishEdgeNoiseScale;
+        s.SoulFishEdgeNoiseScale2    = soulFishEdgeNoiseScale2;
+        s.SoulFishEdgeNoiseSpeed     = soulFishEdgeNoiseSpeed;
         s.ZoneTiling         = waveMaterial.GetVector("_ZoneTiling");
         s.ZoneScrollSpeed    = waveMaterial.GetFloat("_ZoneScrollSpeed");
         s.ZoneNoiseStrength  = waveMaterial.GetFloat("_ZoneNoiseStrength");

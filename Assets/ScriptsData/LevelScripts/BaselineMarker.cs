@@ -10,6 +10,15 @@ public class BaselineMarker : MonoBehaviour
     public float height     = 0f;
     public float discRadius = 12f;
 
+    [Header("Wall Top Height")]
+    [Tooltip("Enable to define the wall-top height. When set it draws an extra gizmo disc and is shown in the Grid Designer beneath the wall prefab field.")]
+    public bool  useWallTopHeight = false;
+    [Tooltip("Absolute world Y of the wall top (where you position the gizmo). The distance from the baseline is derived as wallTopHeight - height, so a negative baseline is handled correctly. Only meaningful when useWallTopHeight is true.")]
+    public float wallTopHeight    = 0f;
+
+    // Distance from the baseline up to the wall top. Correct even when the baseline is negative.
+    public float WallTopDistanceAboveBaseline => wallTopHeight - height;
+
     [Header("Arena Mask Settings")]
     [Range(0f, 1f)] public float maskFadeStartPct = 0.7f;
     [Range(0f, 1f)] public float maskFadeEndPct   = 0.9f;
@@ -96,6 +105,22 @@ public class BaselineMarker : MonoBehaviour
 
         Handles.color = new Color(0f, 0.9f, 0.5f, 0.8f);
         Handles.Label(centre + Vector3.up * 3.6f, $"Baseline  y={height:F2}");
+
+        // Wall Top Height — optional disc marking the top of the arena walls.
+        // wallTopHeight is an absolute world Y; the distance above the baseline is
+        // derived (wallTopHeight - height) so a negative baseline is handled correctly.
+        if (useWallTopHeight)
+        {
+            float   wallTopY = wallTopHeight;
+            float   wallDist = WallTopDistanceAboveBaseline;
+            Vector3 wt = new Vector3(transform.position.x, wallTopY, transform.position.z);
+            Handles.color = new Color(1f, 0.55f, 0.1f, 0.75f);
+            Handles.DrawWireDisc(wt, Vector3.up, discRadius);
+            Gizmos.color  = new Color(1f, 0.55f, 0.1f, 0.6f);
+            Gizmos.DrawLine(centre, wt); // baseline → wall top
+            Handles.color = new Color(1f, 0.55f, 0.1f, 0.95f);
+            Handles.Label(wt + Vector3.up * 0.3f, $"Wall Top  y={wallTopY:F2}  (+{wallDist:F2} above baseline)");
+        }
 
         // Per-tier discs (additive — only drawn when spawnTiers is populated)
         if (spawnTiers != null)

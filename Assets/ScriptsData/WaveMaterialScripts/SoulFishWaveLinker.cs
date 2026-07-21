@@ -5,6 +5,9 @@ public class SoulFishWaveLinker : MonoBehaviour
 {
     [SerializeField] private WaveMaterialController waveController;
 
+    [Tooltip("Log every packed point on each bake. Off by default — the bake now runs per frame, so this floods the console. Turn on only while diagnosing a zone.")]
+    [SerializeField] private bool verboseLogging = false;
+
     const int MAX_POINTS = 20;
 
     static readonly Vector3 OffMapPosition = new Vector3(99999f, 99999f, 99999f);
@@ -35,7 +38,7 @@ public class SoulFishWaveLinker : MonoBehaviour
 
     static readonly int CountID = Shader.PropertyToID("_SoulFishCount");
     static readonly List<Transform> activeFish = new List<Transform>();
-    private struct ZoneEntry { public List<Vector3> nodes; public bool closed; }
+    private struct ZoneEntry { public List<Vector3> nodes; public bool closed; public float radius; }
     static readonly List<ZoneEntry> activeZones = new List<ZoneEntry>();
 
     void Awake()
@@ -43,6 +46,17 @@ public class SoulFishWaveLinker : MonoBehaviour
         Debug.Log($"[SoulFishWaveLinker] Awake — clearing {activeZones.Count} zone(s) and {activeFish.Count} fish from statics.");
         activeFish.Clear();
         activeZones.Clear();
+    }
+
+    // Re-pushes every frame. The point/count uniforms are bare $Globals declared in
+    // SoulFishWaveMask.hlsl, so they live nowhere on disk — reimporting the shader (i.e. saving ANY
+    // shadergraph, or any file that triggers a reload) rebuilds the material from its serialized
+    // state and wipes them, dropping _SoulFishCount to 0 and making the zone vanish. Baking only on
+    // register/unregister meant nothing ever put them back. This costs ~21 setter calls a frame.
+    void LateUpdate()
+    {
+        if (activeZones.Count == 0 && activeFish.Count == 0) return;
+        BakePositionsOnce();
     }
 
     public void BakePositionsOnce()
@@ -65,31 +79,45 @@ public class SoulFishWaveLinker : MonoBehaviour
         foreach (var entry in activeZones)
         {
             if (packedPoints.Count >= MAX_POINTS) break;
-            PackZone(entry.nodes, entry.closed, packedPoints);
+            PackZone(entry.nodes, entry.closed, entry.radius, packedPoints);
         }
 
         foreach (var fish in activeFish)
         {
             if (packedPoints.Count >= MAX_POINTS) break;
             if (fish == null) continue;
-            packedPoints.Add(new Vector4(fish.position.x, fish.position.y, fish.position.z, 1f));
+            // Loose fish carry no zone radius — y = 0 makes the shader use the global _SoulFishRadius.
+            packedPoints.Add(new Vector4(fish.position.x, 0f, fish.position.z, 1f));
         }
 
         int count = packedPoints.Count;
 
         for (int i = 0; i < count; i++)
-            mat.SetVector(PositionIDs[i], packedPoints[i]);
+            SetPoint(mat, i, packedPoints[i]);
 
         for (int i = count; i < MAX_POINTS; i++)
-            mat.SetVector(PositionIDs[i], (Vector4)OffMapPosition);
+            SetPoint(mat, i, (Vector4)OffMapPosition);
 
         mat.SetFloat(CountID, count);
+        Shader.SetGlobalFloat(CountID, count);
 
-        Debug.Log($"[SoulFishWaveLinker] BakePositionsOnce — zones={activeZones.Count} fish={activeFish.Count} packed={count} mat='{mat.name}'");
-        for (int i = 0; i < count; i++)
-            Debug.Log($"  [{i}] pos=({packedPoints[i].x:F1},{packedPoints[i].y:F1},{packedPoints[i].z:F1}) w={packedPoints[i].w}");
+        if (verboseLogging)
+        {
+            Debug.Log($"[SoulFishWaveLinker] BakePositionsOnce — zones={activeZones.Count} fish={activeFish.Count} packed={count} mat='{mat.name}'");
+            for (int i = 0; i < count; i++)
+                Debug.Log($"  [{i}] pos=({packedPoints[i].x:F1},{packedPoints[i].y:F1},{packedPoints[i].z:F1}) w={packedPoints[i].w}");
+        }
 
         waveController.SyncMapWaves();
+    }
+
+    // Dual-write, matching WaveMaterialController.SetGlobalsBackedFloat. These uniforms are bare
+    // $Globals rather than blackboard properties, so the material write alone isn't dependable —
+    // the global write is what actually survives a material rebuild.
+    static void SetPoint(Material mat, int index, Vector4 value)
+    {
+        mat.SetVector(PositionIDs[index], value);
+        Shader.SetGlobalVector(PositionIDs[index], value);
     }
 
     public static void Register(Transform fish)
@@ -106,12 +134,14 @@ public class SoulFishWaveLinker : MonoBehaviour
         FindObjectOfType<SoulFishWaveLinker>()?.BakePositionsOnce();
     }
 
-    public static void RegisterZone(List<Vector3> nodes, bool closed = false)
+    // radius: the zone's authored swim radius (Grid Designer). It becomes the mask footprint
+    // for this zone's points. radius <= 0 leaves points on the global _SoulFishRadius fallback.
+    public static void RegisterZone(List<Vector3> nodes, bool closed = false, float radius = 0f)
     {
         if (activeZones.Exists(e => e.nodes == nodes)) return;
-        activeZones.Add(new ZoneEntry { nodes = nodes, closed = closed });
+        activeZones.Add(new ZoneEntry { nodes = nodes, closed = closed, radius = radius });
         var linker = FindObjectOfType<SoulFishWaveLinker>();
-        Debug.Log($"[SoulFishWaveLinker] RegisterZone — nodes={nodes.Count} closed={closed} linkerFound={linker != null}");
+        Debug.Log($"[SoulFishWaveLinker] RegisterZone — nodes={nodes.Count} closed={closed} radius={radius} linkerFound={linker != null}");
         linker?.BakePositionsOnce();
     }
 
@@ -123,7 +153,9 @@ public class SoulFishWaveLinker : MonoBehaviour
         FindObjectOfType<SoulFishWaveLinker>()?.BakePositionsOnce();
     }
 
-    static void PackZone(List<Vector3> nodes, bool closed, List<Vector4> output)
+    // radius is packed into the .y channel — the wave mask reads it per point (see
+    // SoulFishWaveMask.hlsl). The world-space height (nodes[i].y) is unused by the mask.
+    static void PackZone(List<Vector3> nodes, bool closed, float radius, List<Vector4> output)
     {
         for (int i = 0; i < nodes.Count; i++)
         {
@@ -131,11 +163,11 @@ public class SoulFishWaveLinker : MonoBehaviour
             bool isLast = (i == nodes.Count - 1);
             // closed loop: last real node connects back to first
             float w = (!isLast || closed) ? 2f : 1f;
-            output.Add(new Vector4(nodes[i].x, nodes[i].y, nodes[i].z, w));
+            output.Add(new Vector4(nodes[i].x, radius, nodes[i].z, w));
         }
         // For closed loops, append first node as endpoint so the closing segment renders
         if (closed && nodes.Count > 0 && output.Count < MAX_POINTS)
-            output.Add(new Vector4(nodes[0].x, nodes[0].y, nodes[0].z, 1f));
+            output.Add(new Vector4(nodes[0].x, radius, nodes[0].z, 1f));
     }
 
     public static IReadOnlyList<Transform> ActiveFish => activeFish;
@@ -144,24 +176,27 @@ public class SoulFishWaveLinker : MonoBehaviour
     {
         var packed = new List<Vector4>();
         foreach (var entry in activeZones)
-            PackZone(entry.nodes, entry.closed, packed);
+            PackZone(entry.nodes, entry.closed, entry.radius, packed);
         foreach (var fish in activeFish)
         {
             if (fish == null || packed.Count >= MAX_POINTS) continue;
-            packed.Add(new Vector4(fish.position.x, fish.position.y, fish.position.z, 1f));
+            packed.Add(new Vector4(fish.position.x, 0f, fish.position.z, 1f));
         }
 
+        float fallbackR = waveController != null ? waveController.soulFishRadius : 1f;
         for (int i = 0; i < packed.Count; i++)
         {
-            Vector3 pos = new Vector3(packed[i].x, packed[i].y, packed[i].z);
+            // .y carries the per-point mask radius, not a world height — draw on the water plane.
+            Vector3 pos = new Vector3(packed[i].x, 0f, packed[i].z);
+            float   r   = packed[i].y > 0.0001f ? packed[i].y : fallbackR;
             bool connects = packed[i].w > 1.5f && i < packed.Count - 1;
 
             Gizmos.color = connects ? Color.cyan : Color.yellow;
-            Gizmos.DrawWireSphere(pos, waveController != null ? waveController.soulFishRadius : 1f);
+            Gizmos.DrawWireSphere(pos, r);
 
             if (connects)
             {
-                Vector3 next = new Vector3(packed[i + 1].x, packed[i + 1].y, packed[i + 1].z);
+                Vector3 next = new Vector3(packed[i + 1].x, 0f, packed[i + 1].z);
                 Gizmos.color = Color.cyan;
                 Gizmos.DrawLine(pos, next);
             }
@@ -176,7 +211,7 @@ public class SoulFishWaveLinker : MonoBehaviour
     {
         var packed = new List<Vector4>();
         foreach (var entry in activeZones)
-            PackZone(entry.nodes, entry.closed, packed);
+            PackZone(entry.nodes, entry.closed, entry.radius, packed);
 
         Debug.Log($"[SoulFishWaveLinker] {activeZones.Count} zone(s), {packed.Count} packed point(s):");
         for (int i = 0; i < packed.Count; i++)
@@ -192,21 +227,23 @@ public class SoulFishWaveLinker : MonoBehaviour
         foreach (var entry in activeZones)
         {
             if (packedPoints.Count >= MAX_POINTS) break;
-            PackZone(entry.nodes, entry.closed, packedPoints);
+            PackZone(entry.nodes, entry.closed, entry.radius, packedPoints);
         }
 
         foreach (var fish in activeFish)
         {
             if (packedPoints.Count >= MAX_POINTS) break;
             if (fish == null) continue;
-            packedPoints.Add(new Vector4(fish.position.x, fish.position.y, fish.position.z, 1f));
+            // Loose fish carry no zone radius — y = 0 makes the shader use the global _SoulFishRadius.
+            packedPoints.Add(new Vector4(fish.position.x, 0f, fish.position.z, 1f));
         }
 
         int count = packedPoints.Count;
         for (int i = 0; i < count; i++)
-            mat.SetVector(PositionIDs[i], packedPoints[i]);
+            SetPoint(mat, i, packedPoints[i]);
         for (int i = count; i < MAX_POINTS; i++)
-            mat.SetVector(PositionIDs[i], (Vector4)OffMapPosition);
+            SetPoint(mat, i, (Vector4)OffMapPosition);
         mat.SetFloat(CountID, count);
+        Shader.SetGlobalFloat(CountID, count);
     }
 }

@@ -102,8 +102,12 @@ MonoBehaviour:
   forwardEuler: {x: 0, y: 181.3, z: 0}
   useUpOverride: 0
   upEuler: {x: 0, y: 0, z: 0}
+  useWallDepth: 0
+  wallDepth: 0
   useScaleRadius: 1
   scaleRadius: 0.25
+  usePrefabTopMarker: 0
+  prefabTopHeight: 3
 --- !u!1 &7677057366641282449
 GameObject:
   m_ObjectHideFlags: 0
@@ -311,11 +315,11 @@ PrefabInstance:
     - target: {fileID: 2693853905388621090, guid: e8c7e24e6b32d7d45adafe180e2794c3, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: 4075bc73f35557e459d7e66a033677cb, type: 2}
+      objectReference: {fileID: 2100000, guid: 258b11099042abe43bbb626cd95f20fd, type: 2}
     - target: {fileID: 2834085361736596616, guid: e8c7e24e6b32d7d45adafe180e2794c3, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: 4075bc73f35557e459d7e66a033677cb, type: 2}
+      objectReference: {fileID: 2100000, guid: 258b11099042abe43bbb626cd95f20fd, type: 2}
     - target: {fileID: 5992273285613035240, guid: e8c7e24e6b32d7d45adafe180e2794c3, type: 3}
       propertyPath: m_LocalPosition.y
       value: 0.216
@@ -327,7 +331,7 @@ PrefabInstance:
     - target: {fileID: 6139217524837911568, guid: e8c7e24e6b32d7d45adafe180e2794c3, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: 4075bc73f35557e459d7e66a033677cb, type: 2}
+      objectReference: {fileID: 2100000, guid: 258b11099042abe43bbb626cd95f20fd, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

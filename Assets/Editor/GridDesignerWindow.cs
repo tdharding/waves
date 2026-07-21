@@ -15,6 +15,7 @@ class GridSnapshot
     public List<GridData.PrefabPlacement>       prefabPlacements;
     public List<List<GridData.PrefabPlacement>> tierPrefabPlacements;
     public List<GridData.LinkedPrefabPair>      linkedPairs;
+    public List<GridData.ArenaWaterModifier>    arenaWaterModifiers; // set after construction
 
     public GridSnapshot(int[] square, int[] circle,
                         List<GridData.ArenaEntrance> ents,
@@ -60,7 +61,41 @@ class GridSnapshot
             }
 
         prefabPlacements = CopyPlacements(basePrefabs);
-        linkedPairs = links != null ? new List<GridData.LinkedPrefabPair>(links) : new List<GridData.LinkedPrefabPair>();
+        linkedPairs = new List<GridData.LinkedPrefabPair>();
+        if (links != null)
+            foreach (var lp in links)
+                linkedPairs.Add(new GridData.LinkedPrefabPair
+                {
+                    modifierCellIndex  = lp.modifierCellIndex,
+                    modifierTierIndex  = lp.modifierTierIndex,
+                    inputTubeCellIndex = lp.inputTubeCellIndex,
+                    inputTubeTierIndex = lp.inputTubeTierIndex,
+                    tubeSubdivisions   = lp.tubeSubdivisions,
+                    // Deep-copy the node list so undo snapshots are independent of live edits.
+                    tubePath = lp.tubePath != null
+                        ? new List<UnityEngine.Vector2Int>(lp.tubePath)
+                        : null
+                });
+    }
+
+    public static List<GridData.ArenaWaterModifier> CopyWaterMods(List<GridData.ArenaWaterModifier> src)
+    {
+        var copy = new List<GridData.ArenaWaterModifier>();
+        if (src == null) return copy;
+        foreach (var wm in src)
+            copy.Add(new GridData.ArenaWaterModifier
+            {
+                id               = wm.id,
+                prefab           = wm.prefab,
+                perimeterAngle   = wm.perimeterAngle,
+                tierSlot         = wm.tierSlot,
+                spawnRadius      = wm.spawnRadius,
+                tubeSubdivisions = wm.tubeSubdivisions,
+                tubePath = wm.tubePath != null
+                    ? new List<UnityEngine.Vector2Int>(wm.tubePath)
+                    : new List<UnityEngine.Vector2Int>()
+            });
+        return copy;
     }
 
     public static List<GridData.PrefabPlacement> CopyPlacements(List<GridData.PrefabPlacement> src)
@@ -208,11 +243,30 @@ public class GridDesignerWindow : EditorWindow
     int  _dragSplinePathIdx   = -1;
     int  _dragSplineNodeIdx   = -1;
 
+    // ── Cube building mode ──
+    bool    _drawCubeBuilding   = false;
+    bool    _showCubeBuildings  = true;
+    int     _activeCubeIndex    = -1;   // selected/active block, edited in the panel
+    bool    _isDraggingCubeBox  = false; // click-drag rubber-band creating a new block
+    Vector2 _cubeDragStartNorm  = Vector2.zero;
+    Vector2 _cubeDragCurrentNorm = Vector2.zero;
+    int     _dragCubeCenterIndex = -1;  // block being dragged (grabbed anywhere inside its footprint)
+    Vector2 _cubeDragOffsetNorm  = Vector2.zero; // centre − grab point, so the block doesn't jump to the cursor
+
     // ── Tube path modes ──
     int _tubePlacingEntranceIndex = -1; // -1 = not in placement mode
     int _tubeDrawEntranceIndex    = -1; // -1 = not in edit/drag mode
     int _dragTubeNodeIndex        = -1; // index within tubePath being dragged
     int _selectedTubeNodeIndex    = -1; // highlighted node
+
+    // ── Wave-modifier tube path edit mode (mirrors the lock tube, keyed on linkedPairs) ──
+    int _wmTubeDrawPairIdx = -1; // index into loadedData.linkedPairs currently editing (-1 = off)
+    int _wmDragTubeNodeIdx = -1; // middle node index being dragged
+    int _wmSelTubeNodeIdx  = -1; // highlighted node
+
+    // ── Water-level exit-pipe tube path modes (mirrors the entrance/lock tube, keyed on arenaWaterModifiers) ──
+    int _pipeTubePlacingIndex = -1; // index into arenaWaterModifiers being placed (-1 = off)
+    int _pipeTubeDrawIndex    = -1; // index into arenaWaterModifiers being edited (-1 = off)
 
     // ── Grid navigation ──
     float   _gridZoom      = 1f;
@@ -299,7 +353,9 @@ public class GridDesignerWindow : EditorWindow
         List<int> waveMods  = loadedData?.waveModifierCellIndices        ?? new List<int>();
         List<GridData.SoulSpawnPoint> souls     = loadedData?.soulSpawnPoints ?? new List<GridData.SoulSpawnPoint>();
         List<GridData.ArenaEntrance>  entrances = loadedData?.entrances      ?? new List<GridData.ArenaEntrance>();
-        undoStack.Push(new GridSnapshot(squareGrid, circleGrid, entrances, orbs, souls, waterMods, waveMods, loadedData?.tiers, loadedData?.prefabPlacements, loadedData?.linkedPairs));
+        var snap = new GridSnapshot(squareGrid, circleGrid, entrances, orbs, souls, waterMods, waveMods, loadedData?.tiers, loadedData?.prefabPlacements, loadedData?.linkedPairs);
+        snap.arenaWaterModifiers = GridSnapshot.CopyWaterMods(loadedData?.arenaWaterModifiers);
+        undoStack.Push(snap);
         if (undoStack.Count > MaxUndoSteps) undoStack.TrimExcess();
     }
 
@@ -312,6 +368,7 @@ public class GridDesignerWindow : EditorWindow
         if (loadedData != null)
         {
             loadedData.entrances      = snapshot.entrances ?? new List<GridData.ArenaEntrance>();
+            loadedData.arenaWaterModifiers = GridSnapshot.CopyWaterMods(snapshot.arenaWaterModifiers);
             loadedData.orbCellIndices = new List<int>(snapshot.orbIndices);
             loadedData.waterLevelModifierCellIndices = new List<int>(snapshot.waterLevelModifierIndices);
             loadedData.waveModifierCellIndices       = new List<int>(snapshot.waveModifierIndices);
@@ -384,12 +441,13 @@ public class GridDesignerWindow : EditorWindow
     {
         EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
 
-        SetToolbarButton("⊕ Select",  drawSelect,    new Color(0.4f,0.8f,1f),  () => { activeSlot = -1; _drawSplineWall = false; drawSelect = true; drawSoulArea = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false; });
-        SetToolbarButton("★ Soul",    drawSoulArea,  Color.yellow,             () => { activeSlot = -1; _drawSplineWall = false; drawSoulArea = true; drawSelect = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false; ClearSelectState(); LogSelection(_currentSelection); });
-        SetToolbarButton("◎ Orb",     drawOrb,       Color.white,              () => { activeSlot = -1; _drawSplineWall = false; drawOrb = true; drawCircle = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = false; });
-        SetToolbarButton("〇 Whirl",  drawWhirlpool, new Color(0.7f,0.4f,1f), () => { activeSlot = -1; _drawSplineWall = false; drawWhirlpool = true; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = false; });
-        SetToolbarButton("✕ Eraser", activeSlot == 0, new Color(1f,0.5f,0.5f), () => { activeSlot = 0; _drawSplineWall = false; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = drawDirectPrefab = drawSelect = false; ClearSelectState(); LogSelection(_currentSelection); _isWaitingForTubePlacement = false; });
-        SetToolbarButton("≋ Walls",  _drawSplineWall, new Color(1f,0.7f,0.2f), () => { activeSlot = -1; _drawSplineWall = true; drawSelect = drawSoulArea = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = drawDirectPrefab = false; ClearSelectState(); _isWaitingForTubePlacement = false; });
+        SetToolbarButton("⊕ Select",  drawSelect,    new Color(0.4f,0.8f,1f),  () => { activeSlot = -1; _drawSplineWall = false; _drawCubeBuilding = false; drawSelect = true; drawSoulArea = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false; });
+        SetToolbarButton("★ Soul",    drawSoulArea,  Color.yellow,             () => { activeSlot = -1; _drawSplineWall = false; _drawCubeBuilding = false; drawSoulArea = true; drawSelect = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false; ClearSelectState(); LogSelection(_currentSelection); });
+        SetToolbarButton("◎ Orb",     drawOrb,       Color.white,              () => { activeSlot = -1; _drawSplineWall = false; _drawCubeBuilding = false; drawOrb = true; drawCircle = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = false; });
+        SetToolbarButton("〇 Whirl",  drawWhirlpool, new Color(0.7f,0.4f,1f), () => { activeSlot = -1; _drawSplineWall = false; _drawCubeBuilding = false; drawWhirlpool = true; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = false; });
+        SetToolbarButton("✕ Eraser", activeSlot == 0, new Color(1f,0.5f,0.5f), () => { activeSlot = 0; _drawSplineWall = false; _drawCubeBuilding = false; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = drawDirectPrefab = drawSelect = false; ClearSelectState(); LogSelection(_currentSelection); _isWaitingForTubePlacement = false; });
+        SetToolbarButton("≋ Walls",  _drawSplineWall, new Color(1f,0.7f,0.2f), () => { activeSlot = -1; _drawSplineWall = true; _drawCubeBuilding = false; drawSelect = drawSoulArea = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = drawDirectPrefab = false; ClearSelectState(); _isWaitingForTubePlacement = false; });
+        SetToolbarButton("▦ Blocks", _drawCubeBuilding, new Color(0.55f,0.55f,0.6f), () => { activeSlot = -1; _drawCubeBuilding = true; _drawSplineWall = false; drawSelect = drawSoulArea = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = drawDirectPrefab = false; ClearSelectState(); _isWaitingForTubePlacement = false; });
 
         EditorGUILayout.EndHorizontal();
 
@@ -399,6 +457,11 @@ public class GridDesignerWindow : EditorWindow
         {
             hint.normal.textColor = new Color(1f, 0.7f, 0.2f);
             GUILayout.Label("Left-click: place node  |  Drag node: move  |  Right-click node: delete  |  Esc: deselect path", hint);
+        }
+        else if (_drawCubeBuilding)
+        {
+            hint.normal.textColor = new Color(0.75f, 0.75f, 0.8f);
+            GUILayout.Label("Drag out a box to create  |  Click a box to select  |  Drag centre node to move  |  Edit W/L/H in the Cube Buildings panel  |  Del: remove  |  Esc: exit", hint);
         }
         else if (_isDrawingSoulArea || drawSelect || _isWaitingForTubePlacement)
         {
@@ -677,8 +740,40 @@ public class GridDesignerWindow : EditorWindow
                 EditorUtility.SetDirty(loadedData);
             }
 
+            // Wall prefab associated with the arena profile — read-only display; the
+            // ⊙ button pings it so it can be located in the Project window.
+            if (loadedData.arenaProfile != null)
+            {
+                GameObject wallPrefab = loadedData.arenaProfile.outerWallsPrefab;
+                EditorGUILayout.BeginHorizontal();
+                EditorGUI.BeginDisabledGroup(true);
+                EditorGUILayout.ObjectField("Wall Prefab", wallPrefab, typeof(GameObject), false);
+                EditorGUI.EndDisabledGroup();
+                EditorGUI.BeginDisabledGroup(wallPrefab == null);
+                if (GUILayout.Button("⊙", GUILayout.Width(22)))
+                    EditorGUIUtility.PingObject(wallPrefab);
+                EditorGUI.EndDisabledGroup();
+                EditorGUILayout.EndHorizontal();
+
+                // Wall Top Height — read-only info pulled from the wall prefab's BaselineMarker,
+                // shown only when it has been set on the baseline gizmo in the inspector.
+                if (wallPrefab != null)
+                {
+                    var marker = wallPrefab.GetComponentInChildren<BaselineMarker>(true);
+                    if (marker != null && marker.useWallTopHeight)
+                    {
+                        var wtStyle = new GUIStyle(EditorStyles.miniLabel)
+                            { normal = { textColor = new Color(1f, 0.55f, 0.1f) } };
+                        EditorGUILayout.LabelField("Wall Top Height", $"{marker.WallTopDistanceAboveBaseline:0.##} above baseline (y = {marker.wallTopHeight:0.##})", wtStyle);
+                    }
+                }
+            }
+
             EditorGUILayout.Space();
             DrawPortalList();
+
+            EditorGUILayout.Space();
+            DrawWaterModifierList();
         }
         else
         {
@@ -874,7 +969,8 @@ public class GridDesignerWindow : EditorWindow
                     modifierCellIndex = _pendingModifierCellIndex,
                     modifierTierIndex = _pendingModifierTierIndex,
                     inputTubeCellIndex = index,
-                    inputTubeTierIndex = activeTierIndex
+                    inputTubeTierIndex = activeTierIndex,
+                    tubeSubdivisions   = 3,
                 });
 
                 GridLog($"Linked modifier at {_pendingModifierCellIndex} (T:{_pendingModifierTierIndex}) to tube at {index} (T:{activeTierIndex})");
@@ -1945,8 +2041,8 @@ public class GridDesignerWindow : EditorWindow
                 {
                     EditorGUI.BeginChangeCheck();
                     string scatterLabel = zone.statueGuarded ? "Scatter" : "Radius";
-                    float newRadius = EditorGUILayout.Slider(scatterLabel, zone.radius, 0.1f, 30f);
-                    int   newKnots  = EditorGUILayout.IntSlider("Knot Count", zone.knotCount, 3, 32);
+                    float newRadius = EditorGUILayout.Slider(scatterLabel, zone.radius, 0.1f, 5f);
+                    int   newKnots  = EditorGUILayout.IntSlider("Knot Count", zone.knotCount, 3, 100);
                     if (EditorGUI.EndChangeCheck())
                     {
                         Undo.RecordObject(loadedData, "Edit Soul Zone");
@@ -2409,6 +2505,8 @@ public class GridDesignerWindow : EditorWindow
                     {
                         _tubePlacingEntranceIndex = i;
                         _tubeDrawEntranceIndex    = -1;
+                        _pipeTubePlacingIndex     = -1;
+                        _pipeTubeDrawIndex        = -1;
                         _dragTubeNodeIndex        = -1;
                         _selectedTubeNodeIndex    = -1;
                     }
@@ -2429,6 +2527,8 @@ public class GridDesignerWindow : EditorWindow
                         {
                             _tubeDrawEntranceIndex    = i;
                             _tubePlacingEntranceIndex = -1;
+                            _pipeTubePlacingIndex     = -1;
+                            _pipeTubeDrawIndex        = -1;
                         }
                     }
                     GUI.backgroundColor = Color.white;
@@ -2534,6 +2634,197 @@ public class GridDesignerWindow : EditorWindow
 
     }
 
+    // ─────────────────────────────────────────────
+    // WATER LEVEL MODIFIERS  (perimeter exit pipes)
+    // Mirrors DrawPortalList: each entry is placed by angle around the arena and
+    // fed by an optional soul input tube authored on the grid (same as the lock tube).
+    // ─────────────────────────────────────────────
+
+    void DrawWaterModifierList()
+    {
+        if (loadedData.arenaWaterModifiers == null)
+            loadedData.arenaWaterModifiers = new List<GridData.ArenaWaterModifier>();
+
+        string[] tierLabels = BuildTierLabels();
+
+        EditorGUILayout.LabelField("Water Level Modifiers", EditorStyles.boldLabel);
+
+        int toRemove = -1;
+        for (int i = 0; i < loadedData.arenaWaterModifiers.Count; i++)
+        {
+            var wm = loadedData.arenaWaterModifiers[i];
+            EditorGUI.BeginChangeCheck();
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+            // Row 1: ID / Angle / remove
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField("ID", GUILayout.Width(18));
+            string newID = EditorGUILayout.TextField(wm.id, GUILayout.Width(78));
+
+            float prevLabelWidth = EditorGUIUtility.labelWidth;
+            EditorGUIUtility.labelWidth = 36f;
+            float newAngle = EditorGUILayout.FloatField("Angle", wm.perimeterAngle, GUILayout.Width(74));
+            EditorGUIUtility.labelWidth = prevLabelWidth;
+            EditorGUILayout.LabelField("°", GUILayout.Width(10));
+
+            GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
+            if (GUILayout.Button("✕", GUILayout.Width(22))) toRemove = i;
+            GUI.backgroundColor = Color.white;
+            EditorGUILayout.EndHorizontal();
+
+            // Row 2: Tier + spawn radius
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField("Tier", GUILayout.Width(28));
+            int tierPopup   = EditorGUILayout.Popup(Mathf.Clamp(wm.tierSlot + 1, 0, tierLabels.Length - 1), tierLabels, GUILayout.Width(72));
+            int newTierSlot = tierPopup - 1;
+            float prevLW = EditorGUIUtility.labelWidth;
+            EditorGUIUtility.labelWidth = 74f;
+            float newSpawnRadius = EditorGUILayout.FloatField("Inward", wm.spawnRadius, GUILayout.Width(120));
+            EditorGUIUtility.labelWidth = prevLW;
+            EditorGUILayout.EndHorizontal();
+
+            // Row 3: Prefab
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField("Prefab", GUILayout.Width(50));
+            GameObject newPrefab = (GameObject)EditorGUILayout.ObjectField(wm.prefab, typeof(GameObject), false);
+            EditorGUILayout.EndHorizontal();
+
+            // Reference: the level this pipe lowers water to (read off the prefab controller)
+            if (wm.prefab != null)
+            {
+                var ctrl = wm.prefab.GetComponentInChildren<WaterLevelExitPipeController>();
+                if (ctrl != null)
+                    EditorGUILayout.LabelField($"Lowers water to y = {ctrl.TargetWaterLevelY:0.##}", EditorStyles.miniLabel);
+                else
+                    EditorGUILayout.LabelField("Prefab has no WaterLevelExitPipeController", EditorStyles.miniLabel);
+            }
+
+            // ── Input tube sub-UI (mirrors the entrance lock tube block) ──
+            if (wm.tubePath == null) wm.tubePath = new List<UnityEngine.Vector2Int>();
+
+            EditorGUILayout.BeginHorizontal();
+            float prevLW2 = EditorGUIUtility.labelWidth;
+            EditorGUIUtility.labelWidth = 72f;
+            int newSubs = EditorGUILayout.IntField("Subdivisions", wm.tubeSubdivisions, GUILayout.Width(120));
+            EditorGUIUtility.labelWidth = prevLW2;
+            if (newSubs != wm.tubeSubdivisions)
+            {
+                Undo.RecordObject(loadedData, "Set Tube Subdivisions");
+                wm.tubeSubdivisions = Mathf.Max(0, newSubs);
+                EditorUtility.SetDirty(loadedData);
+            }
+            GUI.enabled = wm.tubePath.Count >= 2;
+            if (GUILayout.Button("+", GUILayout.Width(22)))
+            {
+                Undo.RecordObject(loadedData, "Subdivide Tube Path");
+                var old = wm.tubePath;
+                var subdivided = new List<UnityEngine.Vector2Int>();
+                for (int si = 0; si < old.Count - 1; si++)
+                {
+                    subdivided.Add(old[si]);
+                    subdivided.Add(new UnityEngine.Vector2Int(
+                        Mathf.RoundToInt((old[si].x + old[si + 1].x) * 0.5f),
+                        Mathf.RoundToInt((old[si].y + old[si + 1].y) * 0.5f)));
+                }
+                subdivided.Add(old[old.Count - 1]);
+                wm.tubePath = subdivided;
+                EditorUtility.SetDirty(loadedData);
+            }
+            if (GUILayout.Button("Regenerate", GUILayout.Width(78)))
+                GeneratePipeTubePath(i);
+            GUI.enabled = true;
+            EditorGUILayout.EndHorizontal();
+
+            // Place / Edit / Clear
+            bool isPlacing = _pipeTubePlacingIndex == i;
+            bool isEditing = _pipeTubeDrawIndex == i;
+            EditorGUILayout.BeginHorizontal();
+            GUI.backgroundColor = isPlacing ? new Color(0.4f, 1f, 0.6f) : Color.white;
+            if (GUILayout.Button(isPlacing ? "● Placing…" : "Place Input Tube", GUILayout.Width(110)))
+            {
+                if (isPlacing) _pipeTubePlacingIndex = -1;
+                else
+                {
+                    _pipeTubePlacingIndex = i;
+                    _pipeTubeDrawIndex    = -1;
+                    _tubePlacingEntranceIndex = -1;
+                    _tubeDrawEntranceIndex    = -1;
+                    _dragTubeNodeIndex        = -1;
+                    _selectedTubeNodeIndex    = -1;
+                }
+            }
+            GUI.backgroundColor = Color.white;
+            if (wm.tubePath.Count > 0)
+            {
+                GUI.backgroundColor = isEditing ? new Color(0.5f, 0.8f, 1f) : Color.white;
+                if (GUILayout.Button(isEditing ? "● Editing" : "Edit Nodes", GUILayout.Width(76)))
+                {
+                    if (isEditing) { _pipeTubeDrawIndex = -1; _dragTubeNodeIndex = -1; _selectedTubeNodeIndex = -1; }
+                    else
+                    {
+                        _pipeTubeDrawIndex    = i;
+                        _pipeTubePlacingIndex = -1;
+                        _tubePlacingEntranceIndex = -1;
+                        _tubeDrawEntranceIndex    = -1;
+                    }
+                }
+                GUI.backgroundColor = Color.white;
+            }
+            GUI.backgroundColor = new Color(1f, 0.5f, 0.5f);
+            if (GUILayout.Button("✕", GUILayout.Width(24)))
+            {
+                Undo.RecordObject(loadedData, "Clear Tube Path");
+                wm.tubePath = new List<UnityEngine.Vector2Int>();
+                if (_pipeTubePlacingIndex == i) _pipeTubePlacingIndex = -1;
+                if (_pipeTubeDrawIndex == i)    _pipeTubeDrawIndex    = -1;
+                _dragTubeNodeIndex     = -1;
+                _selectedTubeNodeIndex = -1;
+                EditorUtility.SetDirty(loadedData);
+            }
+            GUI.backgroundColor = Color.white;
+            EditorGUILayout.LabelField($"{wm.tubePath.Count} nodes", GUILayout.Width(52));
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.EndVertical();
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                Undo.RecordObject(loadedData, "Edit Water Modifier");
+                wm.id             = newID;
+                wm.perimeterAngle = newAngle;
+                wm.tierSlot       = newTierSlot;
+                wm.spawnRadius    = newSpawnRadius;
+                wm.prefab         = newPrefab;
+                EditorUtility.SetDirty(loadedData);
+                Repaint();
+            }
+        }
+
+        if (toRemove >= 0)
+        {
+            Undo.RecordObject(loadedData, "Remove Water Modifier");
+            loadedData.arenaWaterModifiers.RemoveAt(toRemove);
+            if (_pipeTubePlacingIndex == toRemove) _pipeTubePlacingIndex = -1;
+            else if (_pipeTubePlacingIndex > toRemove) _pipeTubePlacingIndex--;
+            if (_pipeTubeDrawIndex == toRemove) { _pipeTubeDrawIndex = -1; _dragTubeNodeIndex = -1; _selectedTubeNodeIndex = -1; }
+            else if (_pipeTubeDrawIndex > toRemove) _pipeTubeDrawIndex--;
+            EditorUtility.SetDirty(loadedData);
+        }
+
+        if (GUILayout.Button("+ Add Water Modifier"))
+        {
+            Undo.RecordObject(loadedData, "Add Water Modifier");
+            var defPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/Prefab/ModifierPrefabs/WaterLevelModifierExitPipe.prefab");
+            loadedData.arenaWaterModifiers.Add(new GridData.ArenaWaterModifier
+            {
+                id     = $"watermod_{loadedData.arenaWaterModifiers.Count}",
+                prefab = defPrefab
+            });
+            EditorUtility.SetDirty(loadedData);
+        }
+    }
+
     string[] BuildTierLabels()
     {
         int count = loadedData?.tiers?.Count ?? 0;
@@ -2547,6 +2838,12 @@ public class GridDesignerWindow : EditorWindow
     void DrawRightPanel()
     {
         EditorGUILayout.BeginVertical(GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+
+        // ── Tools bar — runs along the top of the centre draw window ──
+        DrawToolButtons();
+
+        // ── Scale controls for a selected prefab — appears directly under the tools ──
+        DrawSelectedPrefabScaleSection();
 
         // ── Grid display controls ──
         EditorGUILayout.BeginHorizontal();
@@ -2640,6 +2937,8 @@ public class GridDesignerWindow : EditorWindow
                         _activePlacementIsWorldSpaceProp = false;
                         drawDirectPrefab = true;
                         activeSlot = -1;
+                        _drawSplineWall = false;
+                        _drawCubeBuilding = false;
                         drawCircle = drawOrb = drawSoul = drawSoulArea = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false;
                         drawSelect = false;
                         ClearSelectState();
@@ -2682,6 +2981,8 @@ public class GridDesignerWindow : EditorWindow
                         _activePlacementIsWorldSpaceProp = false;
                         drawDirectPrefab = true;
                         activeSlot = -1;
+                        _drawSplineWall = false;
+                        _drawCubeBuilding = false;
                         drawCircle = drawOrb = drawSoul = drawSoulArea = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false;
                         drawSelect = false;
                         ClearSelectState();
@@ -2725,6 +3026,8 @@ public class GridDesignerWindow : EditorWindow
                         _activePlacementIsWorldSpaceProp = true;
                         drawDirectPrefab = true;
                         activeSlot = -1;
+                        _drawSplineWall = false;
+                        _drawCubeBuilding = false;
                         drawCircle = drawOrb = drawSoul = drawSoulArea = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false;
                         drawSelect = false;
                         ClearSelectState();
@@ -2768,6 +3071,8 @@ public class GridDesignerWindow : EditorWindow
                         _activePlacementIsWorldSpaceProp = false;
                         drawDirectPrefab = true;
                         activeSlot = -1;
+                        _drawSplineWall = false;
+                        _drawCubeBuilding = false;
                         drawCircle = drawOrb = drawSoul = drawSoulArea = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false;
                         drawSelect = false;
                         ClearSelectState();
@@ -2791,9 +3096,9 @@ public class GridDesignerWindow : EditorWindow
         EditorGUILayout.BeginVertical(GUILayout.Width(_rightPanelWidth), GUILayout.ExpandHeight(true));
         _rightPanelScroll = EditorGUILayout.BeginScrollView(_rightPanelScroll, GUILayout.ExpandHeight(true));
 
-        DrawToolButtons();
         DrawPrefabLibrarySection();
         if (loadedData != null) DrawSplineWallsSection();
+        if (loadedData != null) DrawCubeBuildingsSection();
         if (loadedData != null) DrawSoulZonesSection();
 
         if (loadedData != null && loadedData.linkedPairs != null && loadedData.linkedPairs.Count > 0)
@@ -2830,7 +3135,6 @@ public class GridDesignerWindow : EditorWindow
         }
 
         DrawTypeBModifierSettingsSection();
-        DrawSelectedPrefabScaleSection();
         DrawSelectedTowerZoneInfo();
 
         EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
@@ -2935,6 +3239,83 @@ public class GridDesignerWindow : EditorWindow
             if (!pp.overrideModifierSettings)
                 EditorGUILayout.LabelField("Using prefab defaults", EditorStyles.miniLabel);
 
+            // ── Input tube node path (mirrors the lock connection) ──────────────
+            int pairIdx = FindModifierPairIndex(tierIndex, pp.cellIndex);
+            if (pairIdx >= 0)
+            {
+                EditorGUILayout.Space(2);
+                EditorGUILayout.LabelField("Input Tube Path", EditorStyles.miniBoldLabel);
+
+                var pair      = loadedData.linkedPairs[pairIdx];
+                int nodeCount = pair.tubePath?.Count ?? 0;
+
+                EditorGUILayout.BeginHorizontal();
+                float prevLW2 = EditorGUIUtility.labelWidth;
+                EditorGUIUtility.labelWidth = 76f;
+                EditorGUI.BeginChangeCheck();
+                int dispSubs = pair.tubeSubdivisions > 0 ? pair.tubeSubdivisions : 3;
+                int newSubs  = EditorGUILayout.IntField("Subdivisions", dispSubs, GUILayout.Width(122));
+                EditorGUIUtility.labelWidth = prevLW2;
+                if (EditorGUI.EndChangeCheck())
+                {
+                    Undo.RecordObject(loadedData, "Set Modifier Tube Subdivisions");
+                    pair.tubeSubdivisions = Mathf.Max(0, newSubs);
+                    loadedData.linkedPairs[pairIdx] = pair;
+                    EditorUtility.SetDirty(loadedData);
+                }
+                using (new EditorGUI.DisabledScope(nodeCount < 2))
+                    if (GUILayout.Button("+", GUILayout.Width(22)))
+                        WMSubdivideTubePath(pairIdx);
+                if (GUILayout.Button(nodeCount >= 2 ? "Regenerate" : "Generate", GUILayout.Width(84)))
+                    WMGenerateTubePath(pairIdx);
+                EditorGUILayout.EndHorizontal();
+
+                EditorGUILayout.BeginHorizontal();
+                bool isEditingThis = _wmTubeDrawPairIdx == pairIdx;
+                using (new EditorGUI.DisabledScope(nodeCount < 2))
+                {
+                    GUI.backgroundColor = isEditingThis ? new Color(0.5f, 0.8f, 1f) : Color.white;
+                    if (GUILayout.Button(isEditingThis ? "● Editing" : "Edit Nodes", GUILayout.Width(90)))
+                    {
+                        if (isEditingThis)
+                        {
+                            _wmTubeDrawPairIdx = -1; _wmDragTubeNodeIdx = -1; _wmSelTubeNodeIdx = -1;
+                        }
+                        else
+                        {
+                            _wmTubeDrawPairIdx = pairIdx; _wmDragTubeNodeIdx = -1; _wmSelTubeNodeIdx = -1;
+                            _tubeDrawEntranceIndex = -1; _tubePlacingEntranceIndex = -1;
+                        }
+                    }
+                    GUI.backgroundColor = Color.white;
+                }
+                GUI.backgroundColor = new Color(1f, 0.5f, 0.5f);
+                using (new EditorGUI.DisabledScope(nodeCount == 0))
+                {
+                    if (GUILayout.Button("✕", GUILayout.Width(24)))
+                    {
+                        Undo.RecordObject(loadedData, "Clear Modifier Tube Path");
+                        pair.tubePath?.Clear();
+                        loadedData.linkedPairs[pairIdx] = pair;
+                        if (_wmTubeDrawPairIdx == pairIdx)
+                        { _wmTubeDrawPairIdx = -1; _wmDragTubeNodeIdx = -1; _wmSelTubeNodeIdx = -1; }
+                        EditorUtility.SetDirty(loadedData);
+                    }
+                }
+                GUI.backgroundColor = Color.white;
+                EditorGUILayout.LabelField($"{nodeCount} node(s)", GUILayout.Width(64));
+                EditorGUILayout.EndHorizontal();
+
+                if (isEditingThis)
+                    EditorGUILayout.HelpBox(
+                        "Drag the middle nodes on the grid. The end nodes stay locked to the tube and modifier.",
+                        MessageType.Info);
+            }
+            else
+            {
+                EditorGUILayout.LabelField("No linked input tube for this modifier.", EditorStyles.miniLabel);
+            }
+
             EditorGUILayout.EndVertical();
         }
 
@@ -2963,27 +3344,18 @@ public class GridDesignerWindow : EditorWindow
         if (align == null || !align.UseScaleRadius) return;
 
         float prevLW = EditorGUIUtility.labelWidth;
-        EditorGUIUtility.labelWidth = 110f;
+        EditorGUIUtility.labelWidth = 160f;
 
         EditorGUILayout.Space(4);
         EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-        EditorGUILayout.LabelField($"Scale · {pp.prefab.name}", EditorStyles.boldLabel);
 
         float cur = pp.scale > 0f ? pp.scale : 1f;
         EditorGUI.BeginChangeCheck();
-        float ns = EditorGUILayout.Slider("Scale", cur, 0.25f, 5f);
+        float ns = EditorGUILayout.Slider($"Scale ({pp.prefab.name})", cur, 0.25f, 5f);
         if (EditorGUI.EndChangeCheck())
         {
             Undo.RecordObject(loadedData, "Scale Prefab Placement");
             pp.scale = ns;
-            EditorUtility.SetDirty(loadedData);
-            Repaint();
-        }
-
-        if (GUILayout.Button("Reset to 1", EditorStyles.miniButton))
-        {
-            Undo.RecordObject(loadedData, "Reset Prefab Scale");
-            pp.scale = 1f;
             EditorUtility.SetDirty(loadedData);
             Repaint();
         }
@@ -3089,6 +3461,14 @@ public class GridDesignerWindow : EditorWindow
         Event e = Event.current;
         bool mouseInView = viewRect.Contains(e.mousePosition);
 
+        // While a panel text/number field is being edited, ignore keyboard events in the
+        // centre window so Delete/Escape/Backspace/etc. act on the field, not the grid
+        // (selection deletes, mode exits, node removal). Drawing only happens on Repaint
+        // events, so bailing on key events here costs no visuals.
+        if (EditorGUIUtility.editingTextField &&
+            (e.type == EventType.KeyDown || e.type == EventType.KeyUp))
+            return;
+
         // Fit + centre the grid within the viewport the first time we know its real size.
         if (!_gridViewInit && e.type != EventType.Layout && viewRect.width > 1f && viewRect.height > 1f)
         {
@@ -3169,6 +3549,11 @@ public class GridDesignerWindow : EditorWindow
         Handles.DrawSolidDisc(rect.center, Vector3.forward, ZoomedGridSize * 0.5f);
         Handles.EndGUI();
 
+        // Cube-building foundations — drawn first so blocks sit on the bottom layer,
+        // beneath cells, prefabs, spline walls and every other overlay. Their selection
+        // nodes + numbers are drawn later (on top) so they stay visible and pickable.
+        DrawCubeBuildingFoundations(rect);
+
         // Selected prefab footprint — opaque fill drawn before the cell loop so the
         // prefab icon (and any icons within the footprint) render on top of it.
         DrawSelectedPrefabScaleFill(rect, GetPixelsPerWorldUnit());
@@ -3181,6 +3566,10 @@ public class GridDesignerWindow : EditorWindow
         if (_drawSplineWall && loadedData != null)
             HandleSplineWallInput(rect, e);
 
+        // Cube building input — click-drag to create, centre-node drag to move (pixel-based, before cell loop)
+        if (_drawCubeBuilding && loadedData != null)
+            HandleCubeBuildingInput(rect, e);
+
         // Select tool — spline wall node picking (pixel-based, before cell loop)
         if (drawSelect && loadedData != null)
             HandleSelectSplineWallInput(rect, e);
@@ -3189,6 +3578,10 @@ public class GridDesignerWindow : EditorWindow
         if (drawSelect && loadedData != null)
             HandleSelectSoulNodeInput(rect, e);
 
+        // Select tool — cube building node picking + free drag (after node pickers so precise picks win)
+        if (drawSelect && loadedData != null)
+            HandleSelectCubeBuildingInput(rect, e);
+
         // Tube path placement mode — mouse preview + click to place
         if (_tubePlacingEntranceIndex >= 0 && loadedData != null)
             HandleTubePlacementInput(rect, e);
@@ -3196,6 +3589,16 @@ public class GridDesignerWindow : EditorWindow
         // Tube path edit/drag mode
         if (_tubeDrawEntranceIndex >= 0 && loadedData != null)
             HandleTubePathInput(rect, e);
+
+        // Wave-modifier tube path edit/drag mode
+        if (_wmTubeDrawPairIdx >= 0 && loadedData != null)
+            HandleWMTubePathInput(rect, e);
+
+        // Water-level exit-pipe tube path placement + edit modes
+        if (_pipeTubePlacingIndex >= 0 && loadedData != null)
+            HandlePipeTubePlacementInput(rect, e);
+        if (_pipeTubeDrawIndex >= 0 && loadedData != null)
+            HandlePipeTubePathInput(rect, e);
 
         for (int y = 0; y < GridSize; y++)
         {
@@ -3271,7 +3674,7 @@ public class GridDesignerWindow : EditorWindow
                         if (bpIcon != null)
                         {
                             GUI.color = new Color(1f, 1f, 1f, baseAlpha);
-                            GUI.DrawTexture(cell, bpIcon, ScaleMode.ScaleToFit);
+                            GUI.DrawTexture(ScaledIconRect(cell, bp, GetPixelsPerWorldUnit()), bpIcon, ScaleMode.ScaleToFit);
                             GUI.color = Color.white;
                         }
                         else
@@ -3341,7 +3744,7 @@ public class GridDesignerWindow : EditorWindow
                             if (tpIcon != null)
                             {
                                 GUI.color = new Color(1f, 1f, 1f, a);
-                                GUI.DrawTexture(cell, tpIcon, ScaleMode.ScaleToFit);
+                                GUI.DrawTexture(ScaledIconRect(cell, tp, GetPixelsPerWorldUnit()), tpIcon, ScaleMode.ScaleToFit);
                                 GUI.color = Color.white;
                             }
                             else
@@ -3459,50 +3862,16 @@ public class GridDesignerWindow : EditorWindow
         {
             Handles.BeginGUI();
 
-            // Radius scatter rings
             float pxPerUnit = GetPixelsPerWorldUnit();
-            if (pxPerUnit > 0f && loadedData.soulZones != null)
-            {
-                // Soul fish zone scatter radii (drawn around each free node)
-                for (int zi = 0; zi < loadedData.soulZones.Count; zi++)
-                {
-                    var zone = loadedData.soulZones[zi];
-                    zone.MigrateNodesIfNeeded();
-                    if (zone.nodePositions == null || zone.nodePositions.Count == 0) continue;
-                    // Fish-bowl tower zones are hidden (represented by the tower + bowl), EXCEPT when
-                    // their tower is selected — then highlight the bowl footprint so the link is clear.
-                    if (zone.towerGuarded)
-                    {
-                        if (!IsSelectedTowerZone(zone)) continue;
-                        // ONE footprint disc at the tower cell (top-down), sized to the prefab's bowl
-                        // radius — never per authored node (older tower zones may still hold a ring).
-                        var selPP  = GetSelectedPlacement();
-                        var selCtrl = selPP?.prefab != null ? selPP.prefab.GetComponentInChildren<FishBowlTowerController>(true) : null;
-                        float bowlR = selCtrl != null ? selCtrl.bowlRadius : 2f;
-                        Vector2 c = CellCenter(rect, selPP.cellIndex);
-                        Handles.color = new Color(0.35f, 0.85f, 1f, 0.85f);
-                        Handles.DrawWireDisc(c, Vector3.forward, bowlR * pxPerUnit, 3f);
-                        Handles.DrawSolidDisc(c, Vector3.forward, EffCell * 0.2f);
-                        continue;
-                    }
-                    bool isActive = zi == _activeSoulZoneIndex;
-                    Color rc = ZonePalette[zi % ZonePalette.Length];
-                    rc.a = isActive ? 0.55f : 0.18f;
-                    Handles.color = rc;
-                    float radiusPx = zone.radius * pxPerUnit;
-                    foreach (var np in zone.nodePositions)
-                        Handles.DrawWireDisc(WorldXZToPixel(rect, np), Vector3.forward, radiusPx, 2f);
-                }
 
-                // Whirlpool radii
-                if (loadedData.whirlpools != null)
+            // Whirlpool radii
+            if (pxPerUnit > 0f && loadedData.whirlpools != null)
+            {
+                foreach (var wp in loadedData.whirlpools)
                 {
-                    foreach (var wp in loadedData.whirlpools)
-                    {
-                        Handles.color = new Color(0.7f, 0.4f, 1f, 0.55f);
-                        float radiusPx = wp.radius * pxPerUnit;
-                        Handles.DrawWireDisc(CellCenter(rect, wp.cellIndex), Vector3.forward, radiusPx, 2f);
-                    }
+                    Handles.color = new Color(0.7f, 0.4f, 1f, 0.55f);
+                    float radiusPx = wp.radius * pxPerUnit;
+                    Handles.DrawWireDisc(CellCenter(rect, wp.cellIndex), Vector3.forward, radiusPx, 2f);
                 }
             }
 
@@ -3516,38 +3885,60 @@ public class GridDesignerWindow : EditorWindow
                             DrawPrefabScaleRings(rect, loadedData.tiers[ti].prefabPlacements, ti, pxPerUnit);
             }
 
-            if (loadedData.soulZones != null)
+            // Soul fish zones — all drawing lives here in one place.
+            if (loadedData.soulZones != null && pxPerUnit > 0f)
             {
                 for (int zi = 0; zi < loadedData.soulZones.Count; zi++)
                 {
                     var zone = loadedData.soulZones[zi];
-                    var pts  = zone.nodePositions;
+                    zone.MigrateNodesIfNeeded();                     // legacy data upgrade
+                    var pts = zone.nodePositions;
                     if (pts == null || pts.Count == 0) continue;
-                    // Tower zones have no visible authored nodes — the tower/bowl represents them.
-                    if (zone.towerGuarded) continue;
-                    Color lc = ZonePalette[zi % ZonePalette.Length];
 
-                    // Connecting lines (+ closing segment for loops)
-                    if (pts.Count >= 2)
+                    // Fish-bowl tower zones have no node path — the tower + bowl represent them.
+                    // When the tower is selected, show the bowl's soul-zone footprint instead.
+                    if (zone.towerGuarded)
                     {
-                        lc.a = 0.85f;
-                        Handles.color = lc;
-                        for (int ni = 0; ni < pts.Count - 1; ni++)
-                            Handles.DrawLine(WorldXZToPixel(rect, pts[ni]), WorldXZToPixel(rect, pts[ni + 1]), 3f);
-                        if (zone.closedLoop && pts.Count >= 3)
-                            Handles.DrawLine(WorldXZToPixel(rect, pts[pts.Count - 1]), WorldXZToPixel(rect, pts[0]), 3f);
+                        if (!IsSelectedTowerZone(zone)) continue;
+                        var selPP   = GetSelectedPlacement();
+                        var selCtrl = selPP?.prefab != null ? selPP.prefab.GetComponentInChildren<FishBowlTowerController>(true) : null;
+                        float bowlR = selCtrl != null ? selCtrl.bowlRadius : 2f;
+                        Vector2 c   = CellCenter(rect, selPP.cellIndex);
+                        Handles.color = new Color(0.35f, 0.85f, 1f, 0.85f);
+                        Handles.DrawWireDisc(c, Vector3.forward, bowlR * pxPerUnit, 3f);
+                        Handles.DrawSolidDisc(c, Vector3.forward, EffCell * 0.2f);
+                        continue;
                     }
 
-                    // Free node markers
+                    Color lc  = ZonePalette[zi % ZonePalette.Length]; lc.a = 1f;
+                    float rpx = Mathf.Max(zone.radius * pxPerUnit, 1f); // node marker radius
+
+                    // Single orange line walking node → node, as thick as the node marker.
+                    // Drawn as filled quads (Handles.DrawLine thickness is unreliable in IMGUI);
+                    // the node circles drawn below cover the corner joints.
+                    Handles.color = lc;
+                    int segs = (zone.closedLoop && pts.Count >= 3) ? pts.Count : pts.Count - 1;
+                    for (int ni = 0; ni < segs; ni++)
+                    {
+                        Vector2 a = WorldXZToPixel(rect, pts[ni]);
+                        Vector2 b = WorldXZToPixel(rect, pts[(ni + 1) % pts.Count]);
+                        Vector2 d = b - a;
+                        if (d.sqrMagnitude < 0.0001f) continue;
+                        d.Normalize();
+                        Vector2 n = new Vector2(-d.y, d.x) * rpx; // half-width = node radius
+                        Handles.DrawAAConvexPolygon((Vector3)(a + n), (Vector3)(b + n), (Vector3)(b - n), (Vector3)(a - n));
+                    }
+
+                    // Orange circle at each node, then a black dot marks the node.
+                    // (Selection is drawn once, generically, further below.)
+                    float dotR = Mathf.Max(rpx * 0.45f, 3f);
                     for (int ni = 0; ni < pts.Count; ni++)
                     {
-                        Vector2 p   = WorldXZToPixel(rect, pts[ni]);
-                        bool    sel = _selectedZoneIndex == zi && _selectedNodeIndex == ni;
-                        Color   mc  = lc; mc.a = 1f;
-                        Handles.color = sel ? Color.white : mc;
-                        Handles.DrawSolidDisc(p, Vector3.forward, EffCell * (sel ? 0.34f : 0.26f));
-                        Handles.color = new Color(0f, 0f, 0f, 0.9f);
-                        Handles.Label(p - new Vector2(4f, 6f), $"Z{zi}");
+                        Vector2 p = WorldXZToPixel(rect, pts[ni]);
+                        Handles.color = lc;
+                        Handles.DrawSolidDisc(p, Vector3.forward, rpx);      // orange circle
+                        Handles.color = Color.black;                         // node dot
+                        Handles.DrawSolidDisc(p, Vector3.forward, dotR);
                     }
                 }
             }
@@ -3565,9 +3956,15 @@ public class GridDesignerWindow : EditorWindow
 
                     if (modOk && tubeOk)
                     {
-                        Handles.color = new Color(0.4f, 1f, 1f, 0.8f);
-                        Handles.DrawLine(a, b, 2.5f);
-                        Handles.DrawSolidDisc(b, Vector3.forward, 3.5f);
+                        // The green node path now shows the connection, so only fall back to a
+                        // straight link line when no path has been generated yet.
+                        bool hasNodePath = pair.tubePath != null && pair.tubePath.Count >= 2;
+                        if (!hasNodePath)
+                        {
+                            Handles.color = new Color(0.4f, 1f, 1f, 0.8f);
+                            Handles.DrawLine(a, b, 2.5f);
+                            Handles.DrawSolidDisc(b, Vector3.forward, 3.5f);
+                        }
                     }
                     else
                     {
@@ -3578,7 +3975,7 @@ public class GridDesignerWindow : EditorWindow
                 }
             }
 
-            // Selection Circle
+            // Selection marker (single white dot)
             if (_currentSelection.type != SelectionType.None)
             {
                 Vector2 center;
@@ -3605,13 +4002,9 @@ public class GridDesignerWindow : EditorWindow
                     center = CellCenter(rect, _currentSelection.cellIndex);
                 }
 
+                // Single thick white dot at the centre of whatever is selected — nothing else.
                 Handles.color = Color.white;
-                Handles.DrawWireDisc(center, Vector3.forward, EffCell * 0.55f, 3.5f);
-
-                if (_currentSelection.type == SelectionType.SoulZoneNode)
-                {
-                    Handles.DrawSolidDisc(center, Vector3.forward, EffCell * 0.2f);
-                }
+                Handles.DrawSolidDisc(center, Vector3.forward, EffCell * 0.32f);
             }
 
             // Bridge mode removed (incompatible with free nodes).
@@ -3633,8 +4026,18 @@ public class GridDesignerWindow : EditorWindow
             // Tube path overlays — one colour per entrance, active entrance highlighted
             DrawTubePathOverlay(rect);
 
+            // Wave-modifier tube path overlays — draws the node path between a modifier and its tube
+            DrawWMTubePathOverlay(rect);
+
+            // Water-level exit-pipe perimeter markers + tube path overlays
+            DrawWaterModifierOverlay(rect);
+            DrawPipeTubePathOverlay(rect);
+
             // Spline wall overlay — drawn on top of all other overlays
             DrawSplineWallOverlay(rect);
+
+            // Cube building overlay — dark grey footprint boxes with centre nodes
+            DrawCubeBuildingOverlay(rect);
 
             Handles.EndGUI();
         }
@@ -3738,6 +4141,21 @@ public class GridDesignerWindow : EditorWindow
             }
         }
 
+        // Wave-modifier tube edit mode — Enter/Escape to exit
+        if (loadedData != null && _wmTubeDrawPairIdx >= 0)
+        {
+            Event te = Event.current;
+            if (te.type == EventType.KeyDown &&
+                (te.keyCode == KeyCode.Return || te.keyCode == KeyCode.KeypadEnter || te.keyCode == KeyCode.Escape))
+            {
+                _wmTubeDrawPairIdx = -1;
+                _wmDragTubeNodeIdx = -1;
+                _wmSelTubeNodeIdx  = -1;
+                te.Use();
+                Repaint();
+            }
+        }
+
         // Soul area draw mode — Enter to commit, Escape to cancel
         if (_isDrawingSoulArea && loadedData != null)
         {
@@ -3800,6 +4218,33 @@ public class GridDesignerWindow : EditorWindow
             }
         }
 
+        // Cube building mode — Escape to exit mode, Delete/Backspace to remove the active block
+        if (_drawCubeBuilding && loadedData != null)
+        {
+            Event cb = Event.current;
+            if (cb.type == EventType.KeyDown)
+            {
+                if (cb.keyCode == KeyCode.Escape)
+                {
+                    _activeCubeIndex = -1;
+                    _drawCubeBuilding = false;
+                    cb.Use();
+                    Repaint();
+                }
+                else if ((cb.keyCode == KeyCode.Delete || cb.keyCode == KeyCode.Backspace)
+                         && loadedData.cubeBuildings != null
+                         && _activeCubeIndex >= 0 && _activeCubeIndex < loadedData.cubeBuildings.Count)
+                {
+                    Undo.RecordObject(loadedData, "Delete Cube Building");
+                    loadedData.cubeBuildings.RemoveAt(_activeCubeIndex);
+                    _activeCubeIndex = -1;
+                    EditorUtility.SetDirty(loadedData);
+                    cb.Use();
+                    Repaint();
+                }
+            }
+        }
+
         // Tube placement - Escape to cancel
         if (_isWaitingForTubePlacement)
         {
@@ -3854,6 +4299,23 @@ public class GridDesignerWindow : EditorWindow
         if (worldWidth <= 0f) return -1f;
 
         return (EffCell * GridSize) / worldWidth;
+    }
+
+    // Icon draw rect for a placement, scaled by its stored scale so the designer image
+    // grows/shrinks with the prefab. When the prefab has a scale radius the icon is sized
+    // to the footprint-ring diameter (so the image and ring stay linked); otherwise it
+    // falls back to the cell size times the scale. Centred on the cell.
+    Rect ScaledIconRect(Rect cell, GridData.PrefabPlacement pp, float pxPerUnit)
+    {
+        float s    = pp.scale > 0f ? pp.scale : 1f;
+        float size = EffCell * s;
+
+        var align = pp.prefab != null ? GetBaselineAlign(pp.prefab) : null;
+        if (align != null && align.UseScaleRadius && align.ScaleRadius > 0f && pxPerUnit > 0f)
+            size = align.ScaleRadius * s * pxPerUnit * 2f; // match footprint ring diameter
+
+        size = Mathf.Max(size, EffCell * 0.5f); // keep tiny-scale icons visible
+        return new Rect(cell.center.x - size * 0.5f, cell.center.y - size * 0.5f, size, size);
     }
 
     // Opaque footprint fill for the currently selected prefab placement. Called before
@@ -4278,6 +4740,45 @@ public class GridDesignerWindow : EditorWindow
     // SPLINE WALL EDITOR
     // ─────────────────────────────────────────────────────────────
 
+    // Sets every segment on a spline wall path to curved (true) or straight (false),
+    // overriding the individual per-segment toggles. Undoable.
+    void SetAllSplineSegmentsCurved(GridData.SplineWallPath path, bool curved)
+    {
+        if (path?.nodes == null || path.nodes.Count < 2) return;
+
+        Undo.RecordObject(loadedData, curved ? "Curve All Spline Segments" : "Straighten All Spline Segments");
+        if (path.segmentCurved == null) path.segmentCurved = new List<bool>();
+
+        // Segment count: one per gap between nodes, plus the closing segment on a loop.
+        int segCount = path.isClosed ? path.nodes.Count : path.nodes.Count - 1;
+        while (path.segmentCurved.Count < segCount) path.segmentCurved.Add(curved);
+        for (int i = 0; i < path.segmentCurved.Count; i++) path.segmentCurved[i] = curved;
+
+        EditorUtility.SetDirty(loadedData);
+        Repaint();
+    }
+
+    // Resizes a whole spline wall path to `newScale` by scaling every node around the path
+    // centroid (relative to the previously-applied scale). Baked into node positions — the
+    // stored pathScale is just the reference for the next relative resize. Undo handled by caller.
+    void ScaleSplineWallPath(GridData.SplineWallPath path, float newScale)
+    {
+        if (path?.nodes == null || path.nodes.Count == 0) return;
+
+        newScale     = Mathf.Max(0.05f, newScale);
+        float oldScale = path.pathScale > 0f ? path.pathScale : 1f;
+        float factor   = newScale / oldScale;
+        path.pathScale = newScale;
+        if (Mathf.Approximately(factor, 1f)) return;
+
+        Vector2 centroid = Vector2.zero;
+        foreach (var n in path.nodes) centroid += n;
+        centroid /= path.nodes.Count;
+
+        for (int i = 0; i < path.nodes.Count; i++)
+            path.nodes[i] = centroid + (path.nodes[i] - centroid) * factor;
+    }
+
     void DrawSplineWallsSection()
     {
         if (loadedData == null) return;
@@ -4309,17 +4810,22 @@ public class GridDesignerWindow : EditorWindow
             GUI.backgroundColor = Color.white;
             EditorGUILayout.EndHorizontal();
 
-            // Row 2: toggles + spacing
+            // Row 2: toggles + spacing + scale
             EditorGUILayout.BeginHorizontal();
             EditorGUI.BeginChangeCheck();
             bool  newClosed  = GUILayout.Toggle(path.isClosed, "Loop",  GUILayout.Width(46));
             GUILayout.Label(new GUIContent("Spacing", "Tile spacing — distance between each wall piece along the path"), GUILayout.Width(52));
-            float newSpacing = EditorGUILayout.FloatField(path.tileSpacing);
+            float newSpacing = EditorGUILayout.FloatField(path.tileSpacing, GUILayout.Width(50));
+            float curScale   = path.pathScale > 0f ? path.pathScale : 1f;
+            GUILayout.Label(new GUIContent("Scale", "Resize the whole path around its centre"), GUILayout.Width(42));
+            float newScale   = EditorGUILayout.FloatField(curScale, GUILayout.Width(50));
             if (EditorGUI.EndChangeCheck())
             {
                 Undo.RecordObject(loadedData, "Edit Spline Wall Path");
                 path.isClosed    = newClosed;
                 path.tileSpacing = Mathf.Max(0.05f, newSpacing);
+                if (!Mathf.Approximately(newScale, curScale))
+                    ScaleSplineWallPath(path, newScale);
                 EditorUtility.SetDirty(loadedData);
             }
             EditorGUILayout.EndHorizontal();
@@ -4350,9 +4856,45 @@ public class GridDesignerWindow : EditorWindow
                     EditorUtility.SetDirty(loadedData);
                 }
 
+                // Procedural wall dimensions (world units) — used when the prefab has a
+                // ProceduralSplineWall component. Height is the whole-path default; the
+                // per-node "H" fields below override it. Drop is applied to the whole path.
+                EditorGUILayout.BeginHorizontal();
+                EditorGUI.BeginChangeCheck();
+                GUILayout.Label(new GUIContent("Height", "Wall height above water (world units). Whole-path default — per-node H below overrides it."), GUILayout.Width(48));
+                float newWallHeight = EditorGUILayout.FloatField(path.wallHeight);
+                GUILayout.Label(new GUIContent("Drop", "How far the wall drops below the waterline so it looks bottomless (world units). Whole path."), GUILayout.Width(38));
+                float newDrop = EditorGUILayout.FloatField(path.depthBelowWater);
+                GUILayout.Label(new GUIContent("Thick", "Wall thickness across the path (world units). Whole path; node columns are this × Node× thick. Overrides the prefab's own thickness."), GUILayout.Width(38));
+                float newThickness = EditorGUILayout.FloatField(path.wallThickness);
+                GUILayout.Label(new GUIContent("Node×", "Node column height & thickness = wall value × this (1.1 = 10% bigger). Overrides the node prefab's own scale."), GUILayout.Width(42));
+                float newNodeScale = EditorGUILayout.FloatField(path.nodeSizeScale);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    Undo.RecordObject(loadedData, "Edit Spline Wall Dimensions");
+                    path.wallHeight      = Mathf.Max(0.01f, newWallHeight);
+                    path.depthBelowWater = Mathf.Max(0f, newDrop);
+                    path.wallThickness   = Mathf.Max(0.001f, newThickness);
+                    path.nodeSizeScale   = Mathf.Max(0.01f, newNodeScale);
+                    EditorUtility.SetDirty(loadedData);
+                }
+                EditorGUILayout.EndHorizontal();
+
                 // Node list
                 int nodeCount = path.nodes?.Count ?? 0;
                 EditorGUILayout.LabelField($"Nodes  ({nodeCount})", EditorStyles.miniBoldLabel);
+
+                // Bulk straighten / curve — overrides every per-segment curve toggle on this path.
+                if (nodeCount >= 2)
+                {
+                    EditorGUILayout.BeginHorizontal();
+                    if (GUILayout.Button(new GUIContent("Straighten All", "Make every segment on this path straight (overrides individual toggles — undoable)"), EditorStyles.miniButtonLeft))
+                        SetAllSplineSegmentsCurved(path, false);
+                    if (GUILayout.Button(new GUIContent("Curve All", "Make every segment on this path curved (overrides individual toggles — undoable)"), EditorStyles.miniButtonRight))
+                        SetAllSplineSegmentsCurved(path, true);
+                    EditorGUILayout.EndHorizontal();
+                }
+
                 if (path.nodes != null)
                 {
                     int insertAfter = -1;
@@ -4379,14 +4921,20 @@ public class GridDesignerWindow : EditorWindow
                         }
                         GUI.backgroundColor = Color.white;
 
+                        // Node positions are edited by dragging in the draw window, not here.
+                        GUILayout.FlexibleSpace();
+
+                        // Per-node height override (world units); 0 = use the path Height above.
                         EditorGUI.BeginChangeCheck();
-                        Vector2 node = path.nodes[ni];
-                        float   newX = EditorGUILayout.FloatField(node.x, GUILayout.Width(52));
-                        float   newZ = EditorGUILayout.FloatField(node.y, GUILayout.Width(52));
+                        GUILayout.Label(new GUIContent("H", "Per-node wall height (world units). 0 = use the path Height."), GUILayout.Width(12));
+                        float curH = path.NodeHeight(ni);
+                        float newH = EditorGUILayout.FloatField(curH, GUILayout.Width(40));
                         if (EditorGUI.EndChangeCheck())
                         {
-                            Undo.RecordObject(loadedData, "Edit Spline Wall Node");
-                            path.nodes[ni] = new Vector2(newX, newZ);
+                            Undo.RecordObject(loadedData, "Edit Spline Wall Node Height");
+                            if (path.nodeHeights == null) path.nodeHeights = new List<float>();
+                            while (path.nodeHeights.Count <= ni) path.nodeHeights.Add(0f); // 0 = use path default
+                            path.nodeHeights[ni] = Mathf.Max(0f, newH);
                             EditorUtility.SetDirty(loadedData);
                         }
 
@@ -4401,6 +4949,8 @@ public class GridDesignerWindow : EditorWindow
                                 path.segmentGap.RemoveAt(ni);
                             if (path.segmentDestructible != null && ni < path.segmentDestructible.Count)
                                 path.segmentDestructible.RemoveAt(ni);
+                            if (path.nodeHeights != null && ni < path.nodeHeights.Count)
+                                path.nodeHeights.RemoveAt(ni);
                             EditorUtility.SetDirty(loadedData);
                             EditorGUILayout.EndHorizontal();
                             break;
@@ -4492,6 +5042,9 @@ public class GridDesignerWindow : EditorWindow
                         while (path.segmentDestructible.Count <= insertAfter) path.segmentDestructible.Add(false);
                         bool inheritedDestr = path.segmentDestructible[insertAfter];
                         path.segmentDestructible.Insert(insertAfter + 1, inheritedDestr);
+                        // Keep per-node height overrides index-aligned; new node uses the path default (0).
+                        if (path.nodeHeights != null && insertAfter + 1 <= path.nodeHeights.Count)
+                            path.nodeHeights.Insert(insertAfter + 1, 0f);
                         EditorUtility.SetDirty(loadedData);
                     }
                 }
@@ -4910,6 +5463,451 @@ public class GridDesignerWindow : EditorWindow
         }
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Water-level exit-pipe tube path — mirrors the entrance/lock tube, keyed on
+    // arenaWaterModifiers. node[0] is the input-tube cell; the last node tracks the
+    // pipe's perimeter cell (derived from perimeterAngle); middle nodes are draggable.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    void HandlePipeTubePlacementInput(Rect rect, Event e)
+    {
+        if (e.type == EventType.MouseMove || e.type == EventType.MouseDrag) Repaint();
+        if (!rect.Contains(e.mousePosition)) return;
+
+        if (e.type == EventType.MouseDown && e.button == 0)
+        {
+            int mx = Mathf.Clamp(Mathf.FloorToInt((e.mousePosition.x - rect.x) / EffCell), 0, GridSize - 1);
+            int my = Mathf.Clamp(Mathf.FloorToInt((e.mousePosition.y - rect.y) / EffCell), 0, GridSize - 1);
+
+            var wm       = loadedData.arenaWaterModifiers[_pipeTubePlacingIndex];
+            var tubeCell = new UnityEngine.Vector2Int(mx, my);
+            var pipeCell = HubAngleToGridCell(rect, wm.perimeterAngle);
+
+            Undo.RecordObject(loadedData, "Place Input Tube");
+            wm.tubePath = new List<UnityEngine.Vector2Int> { tubeCell };
+            int total = wm.tubeSubdivisions + 2;
+            for (int si = 1; si < total - 1; si++)
+            {
+                float t  = (float)si / (total - 1);
+                int   cx = Mathf.RoundToInt(Mathf.Lerp(tubeCell.x, pipeCell.x, t));
+                int   cy = Mathf.RoundToInt(Mathf.Lerp(tubeCell.y, pipeCell.y, t));
+                wm.tubePath.Add(new UnityEngine.Vector2Int(cx, cy));
+            }
+            wm.tubePath.Add(pipeCell);
+
+            _pipeTubePlacingIndex  = -1;
+            _selectedTubeNodeIndex = -1;
+            EditorUtility.SetDirty(loadedData);
+            e.Use();
+            Repaint();
+        }
+    }
+
+    void HandlePipeTubePathInput(Rect rect, Event e)
+    {
+        if (!rect.Contains(e.mousePosition)) return;
+
+        int x = Mathf.FloorToInt((e.mousePosition.x - rect.x) / EffCell);
+        int y = Mathf.FloorToInt((e.mousePosition.y - rect.y) / EffCell);
+        if (x < 0 || x >= GridSize || y < 0 || y >= GridSize) return;
+
+        var wm = loadedData.arenaWaterModifiers[_pipeTubeDrawIndex];
+        if (wm.tubePath == null) wm.tubePath = new List<UnityEngine.Vector2Int>();
+
+        var cell      = new UnityEngine.Vector2Int(x, y);
+        int lockedIdx = wm.tubePath.Count - 1; // last node is locked to the pipe cell
+
+        if (e.type == EventType.MouseDown && e.button == 0)
+        {
+            int hitNode = wm.tubePath.IndexOf(cell);
+            if (hitNode >= 0 && hitNode != lockedIdx)
+            {
+                _dragTubeNodeIndex     = hitNode;
+                _selectedTubeNodeIndex = hitNode;
+                e.Use();
+                Repaint();
+            }
+        }
+        else if (e.type == EventType.MouseDrag && e.button == 0 && _dragTubeNodeIndex >= 0)
+        {
+            if (_dragTubeNodeIndex < wm.tubePath.Count && wm.tubePath[_dragTubeNodeIndex] != cell)
+            {
+                Undo.RecordObject(loadedData, "Move Tube Waypoint");
+                wm.tubePath[_dragTubeNodeIndex] = cell;
+                _selectedTubeNodeIndex = _dragTubeNodeIndex;
+                EditorUtility.SetDirty(loadedData);
+                e.Use();
+                Repaint();
+            }
+        }
+        else if (e.type == EventType.MouseUp && e.button == 0)
+        {
+            _dragTubeNodeIndex = -1;
+            e.Use();
+        }
+    }
+
+    void GeneratePipeTubePath(int idx)
+    {
+        var wm = loadedData.arenaWaterModifiers[idx];
+        if (wm.tubePath == null || wm.tubePath.Count < 2) return;
+
+        Undo.RecordObject(loadedData, "Generate Tube Path");
+        var first = wm.tubePath[0];
+        var last  = wm.tubePath[wm.tubePath.Count - 1];
+
+        wm.tubePath.Clear();
+        wm.tubePath.Add(first);
+        int total = wm.tubeSubdivisions + 2;
+        for (int si = 1; si < total - 1; si++)
+        {
+            float t  = (float)si / (total - 1);
+            int   cx = Mathf.RoundToInt(Mathf.Lerp(first.x, last.x, t));
+            int   cy = Mathf.RoundToInt(Mathf.Lerp(first.y, last.y, t));
+            wm.tubePath.Add(new UnityEngine.Vector2Int(cx, cy));
+        }
+        wm.tubePath.Add(last);
+        _selectedTubeNodeIndex = -1;
+        EditorUtility.SetDirty(loadedData);
+        Repaint();
+    }
+
+    void DrawWaterModifierOverlay(Rect rect)
+    {
+        if (loadedData?.arenaWaterModifiers == null) return;
+
+        foreach (var wm in loadedData.arenaWaterModifiers)
+        {
+            Vector2 px = AngleToCircumferencePixel(rect, wm.perimeterAngle, 1f);
+            Handles.color = Color.black;
+            Handles.DrawSolidDisc(px, Vector3.forward, 6f);
+            Handles.color = new Color(0.2f, 0.8f, 1f);
+            Handles.DrawSolidDisc(px, Vector3.forward, 3.5f);
+            Handles.Label(px + new Vector2(5f, -8f), "[W]");
+        }
+    }
+
+    void DrawPipeTubePathOverlay(Rect rect)
+    {
+        if (loadedData?.arenaWaterModifiers == null) return;
+
+        Color[] pal =
+        {
+            new Color(0.2f, 0.8f, 1f,   1f),
+            new Color(1f,   0.6f, 0.1f, 1f),
+            new Color(0.7f, 0.3f, 1f,   1f),
+            new Color(0.3f, 1f,   0.5f, 1f),
+        };
+
+        // ── Placement preview ──
+        if (_pipeTubePlacingIndex >= 0 && _pipeTubePlacingIndex < loadedData.arenaWaterModifiers.Count
+            && rect.Contains(Event.current.mousePosition))
+        {
+            var  wm = loadedData.arenaWaterModifiers[_pipeTubePlacingIndex];
+            Color pc = pal[_pipeTubePlacingIndex % pal.Length];
+            Vector2 pipePx = AngleToCircumferencePixel(rect, wm.perimeterAngle, 1f);
+
+            int mx = Mathf.Clamp(Mathf.FloorToInt((Event.current.mousePosition.x - rect.x) / EffCell), 0, GridSize - 1);
+            int my = Mathf.Clamp(Mathf.FloorToInt((Event.current.mousePosition.y - rect.y) / EffCell), 0, GridSize - 1);
+            Vector2 tubePx = CellToGridPixel(rect, mx, my);
+
+            Handles.color = new Color(pc.r, pc.g, pc.b, 0.5f);
+            Handles.DrawDottedLine(pipePx, tubePx, 4f);
+
+            int total = wm.tubeSubdivisions + 2;
+            for (int si = 1; si < total - 1; si++)
+            {
+                float t = (float)si / (total - 1);
+                Vector2 np = Vector2.Lerp(tubePx, pipePx, t);
+                Handles.color = new Color(pc.r, pc.g, pc.b, 0.7f);
+                Handles.DrawSolidDisc(np, Vector3.forward, EffCell * 0.22f);
+            }
+
+            Handles.color = pc;
+            Handles.DrawSolidDisc(tubePx, Vector3.forward, EffCell * 0.35f);
+            Handles.color = Color.white;
+            Handles.DrawWireDisc(tubePx, Vector3.forward, EffCell * 0.45f, 2f);
+            Handles.Label(tubePx + new Vector2(6f, -8f), "Input Tube");
+        }
+
+        // ── Sync last node of each path to current pipe cell ──
+        foreach (var wm in loadedData.arenaWaterModifiers)
+        {
+            if (wm.tubePath == null || wm.tubePath.Count < 2) continue;
+            var pipeCell = HubAngleToGridCell(rect, wm.perimeterAngle);
+            if (wm.tubePath[wm.tubePath.Count - 1] != pipeCell)
+            {
+                wm.tubePath[wm.tubePath.Count - 1] = pipeCell;
+                EditorUtility.SetDirty(loadedData);
+            }
+        }
+
+        // ── Placed paths ──
+        for (int wi = 0; wi < loadedData.arenaWaterModifiers.Count; wi++)
+        {
+            var wm = loadedData.arenaWaterModifiers[wi];
+            if (wm.tubePath == null || wm.tubePath.Count == 0) continue;
+
+            bool active = _pipeTubeDrawIndex == wi;
+            Color c = pal[wi % pal.Length];
+            c.a = active ? 1f : 0.55f;
+            Handles.color = c;
+
+            for (int pi = 0; pi < wm.tubePath.Count - 1; pi++)
+            {
+                Vector2 a = CellToGridPixel(rect, wm.tubePath[pi].x,     wm.tubePath[pi].y);
+                Vector2 b = CellToGridPixel(rect, wm.tubePath[pi + 1].x, wm.tubePath[pi + 1].y);
+                Handles.DrawLine(a, b, active ? 2.5f : 1.5f);
+            }
+
+            for (int pi = 0; pi < wm.tubePath.Count; pi++)
+            {
+                Vector2 center = CellToGridPixel(rect, wm.tubePath[pi].x, wm.tubePath[pi].y);
+                float radius   = pi == 0 ? EffCell * 0.35f : EffCell * 0.25f;
+                Handles.color = c;
+                Handles.DrawSolidDisc(center, Vector3.forward, radius);
+
+                if (active && pi == _selectedTubeNodeIndex)
+                {
+                    Handles.color = Color.white;
+                    Handles.DrawWireDisc(center, Vector3.forward, radius + EffCell * 0.1f, 2f);
+                }
+
+                Handles.color = Color.black;
+                Handles.Label(center - new Vector2(3f, 6f), pi.ToString());
+            }
+
+            Vector2 labelPos = CellToGridPixel(rect, wm.tubePath[0].x, wm.tubePath[0].y);
+            Handles.color = Color.white;
+            Handles.Label(labelPos + new Vector2(6f, -8f), $"[Tube] {wm.id}");
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Wave-modifier tube path — mirrors the lock tube system, keyed on linkedPairs.
+    // node[0] tracks the input-tube cell, the last node tracks the modifier cell,
+    // and the middle nodes are freely draggable in "Edit Nodes" mode.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    UnityEngine.Vector2Int CellIndexToColRow(int cellIndex) =>
+        new UnityEngine.Vector2Int(cellIndex % GridSize, cellIndex / GridSize);
+
+    // Returns the linkedPairs index whose modifier matches this placement, or -1.
+    int FindModifierPairIndex(int modTierIndex, int modCellIndex)
+    {
+        if (loadedData?.linkedPairs == null) return -1;
+        for (int i = 0; i < loadedData.linkedPairs.Count; i++)
+        {
+            var p = loadedData.linkedPairs[i];
+            if (p.modifierTierIndex == modTierIndex && p.modifierCellIndex == modCellIndex)
+                return i;
+        }
+        return -1;
+    }
+
+    // Keeps the first/last nodes glued to the current tube/modifier cells so the path
+    // follows the placements (same idea as the lock forcing its last node onto the hub).
+    void WMSyncTubeEndpoints(int pairIdx)
+    {
+        var pair = loadedData.linkedPairs[pairIdx];
+        if (pair.tubePath == null || pair.tubePath.Count < 2) return;
+
+        var tubeCR = CellIndexToColRow(pair.inputTubeCellIndex);
+        var modCR  = CellIndexToColRow(pair.modifierCellIndex);
+        int last   = pair.tubePath.Count - 1;
+        bool changed = false;
+
+        if (pair.tubePath[0] != tubeCR)   { pair.tubePath[0] = tubeCR; changed = true; }
+        if (pair.tubePath[last] != modCR) { pair.tubePath[last] = modCR; changed = true; }
+        if (changed) EditorUtility.SetDirty(loadedData);
+    }
+
+    // Straight line of `tubeSubdivisions` intermediate nodes between the tube and modifier.
+    void WMGenerateTubePath(int pairIdx)
+    {
+        var pair   = loadedData.linkedPairs[pairIdx];
+        var tubeCR = CellIndexToColRow(pair.inputTubeCellIndex);
+        var modCR  = CellIndexToColRow(pair.modifierCellIndex);
+        int subs   = pair.tubeSubdivisions > 0 ? pair.tubeSubdivisions : 3; // 0/unset → sensible default
+
+        Undo.RecordObject(loadedData, "Generate Modifier Tube Path");
+        if (pair.tubePath == null) pair.tubePath = new List<UnityEngine.Vector2Int>();
+        var path = pair.tubePath;
+        path.Clear();
+        path.Add(tubeCR);
+        int total = subs + 2; // first + subdivisions + last
+        for (int si = 1; si < total - 1; si++)
+        {
+            float t  = (float)si / (total - 1);
+            int   cx = Mathf.RoundToInt(Mathf.Lerp(tubeCR.x, modCR.x, t));
+            int   cy = Mathf.RoundToInt(Mathf.Lerp(tubeCR.y, modCR.y, t));
+            path.Add(new UnityEngine.Vector2Int(cx, cy));
+        }
+        path.Add(modCR);
+
+        loadedData.linkedPairs[pairIdx] = pair; // write back (covers first-time list creation)
+        _wmSelTubeNodeIdx = -1;
+        EditorUtility.SetDirty(loadedData);
+        Repaint();
+    }
+
+    // Inserts a midpoint node between every existing pair of nodes (same as the lock's "+").
+    void WMSubdivideTubePath(int pairIdx)
+    {
+        var pair = loadedData.linkedPairs[pairIdx];
+        if (pair.tubePath == null || pair.tubePath.Count < 2) return;
+
+        Undo.RecordObject(loadedData, "Subdivide Modifier Tube Path");
+        var old        = pair.tubePath;
+        var subdivided = new List<UnityEngine.Vector2Int>();
+        for (int si = 0; si < old.Count - 1; si++)
+        {
+            subdivided.Add(old[si]);
+            subdivided.Add(new UnityEngine.Vector2Int(
+                Mathf.RoundToInt((old[si].x + old[si + 1].x) * 0.5f),
+                Mathf.RoundToInt((old[si].y + old[si + 1].y) * 0.5f)));
+        }
+        subdivided.Add(old[old.Count - 1]);
+
+        pair.tubePath = subdivided;
+        loadedData.linkedPairs[pairIdx] = pair;
+        _wmSelTubeNodeIdx = -1;
+        EditorUtility.SetDirty(loadedData);
+        Repaint();
+    }
+
+    void HandleWMTubePathInput(Rect rect, Event e)
+    {
+        if (_wmTubeDrawPairIdx < 0 || _wmTubeDrawPairIdx >= loadedData.linkedPairs.Count) return;
+        if (!rect.Contains(e.mousePosition)) return;
+
+        int x = Mathf.FloorToInt((e.mousePosition.x - rect.x) / EffCell);
+        int y = Mathf.FloorToInt((e.mousePosition.y - rect.y) / EffCell);
+        if (x < 0 || x >= GridSize || y < 0 || y >= GridSize) return;
+
+        var pair = loadedData.linkedPairs[_wmTubeDrawPairIdx];
+        if (pair.tubePath == null || pair.tubePath.Count < 2) return;
+
+        var cell    = new UnityEngine.Vector2Int(x, y);
+        int lastIdx = pair.tubePath.Count - 1;
+
+        if (e.type == EventType.MouseDown && e.button == 0)
+        {
+            int hitNode = pair.tubePath.IndexOf(cell);
+            // Node 0 is the input-tube end (draggable — moves the tube prefab with it).
+            // Middle nodes are waypoints. The last node is pinned to the modifier.
+            if (hitNode >= 0 && hitNode < lastIdx)
+            {
+                _wmDragTubeNodeIdx = hitNode;
+                _wmSelTubeNodeIdx  = hitNode;
+                e.Use();
+                Repaint();
+            }
+        }
+        else if (e.type == EventType.MouseDrag && e.button == 0 &&
+                 _wmDragTubeNodeIdx >= 0 && _wmDragTubeNodeIdx < lastIdx)
+        {
+            if (_wmDragTubeNodeIdx == 0)
+            {
+                // Dragging the tube end relocates the input-tube placement + the link so the
+                // tube and its spline endpoint travel together without breaking the connection.
+                if (pair.tubePath[0] != cell && MoveWMInputTube(_wmTubeDrawPairIdx, cell))
+                {
+                    _wmSelTubeNodeIdx = 0;
+                    e.Use();
+                    Repaint();
+                }
+            }
+            else if (_wmDragTubeNodeIdx < pair.tubePath.Count && pair.tubePath[_wmDragTubeNodeIdx] != cell)
+            {
+                Undo.RecordObject(loadedData, "Move Modifier Tube Waypoint");
+                pair.tubePath[_wmDragTubeNodeIdx] = cell;
+                _wmSelTubeNodeIdx = _wmDragTubeNodeIdx;
+                EditorUtility.SetDirty(loadedData);
+                e.Use();
+                Repaint();
+            }
+        }
+        else if (e.type == EventType.MouseUp && e.button == 0)
+        {
+            _wmDragTubeNodeIdx = -1;
+            e.Use();
+        }
+    }
+
+    // Relocates the input-tube placement (and updates the link + path endpoint) to a new cell,
+    // so the input tube and its spline node move together. Returns false if the move is blocked
+    // (no change, or another placement already occupies the target cell). Undo-recorded on success.
+    bool MoveWMInputTube(int pairIdx, UnityEngine.Vector2Int newCell)
+    {
+        var pair = loadedData.linkedPairs[pairIdx];
+        int newCellIndex = newCell.y * GridSize + newCell.x;
+        if (newCellIndex == pair.inputTubeCellIndex) return false;
+
+        var placements = pair.inputTubeTierIndex == -1
+            ? loadedData.prefabPlacements
+            : (loadedData.tiers != null && pair.inputTubeTierIndex >= 0 && pair.inputTubeTierIndex < loadedData.tiers.Count
+                ? loadedData.tiers[pair.inputTubeTierIndex].prefabPlacements : null);
+
+        // Don't stomp another placement (e.g. the modifier) already on the target cell.
+        if (placements != null && placements.Exists(p => p.cellIndex == newCellIndex)) return false;
+
+        Undo.RecordObject(loadedData, "Move Input Tube");
+        var tubePlacement = placements?.Find(p => p.cellIndex == pair.inputTubeCellIndex);
+        if (tubePlacement != null) tubePlacement.cellIndex = newCellIndex;
+
+        pair.inputTubeCellIndex = newCellIndex;
+        if (pair.tubePath != null && pair.tubePath.Count > 0) pair.tubePath[0] = newCell;
+        loadedData.linkedPairs[pairIdx] = pair;
+        EditorUtility.SetDirty(loadedData);
+        return true;
+    }
+
+    void DrawWMTubePathOverlay(Rect rect)
+    {
+        if (loadedData?.linkedPairs == null) return;
+
+        Color baseCol = new Color(0.2f, 1f, 0.55f, 1f); // green — distinct from the lock's orange
+
+        for (int i = 0; i < loadedData.linkedPairs.Count; i++)
+        {
+            WMSyncTubeEndpoints(i);
+
+            var pair = loadedData.linkedPairs[i];
+            if (pair.tubePath == null || pair.tubePath.Count < 2) continue;
+
+            bool  active = _wmTubeDrawPairIdx == i;
+            Color c      = baseCol; c.a = active ? 1f : 0.5f;
+
+            Handles.color = c;
+            for (int pi = 0; pi < pair.tubePath.Count - 1; pi++)
+            {
+                Vector2 a = CellToGridPixel(rect, pair.tubePath[pi].x,     pair.tubePath[pi].y);
+                Vector2 b = CellToGridPixel(rect, pair.tubePath[pi + 1].x, pair.tubePath[pi + 1].y);
+                Handles.DrawLine(a, b, active ? 2.5f : 1.5f);
+            }
+
+            for (int pi = 0; pi < pair.tubePath.Count; pi++)
+            {
+                Vector2 center   = CellToGridPixel(rect, pair.tubePath[pi].x, pair.tubePath[pi].y);
+                bool    endpoint = pi == 0 || pi == pair.tubePath.Count - 1;
+                float   radius   = endpoint ? EffCell * 0.32f : EffCell * 0.22f;
+
+                Handles.color = c;
+                Handles.DrawSolidDisc(center, Vector3.forward, radius);
+
+                if (active && pi == _wmSelTubeNodeIdx)
+                {
+                    Handles.color = Color.white;
+                    Handles.DrawWireDisc(center, Vector3.forward, radius + EffCell * 0.1f, 2f);
+                }
+
+                Handles.color = Color.black;
+                Handles.Label(center - new Vector2(3f, 6f), pi.ToString());
+            }
+        }
+    }
+
     void HandleSplineWallInput(Rect rect, Event e)
     {
         if (loadedData.splineWallPaths == null)
@@ -5006,7 +6004,10 @@ public class GridDesignerWindow : EditorWindow
             if (hitPath >= 0)
             {
                 Undo.RecordObject(loadedData, "Delete Spline Wall Node");
-                loadedData.splineWallPaths[hitPath].nodes.RemoveAt(hitNode);
+                var rp = loadedData.splineWallPaths[hitPath];
+                rp.nodes.RemoveAt(hitNode);
+                if (rp.nodeHeights != null && hitNode < rp.nodeHeights.Count)
+                    rp.nodeHeights.RemoveAt(hitNode);
                 EditorUtility.SetDirty(loadedData);
                 e.Use();
                 Repaint();
@@ -5129,7 +6130,9 @@ public class GridDesignerWindow : EditorWindow
 
     GameObject GetDefaultSplineWallPrefab()
     {
-        // Prefer exact name match, then any name containing "SplineWall"
+        // Prefer the procedural wall, then the legacy mesh wall, then any name containing "SplineWall"
+        foreach (var p in scannedPrefabs)
+            if (p != null && p.name == "ProceduralSplineWall") return p;
         foreach (var p in scannedPrefabs)
             if (p != null && p.name == "BasicSplineWall1") return p;
         foreach (var p in scannedPrefabs)
@@ -5141,6 +6144,319 @@ public class GridDesignerWindow : EditorWindow
     {
         // Alternate black/white so multiple paths remain distinguishable without colour
         return (pathIdx % 2 == 0) ? Color.white : Color.black;
+    }
+
+    // ── Cube buildings ─────────────────────────────────────────
+    // Footprint stored normalized to the arena (-0.5..0.5), same space as spline-wall nodes.
+    // Click-drag creates a block; dragging a block's centre node moves it; the right-hand
+    // panel edits width/length/height/depth after the fact.
+    void HandleCubeBuildingInput(Rect rect, Event e)
+    {
+        if (loadedData.cubeBuildings == null)
+            loadedData.cubeBuildings = new List<GridData.CubeBuilding>();
+
+        if (e.type == EventType.MouseDown && e.button == 0 && rect.Contains(e.mousePosition))
+        {
+            int hit = PickCubeBuilding(rect, e.mousePosition);
+            if (hit >= 0)
+            {
+                // Click anywhere inside a block → select it and begin moving it.
+                BeginCubeMove(rect, hit, e.mousePosition);
+            }
+            else
+            {
+                // Empty space → rubber-band a new block.
+                _isDraggingCubeBox   = true;
+                _cubeDragStartNorm   = PixelToWorldXZ(rect, e.mousePosition);
+                _cubeDragCurrentNorm = _cubeDragStartNorm;
+            }
+            e.Use();
+            Repaint();
+        }
+        else if (e.type == EventType.MouseDrag && e.button == 0)
+        {
+            if (DragCubeMove(rect, e.mousePosition)) { e.Use(); Repaint(); }
+            else if (_isDraggingCubeBox)
+            {
+                _cubeDragCurrentNorm = PixelToWorldXZ(rect, e.mousePosition);
+                e.Use();
+                Repaint();
+            }
+        }
+        else if (e.type == EventType.MouseUp && e.button == 0)
+        {
+            if (_dragCubeCenterIndex >= 0)
+            {
+                _dragCubeCenterIndex = -1;
+                e.Use();
+            }
+            else if (_isDraggingCubeBox)
+            {
+                _isDraggingCubeBox = false;
+                Vector2 a = _cubeDragStartNorm, b = _cubeDragCurrentNorm;
+                float w = Mathf.Abs(b.x - a.x);
+                float l = Mathf.Abs(b.y - a.y);
+                if (w > 0.005f && l > 0.005f) // ignore stray clicks
+                {
+                    Undo.RecordObject(loadedData, "Add Cube Building");
+                    loadedData.cubeBuildings.Add(new GridData.CubeBuilding
+                    {
+                        center = (a + b) * 0.5f,
+                        width  = w,
+                        length = l,
+                    });
+                    _activeCubeIndex = loadedData.cubeBuildings.Count - 1;
+                    EditorUtility.SetDirty(loadedData);
+                }
+                e.Use();
+                Repaint();
+            }
+        }
+        else if (e.type == EventType.MouseDown && e.button == 1 && rect.Contains(e.mousePosition))
+        {
+            int hit = PickCubeBuilding(rect, e.mousePosition);
+            if (hit >= 0)
+            {
+                Undo.RecordObject(loadedData, "Delete Cube Building");
+                loadedData.cubeBuildings.RemoveAt(hit);
+                if (_activeCubeIndex == hit) _activeCubeIndex = -1;
+                else if (_activeCubeIndex > hit) _activeCubeIndex--;
+                EditorUtility.SetDirty(loadedData);
+                e.Use();
+                Repaint();
+            }
+        }
+    }
+
+    // Cube selection for the ⊕ Select tool: click inside a block to select + move it.
+    // Runs after the spline/soul node pickers so precise node picks still win.
+    void HandleSelectCubeBuildingInput(Rect rect, Event e)
+    {
+        if (loadedData?.cubeBuildings == null || loadedData.cubeBuildings.Count == 0) return;
+
+        if (e.type == EventType.MouseDown && e.button == 0 && rect.Contains(e.mousePosition))
+        {
+            int hit = PickCubeBuilding(rect, e.mousePosition);
+            if (hit >= 0)
+            {
+                BeginCubeMove(rect, hit, e.mousePosition);
+                e.Use();
+                Repaint();
+            }
+        }
+        else if (e.type == EventType.MouseDrag && e.button == 0)
+        {
+            if (DragCubeMove(rect, e.mousePosition)) { e.Use(); Repaint(); }
+        }
+        else if (e.type == EventType.MouseUp && e.button == 0 && _dragCubeCenterIndex >= 0)
+        {
+            _dragCubeCenterIndex = -1;
+            e.Use();
+        }
+    }
+
+    // Pixel radius around a block's centre node that counts as a hit. Large so the node
+    // is an easy target even though it's drawn small.
+    const float CubeNodePickRadius = 16f;
+
+    // Block whose centre node is nearest the pixel (within CubeNodePickRadius), or -1.
+    int PickCubeBuilding(Rect rect, Vector2 mouse)
+    {
+        if (loadedData?.cubeBuildings == null) return -1;
+        int hit = -1; float best = CubeNodePickRadius;
+        for (int i = 0; i < loadedData.cubeBuildings.Count; i++)
+        {
+            float d = Vector2.Distance(WorldXZToPixel(rect, loadedData.cubeBuildings[i].center), mouse);
+            if (d < best) { best = d; hit = i; }
+        }
+        return hit;
+    }
+
+    void BeginCubeMove(Rect rect, int index, Vector2 mouse)
+    {
+        _activeCubeIndex     = index;
+        _dragCubeCenterIndex = index;
+        _isDraggingCubeBox   = false;
+        // Offset keeps the grab point fixed under the cursor instead of snapping centre to it.
+        _cubeDragOffsetNorm  = loadedData.cubeBuildings[index].center - PixelToWorldXZ(rect, mouse);
+        Undo.RecordObject(loadedData, "Move Cube Building");
+    }
+
+    bool DragCubeMove(Rect rect, Vector2 mouse)
+    {
+        if (_dragCubeCenterIndex < 0 || _dragCubeCenterIndex >= loadedData.cubeBuildings.Count)
+            return false;
+        loadedData.cubeBuildings[_dragCubeCenterIndex].center =
+            PixelToWorldXZ(rect, mouse) + _cubeDragOffsetNorm;
+        EditorUtility.SetDirty(loadedData);
+        return true;
+    }
+
+    // Bottom-layer pass: the block fills + outlines only. Drawn before the cell loop so
+    // blocks act as a foundation beneath prefabs, spline walls and every other overlay.
+    void DrawCubeBuildingFoundations(Rect rect)
+    {
+        if (loadedData?.cubeBuildings == null) return;
+
+        float gridPx = EffCell * GridSize;
+        Handles.BeginGUI();
+        for (int i = 0; i < loadedData.cubeBuildings.Count; i++)
+        {
+            var  b      = loadedData.cubeBuildings[i];
+            bool active = (_drawCubeBuilding || drawSelect) && i == _activeCubeIndex;
+
+            float hwPx = b.width  * 0.5f * gridPx;
+            float hlPx = b.length * 0.5f * gridPx;
+            Vector2 c  = WorldXZToPixel(rect, b.center);
+            Rect r     = new Rect(c.x - hwPx, c.y - hlPx, hwPx * 2f, hlPx * 2f);
+
+            EditorGUI.DrawRect(r, active ? new Color(0.32f, 0.34f, 0.40f, 0.85f)
+                                         : new Color(0.20f, 0.20f, 0.23f, 0.80f));
+            DrawRectOutline(r, active ? new Color(0.5f, 0.8f, 1f, 0.95f)
+                                      : new Color(0f, 0f, 0f, 0.6f));
+        }
+        Handles.EndGUI();
+    }
+
+    // Top-layer pass: the selection node + block number, plus the in-progress rubber-band.
+    // Kept on top of everything so nodes stay visible and pickable and numbers stay readable.
+    void DrawCubeBuildingOverlay(Rect rect)
+    {
+        if (loadedData == null) return;
+
+        // In-progress rubber-band while dragging out a new block.
+        if (_drawCubeBuilding && _isDraggingCubeBox)
+        {
+            Vector2 p0 = WorldXZToPixel(rect, _cubeDragStartNorm);
+            Vector2 p1 = WorldXZToPixel(rect, _cubeDragCurrentNorm);
+            Rect rb = Rect.MinMaxRect(Mathf.Min(p0.x, p1.x), Mathf.Min(p0.y, p1.y),
+                                      Mathf.Max(p0.x, p1.x), Mathf.Max(p0.y, p1.y));
+            EditorGUI.DrawRect(rb, new Color(0.3f, 0.3f, 0.34f, 0.55f));
+            DrawRectOutline(rb, new Color(0.85f, 0.85f, 0.9f, 0.9f));
+        }
+
+        if (loadedData.cubeBuildings == null) return;
+
+        GUIStyle blockNumStyle = new GUIStyle(EditorStyles.boldLabel)
+        { alignment = TextAnchor.MiddleCenter, fontSize = 12, normal = { textColor = Color.black } };
+        for (int i = 0; i < loadedData.cubeBuildings.Count; i++)
+        {
+            var  b      = loadedData.cubeBuildings[i];
+            bool active = (_drawCubeBuilding || drawSelect) && i == _activeCubeIndex;
+
+            Vector2 c  = WorldXZToPixel(rect, b.center);
+
+            // Centre node handle — drawn large so it's an easy target for the Select tool
+            // and roomy enough to hold the block number legibly.
+            // A faint outer ring shows the clickable radius on the active block.
+            float nr = active ? 15f : 13f;
+            if (active)
+            {
+                Handles.color = new Color(0.5f, 0.8f, 1f, 0.25f);
+                Handles.DrawSolidDisc((Vector3)c, Vector3.forward, CubeNodePickRadius);
+            }
+            Handles.color = active ? new Color(0.5f, 0.8f, 1f) : new Color(0.85f, 0.85f, 0.9f);
+            Handles.DrawSolidDisc((Vector3)c, Vector3.forward, nr);
+            Handles.color = Color.black;
+            Handles.DrawWireDisc((Vector3)c, Vector3.forward, nr);
+
+            // Block number (matches the "Block N" entries in the Cube Buildings panel),
+            // centred on the node using the measured label size.
+            string  numLabel = (i + 1).ToString();
+            Vector2 numSize  = blockNumStyle.CalcSize(new GUIContent(numLabel));
+            Handles.Label(new Vector2(c.x - numSize.x * 0.5f, c.y - numSize.y * 0.5f), numLabel, blockNumStyle);
+        }
+    }
+
+    void DrawRectOutline(Rect r, Color col)
+    {
+        Handles.color = col;
+        Vector3[] pts =
+        {
+            new Vector3(r.xMin, r.yMin), new Vector3(r.xMax, r.yMin),
+            new Vector3(r.xMax, r.yMax), new Vector3(r.xMin, r.yMax),
+            new Vector3(r.xMin, r.yMin),
+        };
+        Handles.DrawAAPolyLine(2f, pts);
+    }
+
+    void DrawCubeBuildingsSection()
+    {
+        EditorGUILayout.Space();
+        _showCubeBuildings = EditorGUILayout.Foldout(_showCubeBuildings, "Cube Buildings", true, EditorStyles.foldoutHeader);
+        if (!_showCubeBuildings) return;
+
+        if (loadedData.cubeBuildings == null)
+            loadedData.cubeBuildings = new List<GridData.CubeBuilding>();
+
+        EditorGUILayout.HelpBox("Pick the ▦ Blocks tool, then drag out a box on the grid. Footprint is normalized to the arena width; height/depth are world units.", MessageType.None);
+
+        float aw = loadedData.arenaProfile != null ? loadedData.arenaProfile.WorldArenaWidth : 0f;
+
+        int toRemove = -1;
+        for (int i = 0; i < loadedData.cubeBuildings.Count; i++)
+        {
+            var  b        = loadedData.cubeBuildings[i];
+            bool isActive = i == _activeCubeIndex;
+
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+            EditorGUILayout.BeginHorizontal();
+            GUI.backgroundColor = isActive ? new Color(0.5f, 0.8f, 1f) : Color.white;
+            if (GUILayout.Button($"Block {i + 1}", GUILayout.Width(72)))
+            {
+                _activeCubeIndex  = i;
+                _drawCubeBuilding = true; // so the overlay highlights it
+            }
+            GUI.backgroundColor = Color.white;
+            GUILayout.FlexibleSpace();
+            GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
+            if (GUILayout.Button("✕", GUILayout.Width(24))) toRemove = i;
+            GUI.backgroundColor = Color.white;
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUI.BeginChangeCheck();
+            float width  = EditorGUILayout.Slider("Width (norm)",  b.width,  0.005f, 1f);
+            float length = EditorGUILayout.Slider("Length (norm)", b.length, 0.005f, 1f);
+            float height = EditorGUILayout.FloatField("Height (above water)", b.heightAboveWater);
+            float depth  = EditorGUILayout.FloatField("Depth (below water)",  b.depthBelowWater);
+            Vector2 center = EditorGUILayout.Vector2Field("Centre X/Z (norm)", b.center);
+            if (EditorGUI.EndChangeCheck())
+            {
+                Undo.RecordObject(loadedData, "Edit Cube Building");
+                b.width            = Mathf.Max(0.001f, width);
+                b.length           = Mathf.Max(0.001f, length);
+                b.heightAboveWater = height;
+                b.depthBelowWater  = Mathf.Max(0f, depth);
+                b.center           = new Vector2(Mathf.Clamp(center.x, -0.5f, 0.5f),
+                                                 Mathf.Clamp(center.y, -0.5f, 0.5f));
+                EditorUtility.SetDirty(loadedData);
+                Repaint();
+            }
+
+            if (aw > 0f)
+                EditorGUILayout.LabelField($"≈ {b.width * aw:0.##} × {b.length * aw:0.##} m footprint · {b.heightAboveWater:0.##} m tall", EditorStyles.miniLabel);
+
+            EditorGUILayout.EndVertical();
+        }
+
+        if (toRemove >= 0)
+        {
+            Undo.RecordObject(loadedData, "Delete Cube Building");
+            loadedData.cubeBuildings.RemoveAt(toRemove);
+            if (_activeCubeIndex == toRemove) _activeCubeIndex = -1;
+            else if (_activeCubeIndex > toRemove) _activeCubeIndex--;
+            EditorUtility.SetDirty(loadedData);
+        }
+
+        if (GUILayout.Button("+ Add Block (centred)"))
+        {
+            Undo.RecordObject(loadedData, "Add Cube Building");
+            loadedData.cubeBuildings.Add(new GridData.CubeBuilding());
+            _activeCubeIndex  = loadedData.cubeBuildings.Count - 1;
+            _drawCubeBuilding = true;
+            EditorUtility.SetDirty(loadedData);
+        }
     }
 
     // Nodes are stored in normalised grid space (-0.5..0.5), independent of arena size.

@@ -49,6 +49,9 @@ public class LevelSpawner : MonoBehaviour
     [SerializeField] GameObject splineWallPrefab;
     [SerializeField] GameObject splineNodePointPrefab;
 
+    [Header("Cube Buildings")]
+    [SerializeField] GameObject cubeBuildingPrefab;
+
     [Header("Fishing")]
     [SerializeField] FishingController fishingController;
 
@@ -61,6 +64,11 @@ public class LevelSpawner : MonoBehaviour
 
     public bool mazeSpawned;
     bool mazeRotated;
+
+    // The exact transform every spawnParent child underwent during the post-spawn
+    // offset + Y-180 rotation. Map UI uses it to finalise data-reconstructed positions
+    // (spline walls, cube buildings, maze markers) so they land on the real geometry.
+    public Matrix4x4 SpawnFinalizeMatrix { get; private set; } = Matrix4x4.identity;
 
     private GridData activeGridData;
     private ArenaProfile activeArenaProfile;
@@ -133,7 +141,11 @@ public class LevelSpawner : MonoBehaviour
         if (go == null || pp == null) return;
         float s = pp.scale > 0f ? pp.scale : 1f;
         if (!Mathf.Approximately(s, 1f))
+        {
             go.transform.localScale *= s;
+            // Record the scale so the UI minimap can size its marker to match.
+            go.AddComponent<PlacementScaleMarker>().scale = s;
+        }
     }
 
     // Statues spawned this pass, keyed by PrefabPlacement.statueId, so guarded soul-fish
@@ -401,11 +413,20 @@ float   tileZ  = b.size.z / GridData.GridSize;
         // ── Spline Walls — must be before Y180 rotation so they move with spawnParent ──
         SpawnSplineWalls();
 
+        // ── Cube Buildings — before Y180 rotation so they move with spawnParent ──
+        SpawnCubeBuildings();
+
         if (!mazeRotated)
         {
+            // Capture the pre→post transform so the Map UI can finalise data-reconstructed
+            // positions the same way the spawned children were moved.
+            Matrix4x4 beforeFinalize = spawnParent.localToWorldMatrix;
+
             spawnParent.position += postSpawnPositionOffset;
             if (applyPostSpawnY180Rotation)
                 spawnParent.rotation *= Quaternion.Euler(0f, 180f, 0f);
+
+            SpawnFinalizeMatrix = spawnParent.localToWorldMatrix * beforeFinalize.inverse;
 
             if (soulSpawnParent)
             {
@@ -461,7 +482,7 @@ float   tileZ  = b.size.z / GridData.GridSize;
         if (activeArenaProfile?.outerWallsPrefab != null)
             Instantiate(activeArenaProfile.outerWallsPrefab, Vector3.zero, Quaternion.identity);
 
-        ProcessLinkedPairs(spawnedByCell);
+        ProcessLinkedPairs(spawnedByCell, tileX, tileZ);
 
         mazeSpawned = true;
         Debug.Log("MazeSpawned = true");
@@ -500,7 +521,7 @@ float   tileZ  = b.size.z / GridData.GridSize;
             // tileSpacing is world units; convert to normalised space for WalkSpline
             float normStep = Mathf.Max(0.001f, path.tileSpacing / arenaWidth);
 
-            WalkSpline(path.nodes, path.isClosed, path.IsSegmentCurved, path.IsSegmentGap, normStep, (pos2d, tangent, seg) =>
+            WalkSpline(path.nodes, path.isClosed, path.IsSegmentCurved, path.IsSegmentGap, normStep, (pos2d, tangent, seg, segT, spawnDist) =>
             {
                 bool      destructible = destructiblePrefab != null && path.IsSegmentDestructible(seg);
                 GameObject tilePrefab  = destructible ? destructiblePrefab : prefab;
@@ -508,7 +529,18 @@ float   tileZ  = b.size.z / GridData.GridSize;
 
                 float   angle = Mathf.Atan2(tangent.x, tangent.y) * Mathf.Rad2Deg;
                 Vector3 pos   = new Vector3(pos2d.x * arenaWidth, tileY, pos2d.y * arenaWidth);
-                Instantiate(tilePrefab, pos, Quaternion.Euler(0f, angle, 0f), spawnParent);
+                var instance = Instantiate(tilePrefab, pos, Quaternion.Euler(0f, angle, 0f), spawnParent);
+
+                // Procedural wall tiles build their box mesh from the interpolated node height;
+                // legacy mesh prefabs have no ProceduralSplineWall and are left untouched.
+                var proc = instance.GetComponent<ProceduralSplineWall>();
+                if (proc != null)
+                {
+                    float height = path.HeightAt(seg, segT);
+                    // spawnDist is normalised arc-length; scale to world so UVs flow continuously across tiles.
+                    float distAlongPath = spawnDist * arenaWidth;
+                    proc.Build(path.tileSpacing * SplineTileOverlap, height, path.depthBelowWater, distAlongPath, path.wallThickness);
+                }
             });
 
             // Spawn node point markers at each control node
@@ -518,12 +550,56 @@ float   tileZ  = b.size.z / GridData.GridSize;
                 float nodeContactY = nodeAlign != null ? nodeAlign.transform.localPosition.y : 0f;
                 float nodeSpawnY   = spawnedBaselineWaterY - nodeContactY;
 
-                foreach (var node in path.nodes)
+                for (int i = 0; i < path.nodes.Count; i++)
                 {
+                    var     node    = path.nodes[i];
                     Vector3 nodePos = new Vector3(node.x * arenaWidth, nodeSpawnY, node.y * arenaWidth);
-                    Instantiate(splineNodePointPrefab, nodePos, Quaternion.identity, spawnParent);
+                    var     nodeInstance = Instantiate(splineNodePointPrefab, nodePos, Quaternion.identity, spawnParent);
+
+                    // Procedural node columns build a box (slightly taller than the wall at this
+                    // node) capped with a sphere; legacy mesh markers have no ProceduralSplineNode.
+                    var procNode = nodeInstance.GetComponent<ProceduralSplineNode>();
+                    if (procNode != null)
+                        procNode.Build(path.NodeHeight(i), path.depthBelowWater, path.nodeSizeScale, path.wallThickness);
                 }
             }
+        }
+    }
+
+    // =====================================================
+    // CUBE BUILDING SPAWNING
+    // =====================================================
+
+    private void SpawnCubeBuildings()
+    {
+        if (activeGridData?.cubeBuildings == null || activeGridData.cubeBuildings.Count == 0) return;
+
+        if (cubeBuildingPrefab == null)
+        {
+            Debug.LogWarning("[LevelSpawner] cubeBuildingPrefab not assigned — cube buildings not spawned.");
+            return;
+        }
+
+        // Footprint is normalized (-0.5..0.5); scale by arena width for world size, matching spline walls.
+        float arenaWidth = activeArenaProfile != null ? activeArenaProfile.WorldArenaWidth : 12f;
+
+        // Offset the prefab so its PrefabBaselineAlignment disc (origin) meets the baseline water plane.
+        var   align    = cubeBuildingPrefab.GetComponentInChildren<PrefabBaselineAlignment>();
+        float contactY = align != null ? align.transform.localPosition.y : 0f;
+        float spawnY   = spawnedBaselineWaterY - contactY;
+
+        foreach (var b in activeGridData.cubeBuildings)
+        {
+            if (b == null) continue;
+
+            Vector3 pos = new Vector3(b.center.x * arenaWidth, spawnY, b.center.y * arenaWidth);
+            var instance = Instantiate(cubeBuildingPrefab, pos, spawnParent.rotation, spawnParent);
+
+            var builder = instance.GetComponent<ProceduralCubeBuilding>();
+            if (builder != null)
+                builder.Build(b.width * arenaWidth, b.length * arenaWidth, b.heightAboveWater, b.depthBelowWater);
+            else
+                Debug.LogWarning($"[LevelSpawner] cubeBuildingPrefab '{cubeBuildingPrefab.name}' has no ProceduralCubeBuilding component — box not generated.");
         }
     }
 
@@ -534,7 +610,11 @@ float   tileZ  = b.size.z / GridData.GridSize;
         return baselineWaterY - cY;
     }
 
-    static void WalkSpline(List<Vector2> pts, bool closed, System.Func<int,bool> isCurvedSeg, System.Func<int,bool> isGapSeg, float spacing, System.Action<Vector2, Vector2, int> onSpawn)
+    // Tiles are given a length slightly longer than the spacing so consecutive procedural
+    // wall cubes overlap a touch and don't show seams on curves.
+    const float SplineTileOverlap = 1.05f;
+
+    static void WalkSpline(List<Vector2> pts, bool closed, System.Func<int,bool> isCurvedSeg, System.Func<int,bool> isGapSeg, float spacing, System.Action<Vector2, Vector2, int, float, float> onSpawn)
     {
         int       n        = pts.Count;
         int       segCount = closed ? n : n - 1;
@@ -573,7 +653,11 @@ float   tileZ  = b.size.z / GridData.GridSize;
                     float   frac    = dist > 0.0001f ? 1f - back / dist : 1f;
                     Vector2 spawnPt = Vector2.Lerp(prev, curr, frac);
                     Vector2 tangent = dist > 0.0001f ? (curr - prev).normalized : Vector2.up;
-                    onSpawn(spawnPt, tangent, seg);
+                    // Parametric position within this segment (0..1) for per-node height lerp.
+                    float   segT    = ((s - 1) + frac) / stepsThisSeg;
+                    // Cumulative arc-length (normalised units) at this spawn, for continuous UVs.
+                    float   spawnDist = nextSpawn;
+                    onSpawn(spawnPt, tangent, seg, segT, spawnDist);
                     nextSpawn += spacing;
                 }
                 prev = curr;
@@ -601,7 +685,7 @@ float   tileZ  = b.size.z / GridData.GridSize;
             (-p0 + 3f * p1 - 3f * p2 + p3) * t3);
     }
 
-    private void ProcessLinkedPairs(Dictionary<string, GameObject> spawnedByCell)
+    private void ProcessLinkedPairs(Dictionary<string, GameObject> spawnedByCell, float tileX, float tileZ)
     {
         if (activeGridData.linkedPairs == null) return;
 
@@ -610,19 +694,51 @@ float   tileZ  = b.size.z / GridData.GridSize;
             string modKey = $"{pair.modifierTierIndex}_{pair.modifierCellIndex}";
             string tubeKey = $"{pair.inputTubeTierIndex}_{pair.inputTubeCellIndex}";
 
-            if (spawnedByCell.TryGetValue(modKey, out var modGo) && 
+            if (spawnedByCell.TryGetValue(modKey, out var modGo) &&
                 spawnedByCell.TryGetValue(tubeKey, out var tubeGo))
             {
                 var controller = modGo.GetComponent<LevelWaveModifierControllerTypeB>();
                 var tube = tubeGo.GetComponentInChildren<SoulFishInputTube>();
                 var trigger = tubeGo.GetComponentInChildren<SoulEnterPipeTrigger>();
-                
+
                 if (controller != null && tube != null)
                 {
                     // Tube faces the modifier; modifier faces back toward the pipe so its
                     // wave (forward-aligned via PrefabBaselineAlignment) drives toward the pipe.
                     FaceForwardTowardTarget(tubeGo, modGo.transform.position);
                     FaceForwardTowardTarget(modGo, tubeGo.transform.position);
+
+                    // Authored middle waypoints (grid cells) → world positions, mirroring the
+                    // lock's methodology. node[0] tracks the tube cell and the last node tracks
+                    // the modifier cell, so only the intermediate nodes are passed through.
+                    // Positions are derived relative to the already-placed tube instance so they
+                    // inherit the same spawnParent transform (post-spawn offset / Y180 rotation).
+                    if (pair.tubePath != null && pair.tubePath.Count >= 3)
+                    {
+                        Transform anchorParent = tubeGo.transform.parent;
+                        Vector3   anchorLocal  = tubeGo.transform.localPosition;
+                        int cxT = pair.inputTubeCellIndex % GridData.GridSize;
+                        int cyT = pair.inputTubeCellIndex / GridData.GridSize;
+
+                        int lastNode = pair.tubePath.Count - 1;
+                        var waypoints = new List<Vector3>(lastNode - 1);
+                        for (int wi = 1; wi < lastNode; wi++)
+                        {
+                            var cell = pair.tubePath[wi];
+                            // XZ offset from the tube cell, in the same grid frame as placements
+                            // (col → +X, flipped row → +Z). Y is overridden inside the tube.
+                            Vector3 delta = new Vector3(
+                                (cell.x - cxT) * tileX,
+                                0f,
+                                (cyT - cell.y) * tileZ);
+                            Vector3 world = anchorParent != null
+                                ? anchorParent.TransformPoint(anchorLocal + delta)
+                                : anchorLocal + delta;
+                            waypoints.Add(world);
+                        }
+                        if (waypoints.Count > 0) tube.SetWaypoints(waypoints);
+                    }
+
                     tube.SetTargetModifier(controller);
                     tube.SetFishingController(fishingController);
                     if (trigger != null) controller.SetTrigger(trigger);
@@ -794,6 +910,73 @@ else if (controller != null)
                 }
             }
         }
+
+        // ── Water Level Modifiers ──
+        // Perimeter-placed exit pipes, each optionally fed by a soul input tube.
+        // Mirrors the locked-entrance spawn + tube-wiring block above.
+        if (activeGridData.arenaWaterModifiers != null)
+        {
+            for (int i = 0; i < activeGridData.arenaWaterModifiers.Count; i++)
+            {
+                var wm = activeGridData.arenaWaterModifiers[i];
+                GameObject pipe = SpawnPortalPrefab(
+                    prefab:      wm.prefab,
+                    angle:       wm.perimeterAngle,
+                    tierSlot:    wm.tierSlot,
+                    spawnRadius: wm.spawnRadius,
+                    centre:      centre,
+                    tierOffsets: tierOffsets
+                );
+                if (pipe == null) continue;
+
+                var pipeCtrl = pipe.GetComponentInChildren<WaterLevelExitPipeController>();
+
+                // ── Spawn input tube and build spline from authored grid waypoints ──
+                if (wm.tubePath != null && wm.tubePath.Count >= 2 && soulFishInputTubePrefab != null && pipeCtrl != null)
+                {
+                    var tubeAlign        = soulFishInputTubePrefab.GetComponentInChildren<PrefabBaselineAlignment>();
+                    float contactOffsetY = tubeAlign != null ? tubeAlign.transform.localPosition.y : 0f;
+                    float tubeSpawnY     = spawnedBaselineWaterY - contactOffsetY;
+
+                    Quaternion baselineRot = activeBaselineMarker != null
+                        ? Quaternion.LookRotation(activeBaselineMarker.transform.forward, Vector3.up)
+                        : Quaternion.identity;
+                    Quaternion tubeRot = tubeAlign != null ? baselineRot : spawnParent.rotation;
+
+                    var firstCell  = wm.tubePath[0];
+                    int firstIndex = firstCell.y * GridData.GridSize + firstCell.x;
+                    Vector3 tubePos = CellToWorldPos(firstIndex, gridOrigin, tileX, tileZ);
+                    tubePos.y = tubeSpawnY;
+                    GameObject tubeGo = Instantiate(soulFishInputTubePrefab, tubePos, tubeRot, spawnParent);
+
+                    var tube = tubeGo.GetComponent<SoulFishInputTube>();
+                    if (tube != null)
+                    {
+                        int lastNode = wm.tubePath.Count - 1;
+                        var waypoints = new List<Vector3>(lastNode - 1);
+                        for (int wi = 1; wi < lastNode; wi++)
+                        {
+                            var cell      = wm.tubePath[wi];
+                            int cellIndex = cell.y * GridData.GridSize + cell.x;
+                            Vector3 wp    = CellToWorldPos(cellIndex, gridOrigin, tileX, tileZ);
+                            waypoints.Add(wp);
+                        }
+                        tube.SetWaypoints(waypoints);
+                        tube.SetFishingController(fishingController);
+                        FaceForwardTowardTarget(tubeGo, pipe.transform.position);
+                        tube.SetTargetWaterExit(pipeCtrl);
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[LevelSpawner] soulFishInputTubePrefab has no SoulFishInputTube component — tube not connected for water modifier {i}.");
+                    }
+                }
+                else if (wm.tubePath != null && wm.tubePath.Count >= 2 && soulFishInputTubePrefab == null)
+                {
+                    Debug.LogWarning($"[LevelSpawner] soulFishInputTubePrefab not assigned — cannot spawn input tube for water modifier {i}.");
+                }
+            }
+        }
     }
 
     // Returns the spawned reality-layer instance (null if no prefab). Used by SpawnArenaPortals to stamp LevelExitController.
@@ -844,15 +1027,52 @@ else if (controller != null)
         Quaternion rot;
         if (align != null && align.UseForwardOverride)
         {
-            Vector3 fwd = align.LocalForward;
-            Vector3 up  = align.UseUpOverride ? align.LocalUp : Vector3.up;
-            rot = Quaternion.Euler(0f, angle, 0f) * Quaternion.LookRotation(fwd, up);
+            // The prefab's authored layout is rigid and final. Rotate the whole instance as one
+            // piece so the aligner's FORWARD arrow aims at the arena centre and its UP arrow aims
+            // world-up. Whatever the designer aligned to those arrows in the prefab (mesh, spawn
+            // point, colliders) carries through unchanged and ends up pointing into the arena.
+            Vector3    toCentre    = -(Quaternion.Euler(0f, angle, 0f) * Vector3.forward); // horizontal, inward
+            Vector3    up          = align.UseUpOverride ? align.LocalUp : Vector3.up;
+            Quaternion prefabFrame = Quaternion.LookRotation(align.LocalForward, up); // authored FORWARD/UP basis
+            Quaternion worldFrame  = Quaternion.LookRotation(toCentre, Vector3.up);   // target: FORWARD->centre, UP->up
+            rot = worldFrame * Quaternion.Inverse(prefabFrame);
         }
         else
         {
             rot = Quaternion.Euler(0f, angle, 0f);
             if (applyMinus90XRotation) rot *= Quaternion.Euler(-90f, 0f, 0f);
         }
+
+        // Wall Depth — position the prefab so its authored wall-depth disc (the point meant to
+        // meet the arena boundary) lands on the perimeter radius, instead of the aligner.
+        // The disc sits at aligner + LocalForward*wallDepth in prefab space (matching the gizmo),
+        // so translate the instance by the negation of that offset in world space. This shifts
+        // radially (in/out of the wall), not tangentially like the previous rot*Vector3.forward.
+        if (align != null && align.UseWallDepth)
+            pos -= (rot * align.LocalForward) * align.WallDepth;
+
+#if UNITY_EDITOR
+        // ── TEMP door/portal spawn debug — remove once orientation is confirmed ──
+        if (align != null && (align.UseForwardOverride || align.UseWallDepth))
+        {
+            float   rr        = activeArenaProfile != null ? activeArenaProfile.WorldArenaRadius : -1f;
+            Vector3 radialOut = (Quaternion.Euler(0f, angle, 0f) * Vector3.forward).normalized; // centre -> perimeter
+            float   posRadial = Vector3.Dot(pos - centre, radialOut);   // >rr = outside arena, <rr = inside
+            // Which way does each of the instance's axes point relative to the arena?
+            // dot with radialOut: +1 = points straight OUT (toward wall), -1 = points straight IN (toward centre).
+            float dotZ = Vector3.Dot((rot * Vector3.forward), radialOut);
+            float dotX = Vector3.Dot((rot * Vector3.right),   radialOut);
+            float dotY = Vector3.Dot((rot * Vector3.up),      radialOut);
+            float dotLF = align.UseForwardOverride ? Vector3.Dot((rot * align.LocalForward), radialOut) : 0f;
+            Debug.Log(
+                $"[DoorDbg] '{prefab.name}' angle={angle:0.#} arenaR={rr:0.###} spawnRadius={spawnRadius:0.###}\n" +
+                $"  useForwardOverride={align.UseForwardOverride} forward(LocalForward)={align.LocalForward}  useUp={align.UseUpOverride} up(LocalUp)={align.LocalUp}\n" +
+                $"  rot.euler={rot.eulerAngles}\n" +
+                $"  pos={pos}  posRadial={posRadial:0.###}  ({(posRadial > rr ? "OUTSIDE" : "inside")} arena, boundary={rr:0.###})\n" +
+                $"  facing dots vs radialOut (-1=toward centre / +1=toward wall):  +Z={dotZ:0.00}  +X={dotX:0.00}  +Y={dotY:0.00}  LocalForward={dotLF:0.00}");
+        }
+#endif
+
         return Instantiate(prefab, pos, rot, spawnParent);
     }
 
@@ -924,17 +1144,14 @@ else if (controller != null)
             if (zone.towerGuarded)
             {
                 _towersById.TryGetValue(zone.linkedStatueId, out bowlTower);
-                if (bowlTower != null)
+                if (bowlTower == null)
                 {
-                    containerPos = bowlTower.BowlCenterWorld;   // actual bowl position in the world
-                    swimRadius   = bowlTower.BowlWorldRadius;
+                    Debug.LogError($"[LevelSpawner] Tower zone {zoneIndex} (id {zone.linkedStatueId}) has no spawned FishBowlTower — skipping. Registered tower ids: [{string.Join(",", _towersById.Keys)}].");
+                    continue;
                 }
-                else
-                {
-                    Debug.LogWarning($"[LevelSpawner]   Zone {zoneIndex} is towerGuarded but no FishBowlTower with id {zone.linkedStatueId} was spawned — using fallback.");
-                    containerPos = nodeWorldPositions[0] + Vector3.up * 6f;
-                    swimRadius   = 2f;
-                }
+                containerPos = bowlTower.BowlCenterWorld;   // actual bowl position in the world
+                swimRadius   = bowlTower.BowlWorldRadius;
+                Debug.Log($"[LevelSpawner] Tower zone {zoneIndex}: bowlCenter={(bowlTower.bowlCenter != null ? bowlTower.bowlCenter.name : "NULL (using controller transform)")}, bowl world pos={containerPos}, swimRadius={swimRadius}, controller on '{bowlTower.name}'.");
             }
 
             bool isClosedLoop = zone.closedLoop && zone.nodePositions.Count >= 3;
@@ -956,8 +1173,11 @@ else if (controller != null)
             // Spawn shoal container. For towers this is the true bowl position; for normal zones the
             // first node. No -90° X: SplineContainer must stay axis-aligned so InverseTransformPoint
             // maps world XZ → local XZ without distortion.
+            // Tower zones parent the shoal UNDER the bowl so it's fixed to it and falls together when
+            // the tower is smashed; normal zones parent under spawnParent.
+            Transform containerParent = (zone.towerGuarded && bowlTower != null) ? bowlTower.BowlRoot : spawnParent;
             GameObject containerInstance = Instantiate(
-                soulFishContainerPrefab, containerPos, spawnParent.rotation, spawnParent);
+                soulFishContainerPrefab, containerPos, spawnParent.rotation, containerParent);
 
             // Container-level identity label (zone-level, not registered individually)
             var containerLabel = containerInstance.GetComponent<LinkIdentityLabel>();
@@ -979,8 +1199,10 @@ else if (controller != null)
             foreach (var sa in containerInstance.GetComponentsInChildren<SplineAnimate>(true))
                 sa.Loop = loopMode;
 
-            // Register post-rotation positions so the wave/map mask aligns with where fish actually swim
-            SoulFishWaveLinker.RegisterZone(nodeRegPositions, isClosedLoop);
+            // Register post-rotation positions so the wave/map mask aligns with where fish actually swim.
+            // swimRadius (the Grid Designer zone radius) becomes the mask footprint for this zone.
+            SoulFishWaveLinker.RegisterZone(nodeRegPositions, isClosedLoop, swimRadius);
+            SoulFishMapLinker.RegisterZone(nodeRegPositions, isClosedLoop, swimRadius);
 
             // Resolve the guarding statue for a statue-guarded zone (spawned earlier this pass)
             StatueBehaviour guardStatue = null;
@@ -1006,12 +1228,13 @@ else if (controller != null)
                     foreach (var fishTransform in shoal.FishList)
                         fishTransform?.GetComponent<FishFishingBehaviour>()?.SetGuardStatue(guardStatue);
 
-                // Fish-bowl tower: arm bowl mode (fish suppressed aloft) and hand the container to
-                // its tower so a catapult smash drops it. Catchability reopens on landing.
-                if (zone.towerGuarded)
+                // Fish-bowl tower: suppress fish while aloft and hand the shoal to its tower, along
+                // with the water level to drop to. The tower owns the bowl drop + landing; on landing
+                // it reopens catchability.
+                if (zone.towerGuarded && bowlTower != null)
                 {
-                    shoal.InitBowl(bowlWaterY);
-                    if (bowlTower != null) bowlTower.SetContainer(shoal);
+                    shoal.InitBowl();
+                    bowlTower.SetContainer(shoal, bowlWaterY);
                 }
             }
 

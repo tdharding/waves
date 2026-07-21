@@ -249,6 +249,41 @@ public class GridData : ScriptableObject
     public List<ArenaEntrance> entrances = new List<ArenaEntrance>();
 
     // ─────────────────────────────────────────────
+    // ARENA WATER MODIFIERS
+    // Wall-mounted water-level exit pipes placed around the perimeter by angle
+    // (same scheme as entrances/locks). Each is fed by a SoulFishInputTube whose
+    // path is authored on the grid; when a soul arrives the pipe lowers the water.
+    // ─────────────────────────────────────────────
+
+    [System.Serializable]
+    public class ArenaWaterModifier
+    {
+        [Tooltip("Display label only.")]
+        public string id = "watermod_0";
+
+        [Tooltip("Exit-pipe prefab (WaterLevelModifierExitPipe) with a PrefabBaselineAlignment forward override.")]
+        public GameObject prefab;
+
+        [Tooltip("Degrees Y around the arena centre. 0 = forward (+Z), increases clockwise.")]
+        public float perimeterAngle;
+
+        [Tooltip("-1 = base layer. 0+ = index into GridData.tiers for Y height.")]
+        public int tierSlot = -1;
+
+        [Tooltip("Inward offset from the arena perimeter, in world units.")]
+        public float spawnRadius = 0f;
+
+        [Tooltip("Grid-cell waypoints (col,row) for the soul tube. node[0] = input-tube spawn cell, " +
+                 "last node = the pipe's perimeter cell; middle nodes are draggable. Fewer than 2 = no tube.")]
+        public List<UnityEngine.Vector2Int> tubePath = new List<UnityEngine.Vector2Int>();
+
+        [Tooltip("Number of intermediate nodes auto-generated between the input tube and the pipe.")]
+        public int tubeSubdivisions = 3;
+    }
+
+    public List<ArenaWaterModifier> arenaWaterModifiers = new List<ArenaWaterModifier>();
+
+    // ─────────────────────────────────────────────
     // ORBS
     // ─────────────────────────────────────────────
 
@@ -304,6 +339,14 @@ public class GridData : ScriptableObject
         public int modifierTierIndex; // -1 = base
         public int inputTubeCellIndex;
         public int inputTubeTierIndex; // -1 = base
+
+        [Tooltip("Grid-cell waypoints (col,row) for the soul tube path from the input tube to the modifier. " +
+                 "node[0] tracks the input-tube cell, the last node tracks the modifier cell, middle nodes are draggable. " +
+                 "Empty/fewer than 2 = straight auto-join (legacy behaviour).")]
+        public List<UnityEngine.Vector2Int> tubePath;
+
+        [Tooltip("Number of intermediate nodes generated between the input tube and the modifier.")]
+        public int tubeSubdivisions;
     }
 
     public List<LinkedPrefabPair> linkedPairs = new List<LinkedPrefabPair>();
@@ -365,9 +408,24 @@ public class GridData : ScriptableObject
         public List<bool>    segmentCurved       = new List<bool>(); // index i = curved flag for segment node[i]→node[i+1]; missing = true
         public List<bool>    segmentGap          = new List<bool>(); // index i = gap flag (no wall) for segment node[i]→node[i+1]; missing = false
         public List<bool>    segmentDestructible = new List<bool>(); // index i = use destructiblePrefabOverride for segment node[i]→node[i+1]; missing = false
-        public float         tileSpacing         = 0.2f;
+        public float         tileSpacing         = 0.09f;
         public GameObject    prefabOverride;             // null = use LevelSpawner.splineWallPrefab
         public GameObject    destructiblePrefabOverride; // prefab (with DestructibleWall) used for segments flagged destructible
+
+        // Procedural wall dimensions (world units). Used when the tile prefab has a
+        // ProceduralSplineWall component; ignored by legacy mesh prefabs.
+        [Tooltip("Wall height above the waterline (world units). Per-path default; individual nodes can override via nodeHeights.")]
+        public float         wallHeight          = 1f;
+        [Tooltip("World-units the wall drops below the waterline so it appears bottomless. Whole-path setting.")]
+        public float         depthBelowWater     = 7f;
+        [Tooltip("Wall thickness across the path (world units). Whole-path setting; node columns are this × nodeSizeScale thick.")]
+        public float         wallThickness       = 0.09f;
+        [Tooltip("Optional per-node height overrides (world units). Entry <= 0 or missing uses wallHeight.")]
+        public List<float>   nodeHeights         = new List<float>();
+        [Tooltip("Node column size relative to the wall: node column height & thickness = wall value × this. 1.1 = 10% bigger. Designer is authoritative — overrides the node prefab's own scale.")]
+        public float         nodeSizeScale       = 1.1f;
+        [Tooltip("Overall scale of the whole path. Editing it in the Grid Designer resizes every node around the path centre (baked into node positions).")]
+        public float         pathScale           = 1f;
 
         public bool IsSegmentCurved(int seg) =>
             segmentCurved != null && seg < segmentCurved.Count ? segmentCurved[seg] : true;
@@ -377,7 +435,54 @@ public class GridData : ScriptableObject
 
         public bool IsSegmentDestructible(int seg) =>
             segmentDestructible != null && seg < segmentDestructible.Count && segmentDestructible[seg];
+
+        // Effective height at node i: its override if positive, otherwise the path default.
+        public float NodeHeight(int i)
+        {
+            float h = (nodeHeights != null && i >= 0 && i < nodeHeights.Count) ? nodeHeights[i] : 0f;
+            return h > 0f ? h : wallHeight;
+        }
+
+        // Wall height interpolated along segment `seg` (node[seg]→node[seg+1]) at local t (0..1).
+        public float HeightAt(int seg, float t)
+        {
+            int n = nodes != null ? nodes.Count : 0;
+            if (n == 0) return wallHeight;
+            int i0 = Mathf.Clamp(seg, 0, n - 1);
+            int i1 = isClosed ? (seg + 1) % n : Mathf.Min(seg + 1, n - 1);
+            return Mathf.Lerp(NodeHeight(i0), NodeHeight(i1), Mathf.Clamp01(t));
+        }
     }
 
     public List<SplineWallPath> splineWallPaths = new List<SplineWallPath>();
+
+    // ─────────────────────────────────────────────
+    // CUBE BUILDINGS
+    // Procedurally-generated rectangular blocks drawn in the Grid Designer.
+    // Footprint is stored normalized to the arena (same -0.5..0.5 space as
+    // SplineWallPath nodes); multiply by WorldArenaWidth at spawn for world size.
+    // The block's top face sits `heightAboveWater` above the waterline and its
+    // bottom face drops `depthBelowWater` beneath it so it appears bottomless.
+    // ─────────────────────────────────────────────
+
+    [System.Serializable]
+    public class CubeBuilding
+    {
+        [Tooltip("Footprint centre in normalized grid space (-0.5..0.5 from centre), same space as SplineWallPath nodes.")]
+        public Vector2 center = Vector2.zero;
+
+        [Tooltip("Footprint width (X) as a fraction of the arena width. Multiplied by WorldArenaWidth at spawn.")]
+        public float width = 0.1f;
+
+        [Tooltip("Footprint length (Z) as a fraction of the arena width. Multiplied by WorldArenaWidth at spawn.")]
+        public float length = 0.1f;
+
+        [Tooltip("World-units the top surface stands above the waterline.")]
+        public float heightAboveWater = 2f;
+
+        [Tooltip("World-units the bottom face drops below the waterline so the block appears bottomless.")]
+        public float depthBelowWater = 5f;
+    }
+
+    public List<CubeBuilding> cubeBuildings = new List<CubeBuilding>();
 }

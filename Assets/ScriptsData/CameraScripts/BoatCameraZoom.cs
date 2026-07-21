@@ -42,6 +42,11 @@ public float whirlTweenTime = 0.25f;
 
     public float ZoomT { get; private set; }
 
+    // Current camera FOV, and a 0..1 zoom amount (0 = fully zoomed out at maxFOV,
+    // 1 = fully zoomed in at minFOV). Used by the Map UI to scale its imagery with zoom.
+    public float CurrentFOV    => cam != null ? cam.Lens.FieldOfView : defaultFOV;
+    public float NormalizedZoom => Mathf.InverseLerp(maxFOV, minFOV, CurrentFOV);
+
     void Start()
     {
         gameplayBaseFOV = defaultFOV;

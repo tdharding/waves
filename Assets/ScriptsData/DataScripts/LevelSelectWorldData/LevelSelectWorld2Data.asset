@@ -156,12 +156,19 @@ MonoBehaviour:
   - id: d54580f2-5bf9-4a36-9bc0-d067959f5e0b
     worldPosition: {x: 57.57128, y: 0, z: -27.849686}
     type: 0
+  - id: 5128b34f-8956-4859-8cf0-edd390670769
+    worldPosition: {x: 79.938866, y: 0, z: -16.047691}
+    type: 0
+  - id: edfdd305-ee3a-4542-ba2e-05f1dc9a9fb9
+    worldPosition: {x: 79.82427, y: 0, z: -28.26948}
+    type: 2
   paths:
   - pathId: cb512902-99c4-4aa3-973b-d4a908cef861
     segmentId: MainRiver
     nodeIds:
     - 6c2c0bb8-0ed6-4a0c-a0c7-31ed04a6984b
     - 41074375-ff3e-430e-9c56-aad6f0420be6
+    - 5128b34f-8956-4859-8cf0-edd390670769
     - e1f05638-ddfe-4bb2-9b7b-68de9e60a628
     isLeftPath: 0
     isRightPath: 0
@@ -231,7 +238,31 @@ MonoBehaviour:
     editorColor: {r: 0.9, g: 0.27, b: 0.8218802, a: 1}
     curveStrength: 0.1
     curveSubdivisions: 2
-  junctions: []
+  - pathId: a81a3bf5-f2e1-4015-b606-4880663b35dd
+    segmentId: Branch_04
+    nodeIds:
+    - 5128b34f-8956-4859-8cf0-edd390670769
+    - edfdd305-ee3a-4542-ba2e-05f1dc9a9fb9
+    isLeftPath: 0
+    isRightPath: 1
+    segmentType: 1
+    riverName: Branch_04
+    leadsToArena: 1
+    arenaIsAtEnd: 1
+    extrudeOnExit: 0
+    tJunctionBidirectional: 0
+    arenaGridDataGuid: 
+    editorColor: {r: 0.27, g: 0.9, b: 0.79415953, a: 1}
+    curveStrength: 1
+    curveSubdivisions: 2
+  junctions:
+  - junctionId: 4e64911c-ccd4-45c7-a00f-aeb4c6e7eed7
+    nodeId: 5128b34f-8956-4859-8cf0-edd390670769
+    pathIds:
+    - cb512902-99c4-4aa3-973b-d4a908cef861
+    - a81a3bf5-f2e1-4015-b606-4880663b35dd
+    riverPathId: cb512902-99c4-4aa3-973b-d4a908cef861
+    branchPathId: a81a3bf5-f2e1-4015-b606-4880663b35dd
   shops:
   - nodeId: 96534931-abe4-4d47-80b1-94b5937fbf7e
     pathId: 
@@ -256,6 +287,12 @@ MonoBehaviour:
       entranceIndex: 2
     - nodeId: ed6a26f4-1b0d-40a4-ac17-43bc986d2827
       entranceIndex: 3
+  - nodeId: edfdd305-ee3a-4542-ba2e-05f1dc9a9fb9
+    gridData: {fileID: 11400000, guid: 7f67e16e8af8b6b4cbaf779cab9aa6bd, type: 2}
+    entranceIndex: 0
+    arenaPrefabOverride: {fileID: 0}
+    arenaRadius: 6.38
+    secondaryEntrances: []
   junctionScriptObject: {fileID: 3543737601092306643, guid: cdc03d5a67a4c8a4ca447c17a1a65a6b, type: 3}
   junctionPrefab: {fileID: 3543737601092306643, guid: cdc03d5a67a4c8a4ca447c17a1a65a6b, type: 3}
   junctionRightFacingPrefab: {fileID: 1054175076011857233, guid: 08a0e3b54a9037545a500567ad11a7af, type: 3}
@@ -313,7 +350,7 @@ MonoBehaviour:
   musicController: {fileID: 0}
   openingSequence: {fileID: 0}
   targetScenePath: Assets/Scenes/LevelSelectWorlds/LevelSelectWorld2.unity
-  useOpeningSequence: 0
+  useOpeningSequence: 1
   openingSequenceStartPos: {x: 143.3325, y: 0, z: -12.623}
   openingSequencePrefab: {fileID: 7575765240899787153, guid: ac17943291d2d9d42b50db647d5bfb47, type: 3}
   canvasOriginX: 0

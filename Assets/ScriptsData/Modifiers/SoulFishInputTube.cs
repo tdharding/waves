@@ -14,6 +14,7 @@ public class SoulFishInputTube : MonoBehaviour
     [SerializeField] private SplineContainer localSpline;
     [SerializeField] private LevelWaveModifierControllerTypeB targetModifier;
     [SerializeField] private DoorLockHubController targetLockHub;
+    [SerializeField] private WaterLevelExitPipeController targetWaterExit;
     [SerializeField] private FishingController fishingController;
     [SerializeField] private GameObject fishPrefab;
     [SerializeField] private GameObject tubeExtrudePrefab;
@@ -74,6 +75,12 @@ public class SoulFishInputTube : MonoBehaviour
         InitializeSystem();
     }
 
+    public void SetTargetWaterExit(WaterLevelExitPipeController pipe)
+    {
+        targetWaterExit = pipe;
+        InitializeSystem();
+    }
+
     public void SetLocalSpline(SplineContainer spline)
     {
         localSpline = spline;
@@ -88,6 +95,7 @@ public class SoulFishInputTube : MonoBehaviour
     {
         if (targetModifier != null) return targetModifier.splineReceiver;
         if (targetLockHub != null) return targetLockHub.pipeConnector;
+        if (targetWaterExit != null) return targetWaterExit.splineReceiver;
         return null;
     }
 
@@ -99,7 +107,7 @@ public class SoulFishInputTube : MonoBehaviour
 
     private void InitializeSystem()
     {
-        bool hasTarget = targetModifier != null || targetLockHub != null;
+        bool hasTarget = targetModifier != null || targetLockHub != null || targetWaterExit != null;
         if (!hasTarget || localSpline == null || isInitialized) return;
 
         TryFindFishingController();
@@ -293,8 +301,9 @@ public class SoulFishInputTube : MonoBehaviour
             }
         }
 
-        // 5. Notify lock hub on arrival (wave modifier is notified via physics trigger on the fish)
+        // 5. Notify lock hub / water-exit pipe on arrival (wave modifier is notified via physics trigger on the fish)
         targetLockHub?.OnSoulArrived();
+        targetWaterExit?.OnSoulArrived();
 
         // 6. Cleanup
         if (fishingController != null && tracker != null)

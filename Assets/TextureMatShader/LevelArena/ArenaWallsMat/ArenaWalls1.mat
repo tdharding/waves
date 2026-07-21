@@ -182,6 +182,8 @@ Material:
     - _ReceiveShadows: 0
     - _ShadowFade: 1.2
     - _ShadowIntensity: 1.78
+    - _ShadowRadius: 4.19
+    - _ShadowRadiusSoftness: 2.67
     - _Smoothness: 0.609
     - _SmoothnessTextureChannel: 0
     - _SoftParticlesEnabled: 0

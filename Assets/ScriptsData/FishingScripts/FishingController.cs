@@ -47,6 +47,16 @@ public class FishingController : MonoBehaviour
     [Header("Glow FX")]
     [SerializeField] private Transform captureGlowPoint;
 
+    [Header("Toggle Visuals")]
+    [Tooltip("Extra ring visual shown only while sonar mode is active")]
+    [SerializeField] private GameObject sonarRing;
+
+    [Tooltip("Inner whirl skinned mesh; disabled until the whirl activates (Space pressed)")]
+    [SerializeField] private SkinnedMeshRenderer innerFishWhirlRenderer;
+
+    [Tooltip("When sonar is closing and its normalized radius drops to/below this, the inner whirl mesh is force-disabled")]
+    [SerializeField] private float sonarCloseThreshold = 0.02f;
+
     [Header("Audio")]
     public SoulCaptureSFXPlayer soulCaptureSFX;
 
@@ -72,15 +82,28 @@ public class FishingController : MonoBehaviour
     }
 
     private readonly List<FishFishingBehaviour> registeredFish = new();
+
+    // Read-only view for systems that react to live fish positions (e.g. WindowLightManager).
+    public IReadOnlyList<FishFishingBehaviour> RegisteredFish => registeredFish;
     private readonly List<Transform> tubeDeliveryTransforms = new();
 
     public void RegisterTubeDelivery(Transform t)   { if (t != null && !tubeDeliveryTransforms.Contains(t)) tubeDeliveryTransforms.Add(t); }
     public void UnregisterTubeDelivery(Transform t) { tubeDeliveryTransforms.Remove(t); }
 
+    private bool _sonarRingShown;
+    // True while the whirl is deployed (Space press → retract complete): hides the sonar ring
+    private bool _ringSuppressedByWhirl;
+
     void Start()
     {
         if (soulWhirlDirection != null)
             soulWhirlDirection.travelSpeed = fishTravelSpeed;
+
+        if (innerFishWhirlRenderer != null)
+            innerFishWhirlRenderer.enabled = false;
+
+        if (sonarRing != null)
+            sonarRing.SetActive(false);
     }
 
     // --------------------------------------------------
@@ -157,6 +180,9 @@ public class FishingController : MonoBehaviour
         }
         else
         {
+            // Inner whirl mesh is NOT disabled here — it stays visible through the
+            // retract animation and is switched off by OnRetractComplete() when the
+            // RetractNetBoat clip fires its end-of-animation event.
             whirlFX?.Retract();
             cameraZoom?.SetWhirlZoom(false);
             soulWhirlDirection?.SetFishingActive(false, pinchStrengthMin, pinchStrengthMax, whirlRadiusMin, whirlRadiusMax, whirlShaderTransitionSpeed);
@@ -170,7 +196,24 @@ public class FishingController : MonoBehaviour
 
     public void StartFishing()
     {
+        if (innerFishWhirlRenderer != null)
+            innerFishWhirlRenderer.enabled = true;
+
+        // Hide the sonar ring for the duration of the whirl (until retract completes)
+        _ringSuppressedByWhirl = true;
+
         whirlFX?.Deploy();
+    }
+
+    // Called once the RetractNetBoat animation finishes (relayed via WhirlFXController).
+    // Guarded so a fresh StartFishing during the retract won't wrongly hide the mesh.
+    public void OnRetractComplete()
+    {
+        if (innerFishWhirlRenderer != null && !fishingActive)
+            innerFishWhirlRenderer.enabled = false;
+
+        // Whirl is fully retracted — allow the sonar ring back (LateUpdate re-shows it if sonar is still active)
+        _ringSuppressedByWhirl = false;
     }
 
     // --------------------------------------------------
@@ -218,6 +261,25 @@ public class FishingController : MonoBehaviour
 
     void LateUpdate()
     {
+        // Sonar ring shows while sonar is active, but is hidden for the duration of the whirl
+        bool sonarOn = sonar != null && sonar.IsSonarActive;
+        bool ringShouldShow = sonarOn && !_ringSuppressedByWhirl;
+        if (sonarRing != null && ringShouldShow != _sonarRingShown)
+        {
+            _sonarRingShown = ringShouldShow;
+            sonarRing.SetActive(ringShouldShow);
+        }
+
+        // Safety: once the sonar has gone inactive and its radius has closed to ~0,
+        // force the inner whirl mesh off regardless of the retract flow. Gated on
+        // !sonarOn so it never fires during the brief near-zero window while opening.
+        if (innerFishWhirlRenderer != null && innerFishWhirlRenderer.enabled
+            && !sonarOn && sonar != null
+            && sonar.CurrentNormalizedRadius <= sonarCloseThreshold)
+        {
+            innerFishWhirlRenderer.enabled = false;
+        }
+
         int count = 0;
         for (int i = 0; i < registeredFish.Count && count < 8; i++)
         {
@@ -240,6 +302,17 @@ public class FishingController : MonoBehaviour
     {
         fishingActive = false;
         whirlFX?.DecreaseWhirl();
+
+        if (innerFishWhirlRenderer != null)
+            innerFishWhirlRenderer.enabled = false;
+
+        if (sonarRing != null)
+        {
+            sonarRing.SetActive(false);
+            _sonarRingShown = false;
+        }
+        _ringSuppressedByWhirl = false;
+
         Shader.SetGlobalFloat(HooverFishCountID, 0f);
     }
 }

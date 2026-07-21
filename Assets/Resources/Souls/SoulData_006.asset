@@ -14,9 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SoulData
   soulDataIdentity: 6
   fishPrefab: {fileID: 253525322543634003, guid: 33e03828ca8448643a20c3e33023a29a, type: 3}
-  homeLevelID: 
-  associatedWavePreset: {fileID: 11400000, guid: 3c3129a581286d74a943d52187bb2e54, type: 2}
+  homeLevelID: LargeLevelTest3
+  associatedWavePreset: {fileID: 11400000, guid: 7b44327b8a695e8499633a917141d38f, type: 2}
   allocated: 1
-  allocatedToLevelID: Level2Big
+  allocatedToLevelID: LargeLevelTest3
   soulName: Soul #6
   videoClip: {fileID: 32900000, guid: a0081b150ecf4994c9e3a025d8879995, type: 3}

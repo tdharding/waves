@@ -41,11 +41,7 @@ MonoBehaviour:
     closedLoop: 1
     radius: 0.5
     knotCount: 8
-    souls:
-    - {fileID: 11400000, guid: 6ce6c6de6a9bbb9498b0f62b1c91bbbb, type: 2}
-    - {fileID: 11400000, guid: e864bcc5385b7dd44b7f148c5b838eb4, type: 2}
-    - {fileID: 11400000, guid: 01115f2321dccc94f975b1b52dd7304c, type: 2}
-    - {fileID: 11400000, guid: 50dff3742e73fe24aa4da2ff4f033d56, type: 2}
+    souls: []
     statueGuarded: 1
     linkedStatueId: 1
     ringRadius: 1.5
@@ -56,16 +52,7 @@ MonoBehaviour:
     closedLoop: 0
     radius: 6.1
     knotCount: 6
-    souls:
-    - {fileID: 11400000, guid: 7942ae496e9ca334a9492af0454470f2, type: 2}
-    - {fileID: 11400000, guid: f275aa5391205a946a7997d27653b89a, type: 2}
-    - {fileID: 11400000, guid: 1bb12c3d5a3b443439a79a543d888b9d, type: 2}
-    - {fileID: 11400000, guid: 10541b4732983a64895a2e9fb56a0a9a, type: 2}
-    - {fileID: 11400000, guid: 59cbc66aaaf9cb94baff61d8e9a2462f, type: 2}
-    - {fileID: 11400000, guid: ce67aa4dccb7f61438c237ba9f77fb38, type: 2}
-    - {fileID: 11400000, guid: 55159700a4d740c44bc6a7bd8a84dc07, type: 2}
-    - {fileID: 11400000, guid: 202f359e43cb10e4eb16a5d06122181b, type: 2}
-    - {fileID: 11400000, guid: cf2c832d872d5f941ad674f3c46c1a32, type: 2}
+    souls: []
     statueGuarded: 0
     linkedStatueId: 0
     ringRadius: 0.08
@@ -83,12 +70,7 @@ MonoBehaviour:
     closedLoop: 1
     radius: 0.1
     knotCount: 8
-    souls:
-    - {fileID: 11400000, guid: 5dd47def8907c2344af77bc3449b8511, type: 2}
-    - {fileID: 11400000, guid: 190fe016701e3c84194052813c37af52, type: 2}
-    - {fileID: 11400000, guid: f921c4d61902d864495f9cc57478ee39, type: 2}
-    - {fileID: 11400000, guid: 31d002ec91bc01144ae6514dc5402499, type: 2}
-    - {fileID: 11400000, guid: 819882b48aeba7f429f87fd550d47e03, type: 2}
+    souls: []
     statueGuarded: 1
     linkedStatueId: 2
     ringRadius: 0.052
@@ -99,11 +81,7 @@ MonoBehaviour:
     closedLoop: 0
     radius: 0.5
     knotCount: 8
-    souls:
-    - {fileID: 11400000, guid: 4e6977c428b669d44977f56091fe3c2c, type: 2}
-    - {fileID: 11400000, guid: f461b3f2e1b14f848b8e4cd758b76ca3, type: 2}
-    - {fileID: 11400000, guid: 91ca60bd9ad90a146ab5d08c9b6f0929, type: 2}
-    - {fileID: 11400000, guid: cbb48d7113346304e8b170ef32454a63, type: 2}
+    souls: []
     statueGuarded: 0
     linkedStatueId: 3
     ringRadius: 0.08
@@ -148,16 +126,6 @@ MonoBehaviour:
   waterLevelModifierCellIndices: 
   waveModifierCellIndices: 
   prefabPlacements:
-  - cellIndex: 377
-    prefab: {fileID: 4089478517322769272, guid: 0ad9522f599f9b64d8410dc3a60b232a, type: 3}
-    isCircle: 0
-    isWorldSpaceProp: 0
-    statueId: 0
-    scale: 1
-    overrideModifierSettings: 0
-    speedBoost: 0
-    frequencyBoost: 0
-    rippleDepthBoost: 0
   - cellIndex: 493
     prefab: {fileID: 4089478517322769272, guid: 0ad9522f599f9b64d8410dc3a60b232a, type: 3}
     isCircle: 0
@@ -228,32 +196,12 @@ MonoBehaviour:
     speedBoost: 0
     frequencyBoost: 0
     rippleDepthBoost: 0
-  - cellIndex: 669
-    prefab: {fileID: 4089478517322769272, guid: 0ad9522f599f9b64d8410dc3a60b232a, type: 3}
-    isCircle: 0
-    isWorldSpaceProp: 0
-    statueId: 0
-    scale: 1
-    overrideModifierSettings: 0
-    speedBoost: 0
-    frequencyBoost: 0
-    rippleDepthBoost: 0
   - cellIndex: 109
     prefab: {fileID: 4089478517322769272, guid: 0ad9522f599f9b64d8410dc3a60b232a, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
     statueId: 0
     scale: 3.4
-    overrideModifierSettings: 0
-    speedBoost: 0
-    frequencyBoost: 0
-    rippleDepthBoost: 0
-  - cellIndex: 248
-    prefab: {fileID: 4089478517322769272, guid: 0ad9522f599f9b64d8410dc3a60b232a, type: 3}
-    isCircle: 0
-    isWorldSpaceProp: 0
-    statueId: 0
-    scale: 1
     overrideModifierSettings: 0
     speedBoost: 0
     frequencyBoost: 0
@@ -270,76 +218,6 @@ MonoBehaviour:
     rippleDepthBoost: 0
   - cellIndex: 388
     prefab: {fileID: 4089478517322769272, guid: 0ad9522f599f9b64d8410dc3a60b232a, type: 3}
-    isCircle: 0
-    isWorldSpaceProp: 0
-    statueId: 0
-    scale: 1
-    overrideModifierSettings: 0
-    speedBoost: 0
-    frequencyBoost: 0
-    rippleDepthBoost: 0
-  - cellIndex: 504
-    prefab: {fileID: 4089478517322769272, guid: 0ad9522f599f9b64d8410dc3a60b232a, type: 3}
-    isCircle: 0
-    isWorldSpaceProp: 0
-    statueId: 0
-    scale: 1
-    overrideModifierSettings: 0
-    speedBoost: 0
-    frequencyBoost: 0
-    rippleDepthBoost: 0
-  - cellIndex: 439
-    prefab: {fileID: 4089478517322769272, guid: 0ad9522f599f9b64d8410dc3a60b232a, type: 3}
-    isCircle: 0
-    isWorldSpaceProp: 0
-    statueId: 0
-    scale: 1.64
-    overrideModifierSettings: 0
-    speedBoost: 0
-    frequencyBoost: 0
-    rippleDepthBoost: 0
-  - cellIndex: 473
-    prefab: {fileID: 4089478517322769272, guid: 0ad9522f599f9b64d8410dc3a60b232a, type: 3}
-    isCircle: 0
-    isWorldSpaceProp: 0
-    statueId: 0
-    scale: 1
-    overrideModifierSettings: 0
-    speedBoost: 0
-    frequencyBoost: 0
-    rippleDepthBoost: 0
-  - cellIndex: 570
-    prefab: {fileID: 4089478517322769272, guid: 0ad9522f599f9b64d8410dc3a60b232a, type: 3}
-    isCircle: 0
-    isWorldSpaceProp: 0
-    statueId: 0
-    scale: 0.25
-    overrideModifierSettings: 0
-    speedBoost: 0
-    frequencyBoost: 0
-    rippleDepthBoost: 0
-  - cellIndex: 506
-    prefab: {fileID: 4089478517322769272, guid: 0ad9522f599f9b64d8410dc3a60b232a, type: 3}
-    isCircle: 0
-    isWorldSpaceProp: 0
-    statueId: 0
-    scale: 1
-    overrideModifierSettings: 0
-    speedBoost: 0
-    frequencyBoost: 0
-    rippleDepthBoost: 0
-  - cellIndex: 537
-    prefab: {fileID: 4089478517322769272, guid: 0ad9522f599f9b64d8410dc3a60b232a, type: 3}
-    isCircle: 0
-    isWorldSpaceProp: 0
-    statueId: 0
-    scale: 1
-    overrideModifierSettings: 0
-    speedBoost: 0
-    frequencyBoost: 0
-    rippleDepthBoost: 0
-  - cellIndex: 505
-    prefab: {fileID: 4089478517322769272, guid: b281873fcec2470459927b53eab8e1cc, type: 3}
     isCircle: 0
     isWorldSpaceProp: 0
     statueId: 0
@@ -443,6 +321,13 @@ MonoBehaviour:
     modifierTierIndex: -1
     inputTubeCellIndex: 724
     inputTubeTierIndex: -1
+    tubePath:
+    - {x: 20, y: 22}
+    - {x: 16, y: 24}
+    - {x: 12, y: 24}
+    - {x: 9, y: 23}
+    - {x: 6, y: 21}
+    tubeSubdivisions: 0
   tiers: []
   whirlpools: []
   whirlpoolDepth: 5
@@ -470,6 +355,12 @@ MonoBehaviour:
     segmentCurved: 000000000000000000000001
     segmentGap: 000000000000000000010000
     segmentDestructible: 000000010000010000000000
-    tileSpacing: 0.09
+    tileSpacing: 0.07
     prefabOverride: {fileID: 101384417285704880, guid: b4c222fbda622d34aa403df08beaaa59, type: 3}
     destructiblePrefabOverride: {fileID: 101384417285704880, guid: 4d50559f4f19fee47b5e220ea91d92ae, type: 3}
+  cubeBuildings:
+  - center: {x: 0.3109502, y: -0.034206487}
+    width: 0.205
+    length: 0.172
+    heightAboveWater: 2
+    depthBelowWater: 5

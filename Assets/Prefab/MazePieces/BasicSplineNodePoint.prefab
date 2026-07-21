@@ -79,6 +79,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PrefabBaselineAlignment
   showDebug: 1
+  useForwardOverride: 0
+  forwardEuler: {x: 0, y: 0, z: 0}
+  useUpOverride: 0
+  upEuler: {x: 0, y: 0, z: 0}
+  useScaleRadius: 0
+  scaleRadius: 3
 --- !u!1001 &1077632519496584164
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -234,7 +240,7 @@ PrefabInstance:
     - target: {fileID: -7511558181221131132, guid: 406bad0ce7a8a5841b50e84016e18888, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: 4075bc73f35557e459d7e66a033677cb, type: 2}
+      objectReference: {fileID: 2100000, guid: 258b11099042abe43bbb626cd95f20fd, type: 2}
     - target: {fileID: -5754084199372789682, guid: 406bad0ce7a8a5841b50e84016e18888, type: 3}
       propertyPath: m_Mesh
       value: 
