@@ -6,15 +6,21 @@
 // blocks, which scale because they're parented under the zoom content root.
 //
 // Layout per point (mirrors SoulFishWaveMask so both masks read the same registration data):
-//   .xz = position on the map surface   .y = this point's radius   .w = 2 -> connect to the next
+//   .xz = position on the map surface   .y = this point's radius   .w > 0 -> connect to the next
 // The map plane only ever rotates about Y, so comparing in XZ stays distortion-free.
+// (The wave mask packs ±(1 + arc length) into .w; the map only needs the sign, so its linker
+// packs ±1 — the connect test `w > 0` is the shared convention.)
+//
+// 40 slots to match SOULFISH_MAX_POINTS — curved zones densify into more points than their
+// authored nodes, and the old 10-point cap was already truncating multi-zone levels.
 //
 // NOTE THE _Map_ INFIX. These are bare uniforms, so they live in $Globals — a single slot shared
 // across every shader in the project, NOT per-material. They were previously named
 // _SoulFishPositions/_SoulFishCount, identical to SoulFishWaveMask's, so whichever linker wrote
 // last won and the wave's 17-point river was being truncated to the map's 10-point cap. Never give
 // these the same name as the wave mask's.
-float4 _SoulFishMapPositions[10];
+#define SOULFISH_MAP_MAX_POINTS 40
+float4 _SoulFishMapPositions[SOULFISH_MAP_MAX_POINTS];
 float _SoulFishMapCount;
 
 // Still pushed by SoulFishMapLinker for other map shaders; this mask no longer needs them.
@@ -33,9 +39,9 @@ float distToSegment_SoulMap(float2 p, float2 a, float2 b)
 void SoulFishMask_float(float3 WorldPos, float Radius, out float Mask)
 {
     float mask  = 0.0;
-    int   count = (int)_SoulFishMapCount;
+    int   count = min((int)_SoulFishMapCount, SOULFISH_MAP_MAX_POINTS);
 
-    for (int i = 0; i < 10; i++)
+    for (int i = 0; i < SOULFISH_MAP_MAX_POINTS; i++)
     {
         if (i >= count)
             break;
@@ -49,9 +55,9 @@ void SoulFishMask_float(float3 WorldPos, float Radius, out float Mask)
         // Normalized distance to this node: 0 = centre, 1 = edge.
         float t = distance(WorldPos.xz, p) / r;
 
-        // Connected points (w > 1.5) extend the zone along the segment, so a node chain reads as
+        // Connected points (w > 0) extend the zone along the segment, so a node chain reads as
         // one continuous river rather than beads. A closed loop keeps connecting off the end.
-        if (i < 9 && i < count - 1 && _SoulFishMapPositions[i].w > 1.5)
+        if (i < count - 1 && _SoulFishMapPositions[i].w > 0.0)
             t = min(t, distToSegment_SoulMap(WorldPos.xz, p, _SoulFishMapPositions[i+1].xz) / r);
 
         mask = max(mask, 1.0 - saturate(t));

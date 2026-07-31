@@ -13,33 +13,33 @@ MonoBehaviour:
   m_Name: LargeScaleWaves2
   m_EditorClassIdentifier: Assembly-CSharp::WavePreset
   state:
-    Frequency: 1.26
+    Frequency: 7.08
     Speed: 0.12
-    RippleDepth: -0.08
+    RippleDepth: 0.04
     Smoothness: 0
     Transparency: 1
-    Strength: 0.28
-    TroughRingWave1Brightness: 11
-    PeakRingWave2Brightness: 1.45
-    TwirlBaseStrength: -0.97
-    TwirlSlopeBoost: -3.05
-    TwirlScale: 5.12
+    Strength: 0.01
+    TroughRingWave1Brightness: 1.88
+    PeakRingWave2Brightness: 8.91
+    TwirlBaseStrength: -0.25
+    TwirlSlopeBoost: -0.2
+    TwirlScale: 0.48
     DepthTwirlStrength: 4.17
     DepthFadeStrength: 1.99
     DepthFadeLine: 3.66
     WhirlpoolTwirlStrength: 11.52
     WhirlpoolAreaTwirlStrength: 14.55
     SoulFishTwirlStrength: 0.78
-    SoulFishMaskStrength: 0.328
+    SoulFishMaskStrength: 0.059
     SoulFishRadius: 1.49
-    SoulFishBrightness1: 4.96
+    SoulFishBrightness1: 3
     SoulFishFadeStart: 0
-    SoulFishEdgeNoiseStrength: 0.65
-    SoulFishEdgeNoiseScale: 2.53
-    SoulFishEdgeNoiseScale2: 29.8
-    SoulFishEdgeNoiseSpeed: 0.92
-    ZoneTiling: {x: -0.16, y: 0.98}
-    ZoneScrollSpeed: 0.11
+    SoulFishEdgeNoiseStrength: 0.17
+    SoulFishEdgeNoiseScale: 6.19
+    SoulFishEdgeNoiseScale2: 160.3
+    SoulFishEdgeNoiseSpeed: 0.25
+    ZoneTiling: {x: -0.67, y: 0.98}
+    ZoneScrollSpeed: 0.015
     ZoneNoiseStrength: 0.16
     ZoneTexture: {fileID: 2800000, guid: f0208073e7e1ff74f8d935f89de3e807, type: 3}
     WhirlpoolTaper: 1.49

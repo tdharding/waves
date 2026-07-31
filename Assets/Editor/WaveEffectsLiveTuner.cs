@@ -635,12 +635,24 @@ public class WaveEffectsLiveTuner : EditorWindow
     {
         if (!waveMaterial || !testSoulFishEnabled || testSoulFishPositions.Count == 0) return;
 
-        int count = Mathf.Min(testSoulFishPositions.Count, 10);
+        // Matches SoulFishWaveLinker's packing: one flat 40-slot array, .y = per-point radius
+        // (0 = global fallback), .w = -1 for lone unconnected points. Dual-write (material +
+        // global) like the linker, since these are bare $Globals.
+        const int maxPoints = 40;
+        var buffer = new Vector4[maxPoints];
+        int count = Mathf.Min(testSoulFishPositions.Count, maxPoints);
         for (int i = 0; i < count; i++)
-            waveMaterial.SetVector("_SoulFishPosition" + (i + 1), testSoulFishPositions[i]);
-        for (int i = count; i < 10; i++)
-            waveMaterial.SetVector("_SoulFishPosition" + (i + 1), OffMap);
+        {
+            Vector3 p = testSoulFishPositions[i];
+            buffer[i] = new Vector4(p.x, p.y, p.z, -1f);
+        }
+        for (int i = count; i < maxPoints; i++)
+            buffer[i] = new Vector4(OffMap.x, 0f, OffMap.z, -1f);
+
+        waveMaterial.SetVectorArray("_SoulFishWavePositions", buffer);
         waveMaterial.SetFloat("_SoulFishCount", count);
+        Shader.SetGlobalVectorArray("_SoulFishWavePositions", buffer);
+        Shader.SetGlobalFloat("_SoulFishCount", count);
     }
 
     void ClearTestSoulFish()

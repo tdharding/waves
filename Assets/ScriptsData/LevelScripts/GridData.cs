@@ -116,6 +116,37 @@ public class GridData : ScriptableObject
     [System.Serializable]
     public class SoulZone
     {
+        // A zone is either the level's main soul-fish path (door A → door B) or a Sub-Zone —
+        // a bowl/statue-owned tributary that adjoins a main path and merges in when unlocked.
+        // Named for forward use in level-select / cross-level routing. Default keeps every
+        // existing zone as a MainPath (no behaviour change).
+        public enum ZoneRole { MainPath, SubZone }
+
+        [Tooltip("MainPath = the level's soul-fish highway. SubZone = a bowl/statue tributary that adjoins a main path.")]
+        public ZoneRole zoneRole = ZoneRole.MainPath;
+
+        // ── Stable identity & junction (single-level now; the keys carry to cross-level later) ──
+        [Tooltip("Stable unique id within this level. Assigned by the designer; referenced by junctions and (later) cross-level routing. 0 = unassigned (auto-filled on load).")]
+        public int zoneId = 0;
+
+        [Tooltip("SubZone only: the zoneId of the MainPath this tributary adjoins. 0 = not linked.")]
+        public int adjoinZoneId = 0;
+
+        [Tooltip("SubZone only: the node index on the adjoined MainPath where this tributary merges (normally a street-light node).")]
+        public int adjoinNodeIndex = -1;
+
+        [Tooltip("MainPath only: entrance index (into GridData.entrances) that is door A / the path's start. -1 = unset.")]
+        public int entryEntranceIndex = -1;
+
+        [Tooltip("MainPath only: entrance index (into GridData.entrances) that is door B / the path's exit. -1 = unset.")]
+        public int exitEntranceIndex = -1;
+
+        [Tooltip("Reserved for cross-level routing (level-select). A stable key identifying where this path's souls come from. Unused in single-level play.")]
+        public string externalSourceKey = "";
+
+        [Tooltip("Reserved for cross-level routing (level-select). A stable key identifying where this path's souls continue to. Unused in single-level play.")]
+        public string externalTargetKey = "";
+
         [Tooltip("LEGACY grid cell indices. Migrated into nodePositions on load; kept only for back-compat.")]
         public List<int> nodes = new List<int>();
 
@@ -125,11 +156,23 @@ public class GridData : ScriptableObject
         [Tooltip("True = the path closes back on itself into a loop.")]
         public bool closedLoop = false;
 
-        [Tooltip("Scatter/path radius for spline knot generation and wave mask (fish swim-band width).")]
+        [Tooltip("Per-segment curve flags: index i = segment node[i]→node[i+1] (closing segment last on loops). Missing entries = straight, so pre-curve zones keep their shape.")]
+        public List<bool> segmentCurved = new List<bool>();
+
+        [Tooltip("Scatter/path radius for spline knot generation and wave mask (fish swim-band width). For a SubZone tributary this is the SOURCE pool radius (around the bowl).")]
         public float radius = 0.5f;
+
+        [Tooltip("SubZone tributary only: half-width (world units) of the connecting path band from the source to the junction, separate from the source pool radius. Small = thin river.")]
+        public float pathWidth = 0.15f;
 
         [Tooltip("Number of spline knots to generate for fish swim path.")]
         public int knotCount = 8;
+
+        [Tooltip("Max samples per curved segment when the path is densified at runtime. Higher = smoother curves on the water, but the wave mask's 40-point budget is SHARED across all zones + fish on the level, so lavish zones leave less for others. 0/legacy = default 6.")]
+        public int curveResolution = 6;
+
+        // Guards legacy zones (field absent → deserializes to 0) and any 0 back to the default.
+        public int EffectiveCurveResolution => curveResolution > 0 ? Mathf.Clamp(curveResolution, 1, 16) : 6;
 
         [Tooltip("Soul identities in this zone. Each entry spawns one fish mesh instance.")]
         public List<SoulData> souls = new List<SoulData>();
@@ -149,6 +192,48 @@ public class GridData : ScriptableObject
                  "the bowl and drops into the water when the tower is destroyed; fish become catchable on landing. " +
                  "The bowl height and swim radius are defined by the tower prefab's FishBowlTowerController — not stored here.")]
         public bool towerGuarded = false;
+
+        // ── Street lights ────────────────────────────────────
+        // A street light stands on a path node and gates zone progression: the zone is
+        // revealed only up to the last lit light, ending in a circular fish pool around it.
+        // Feeding a caught soul into the NEXT light (in path order) draws the zone onward.
+
+        [System.Serializable]
+        public class StreetLight
+        {
+            [Tooltip("Index into nodePositions where this light stands.")]
+            public int nodeIndex;
+
+            [Tooltip("World-unit radius of the circular fish pool (mask + swim loop) around this light.")]
+            public float poolRadius = 1f;
+        }
+
+        public List<StreetLight> streetLights = new List<StreetLight>();
+
+        // Lights in path order (ascending node index) — the numbering shown in the designer
+        // and the order they must be fed in. Light #1 is lit from the start.
+        public List<StreetLight> StreetLightsInOrder()
+        {
+            var sorted = streetLights != null ? new List<StreetLight>(streetLights) : new List<StreetLight>();
+            sorted.Sort((a, b) => a.nodeIndex.CompareTo(b.nodeIndex));
+            return sorted;
+        }
+
+        public StreetLight StreetLightAtNode(int nodeIdx) =>
+            streetLights?.Find(l => l != null && l.nodeIndex == nodeIdx);
+
+        // Unlike SplineWallPath (missing = curved), zones default missing entries to straight —
+        // every zone authored before curve support must keep its rectilinear shape.
+        public bool IsSegmentCurved(int seg) =>
+            segmentCurved != null && seg >= 0 && seg < segmentCurved.Count && segmentCurved[seg];
+
+        // Segment count of the node path: one per gap between nodes, plus the closing segment on a loop.
+        public int SegmentCount()
+        {
+            int n = nodePositions?.Count ?? 0;
+            if (n < 2) return 0;
+            return (closedLoop && n >= 3) ? n : n - 1;
+        }
 
         // Back-compat: older assets stored grid-cell indices in `nodes`. Populate nodePositions
         // from them once so existing levels keep their zones. No-op after first migration.
@@ -307,10 +392,29 @@ public class GridData : ScriptableObject
     [System.Serializable]
     public class PrefabPlacement
     {
-        public int        cellIndex;
+        public int        cellIndex;       // LEGACY/derived: kept in sync with `position` (nearest cell)
+                                           // for back-compat consumers (links, map). `position` is authority.
         public GameObject prefab;
         public bool       isCircle;        // true = soul/overlay plane
         public bool       isWorldSpaceProp; // true = statue/world prop — skips grid rotation, uses baseline height
+
+        [Tooltip("Free normalized position (-0.5..0.5 from arena centre), same space as spline/soul nodes. " +
+                 "Authority for spawn + designer once freePlaced is set; cellIndex is kept in sync (nearest cell).")]
+        public UnityEngine.Vector2 position;
+
+        [Tooltip("False for legacy grid-bound placements; migrated to a free position (cell centre) on load.")]
+        public bool freePlaced;
+
+        // Migrate a legacy grid-bound placement to a free position at its cell centre. Idempotent.
+        public void EnsureFreePosition()
+        {
+            if (freePlaced) return;
+            position   = SoulZone.CellToNormalized(cellIndex);
+            freePlaced = true;
+        }
+
+        // Keep the legacy cellIndex pointing at the nearest cell to the free position.
+        public void SyncCellIndex() => cellIndex = NormalizedToCell(position);
 
         // Non-zero when this placement is a statue that owns a guarded soul-fish zone.
         // Stamped onto the spawned StatueBehaviour and matched by SoulZone.linkedStatueId.
@@ -331,6 +435,26 @@ public class GridData : ScriptableObject
     }
 
     public List<PrefabPlacement> prefabPlacements = new List<PrefabPlacement>();
+
+    // Nearest grid cell to a normalized position (inverse of SoulZone.CellToNormalized).
+    public static int NormalizedToCell(UnityEngine.Vector2 norm)
+    {
+        int col = Mathf.Clamp(Mathf.RoundToInt((norm.x + 0.5f) * GridSize - 0.5f), 0, GridSize - 1);
+        int row = Mathf.Clamp(Mathf.RoundToInt((0.5f - norm.y) * GridSize - 0.5f), 0, GridSize - 1);
+        return row * GridSize + col;
+    }
+
+    // One-time migration of legacy grid-bound placements (base + tiers) to free positions.
+    // Safe to call every load — idempotent per placement via freePlaced.
+    public void MigratePlacementPositions()
+    {
+        if (prefabPlacements != null)
+            foreach (var p in prefabPlacements) p?.EnsureFreePosition();
+        if (tiers != null)
+            foreach (var t in tiers)
+                if (t?.prefabPlacements != null)
+                    foreach (var p in t.prefabPlacements) p?.EnsureFreePosition();
+    }
 
     [System.Serializable]
     public struct LinkedPrefabPair

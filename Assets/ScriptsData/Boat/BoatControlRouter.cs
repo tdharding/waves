@@ -119,6 +119,16 @@ public class BoatControlRouter : MonoBehaviour
             else if (!spaceHeld && fishing.IsFishingActive)
                 fishing.SetFishingActive(false);
 
+            // Hold Up/Down while the whirl is out to lengthen/shorten it, moving the mouth
+            // closer to or further from the boat. The chosen length persists between deploys.
+            if (fishing.IsFishingActive)
+            {
+                float lengthAxis = 0f;
+                if (Input.GetKey(KeyCode.UpArrow))   lengthAxis += 1f;
+                if (Input.GetKey(KeyCode.DownArrow)) lengthAxis -= 1f;
+                fishing.AdjustWhirlLength(lengthAxis);
+            }
+
             boatMovement.SetBoosting(false);
             boatMovement.SetSonarSlow(true);
         }

@@ -37,7 +37,12 @@
       "PowerShell(git lfs version 2>&1)",
       "Bash(git restore *)",
       "Bash(cp '/c/Users/tomdh/Desktop/FILES/ART/2026_ART/tomhardingillustration/boat bobbing 256.png' /c/Users/tomdh/Desktop/FILES/ART/2026_ART/tomhardingillustration/boat.png)",
-      "Read(//c/Users/tomdh/Desktop/FILES/ART/2026_ART/tomhardingillustration/**)"
+      "Read(//c/Users/tomdh/Desktop/FILES/ART/2026_ART/tomhardingillustration/**)",
+      "Bash(git -C /c/Users/tomdh/Desktop/FILES/ART/2026_ART/tomhardingillustration commit -aq -m ' *)",
+      "Bash(git -C /c/Users/tomdh/Desktop/FILES/ART/2026_ART/tomhardingillustration push origin main)",
+      "Bash(git -C /c/Users/tomdh/Desktop/FILES/ART/2026_ART/tomhardingillustration rm --cached -q experimentallogov1.png)",
+      "Bash(git -C /c/Users/tomdh/Desktop/FILES/ART/2026_ART/tomhardingillustration add experimentallogov2.png index.html .gitignore)",
+      "Bash(git -C /c/Users/tomdh/Desktop/FILES/ART/2026_ART/tomhardingillustration status -s)"
     ]
   }
 }

@@ -1,6 +1,8 @@
 using System.Collections;
 using UnityEngine;
 
+// Runs before SecondWhirlChain (60) so the trailing chain reads the stretched mouth this frame.
+[DefaultExecutionOrder(50)]
 public class SoulWhirlDirection : MonoBehaviour
 {
     [Header("Tube Path")]
@@ -27,12 +29,40 @@ public class SoulWhirlDirection : MonoBehaviour
     [Tooltip("How many times faster than travelSpeed fish exit the tube when the whirl is released mid-travel")]
     public float reverseSpeedMultiplier = 2f;
 
+    [Header("Length Control")]
+    [Tooltip("WhirlArmature — the bones' parent. Scaled along its length axis to stretch the whole tube. " +
+             "Must be a transform with no animation curves of its own.")]
+    public Transform armatureRoot;
+
+    [Tooltip("Which local axis of the armature runs along the tube. Blender-exported bones run along Y.")]
+    public LengthAxis armatureLengthAxis = LengthAxis.Y;
+
+    [Tooltip("Shortest the whirl can be pulled in, as a fraction of the authored tube length")]
+    public float minLengthScale = 0.5f;
+
+    [Tooltip("Furthest the whirl can be pushed out, as a fraction of the authored tube length")]
+    public float maxLengthScale = 1.2f;
+
+    [Tooltip("How fast Up/Down changes the length scale, in scale units per second")]
+    public float lengthAdjustSpeed = 0.4f;
+
+    public enum LengthAxis { X, Y, Z }
+
+    // Persists between whirl deploys — the player's chosen reach is remembered.
+    private float _lengthScale = 1f;
+
+    // The armature's authored scale, captured before we ever stretch it.
+    private Vector3 _baseArmatureScale = Vector3.one;
+    private bool    _baseArmatureScaleCaptured;
+
 
     // --------------------------------------------------
     // PUBLIC API — used by FishFishingBehaviour
     // --------------------------------------------------
 
     public Vector3 MouthPosition => ComputeMouthPosition();
+    public float LengthScale => _lengthScale;
+    public Transform MouthBoneTransform => (boneChain != null && boneChain.Length > 0) ? MouthBone : null;
     public Vector3 MouthAxis     => MouthBone.up;
     public Transform[] GetPath()  => boneChain;
     public float EntryRadius      => mouthRadius;
@@ -86,8 +116,21 @@ public class SoulWhirlDirection : MonoBehaviour
         _transitionSpeed  = speed;
     }
 
+    // axis: +1 lengthens (Up), -1 shortens (Down), 0 idle. Called every frame by BoatControlRouter.
+    public void AdjustLength(float axis)
+    {
+        if (Mathf.Approximately(axis, 0f)) return;
+
+        _lengthScale = Mathf.Clamp(
+            _lengthScale + axis * lengthAdjustSpeed * Time.deltaTime,
+            minLengthScale,
+            maxLengthScale);
+    }
+
     void LateUpdate()
     {
+        ApplyLengthScale();
+
         if (boneChain == null || boneChain.Length < 2 || sonarGridMaterial == null) return;
 
         float targetT = _fishingActive ? 1f : 0f;
@@ -108,7 +151,34 @@ public class SoulWhirlDirection : MonoBehaviour
     Vector3 ComputeMouthPosition()
     {
         if (boneChain == null || boneChain.Length < 1) return transform.position;
-        return MouthBone.position + TubeAxis * mouthOffset;
+        // mouthOffset is a distance along the tube, so it stretches with the tube.
+        return MouthBone.position + TubeAxis * (mouthOffset * _lengthScale);
+    }
+
+    // Stretches the tube by scaling the armature along its length axis only, so the tube gets
+    // longer or shorter without getting fatter. Scaling the armature rather than the bones is
+    // deliberate: the deploy/retract clips drive the bones' own position AND scale, so anything
+    // written directly to a bone fights the clip. The armature root carries no curves, so this
+    // layers cleanly underneath — the animation plays exactly as authored, at the player's length.
+    void ApplyLengthScale()
+    {
+        if (armatureRoot == null) return;
+
+        if (!_baseArmatureScaleCaptured)
+        {
+            _baseArmatureScale         = armatureRoot.localScale;
+            _baseArmatureScaleCaptured = true;
+        }
+
+        Vector3 s = _baseArmatureScale;
+        switch (armatureLengthAxis)
+        {
+            case LengthAxis.X: s.x *= _lengthScale; break;
+            case LengthAxis.Y: s.y *= _lengthScale; break;
+            case LengthAxis.Z: s.z *= _lengthScale; break;
+        }
+
+        armatureRoot.localScale = s;
     }
 
 #if UNITY_EDITOR
@@ -147,6 +217,15 @@ public class SoulWhirlDirection : MonoBehaviour
         // dot at mouth
         Gizmos.DrawSphere(mouth, 0.04f);
 
+        // ── length range (magenta) ────────────────────────────────────────────
+        // Where the mouth sits at the two extremes of the Up/Down control.
+        if (armatureRoot != null)
+        {
+            Gizmos.color = Color.magenta;
+            Gizmos.DrawWireSphere(ScaledMouth(minLengthScale), 0.05f);
+            Gizmos.DrawWireSphere(ScaledMouth(maxLengthScale), 0.05f);
+        }
+
         // ── travel path (cyan) ────────────────────────────────────────────────
         Gizmos.color = Color.cyan;
 
@@ -158,6 +237,19 @@ public class SoulWhirlDirection : MonoBehaviour
             Gizmos.DrawSphere(bone.position, 0.03f);
             prev = bone.position;
         }
+    }
+
+    // Where the mouth would land if the armature were scaled by `scale` along its length axis.
+    Vector3 ScaledMouth(float scale)
+    {
+        Vector3 local = armatureRoot.InverseTransformPoint(MouthBone.position);
+        switch (armatureLengthAxis)
+        {
+            case LengthAxis.X: local.x *= scale; break;
+            case LengthAxis.Y: local.y *= scale; break;
+            case LengthAxis.Z: local.z *= scale; break;
+        }
+        return armatureRoot.TransformPoint(local) + TubeAxis * (mouthOffset * scale);
     }
 
     static readonly int discSegments = 24;

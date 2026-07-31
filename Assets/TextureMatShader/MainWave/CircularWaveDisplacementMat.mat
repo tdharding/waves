@@ -78,7 +78,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _NormalTexture:
-        m_Texture: {fileID: 2800000, guid: df38cf9d91960914390da89498cd9566, type: 3}
+        m_Texture: {fileID: 2800000, guid: aeb74d7691c0cd64ea8d5b9b54a45338, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _OcclusionMap:
@@ -147,7 +147,7 @@ Material:
     - _BoatRippleSpeed: 0.2
     - _BoatRipplesFrequency: 10
     - _BoatSonarPosition: 0
-    - _BoatSpeed01: 0.333359
+    - _BoatSpeed01: 0.33204463
     - _BoatTrailWidth: 40
     - _BowAmplitude: -2.43
     - _BowFrontWaveClamp: 1
@@ -188,7 +188,7 @@ Material:
     - _FoamSoftness: 4.33
     - _FoamSpeed: 0.2
     - _FoamStrength: -1.56
-    - _Frequency: 1.26
+    - _Frequency: 7.08
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
@@ -206,20 +206,20 @@ Material:
     - _Parallax: 0.005
     - _PeakRingWave1Brightness: -0.44
     - _PeakRingWave1Contrast: 0.83
-    - _PeakRingWave2Brightness: 1.45
+    - _PeakRingWave2Brightness: 8.91
     - _PeakRingWave2Contrast: -0.01
     - _PeakTroughSmoothStepFactor: 0.22
-    - _QueueControl: 0
+    - _QueueControl: 1
     - _QueueOffset: 32
     - _ReceiveShadows: 1
     - _RingAmplitude: 0.05
     - _RingFalloff: 0.34
     - _RingFrequency: 4
     - _RingScrollSpeed: 1.26
-    - _RippleDepth: -0.08
+    - _RippleDepth: 0.04
     - _ShadowStep: 0
     - _SmoothStepNormalDepthWave: 0.57
-    - _Smoothness: 0.208
+    - _Smoothness: 0
     - _SmoothnessTextureChannel: 0
     - _SonarBDimensionMultiply: 1
     - _SonarGDimensionMultiply: 0.5
@@ -227,9 +227,9 @@ Material:
     - _SonarRadius: 1.87
     - _Sonar_Radius: 0
     - _Sonar_Radius_Softness: 0
-    - _SoulFishBrightness1: 1.12
+    - _SoulFishBrightness1: 3
     - _SoulFishDistortion1: 10.82
-    - _SoulFishMaskStrength: 0.328
+    - _SoulFishMaskStrength: 0.059
     - _SoulFishRadius1: 0.1
     - _SoulFishRadius10: 0.1
     - _SoulFishRadius2: 0.55
@@ -261,13 +261,13 @@ Material:
     - _TimeNormal2: 0.01
     - _Transparency: 1
     - _TroughBrightness: 0
-    - _TroughRingWave1Brightness: 32.4
+    - _TroughRingWave1Brightness: 1.88
     - _TroughRingWave1Contrast: 0.7
     - _TroughRingWave2Brightness: 1.8
     - _TroughRingWave2Contrast: 1.1
-    - _TwirlBaseStrength: 0.67
-    - _TwirlScale: 70.8
-    - _TwirlSlopeBoost: 0.66
+    - _TwirlBaseStrength: -0.25
+    - _TwirlScale: 0.48
+    - _TwirlSlopeBoost: -0.2
     - _TwirlSpeed: 1
     - _TwirlStrengthNormal: 0.28
     - _VoronoiFactor: 0
@@ -287,8 +287,8 @@ Material:
     - _WorkflowMode: 1
     - _XRMotionVectorsPass: 1
     - _ZWrite: 1
-    - _ZoneNoiseStrength: 0.109
-    - _ZoneScrollSpeed: 0.04
+    - _ZoneNoiseStrength: 0.16
+    - _ZoneScrollSpeed: 0.015
     - _ZoneTiling: 18.52
     - _boatedgemaskwidth: 0
     - _boatedgewavesharpness: 1.41
@@ -297,12 +297,12 @@ Material:
     m_Colors:
     - _ArenaMask: {r: 0, g: -5.5, b: 0, a: 0}
     - _BaseColor: {r: 0.9245283, g: 0.9245283, b: 0.9245283, a: 1}
-    - _BoatCenter: {r: -2.772887, g: 0, b: 1.5248647, a: 0}
-    - _BoatForward: {r: 0.056557283, g: 0.010235384, b: -0.9983471, a: 0}
-    - _BoatForwardLocal: {r: 0.056557283, g: -0.9983472, b: 0, a: 0}
-    - _BoatPosition: {r: -2.7672312, g: -5.4462037, b: 1.4250298, a: 0}
-    - _BoatRight: {r: -0.99693733, g: -0.053520545, b: -0.057026125, a: 0}
-    - _BoatSonarPosition: {r: -2.7722926, g: -5.503314, b: 1.524898, a: 0}
+    - _BoatCenter: {r: 2.3939989, g: 0, b: -4.1149735, a: 0}
+    - _BoatForward: {r: 0.9089289, g: -0.04367575, b: 0.41465762, a: 0}
+    - _BoatForwardLocal: {r: 0.9089289, g: 0.41465768, b: 0, a: 0}
+    - _BoatPosition: {r: 2.4848917, g: -5.485269, b: -4.0735073, a: 0}
+    - _BoatRight: {r: 0.41399622, g: 0.21273151, b: -0.8850721, a: 0}
+    - _BoatSonarPosition: {r: 2.3937492, g: -5.5, b: -4.1144323, a: 0}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _DeepColour: {r: 1, g: 0, b: 0, a: 1}
     - _DepthColour: {r: 1, g: 1, b: 1, a: 0}
@@ -318,22 +318,22 @@ Material:
     - _ShadowColour: {r: 0, g: 0, b: 0, a: 1}
     - _SonarRadiusDimensions: {r: 0, g: 0, b: 0, a: 0}
     - _Sonar_Effect_Color: {r: 0, g: 0, b: 0, a: 0}
-    - _SoulFishPosition1: {r: 9.974999, g: 0.4, b: 9.974999, a: 2}
-    - _SoulFishPosition10: {r: 1.5206002, g: 0.4, b: -3.3979542, a: 2}
-    - _SoulFishPosition2: {r: 5.549806, g: 0.4, b: 10.032736, a: 2}
-    - _SoulFishPosition3: {r: 5.489669, g: 0.4, b: 5.482339, a: 2}
-    - _SoulFishPosition4: {r: 1.179823, g: 0.4, b: 5.522429, a: 2}
-    - _SoulFishPosition5: {r: -3.2503, g: 0.4, b: 5.502382, a: 2}
-    - _SoulFishPosition6: {r: -3.270347, g: 0.4, b: 1.052215, a: 2}
-    - _SoulFishPosition7: {r: -7.7806516, g: 0.4, b: 1.052215, a: 2}
-    - _SoulFishPosition8: {r: -7.7606044, g: 0.4, b: -3.4380445, a: 2}
-    - _SoulFishPosition9: {r: -3.1701171, g: 0.4, b: -3.3979542, a: 2}
+    - _SoulFishPosition1: {r: 99999, g: 99999, b: 99999, a: 0}
+    - _SoulFishPosition10: {r: 99999, g: 99999, b: 99999, a: 0}
+    - _SoulFishPosition2: {r: 99999, g: 99999, b: 99999, a: 0}
+    - _SoulFishPosition3: {r: 99999, g: 99999, b: 99999, a: 0}
+    - _SoulFishPosition4: {r: 99999, g: 99999, b: 99999, a: 0}
+    - _SoulFishPosition5: {r: 99999, g: 99999, b: 99999, a: 0}
+    - _SoulFishPosition6: {r: 99999, g: 99999, b: 99999, a: 0}
+    - _SoulFishPosition7: {r: 99999, g: 99999, b: 99999, a: 0}
+    - _SoulFishPosition8: {r: 99999, g: 99999, b: 99999, a: 0}
+    - _SoulFishPosition9: {r: 99999, g: 99999, b: 99999, a: 0}
     - _SoulFishWaveColor: {r: 0, g: 0, b: 0, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
     - _SurfaceColourTest1: {r: 0, g: 0.8023877, b: 1, a: 1}
     - _Tiling: {r: 20, g: 20, b: 0, a: 0}
     - _WaveCenter: {r: 0, g: 0, b: 0, a: 0}
     - _WaveCenter5: {r: 0.34, g: 0, b: 0, a: 0}
-    - _ZoneTiling: {r: -0.16, g: 0.98, b: 0, a: 0}
+    - _ZoneTiling: {r: -0.67, g: 0.98, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

@@ -1,28 +1,23 @@
-// Declare individual position properties
-float4 _SoulFishPosition1;
-float4 _SoulFishPosition2;
-float4 _SoulFishPosition3;
-float4 _SoulFishPosition4;
-float4 _SoulFishPosition5;
-float4 _SoulFishPosition6;
-float4 _SoulFishPosition7;
-float4 _SoulFishPosition8;
-float4 _SoulFishPosition9;
-float4 _SoulFishPosition10;
-float4 _SoulFishPosition11;
-float4 _SoulFishPosition12;
-float4 _SoulFishPosition13;
-float4 _SoulFishPosition14;
-float4 _SoulFishPosition15;
-float4 _SoulFishPosition16;
-float4 _SoulFishPosition17;
-float4 _SoulFishPosition18;
-float4 _SoulFishPosition19;
-float4 _SoulFishPosition20;
+// Soul fish zone mask + path-space UV for the wave surface.
+//
+// Packed points arrive from SoulFishWaveLinker as one flat array shared by every zone on the
+// level (a zone is a consecutive run of chained points):
+//   .xz = world position          .y = this point's mask radius (0 = use _SoulFishRadius)
+//   .w  = ±(1 + cumulative XZ arc length along the zone at this point)
+//         sign:  positive = connects to the next point, negative = end of a chain / lone point
+// The arc length riding in .w is what makes a consistent along-path UV possible: the shader
+// recovers s = |w| - 1 + h·segLen at any pixel without a second uniform array.
+//
+// These are bare $Globals (NOT blackboard properties) — see SoulFishWaveLinker for why they are
+// re-pushed every frame through both Material.Set* and Shader.SetGlobal*. The array is written
+// with SetVectorArray; global arrays lock their size on first set, so the linker always pushes
+// the full 40 slots.
+#define SOULFISH_MAX_POINTS 40
 
-float _SoulFishCount;
-float _SoulFishRadius;
-float _SoulFishStrength;
+float4 _SoulFishWavePositions[SOULFISH_MAX_POINTS];
+float  _SoulFishCount;
+float  _SoulFishRadius;
+float  _SoulFishStrength;
 
 // Edge-fade noise controls (set from WaveMaterialController / WaveEffectsLiveTuner).
 float _SoulFishFadeStart;         // 0..1 of the radius where the fade band begins (core stays solid below this)
@@ -30,13 +25,6 @@ float _SoulFishEdgeNoiseStrength; // how hard the noise erodes/extends the fade 
 float _SoulFishEdgeNoiseScale;    // world-space frequency of the large octave (used at the inner fade)
 float _SoulFishEdgeNoiseScale2;   // world-space frequency of the fine octave (used at the outer edge)
 float _SoulFishEdgeNoiseSpeed;    // scroll speed for the animated fringe
-
-float distToSegment_SoulFish(float2 p, float2 a, float2 b)
-{
-    float2 pa = p - a, ba = b - a;
-    float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
-    return length(pa - ba * h);
-}
 
 // --- Procedural value noise (self-contained; no texture bindings) ---
 float hash_SoulFish(float2 p)
@@ -58,36 +46,23 @@ float valueNoise_SoulFish(float2 p)
     return lerp(lerp(a, b, u.x), lerp(c, d, u.x), u.y);
 }
 
-void SoulFishWaveMask_float(
+// Core evaluation shared by both graph entry points.
+//
+// PathUV is a path-space coordinate: x = distance travelled along the zone path (world units,
+// continuous across nodes thanks to the packed arc length), y = signed sideways offset from the
+// path centreline (positive = left of travel). Scrolling PathUV.x makes the texture flow down
+// the river in one consistent trajectory — corners bend the texture instead of smearing it.
+// For lone points (single-node zones, loose fish) PathUV falls back to the static local offset
+// from the point, matching the old "circular zones don't scroll" behaviour.
+void SoulFishWaveMaskCore(
     float3 WorldPos,
     float  SoulFishMaskStrength,
     out float  Mask,
-    out float2 Flow)   // world-space XZ direction along the nearest river segment (0 for circular zones)
+    out float2 Flow,
+    out float2 PathUV)
 {
-    float4 positions[20];
-    positions[0]  = _SoulFishPosition1;
-    positions[1]  = _SoulFishPosition2;
-    positions[2]  = _SoulFishPosition3;
-    positions[3]  = _SoulFishPosition4;
-    positions[4]  = _SoulFishPosition5;
-    positions[5]  = _SoulFishPosition6;
-    positions[6]  = _SoulFishPosition7;
-    positions[7]  = _SoulFishPosition8;
-    positions[8]  = _SoulFishPosition9;
-    positions[9]  = _SoulFishPosition10;
-    positions[10] = _SoulFishPosition11;
-    positions[11] = _SoulFishPosition12;
-    positions[12] = _SoulFishPosition13;
-    positions[13] = _SoulFishPosition14;
-    positions[14] = _SoulFishPosition15;
-    positions[15] = _SoulFishPosition16;
-    positions[16] = _SoulFishPosition17;
-    positions[17] = _SoulFishPosition18;
-    positions[18] = _SoulFishPosition19;
-    positions[19] = _SoulFishPosition20;
-
     float maskAccum = 0.0;
-    int count = (int)_SoulFishCount;
+    int count = min((int)_SoulFishCount, SOULFISH_MAX_POINTS);
 
     // Two animated world-space noise octaves, evaluated once (they depend only on the pixel).
     // A large base octave and a finer octave; they're blended per point across the fade band below.
@@ -98,35 +73,68 @@ void SoulFishWaveMask_float(
 
     float fadeStart = saturate(_SoulFishFadeStart);
 
-    float2 flowSum = float2(0.0, 0.0); // proximity-weighted sum of segment tangents
+    float2 flowSum = float2(0.0, 0.0); // proximity-weighted sum of segment tangents (legacy Flow)
 
-    for (int i = 0; i < 20; i++)
+    // Nearest feature wins the UV. bestT compares radius-normalized distances so zones with
+    // different radii hand over exactly where their mask dominance changes.
+    float  bestT  = 1e9;
+    float2 bestUV = float2(0.0, 0.0);
+
+    for (int i = 0; i < SOULFISH_MAX_POINTS; i++)
     {
         if (i >= count) break;
 
-        float2 p = positions[i].xz;
+        float4 P = _SoulFishWavePositions[i];
+        float2 p = P.xz;
 
-        // Per-point mask radius rides in the otherwise-unused .y channel, authored by the
-        // Grid Designer soul-zone radius. Points with y == 0 (e.g. loose fish) fall back to
-        // the global _SoulFishRadius, preserving the old behaviour.
-        float r = positions[i].y > 0.0001 ? positions[i].y : _SoulFishRadius;
+        float r = P.y > 0.0001 ? P.y : _SoulFishRadius;
         r = max(r, 0.0001);
+
+        bool  connects = (P.w > 0.0) && (i < count - 1);
+        float cumLen   = abs(P.w) - 1.0;
 
         // Nearest normalized distance to this point (and its outgoing segment): 0 = centre, 1 = edge.
         float t = length(WorldPos.xz - p) / r;
-        if (i < 19 && i < count - 1 && positions[i].w > 1.5)
-        {
-            float2 seg    = positions[i+1].xz - p;
-            float  segLen = length(seg);
-            float  ds     = distToSegment_SoulFish(WorldPos.xz, p, positions[i+1].xz);
-            t = min(t, ds / r);
 
-            // Accumulate the segment tangent, weighted by proximity, so Flow blends smoothly
-            // between segments instead of snapping at the node joints.
-            if (segLen > 1e-4)
+        if (connects)
+        {
+            float2 ba      = _SoulFishWavePositions[i + 1].xz - p;
+            float2 pa      = WorldPos.xz - p;
+            float  segLen2 = dot(ba, ba);
+            if (segLen2 > 1e-8)
             {
+                float segLen = sqrt(segLen2);
+                float h      = clamp(dot(pa, ba) / segLen2, 0.0, 1.0);
+                float ds     = length(pa - ba * h);
+                t = min(t, ds / r);
+
+                // Accumulate the segment tangent, weighted by proximity, so Flow blends smoothly
+                // between segments instead of snapping at the node joints.
                 float w = saturate(1.0 - ds / r);
-                flowSum += (seg / segLen) * w;
+                flowSum += (ba / segLen) * w;
+
+                // Path-space candidate. ds (euclidean distance to the segment) is continuous
+                // through corners — beyond an open end it becomes distance to the endpoint, so
+                // end caps and outer corners never tear the UV.
+                float tSeg = ds / r;
+                if (tSeg < bestT)
+                {
+                    bestT = tSeg;
+                    float s      = cumLen + h * segLen;
+                    float crossZ = ba.x * pa.y - ba.y * pa.x; // >0 = left of travel direction
+                    bestUV = float2(s, crossZ >= 0.0 ? ds : -ds);
+                }
+            }
+        }
+        else
+        {
+            // Lone point: not chaining out, and nothing chains into it (chain interiors and
+            // endpoints are already covered by their segment's clamped projection above).
+            bool chainedInto = (i > 0) && (_SoulFishWavePositions[i - 1].w > 0.0);
+            if (!chainedInto && t < bestT)
+            {
+                bestT  = t;
+                bestUV = WorldPos.xz - p; // static local offset — circular zones don't scroll
             }
         }
 
@@ -150,4 +158,31 @@ void SoulFishWaveMask_float(
     // Normalized flow direction along the path (0 for single-node / circular zones).
     float flowLen = length(flowSum);
     Flow = flowLen > 1e-4 ? flowSum / flowLen : float2(0.0, 0.0);
+
+    PathUV = bestUV;
+}
+
+// Legacy entry point — keeps existing Custom Function nodes (Mask + Flow outputs) compiling
+// unchanged. Prefer SoulFishWaveMaskPath below for the path-space UV.
+void SoulFishWaveMask_float(
+    float3 WorldPos,
+    float  SoulFishMaskStrength,
+    out float  Mask,
+    out float2 Flow)
+{
+    float2 pathUV;
+    SoulFishWaveMaskCore(WorldPos, SoulFishMaskStrength, Mask, Flow, pathUV);
+}
+
+// Path-space entry point. Wire PathUV into Tiling And Offset (UV input) and scroll by offsetting
+// x with Time × ZoneScrollSpeed — the texture then travels along the zone path everywhere.
+// PathUV is in world units on both axes.
+void SoulFishWaveMaskPath_float(
+    float3 WorldPos,
+    float  SoulFishMaskStrength,
+    out float  Mask,
+    out float2 Flow,
+    out float2 PathUV)
+{
+    SoulFishWaveMaskCore(WorldPos, SoulFishMaskStrength, Mask, Flow, PathUV);
 }

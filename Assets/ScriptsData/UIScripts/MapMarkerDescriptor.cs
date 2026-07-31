@@ -6,8 +6,9 @@ using UnityEngine;
 /// </summary>
 public enum MapIcon
 {
-    BigSpike,   // triangle, gradient fill, bottom ~10% fades out
-    FishBowl,   // lollipop: rectangle stick + circle on top
+    BigSpike,     // triangle, gradient fill, bottom ~10% fades out
+    FishBowl,     // lollipop: rectangle stick + circle on top
+    StreetLight,  // lollipop with a bulb (black off / white on) + halo behind (shown when lit)
 }
 
 /// <summary>

@@ -151,7 +151,7 @@ Material:
     - _InMinMax1: {r: -1.33, g: -1.01, b: 0, a: 0}
     - _LightAngle1: {r: -4.7, g: 35.7, b: 41.8, a: 0}
     - _LightAngle2: {r: -4.7, g: 19.62, b: 465.8, a: 0}
-    - _SonarCenter: {r: 0.50018466, g: 0.45660645, b: 0, a: 0}
+    - _SonarCenter: {r: 0.500068, g: 0.45802423, b: 0, a: 0}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
     - _Tiling: {r: 1, g: 1, b: 0, a: 0}
     - _Tiling_1: {r: 1, g: 1, b: 0, a: 0}

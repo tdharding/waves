@@ -62,6 +62,12 @@ public float ui3DCameraX = float.MaxValue; // sentinel — slider reads camera p
     public List<string> unlockedObstacles = new List<string>();
 
     // ─────────────────────────────────────────────
+    // SHOP PURCHASES
+    // IDs of items bought from shops (figurehead, etc.). Permanent.
+    // ─────────────────────────────────────────────
+    public List<string> purchasedShopItems = new List<string>();
+
+    // ─────────────────────────────────────────────
     // EXIT-UNLOCKED RIVER SEGMENTS
     // Segments with ExtrudeOnExit=true that have been permanently unlocked
     // after the player exited an arena. Persisted so they stay extruded on reload.

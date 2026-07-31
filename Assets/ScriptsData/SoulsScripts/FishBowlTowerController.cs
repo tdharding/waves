@@ -170,6 +170,14 @@ public class FishBowlTowerController : MonoBehaviour
 
         Debug.Log($"[FishBowlTower] Bowl landed at Y={ProbePos().y:0.##} on '{name}' — dissolving glass, settling shoal.", this);
 
+        // Tributary bowls carry a street-light chain whose swim spline was baked aloft at spawn.
+        // Re-bake it now that the container sits at the water, so the drawn path/pools line up.
+        if (_container != null)
+        {
+            var chain = _container.GetComponentInChildren<SoulZoneStreetLightChain>(true);
+            if (chain != null) chain.RebakeAfterMove();
+        }
+
         // The shoal eases each fish from the surface down to its exact wave depth, then opens catching.
         if (_container != null) _container.BeginSettle(settleDuration);
     }

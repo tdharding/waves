@@ -349,6 +349,48 @@ public static class GameProgressData
     }
 
     // ─────────────────────────────────────────────
+    // SHOP PURCHASES
+    // ─────────────────────────────────────────────
+
+    /// <summary>Fired when an item is bought (or revoked in the tester tool),
+    /// so anything already in the scene can react immediately.</summary>
+    public static event System.Action<string, bool> ShopItemOwnershipChanged;
+
+    public static bool IsItemPurchased(string itemID)
+    {
+        if (string.IsNullOrEmpty(itemID)) return false;
+        return SaveManager.Load().purchasedShopItems.Contains(itemID);
+    }
+
+    public static void PurchaseItem(string itemID)
+    {
+        if (string.IsNullOrEmpty(itemID)) return;
+        var data = SaveManager.Load();
+        if (!data.purchasedShopItems.Contains(itemID))
+        {
+            data.purchasedShopItems.Add(itemID);
+            SaveManager.Write();
+        }
+        ShopItemOwnershipChanged?.Invoke(itemID, true);
+    }
+
+    /// <summary>Undoes a purchase. Used by the tester tool.</summary>
+    public static void RevokeItem(string itemID)
+    {
+        if (string.IsNullOrEmpty(itemID)) return;
+        var data = SaveManager.Load();
+        if (data.purchasedShopItems.Remove(itemID))
+            SaveManager.Write();
+        ShopItemOwnershipChanged?.Invoke(itemID, false);
+    }
+
+    public static void ClearPurchasedItems()
+    {
+        SaveManager.Load().purchasedShopItems.Clear();
+        SaveManager.Write();
+    }
+
+    // ─────────────────────────────────────────────
     // EXIT-UNLOCKED RIVER SEGMENTS
     // ─────────────────────────────────────────────
 

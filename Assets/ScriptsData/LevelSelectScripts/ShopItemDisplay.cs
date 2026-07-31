@@ -9,6 +9,11 @@ public class ShopItemDisplay : MonoBehaviour
     public string itemName = "Shop Item";
     public int price = 10;
 
+    [Tooltip("Save ID for this purchase, e.g. \"Figurehead\". Leave blank for items that can be bought repeatedly.")]
+    public string itemID = "";
+    [Tooltip("Hide the item from the shop once it has been bought.")]
+    public bool hideOnceOwned = true;
+
     [Header("Positioning")]
     [Tooltip("How far above the spawn point the item floats.")]
     public float verticalOffset = 0.5f;
@@ -34,6 +39,9 @@ public class ShopItemDisplay : MonoBehaviour
     {
         _baseLocalPosition      = transform.localPosition + Vector3.up * verticalOffset;
         transform.localPosition = _baseLocalPosition;
+
+        if (hideOnceOwned && GameProgressData.IsItemPurchased(itemID))
+            gameObject.SetActive(false);
     }
 
     private void Update()
@@ -84,7 +92,14 @@ public class ShopItemDisplay : MonoBehaviour
         if (OrbCollectCounter.SpendOrbs(price))
         {
             Debug.Log($"[ShopItemDisplay] Bought {itemName} for {price} Orbs.");
+            GameProgressData.PurchaseItem(itemID);
             onClick.Invoke();
+
+            if (hideOnceOwned && !string.IsNullOrEmpty(itemID))
+            {
+                ShopItemTooltipHUD.Instance?.Hide();
+                gameObject.SetActive(false);
+            }
         }
     }
 }

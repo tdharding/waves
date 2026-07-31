@@ -227,6 +227,18 @@ public class GameTesterTool : EditorWindow
         }
 
         EditorGUILayout.Space(6);
+        EditorGUILayout.LabelField("Shop Purchases", EditorStyles.boldLabel);
+
+        bool figureheadOwned    = GameProgressData.IsItemPurchased(ShopItemUnlockToggle.FigureheadItemID);
+        bool newFigureheadOwned = EditorGUILayout.ToggleLeft(" Figurehead Purchased", figureheadOwned);
+        if (newFigureheadOwned != figureheadOwned)
+        {
+            if (newFigureheadOwned) GameProgressData.PurchaseItem(ShopItemUnlockToggle.FigureheadItemID);
+            else                    GameProgressData.RevokeItem(ShopItemUnlockToggle.FigureheadItemID);
+            Debug.Log($"[SaveDataMonitor] Figurehead purchased: {newFigureheadOwned}");
+        }
+
+        EditorGUILayout.Space(6);
     }
 
     private void ApplyToolUnlocksToStatics()

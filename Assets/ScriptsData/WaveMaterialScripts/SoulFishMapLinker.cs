@@ -11,7 +11,10 @@ public class SoulFishMapLinker : MonoBehaviour
 
 static readonly int RadiusID = Shader.PropertyToID("_SoulFishMarkerRadius");
 
-    const int MAX_POINTS = 10;
+    // Matches SOULFISH_MAP_MAX_POINTS in SoulFishMapMask.hlsl. Raised alongside the wave mask's
+    // budget — curved zones densify into more points, and 10 was already truncating levels with
+    // a long river plus statue rings.
+    const int MAX_POINTS = 40;
 
     // _Map_ infix is deliberate: these are bare $Globals uniforms in SoulFishMapMask.hlsl, i.e. one
     // slot shared project-wide rather than per-material. They used to be named _SoulFishPositions /
@@ -126,6 +129,17 @@ static readonly int RadiusID = Shader.PropertyToID("_SoulFishMarkerRadius");
         Instance?.BakePositionsOnce();
     }
 
+    // Changes a registered zone's radius in place (found by list reference). Used by
+    // SoulZoneStreetLightChain to bloom a pool open; caller re-bakes per frame.
+    public static void UpdateZoneRadius(List<Vector3> nodes, float radius)
+    {
+        int idx = activeZones.FindIndex(e => e.nodes == nodes);
+        if (idx < 0) return;
+        var entry = activeZones[idx];
+        entry.radius = radius;
+        activeZones[idx] = entry;
+    }
+
     // ─────────────────────────────────────────
     // BAKE
     // ─────────────────────────────────────────
@@ -181,8 +195,9 @@ static readonly int RadiusID = Shader.PropertyToID("_SoulFishMarkerRadius");
                 if (packedPoints.Count >= MAX_POINTS) break;
                 Vector3 mapPos = ToMapSurface(map, nodes[i]);
                 bool isLast = (i == nodes.Count - 1);
-                // w = 2 means "connect to the next point"; a closed loop keeps connecting off the end.
-                float w = (!isLast || entry.closed) ? 2f : 1f;
+                // w > 0 means "connect to the next point" (shared convention with the wave mask,
+                // which packs ±(1 + arc length); the map only needs the sign so it packs ±1).
+                float w = (!isLast || entry.closed) ? 1f : -1f;
                 // .y carries the radius, not a height — the mask compares in XZ.
                 packedPoints.Add(new Vector4(mapPos.x, r, mapPos.z, w));
             }
@@ -191,7 +206,7 @@ static readonly int RadiusID = Shader.PropertyToID("_SoulFishMarkerRadius");
             if (entry.closed && nodes.Count > 0 && packedPoints.Count < MAX_POINTS)
             {
                 Vector3 first = ToMapSurface(map, nodes[0]);
-                packedPoints.Add(new Vector4(first.x, r, first.z, 1f));
+                packedPoints.Add(new Vector4(first.x, r, first.z, -1f));
             }
         }
 
@@ -201,7 +216,7 @@ static readonly int RadiusID = Shader.PropertyToID("_SoulFishMarkerRadius");
             if (packedPoints.Count >= MAX_POINTS) break;
             if (fish == null) continue;
             Vector3 mapPos = ToMapSurface(map, fish.position);
-            packedPoints.Add(new Vector4(mapPos.x, 0f, mapPos.z, 1f));
+            packedPoints.Add(new Vector4(mapPos.x, 0f, mapPos.z, -1f));
         }
 
         int count = packedPoints.Count;

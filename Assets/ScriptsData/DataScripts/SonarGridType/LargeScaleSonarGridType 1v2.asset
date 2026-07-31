@@ -16,7 +16,7 @@ MonoBehaviour:
   rows: 10
   levels: 4
   linesPerCell: 78
-  subdivisions: 10
+  subdivisions: 100
   surfaceDepthOffset: -0.5
   spawnVertical: 1
   spawnCrossVertical: 1

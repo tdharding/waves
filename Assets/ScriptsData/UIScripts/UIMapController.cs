@@ -9,6 +9,14 @@ public class UIMapController : MonoBehaviour
     {
         Instance = this;
     }
+
+    // The fade is a shader GLOBAL, so it would otherwise stay stuck on if this controller
+    // stops running mid-sonar (scene unload, HUD disabled) and leave the map invisible.
+    private void OnDisable()
+    {
+        _sonarFade = 0f;
+        Shader.SetGlobalFloat(_MapUIFadeOutId, 0f);
+    }
     [Header("Map Surface")]
     [SerializeField] private Transform mapSurface;
     public Transform MapSurface => mapSurface;
@@ -77,6 +85,17 @@ public class UIMapController : MonoBehaviour
     [SerializeField] private float mapIconSize        = 0.04f;
     [Tooltip("Aligner ScaleRadius that counts as 'normal' size (→ base icon size). Larger footprints scale the icon up; smaller ones never shrink below the base.")]
     [SerializeField] private float mapIconReferenceRadius = 3f;
+    [Tooltip("Shape parameters for the procedural icons (edit via the Map Icon Library window). Null = built-in defaults.")]
+    [SerializeField] private MapIconLibrary iconLibrary;
+
+    // Resolved icon shape params (assigned library or built-in defaults).
+    private MapIconLibrary Lib => iconLibrary != null ? iconLibrary : MapIconLibrary.Default;
+
+    [Header("Street Light Markers")]
+    [Tooltip("Parent for street-light map icons. Falls back to mazeWallMarkerParent if unset.")]
+    [SerializeField] private Transform streetLightMapParent;
+    [Tooltip("Base half-size of a street-light map icon.")]
+    [SerializeField] private float streetLightIconSize  = 0.05f;
 
     [Header("Map Height Cue (taller objects lift + draw on top)")]
     [Tooltip("Map-plane 'up' lift per world-unit of object height (from a prefab's PrefabBaselineAlignment map top marker).")]
@@ -93,6 +112,16 @@ public class UIMapController : MonoBehaviour
     [SerializeField] private float mapMaskRadius  = 0.5f;
     [Tooltip("Soft-edge width (world units) at the mask boundary.")]
     [SerializeField] private float mapMaskFeather = 0.03f;
+
+    [Header("Sonar Fade (hand the map over to the sonar map)")]
+    [Tooltip("Fade the procedurally-drawn map imagery out while sonar mode is active.")]
+    [SerializeField] private bool  fadeInSonarMode = true;
+    [Tooltip("Source of the 0..1 sonar sweep amount. Left unset, the controller finds it in the scene.")]
+    [SerializeField] private SonarSystemController sonarSystem;
+    [Tooltip("Alpha the procedural map drops to at full sonar. 0 = fully hidden.")]
+    [SerializeField, Range(0f, 1f)] private float sonarFadeAlpha = 0f;
+    [Tooltip("How fast the fade eases toward the sonar amount (per second). 0 = track the sonar sweep exactly.")]
+    [SerializeField] private float sonarFadeSpeed = 8f;
 
     [Header("Map Zoom (scales imagery with gameplay camera zoom)")]
     [Tooltip("Assign to enable zoom. All procedural map imagery is parented here and this transform is scaled/re-centred each frame. Its parent should be unscaled/unrotated, and it must sit at identity when the map is built.")]
@@ -143,6 +172,11 @@ public class UIMapController : MonoBehaviour
     private readonly List<GameObject> _cubeBuildingMapInstances = new List<GameObject>();
     // Spline LineRenderers — tracked so their (world-space) width can be scaled with zoom.
     private readonly List<LineRenderer> _splineLines            = new List<LineRenderer>();
+    // Live street-light markers, keyed by their controller so state (lit/unlit) can be pushed each frame.
+    private readonly Dictionary<StreetLightController, MapStreetLightMarker> _streetLightMarkers
+        = new Dictionary<StreetLightController, MapStreetLightMarker>();
+    // Every street-light-source marker GameObject (incl. non-stateful shapes), for rebuild cleanup.
+    private readonly List<GameObject> _streetLightGOs = new List<GameObject>();
     // Per-line unzoomed width (splineLineWidth × the path's thickness factor), index-matched
     // to _splineLines so zoom scaling doesn't flatten every path back to one width.
     private readonly List<float>        _splineLineBaseWidths   = new List<float>();
@@ -189,6 +223,7 @@ public void ApplyRefPlaneRotation()
    void LateUpdate()
 {
     UpdateMapMask();
+    UpdateSonarFade();
 
     if (!MapProjection.IsReady) return;
 
@@ -196,6 +231,7 @@ public void ApplyRefPlaneRotation()
 
     UpdateMapZoom(boat);
     UpdateSplineLineWidths();
+    UpdateStreetLightMarkers();
 
     // Driven from here, not from the linker's own LateUpdate: the soul-fish mask has to be baked
     // with THIS frame's zoom state, and script execution order wouldn't otherwise guarantee that.
@@ -295,28 +331,31 @@ void UpdateBoatPointer(Transform boat)
             {
                 if (mapMarkerMaterial == null) continue;   // procedural icons need the shared material
                 MapIcon icon = desc != null ? desc.icon : MapIcon.BigSpike;
-
-                // Size follows the prefab's real footprint (aligner ScaleRadius) RELATIVE to a
-                // reference size, so bigger objects get bigger icons but nothing shrinks below base.
-                float refR      = Mathf.Max(0.0001f, mapIconReferenceRadius);
-                float footprint = align != null && align.UseScaleRadius && align.ScaleRadius > 0f
-                    ? Mathf.Max(1f, align.ScaleRadius / refR)
-                    : 1f;
-
-                marker = BuildIconMarker(icon, pos, normal, mapIconSize * scale * footprint, ContentParent(mazeWallMarkerParent));
+                marker = BuildIconMarker(icon, pos, normal, mapIconSize * scale * IconFootprint(align),
+                                         ContentParent(mazeWallMarkerParent));
             }
 
-            // Optionally give the marker a SortingGroup so it sorts correctly against other
-            // transparent map elements (e.g. fish bowls, which otherwise disappear behind the map).
-            if (desc != null && desc.addSortingGroup)
-            {
-                var sg = marker.GetComponent<UnityEngine.Rendering.SortingGroup>();
-                if (sg == null) sg = marker.AddComponent<UnityEngine.Rendering.SortingGroup>();
-                sg.sortingOrder = desc.sortingOrder;
-            }
-
+            ApplyDescriptorSorting(marker, desc);
             _mazeWallMapInstances.Add(marker);
         }
+    }
+
+    // Adds a SortingGroup to a marker when its descriptor asks for one (so transparent icons like
+    // fish bowls / street lights sort over the map surface). Shared by all marker paths.
+    private void ApplyDescriptorSorting(GameObject marker, MapMarkerDescriptor desc)
+    {
+        if (marker == null || desc == null || !desc.addSortingGroup) return;
+        var sg = marker.GetComponent<UnityEngine.Rendering.SortingGroup>();
+        if (sg == null) sg = marker.AddComponent<UnityEngine.Rendering.SortingGroup>();
+        sg.sortingOrder = desc.sortingOrder;
+    }
+
+    // Icon size factor from the prefab's real footprint (aligner ScaleRadius) relative to a
+    // reference — bigger objects get bigger icons, nothing shrinks below the base. Shared.
+    private float IconFootprint(PrefabBaselineAlignment align)
+    {
+        if (align == null || !align.UseScaleRadius || align.ScaleRadius <= 0f) return 1f;
+        return Mathf.Max(1f, align.ScaleRadius / Mathf.Max(0.0001f, mapIconReferenceRadius));
     }
 
     // Grid cell index -> map position, mirroring LevelSpawner.CellToWorldPos (with its Y flip)
@@ -461,6 +500,96 @@ void UpdateBoatPointer(Transform boat)
 
             _cubeBuildingMapInstances.Add(BuildQuadMarker(p0, p1, p2, p3, parent));
         }
+    }
+
+    // ─────────────────────────────────────────
+    // STREET LIGHTS (live markers — reflect StreetLightController.IsLit)
+    // ─────────────────────────────────────────
+
+    /// <summary>
+    /// Builds a street-light icon for every spawned StreetLightController. Positions are static
+    /// (lights don't move) so they're parented under the content root like other icons; only the
+    /// lit/unlit visual updates each frame (UpdateStreetLightMarkers). Must run after the lights
+    /// spawn and while the content root is at identity (LevelDataController handles both).
+    /// </summary>
+    public void BuildStreetLightMap()
+    {
+        ClearStreetLightMarkers();
+
+        if (!MapProjection.IsReady || mapMarkerMaterial == null) return;
+
+        Vector3   normal = MapPlaneNormal();
+        Transform parent = ContentParent(streetLightMapParent != null ? streetLightMapParent : mazeWallMarkerParent);
+
+        foreach (var light in StreetLightController.All)
+        {
+            if (light == null) continue;
+
+            // Same descriptor conventions as every other marker (drawOnMap, footprint sizing, sorting).
+            var desc  = light.GetComponentInChildren<MapMarkerDescriptor>(true);
+            if (desc != null && !desc.drawOnMap) continue;
+            var align = light.GetComponentInChildren<PrefabBaselineAlignment>(true);
+
+            Vector3 pos  = MapProjection.WorldToMap(light.transform.position) + normal * mapMarkerLift;
+            float   size = streetLightIconSize * markerScale * IconFootprint(align) * Lib.streetLight.sizeFactor;
+
+            // Shape comes from the descriptor (default StreetLight); rendered through the shared entry point.
+            MapIcon icon = desc != null ? desc.icon : MapIcon.StreetLight;
+            var go = BuildIconMarker(icon, pos, normal, size, parent);
+            _streetLightGOs.Add(go);
+
+            ApplyDescriptorSorting(go, desc);
+
+            // Only the StreetLight shape carries the lit/unlit state component.
+            var marker = go.GetComponent<MapStreetLightMarker>();
+            if (marker != null)
+            {
+                marker.SetLit(light.IsLit);
+                _streetLightMarkers[light] = marker;
+            }
+        }
+    }
+
+    // Pushes each street light's lit/unlit state to its marker; culls markers for destroyed lights.
+    private void UpdateStreetLightMarkers()
+    {
+        if (_streetLightMarkers.Count == 0) return;
+
+        List<StreetLightController> dead = null;
+        foreach (var kvp in _streetLightMarkers)
+        {
+            if (kvp.Key == null || kvp.Value == null)
+            {
+                if (kvp.Value) Destroy(kvp.Value.gameObject);
+                if (dead == null) dead = new List<StreetLightController>();
+                dead.Add(kvp.Key);
+                continue;
+            }
+            kvp.Value.SetLit(kvp.Key.IsLit);
+        }
+
+        if (dead != null)
+            foreach (var k in dead)
+                _streetLightMarkers.Remove(k);
+    }
+
+    private void ClearStreetLightMarkers()
+    {
+        for (int i = 0; i < _streetLightGOs.Count; i++)
+            if (_streetLightGOs[i]) Destroy(_streetLightGOs[i]);
+        _streetLightGOs.Clear();
+        _streetLightMarkers.Clear();
+    }
+
+    // Rebuilds the icon-based markers (maze + street lights) from current data — used by the
+    // Map Icon Library window so shape/size edits show live in play mode. Resets the content root
+    // to identity first (markers build in the natural frame); zoom re-applies next LateUpdate.
+    public void RebuildProceduralMarkers()
+    {
+        if (!MapProjection.IsReady) return;
+        PrepareMapContentRoot();
+        BuildMazeWallMap();
+        BuildStreetLightMap();
     }
 
     // ─────────────────────────────────────────
@@ -620,6 +749,11 @@ void UpdateBoatPointer(Transform boat)
     // Vertex alpha bakes any shape fade (e.g. the spike's base). UVs feed the material gradient/rock.
     private GameObject BuildIconMarker(MapIcon icon, Vector3 center, Vector3 normal, float size, Transform parent)
     {
+        // StreetLight is stateful (bulb/halo toggle) so it has its own builder that also
+        // attaches a MapStreetLightMarker — but it's still selected through the same desc.icon.
+        if (icon == MapIcon.StreetLight)
+            return BuildStreetLightIcon(center, normal, size, parent);
+
         Vector3 u = Vector3.Cross(normal, Vector3.up);
         if (u.sqrMagnitude < 1e-6f) u = Vector3.right;
         u.Normalize();
@@ -660,8 +794,8 @@ void UpdateBoatPointer(Transform boat)
     private void BuildBigSpikeIcon(Vector3 c, Vector3 u, Vector3 v, float s,
                                    System.Func<Vector3, Color, int> add, System.Action<int, int, int> tri)
     {
-        const float fadeFrac = 0.1f;
-        float halfW = s * 0.7f;
+        float fadeFrac = Lib.spike.baseFadeFraction;
+        float halfW    = s * Lib.spike.widthFactor;
 
         Vector3 apex  = c + v * s;
         Vector3 baseC = c - v * s;
@@ -688,9 +822,9 @@ void UpdateBoatPointer(Transform boat)
     {
         Color solid = Color.white;
 
-        float   rc    = s * 0.55f;              // bowl radius
-        Vector3 bowlC = c + v * (s - rc);       // top of bowl reaches ~+v*s
-        float   halfStickW = s * 0.16f;
+        float   rc    = s * Lib.fishBowl.bowlRadiusFactor;   // bowl radius
+        Vector3 bowlC = c + v * (s - rc);                    // top of bowl reaches ~+v*s
+        float   halfStickW = s * Lib.fishBowl.stickWidthFactor;
         Vector3 stickBot = c - v * s;
 
         // Stick (bottom → bowl centre so it tucks under the circle).
@@ -702,7 +836,7 @@ void UpdateBoatPointer(Transform boat)
         tri(sbl, str, stl);
 
         // Bowl (triangle fan).
-        int seg  = Mathf.Max(8, nodeCircleSegments);
+        int seg  = Mathf.Max(8, Lib.fanSegments);
         int cIdx = add(bowlC, solid);
         int prev = -1;
         for (int i = 0; i <= seg; i++)
@@ -714,7 +848,86 @@ void UpdateBoatPointer(Transform boat)
         }
     }
 
-    private void AssignMesh(GameObject go, Vector3[] verts, Vector2[] uvs, int[] tris, string name, Color[] colors = null)
+    // Street light: a lollipop whose bulb toggles black(off)/white(on), with a half-opacity
+    // halo circle behind it that appears only when lit. Built as one mesh in draw order
+    // halo → stick → bulb; the returned GameObject carries a MapStreetLightMarker to flip state.
+    private GameObject BuildStreetLightIcon(Vector3 center, Vector3 normal, float size, Transform parent)
+    {
+        Vector3 u = Vector3.Cross(normal, Vector3.up);
+        if (u.sqrMagnitude < 1e-6f) u = Vector3.right;
+        u.Normalize();
+        Vector3 v = Vector3.Cross(normal, u).normalized;
+
+        var go = new GameObject("MapIcon_StreetLight");
+        go.transform.SetParent(parent, false);
+
+        var verts = new List<Vector3>();
+        var uvs   = new List<Vector2>();
+        var cols  = new List<Color>();
+        var tris  = new List<int>();
+
+        int Add(Vector3 world, Color col)
+        {
+            Vector3 rel = world - center;
+            uvs.Add(new Vector2(0.5f + Vector3.Dot(rel, u) / (2f * size),
+                                0.5f + Vector3.Dot(rel, v) / (2f * size)));
+            verts.Add(go.transform.InverseTransformPoint(world));
+            cols.Add(col);
+            return verts.Count - 1;
+        }
+        void Tri(int a, int b, int c) { tris.Add(a); tris.Add(b); tris.Add(c); }
+        void Fan(Vector3 fc, float r, Color col)
+        {
+            int fanSeg = Mathf.Max(10, Lib.fanSegments);
+            int c0 = Add(fc, col);
+            int prev = -1;
+            for (int i = 0; i <= fanSeg; i++)
+            {
+                float ang = (i / (float)fanSeg) * Mathf.PI * 2f;
+                int idx = Add(fc + (u * Mathf.Cos(ang) + v * Mathf.Sin(ang)) * r, col);
+                if (i > 0) Tri(c0, prev, idx);
+                prev = idx;
+            }
+        }
+
+        var sl = Lib.streetLight;
+        Vector3 bulbC = center + v * (size * sl.bulbCenterYFactor);
+        float   rb    = size * sl.bulbRadiusFactor;   // bulb radius
+        float   rh    = size * sl.haloRadiusFactor;   // halo radius (behind bulb)
+        float   halfStickW = size * sl.stickWidthFactor;
+        Vector3 stickBot   = center - v * size;
+
+        Color offHalo = new Color(1f, 1f, 1f, 0f);  // hidden until lit
+        Color offBulb = new Color(0f, 0f, 0f, 1f);  // black until lit
+        Color white   = Color.white;
+
+        // Halo (drawn first = behind).
+        int haloStart = verts.Count;
+        Fan(bulbC, rh, offHalo);
+        int haloCount = verts.Count - haloStart;
+
+        // Stick.
+        int sbl = Add(stickBot - u * halfStickW, white);
+        int sbr = Add(stickBot + u * halfStickW, white);
+        int stl = Add(bulbC    - u * halfStickW, white);
+        int str = Add(bulbC    + u * halfStickW, white);
+        Tri(sbl, sbr, str);
+        Tri(sbl, str, stl);
+
+        // Bulb (drawn last = front).
+        int bulbStart = verts.Count;
+        Fan(bulbC, rb, offBulb);
+        int bulbCount = verts.Count - bulbStart;
+
+        Color[] colArray = cols.ToArray();
+        Mesh mesh = AssignMesh(go, verts.ToArray(), uvs.ToArray(), tris.ToArray(), "MapIcon_StreetLight", colArray);
+
+        var marker = go.AddComponent<MapStreetLightMarker>();
+        marker.Init(mesh, colArray, bulbStart, bulbCount, haloStart, haloCount, sl.haloAlpha);
+        return go;
+    }
+
+    private Mesh AssignMesh(GameObject go, Vector3[] verts, Vector2[] uvs, int[] tris, string name, Color[] colors = null)
     {
         var mesh = new Mesh { name = name };
         mesh.vertices  = verts;
@@ -737,6 +950,8 @@ void UpdateBoatPointer(Transform boat)
         mr.sharedMaterial    = mapMarkerMaterial;
         mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         mr.receiveShadows    = false;
+
+        return mesh;
     }
 
     private void ClearInstances(List<GameObject> list)
@@ -769,6 +984,42 @@ void UpdateBoatPointer(Transform boat)
         Shader.SetGlobalVector(_MapMaskCenterId, center);
         Shader.SetGlobalFloat (_MapMaskRadiusId, mapMaskRadius);
         Shader.SetGlobalFloat (_MapMaskFeatherId, mapMaskFeather);
+    }
+
+    // ─────────────────────────────────────────
+    // SONAR FADE (procedural map hands over to the sonar map)
+    // ─────────────────────────────────────────
+
+    // Fade-OUT amount pushed to the shared MapProcedural material. Inverted (0 = visible) so a
+    // scene with no controller driving it still draws the map — shader globals default to 0.
+    private static readonly int _MapUIFadeOutId = Shader.PropertyToID("_MapUIFadeOut");
+
+    private float _sonarFade;          // 0 = full map, 1 = fully faded out
+    private bool  _sonarSystemSearched;
+
+    // Follows the sonar sweep (SonarSystemController.CurrentNormalizedRadius) so the map fades
+    // out and back in on the same tween the sonar itself uses, eased a little on top.
+    private void UpdateSonarFade()
+    {
+        float target = 0f;
+
+        if (fadeInSonarMode)
+        {
+            if (sonarSystem == null && !_sonarSystemSearched)
+            {
+                _sonarSystemSearched = true;   // one lookup only — no per-frame scene search
+                sonarSystem = FindObjectOfType<SonarSystemController>();
+            }
+
+            if (sonarSystem != null)
+                target = Mathf.Clamp01(sonarSystem.CurrentNormalizedRadius) * (1f - sonarFadeAlpha);
+        }
+
+        _sonarFade = sonarFadeSpeed > 0f
+            ? Mathf.Lerp(_sonarFade, target, 1f - Mathf.Exp(-sonarFadeSpeed * Time.deltaTime))
+            : target;
+
+        Shader.SetGlobalFloat(_MapUIFadeOutId, _sonarFade);
     }
 
     // ─────────────────────────────────────────

@@ -14,6 +14,15 @@ public class LevelSpawner : MonoBehaviour
     [Header("Soul Fish Zone")]
     [SerializeField] GameObject soulFishContainerPrefab;
 
+    [Tooltip("Spawned at zone nodes flagged as street lights in the Grid Designer. Needs a StreetLightController + collider on the Interaction layer (see StreetLightController for the prefab contract).")]
+    [SerializeField] GameObject streetLightPrefab;
+
+    [Tooltip("World units per second for the street light path draw and the fish migration that follows it.")]
+    [SerializeField] float streetLightRevealSpeed = 2.5f;
+
+    [Tooltip("Seconds a newly lit street light's pool takes to bloom to full radius before the path draws.")]
+    [SerializeField] float streetLightPoolOpenSeconds = 0.75f;
+
     [Header("Orbs of Omalon")]
     [SerializeField] GameObject orbPrefab;
 
@@ -77,6 +86,17 @@ public class LevelSpawner : MonoBehaviour
     public Bounds GetArenaBounds() => cachedArenaBounds;
     private float spawnedBaselineWaterY;
     public float GetBaselineWaterY() => spawnedBaselineWaterY;
+
+    // Street lights published by (zoneId, authored node index) as zones spawn, so a fish-bowl
+    // tributary can find the river lamp at its junction whichever order the zones came in.
+    private readonly Dictionary<(int zoneId, int nodeIndex), StreetLightController> _lightsByZoneNode
+        = new Dictionary<(int, int), StreetLightController>();
+    private readonly Dictionary<int, SoulZoneStreetLightChain> _chainsByZoneId
+        = new Dictionary<int, SoulZoneStreetLightChain>();
+    private readonly Dictionary<(int zoneId, int nodeIndex), int> _denseByZoneNode
+        = new Dictionary<(int, int), int>();
+    private readonly List<(SoulZoneTributaryLink link, int adjoinZoneId, int adjoinNodeIndex, int zoneIndex)>
+        _pendingTributaries = new List<(SoulZoneTributaryLink, int, int, int)>();
     private BaselineMarker activeBaselineMarker;
     public BaselineMarker GetBaselineMarker() => activeBaselineMarker;
     // Absolute world-Y per tier slot. Populated from BaselineMarker.spawnTiers when defined;
@@ -283,14 +303,14 @@ float   tileZ  = b.size.z / GridData.GridSize;
         _statuesById.Clear();
         _towersById.Clear();
 
+        // Legacy grid-bound placements → free positions (idempotent). Covers base + tiers.
+        activeGridData.MigratePlacementPositions();
+
         if (activeGridData.prefabPlacements != null)
         {
             foreach (var pp in activeGridData.prefabPlacements)
             {
                 if (pp.prefab == null) continue;
-                int cellX    = pp.cellIndex % GridData.GridSize;
-                int cellY    = pp.cellIndex / GridData.GridSize;
-                int flippedY = GridData.GridSize - 1 - cellY;
                 Transform par = (pp.isCircle && soulSpawnParent) ? soulSpawnParent : spawnParent;
                 var  baselineAlign    = pp.prefab.GetComponentInChildren<PrefabBaselineAlignment>();
                 bool hasBaselineAlign = baselineAlign != null;
@@ -300,11 +320,9 @@ float   tileZ  = b.size.z / GridData.GridSize;
                 float contactOffsetY  = baselineAlign != null ? baselineAlign.transform.position.y * placementScale : 0f;
                 float baselineSpawnY  = spawnedBaselineWaterY - contactOffsetY;
                 float spawnY          = (pp.isWorldSpaceProp || hasBaselineAlign) ? baselineSpawnY : par.position.y;
-                Vector3 pos   = new Vector3(
-                    origin.x + cellX    * tileX + tileX * 0.5f,
-                    spawnY,
-                    origin.z + flippedY * tileZ + tileZ * 0.5f
-                );
+                // Free position is the authority now (cellIndex is only a derived back-compat key).
+                Vector3 pos = NormalizedToWorldPos(pp.position, origin, tileX, tileZ);
+                pos.y = spawnY;
                 Quaternion rot = hasBaselineAlign ? baselineRot : par.rotation;
                 var instance = Instantiate(pp.prefab, pos, rot, par);
                 ApplyPlacementScale(instance, pp);
@@ -382,17 +400,12 @@ float   tileZ  = b.size.z / GridData.GridSize;
                     foreach (var pp in tier.prefabPlacements)
                     {
                         if (pp.prefab == null) continue;
-                        int cellX    = pp.cellIndex % GridData.GridSize;
-                        int cellY    = pp.cellIndex / GridData.GridSize;
-                        int flippedY = GridData.GridSize - 1 - cellY;
                         var  tierAlign      = pp.prefab.GetComponentInChildren<PrefabBaselineAlignment>();
                         float tierScale     = pp.scale > 0f ? pp.scale : 1f;
                         float tierContactY  = tierAlign != null ? tierAlign.transform.position.y * tierScale : 0f;
-                        Vector3 pos2 = new Vector3(
-                            origin.x + cellX    * tileX + tileX * 0.5f,
-                            spawnedBaselineWaterY + yOff - tierContactY,
-                            origin.z + flippedY * tileZ + tileZ * 0.5f
-                        );
+                        // Free position is the authority (cellIndex is only a derived back-compat key).
+                        Vector3 pos2 = NormalizedToWorldPos(pp.position, origin, tileX, tileZ);
+                        pos2.y = spawnedBaselineWaterY + yOff - tierContactY;
                         Quaternion rot2 = spawnParent.rotation;
                         if (applyMinus90XRotation) rot2 *= Quaternion.Euler(-90f, 0f, 0f);
                         var instance = Instantiate(pp.prefab, pos2, rot2, spawnParent);
@@ -683,6 +696,108 @@ float   tileZ  = b.size.z / GridData.GridSize;
             (-p0 + p2) * t +
             (2f * p0 - 5f * p1 + 4f * p2 - p3) * t2 +
             (-p0 + 3f * p1 - 3f * p2 + p3) * t3);
+    }
+
+    // =====================================================
+    // SOUL ZONE PATH DENSIFICATION
+    // Curvature is an authoring-time concept: before a zone reaches any runtime consumer
+    // (wave/map mask packing, fish spline knots, shoal init) its curved segments are sampled
+    // into a denser straight-segment polyline. Everything downstream keeps working on
+    // segments — there are just more of them where the path bends.
+    // =====================================================
+
+    // Absolute per-zone ceiling — the whole shared shader budget (SoulFishWaveLinker.MAX_POINTS
+    // is 40 across all zones + loose fish). A zone only approaches this at high curveResolution;
+    // the effective budget scales from 24 (default resolution) up to here. The linker warns if
+    // several zones together overflow the 40.
+    const int SoulZoneMaxRenderPoints = 40;
+
+    // authoredToDense (optional): filled with each authored node's index in the returned dense
+    // path, so callers (street lights) can locate authored nodes on the curve.
+    static List<Vector2> BuildSoulZoneRenderPath(GridData.SoulZone zone, List<int> authoredToDense = null)
+    {
+        var src = zone.nodePositions;
+        int n   = src?.Count ?? 0;
+        var result = new List<Vector2>();
+        authoredToDense?.Clear();
+        if (n == 0) return result;
+
+        bool closed   = zone.closedLoop && n >= 3;
+        int  segCount = zone.SegmentCount();
+
+        bool anyCurved = false;
+        for (int s = 0; s < segCount; s++)
+            if (zone.IsSegmentCurved(s)) { anyCurved = true; break; }
+
+        // Catmull-Rom needs neighbours on both sides to bend; with < 3 nodes it degenerates
+        // to the straight segment anyway.
+        if (n < 3 || !anyCurved)
+        {
+            result.AddRange(src);
+            if (authoredToDense != null)
+                for (int i = 0; i < n; i++) authoredToDense.Add(i);
+            return result;
+        }
+
+        // Per-zone curve resolution: the max samples any one curved segment gets. The per-zone
+        // point budget scales with it (but never past the shared 40-point shader ceiling), so
+        // raising resolution actually reaches the mask instead of being shaved back. At the
+        // default resolution (6) the budget is 24, preserving prior behaviour exactly.
+        int perSegMax   = zone.EffectiveCurveResolution;
+        int zoneBudget  = Mathf.Clamp(perSegMax * 4, 24, SoulZoneMaxRenderPoints);
+
+        // Subdivisions per segment: straight = 1, curved scales with normalized length
+        // (nodes are in -0.5..0.5 arena space, so len * 40 ≈ 4 samples per 10% of the arena).
+        var subdiv = new int[segCount];
+        int total  = 1; // starting node
+        for (int s = 0; s < segCount; s++)
+        {
+            if (!zone.IsSegmentCurved(s))
+                subdiv[s] = 1;
+            else
+            {
+                float len = Vector2.Distance(src[s], src[(s + 1) % n]);
+                subdiv[s] = Mathf.Clamp(Mathf.CeilToInt(len * 40f), 2, perSegMax);
+            }
+            total += subdiv[s];
+        }
+
+        // Over budget: shave samples off the most-subdivided segments until it fits.
+        while (total > zoneBudget)
+        {
+            int maxIdx = 0;
+            for (int s = 1; s < segCount; s++)
+                if (subdiv[s] > subdiv[maxIdx]) maxIdx = s;
+            if (subdiv[maxIdx] <= 1) break;
+            subdiv[maxIdx]--;
+            total--;
+        }
+
+        result.Add(src[0]);
+        var denseIndexOfNode = new int[n];
+        denseIndexOfNode[0] = 0;
+        for (int s = 0; s < segCount; s++)
+        {
+            bool curved = zone.IsSegmentCurved(s);
+            int  i2     = (s + 1) % n;
+            for (int k = 1; k <= subdiv[s]; k++)
+            {
+                float t = (float)k / subdiv[s];
+                result.Add(curved ? SplineSample(src, s, t, closed)
+                                  : Vector2.Lerp(src[s], src[i2], t));
+            }
+            // The segment's final sample (t = 1) is exactly the authored end node.
+            if (i2 != 0) denseIndexOfNode[i2] = result.Count - 1;
+        }
+
+        // Closed loops: the final sample IS node 0 again — drop it, the mask packers append
+        // the closing duplicate themselves and the knot generator wraps on its own.
+        if (closed) result.RemoveAt(result.Count - 1);
+
+        if (authoredToDense != null)
+            authoredToDense.AddRange(denseIndexOfNode);
+
+        return result;
     }
 
     private void ProcessLinkedPairs(Dictionary<string, GameObject> spawnedByCell, float tileX, float tileZ)
@@ -1086,6 +1201,12 @@ else if (controller != null)
 
     private void SpawnSoulFish(Vector3 origin, float tileX, float tileZ)
     {
+        // Per-load state: a reloaded level must not inherit the previous level's lamps/links.
+        _lightsByZoneNode.Clear();
+        _chainsByZoneId.Clear();
+        _denseByZoneNode.Clear();
+        _pendingTributaries.Clear();
+
         if (activeGridData.soulZones == null || activeGridData.soulZones.Count == 0)
         {
             Debug.Log("[LevelSpawner] SpawnSoulFish — no soulZones on GridData, skipping.");
@@ -1122,9 +1243,15 @@ else if (controller != null)
             foreach (var s in zone.souls)
                 if (s != null) s.homeLevelID = levelID;
 
-            // Convert normalized node positions → world positions (pre-rotation, for instantiation)
-            var nodeWorldPositions = new List<Vector3>(zone.nodePositions.Count);
-            foreach (var n in zone.nodePositions)
+            // Convert node positions → world positions (pre-rotation, for instantiation).
+            // Curved segments are pre-sampled into a denser polyline here, so the mask packers,
+            // fish spline knots and shoal registration all follow the curve without knowing
+            // about it. lightMap tracks where each authored node landed in the dense path, so
+            // street lights can find their spot on the curve.
+            var lightMap = new List<int>();
+            var renderPath = BuildSoulZoneRenderPath(zone, lightMap);
+            var nodeWorldPositions = new List<Vector3>(renderPath.Count);
+            foreach (var n in renderPath)
                 nodeWorldPositions.Add(NormalizedToWorldPos(n, origin, tileX, tileZ));
 
             // Pre-compute post-rotation positions for material mask registration.
@@ -1156,15 +1283,52 @@ else if (controller != null)
 
             bool isClosedLoop = zone.closedLoop && zone.nodePositions.Count >= 3;
 
+            // Street-light-gated zone: lights partition the path into stages and the chain
+            // controller owns mask registration + the swim spline. Guarded zones don't mix
+            // with lights, and a light chain needs an open path.
+            var zoneLights = zone.StreetLightsInOrder();
+            zoneLights.RemoveAll(l => l == null || l.nodeIndex < 0 || l.nodeIndex >= lightMap.Count);
+            bool streetLightZone = zoneLights.Count > 0 && !zone.statueGuarded && !zone.towerGuarded
+                                   && zone.nodePositions.Count >= 2;
+            if (streetLightZone && streetLightPrefab == null)
+            {
+                Debug.LogWarning($"[LevelSpawner] Zone {zoneIndex} has street lights but no streetLightPrefab assigned — spawning as a normal zone.");
+                streetLightZone = false;
+            }
+            if (streetLightZone && isClosedLoop)
+            {
+                Debug.LogWarning($"[LevelSpawner] Zone {zoneIndex}: street lights on a closed loop — treating the path as open.");
+                isClosedLoop = false;
+            }
+
+            // Fish-bowl tributary: a tower zone with a path from the bowl to a junction node on a
+            // main path. It needs no lights of its own — the join is gated by TWO conditions at
+            // runtime (tower toppled + the river's lamp at the junction lit), owned by
+            // SoulZoneTributaryLink. See the resolve pass after this loop for the gate wiring.
+            bool bowlTributary = zone.towerGuarded && zone.nodePositions.Count >= 2
+                                 && zone.adjoinZoneId != 0 && zone.adjoinNodeIndex >= 0 && !isClosedLoop;
+            bool useChain = streetLightZone;
+
+            if (zone.towerGuarded && !bowlTributary)
+            {
+                Debug.LogWarning(
+                    $"[LevelSpawner] Zone {zoneIndex} (fish bowl) is NOT running as a tributary — it will stay a " +
+                    $"pool at the bowl and never join a river. Requirements: " +
+                    $"nodes>=2 ({zone.nodePositions.Count}), adjoinZoneId!=0 ({zone.adjoinZoneId}), " +
+                    $"adjoinNodeIndex>=0 ({zone.adjoinNodeIndex}), notClosedLoop ({!isClosedLoop}).");
+            }
+
             // Generate spline knots — always a looping swim path
             List<Vector3> splineKnots;
             bool closedSpline = true;
             SplineAnimate.LoopMode loopMode = SplineAnimate.LoopMode.Loop;
 
             // Tower zones always swim a single contained disc around the real bowl centre, ignoring
-            // any authored node ring (older tower zones may still carry one in their data).
+            // any authored node path (a tributary's nodes describe the joining line, not a swim route).
             if (zone.towerGuarded)
                 splineKnots = GenerateSingleNodeKnots(containerPos, swimRadius, zone.knotCount);
+            else if (streetLightZone)
+                splineKnots = null;   // the street light chain injects and owns the swim circle
             else if (zone.nodePositions.Count == 1)
                 splineKnots = GenerateSingleNodeKnots(nodeWorldPositions[0], swimRadius, zone.knotCount);
             else
@@ -1192,17 +1356,74 @@ else if (controller != null)
                 continue;
             }
 
-            // Inject generated knots
-            InjectSplineKnots(splineContainer, splineKnots, closedSpline);
+            // Inject generated knots (street light zones: the chain injects its own circle below)
+            if (splineKnots != null)
+                InjectSplineKnots(splineContainer, splineKnots, closedSpline);
 
             // Configure SplineAnimate loop mode on any already-present animate components
             foreach (var sa in containerInstance.GetComponentsInChildren<SplineAnimate>(true))
                 sa.Loop = loopMode;
 
-            // Register post-rotation positions so the wave/map mask aligns with where fish actually swim.
-            // swimRadius (the Grid Designer zone radius) becomes the mask footprint for this zone.
-            SoulFishWaveLinker.RegisterZone(nodeRegPositions, isClosedLoop, swimRadius);
-            SoulFishMapLinker.RegisterZone(nodeRegPositions, isClosedLoop, swimRadius);
+            SoulZoneStreetLightChain streetChain = null;
+            if (useChain)
+            {
+                // Spawn the light prefabs along the dense path, then hand everything to the
+                // chain — it registers the initial pool-only state (light #1 lit) and owns
+                // the reveal/migration from here.
+                // Height comes from the prefab's own PrefabBaselineAlignment (its waterline disc
+                // meets the baseline plane), same as spline walls / node points / cube buildings —
+                // the path's XZ, the aligner's Y.
+                var lightControllers = new List<StreetLightController>();
+                var denseIndices     = new List<int>();
+                var poolRadii        = new List<float>();
+
+                float lightSpawnY    = SplineWallSpawnY(streetLightPrefab, spawnedBaselineWaterY, 0f);
+                foreach (var l in zoneLights)
+                {
+                    int dense = lightMap[l.nodeIndex];
+                    denseIndices.Add(dense);
+                    poolRadii.Add(Mathf.Max(0.05f, l.poolRadius));
+
+                    Vector3 lightPos = nodeWorldPositions[dense];
+                    lightPos.y = lightSpawnY;
+                    var lightInstance = Instantiate(streetLightPrefab, lightPos,
+                                                    spawnParent.rotation, spawnParent);
+                    var ctrl = lightInstance.GetComponent<StreetLightController>();
+                    if (ctrl == null) ctrl = lightInstance.AddComponent<StreetLightController>();
+                    lightControllers.Add(ctrl);
+
+                    // Publish by (zoneId, authored node) so a tributary can find its junction lamp
+                    // regardless of the order zones spawn in.
+                    if (zone.zoneId != 0)
+                        _lightsByZoneNode[(zone.zoneId, l.nodeIndex)] = ctrl;
+                }
+
+                float corridorRadius = swimRadius;
+
+                streetChain = containerInstance.AddComponent<SoulZoneStreetLightChain>();
+                streetChain.revealSpeed     = streetLightRevealSpeed;
+                streetChain.poolOpenSeconds = streetLightPoolOpenSeconds;
+                streetChain.Init(nodeRegPositions, nodeWorldPositions, denseIndices, poolRadii,
+                                 lightControllers, corridorRadius, zone.knotCount, splineContainer);
+
+                // Publish the river so a joined tributary can follow its frontier, plus the
+                // authored→dense node mapping its junction index needs.
+                if (zone.zoneId != 0)
+                {
+                    _chainsByZoneId[zone.zoneId] = streetChain;
+                    for (int an = 0; an < zone.nodePositions.Count && an < lightMap.Count; an++)
+                        _denseByZoneNode[(zone.zoneId, an)] = lightMap[an];
+                }
+            }
+            else if (!zone.towerGuarded)
+            {
+                // Register post-rotation positions so the wave/map mask aligns with where fish actually swim.
+                // swimRadius (the Grid Designer zone radius) becomes the mask footprint for this zone.
+                // Tower zones are excluded: their shoal is still aloft in the bowl, so painting the zone
+                // now would glow at the tower's base. SoulShoalController registers it on bowl landing.
+                SoulFishWaveLinker.RegisterZone(nodeRegPositions, isClosedLoop, swimRadius);
+                SoulFishMapLinker.RegisterZone(nodeRegPositions, isClosedLoop, swimRadius);
+            }
 
             // Resolve the guarding statue for a statue-guarded zone (spawned earlier this pass)
             StatueBehaviour guardStatue = null;
@@ -1220,8 +1441,31 @@ else if (controller != null)
                 shoal.splineContainer   = splineContainer;
                 shoal.fishingController = fishingController;
                 shoal.SetGuardStatue(guardStatue);
-                shoal.InitZone(nodeRegPositions);
+                // Street light zones hand the shoal the chain's revealed-path list (same
+                // reference the chain mutates as lights come on), so CanFish tracks the
+                // frontier automatically. The register call inside dedupes by reference.
+                // Tower zones defer mask registration to bowl-landing (BeginSettle); everything
+                // else registers immediately (a no-op dedupe against the calls just above).
+                // A tributary's mask is owned by SoulZoneTributaryLink (source pool on landing,
+                // joining line only once the river's gate lamp is lit), so the shoal must not
+                // paint the whole path when the bowl settles.
+                shoal.maskOwnedExternally = bowlTributary;
+                shoal.InitZone(streetChain != null ? streetChain.RevealedRegPath : nodeRegPositions,
+                               swimRadius, registerNow: !zone.towerGuarded);
                 shoal.SpawnFish(activeGridData.soulZones, zoneIndex, levelID);
+
+                // Fish-bowl tributary: build the link now, resolve its gate lamp after every zone
+                // has spawned (the main path may come later in this loop).
+                if (bowlTributary)
+                {
+                    var link = containerInstance.AddComponent<SoulZoneTributaryLink>();
+                    link.revealSpeed     = streetLightRevealSpeed;
+                    link.poolOpenSeconds = streetLightPoolOpenSeconds;
+                    link.Init(nodeRegPositions, swimRadius,
+                              zone.pathWidth > 0.01f ? zone.pathWidth : zone.radius,
+                              shoal, splineContainer, zone.knotCount);
+                    _pendingTributaries.Add((link, zone.adjoinZoneId, zone.adjoinNodeIndex, zoneIndex));
+                }
 
                 // Block capture on each guarded fish until the statue is destroyed
                 if (guardStatue != null)
@@ -1255,6 +1499,41 @@ else if (controller != null)
 
             Debug.Log($"[LevelSpawner] Zone {zoneIndex} spawned — {zone.nodePositions.Count} node(s), {zone.souls.Count} soul(s), closed={isClosedLoop}.");
         }
+
+        ResolveTributaryGates();
+    }
+
+    // Every zone has spawned, so all street lights are published: hand each fish-bowl tributary
+    // the lamp on the main river at its junction node. That lamp plus the toppled tower are the
+    // two conditions the joining line waits on.
+    private void ResolveTributaryGates()
+    {
+        foreach (var (link, adjoinZoneId, adjoinNodeIndex, zoneIndex) in _pendingTributaries)
+        {
+            if (link == null) continue;
+
+            _lightsByZoneNode.TryGetValue((adjoinZoneId, adjoinNodeIndex), out var gate);
+            _chainsByZoneId.TryGetValue(adjoinZoneId, out var mainChain);
+            if (!_denseByZoneNode.TryGetValue((adjoinZoneId, adjoinNodeIndex), out int junctionDense))
+                junctionDense = -1;
+
+            if (mainChain == null || junctionDense < 0)
+            {
+                Debug.LogWarning(
+                    $"[LevelSpawner] Zone {zoneIndex} (fish bowl tributary) adjoins zone id {adjoinZoneId} " +
+                    $"node {adjoinNodeIndex}, but that main path has no street-light chain — the join can never " +
+                    $"open. Put at least one street light on the main path so it has a flowing frontier.");
+            }
+            else
+            {
+                Debug.Log($"[LevelSpawner] Zone {zoneIndex} (fish bowl tributary) joins zone id {adjoinZoneId} " +
+                          $"at node {adjoinNodeIndex} (dense {junctionDense})" +
+                          $"{(gate != null ? $", junction carries lamp '{gate.name}'" : " (mid-path junction, no lamp)")} " +
+                          $"— opens once the river flows past it.");
+            }
+            link.SetGate(gate, mainChain, junctionDense);
+        }
+        _pendingTributaries.Clear();
     }
 
     // =====================================================

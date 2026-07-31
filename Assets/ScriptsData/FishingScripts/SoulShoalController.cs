@@ -51,15 +51,30 @@ public class SoulShoalController : MonoBehaviour
             if (f != null) f.GetComponent<SoulFishProximityAudio>()?.Init(_boat);
     }
 
-    // Called by LevelSpawner before Start() to pass zone node world positions
-    public void InitZone(List<Vector3> nodePositions)
+    private float _zoneMaskRadius;
+    private bool  _maskRegistered;
+
+    // Set by LevelSpawner for a fish-bowl tributary: SoulZoneTributaryLink owns the mask
+    // (source pool on landing, corridor only once the river's gate light is lit), so the
+    // bowl-landing registration below must not paint the whole path.
+    [HideInInspector] public bool maskOwnedExternally;
+
+    // Called by LevelSpawner before Start() to pass zone node world positions.
+    // registerNow = false defers the wave/map mask (tower zones: the glow shouldn't paint at
+    // the tower base while the shoal is still aloft in the bowl — BeginSettle registers it
+    // the moment the bowl hits the water).
+    public void InitZone(List<Vector3> nodePositions, float maskRadius = 0f, bool registerNow = true)
     {
-        _nodePositions = nodePositions;
-        
-        if (_nodePositions != null && _nodePositions.Count > 0)
+        _nodePositions  = nodePositions;
+        _zoneMaskRadius = maskRadius;
+
+        if (registerNow && _nodePositions != null && _nodePositions.Count > 0)
         {
-            SoulFishWaveLinker.RegisterZone(_nodePositions);
-            SoulFishMapLinker.RegisterZone(_nodePositions);
+            // Dedupe by list reference keeps LevelSpawner's earlier radius-carrying
+            // registration authoritative when it already ran.
+            SoulFishWaveLinker.RegisterZone(_nodePositions, false, maskRadius);
+            SoulFishMapLinker.RegisterZone(_nodePositions, false, maskRadius);
+            _maskRegistered = true;
         }
     }
 
@@ -154,6 +169,16 @@ public class SoulShoalController : MonoBehaviour
 
     private IEnumerator SettleRoutine(float duration)
     {
+        // The bowl has hit the water: NOW paint the zone. Tower zones defer this from spawn so
+        // the glow doesn't appear at the tower's base while the shoal is still aloft.
+        if (!maskOwnedExternally && !_maskRegistered && _nodePositions != null && _nodePositions.Count > 0)
+        {
+            SoulFishWaveLinker.RegisterZone(_nodePositions, false, _zoneMaskRadius);
+            SoulFishMapLinker.RegisterZone(_nodePositions, false, _zoneMaskRadius);
+            _maskRegistered = true;
+            Debug.Log($"[SoulShoalController] Bowl landed — soul zone mask registered for '{gameObject.name}'.");
+        }
+
         float e = 0f;
         while (e < duration)
         {

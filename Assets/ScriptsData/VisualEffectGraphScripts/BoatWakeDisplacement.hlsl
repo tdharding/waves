@@ -3,6 +3,8 @@
 float _WavePhase;
 #endif
 
+// RingFrequency, RingScrollSpeed and Time are kept on the signature so the Shader Graph
+// custom function node stays wired, but the wake no longer ripples — they are unused.
 void BoatWakeDisplacement_float(
     float3 PositionIn,
     float4 BoatCenter,
@@ -24,22 +26,20 @@ void BoatWakeDisplacement_float(
     float2 toBoat = PositionIn.xy - float2(BoatCenter.x, -BoatCenter.z);
     float  dist   = length(toBoat);
 
-    // Radial mask — smooth fade to zero at WakeRadius
-    float  mask   = 1.0 - smoothstep(WakeRadius * 0.5, WakeRadius, dist);
+    // Permanent displacement pocket centred on the boat.
+    // 1 directly under the hull, easing to 0 at WakeRadius.
+    float  t       = saturate(dist / max(WakeRadius, 1e-4));
+    float  profile = 1.0 - smoothstep(0.0, 1.0, t);
 
-    // Scrolling rings — stronger when moving
-    float  rings  = sin(dist * RingFrequency - Time * RingScrollSpeed)
-                  * exp(-dist * RingFalloff)
-                  * RingAmplitude
-                  * BoatSpeed01;
+    // RingFalloff shapes the profile: >1 pulls the pocket tight around the hull,
+    // <1 spreads it out towards the edge.
+    profile = pow(profile, max(RingFalloff, 0.01));
 
-    // Idle pulse — always present at low amplitude
-    float  idle   = sin(dist * RingFrequency * 0.5 - Time * RingScrollSpeed * 0.3)
-                  * exp(-dist * RingFalloff * 0.5)
-                  * IdleAmplitude;
+    // IdleAmplitude is the always-on depth; RingAmplitude adds depth with speed.
+    float  amplitude = IdleAmplitude + RingAmplitude * BoatSpeed01;
 
-    float  wakeDisplace = (rings + idle) * mask;
+    float  wakeDisplace = profile * amplitude;
     PositionOut.z -= wakeDisplace;
 
-    WakeBrightness = wakeDisplace * mask;
+    WakeBrightness = wakeDisplace;
 }

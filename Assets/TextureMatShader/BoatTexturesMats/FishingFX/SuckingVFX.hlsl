@@ -1,5 +1,5 @@
 // Custom Function node for SuckingVFX ShaderGraph.
-// Scrolls a greyscale wavy-line texture up the trunk, fades it at the mouth,
+// Scrolls a greyscale wavy-line texture up the trunk, fades it at both ends,
 // and applies a total-alpha multiplier driven by SecondWhirlChain.cs.
 
 void SuckingVFX_float(
@@ -10,6 +10,7 @@ void SuckingVFX_float(
     float             TilingX,
     float             TilingY,
     float             MouthFadeLength,
+    float             TailFadeLength,
     float             TotalAlpha,
     out float         FinalAlpha
 )
@@ -24,7 +25,11 @@ void SuckingVFX_float(
     float s = smoothstep(0.0, MouthFadeLength, UV.y);
     float mouthFade = s * s * s;
 
-    FinalAlpha = texMask * mouthFade * TotalAlpha;
+    // Mirror fade at the far end (UV.y == 1), opaque before TailFadeLength from that end
+    float t = smoothstep(0.0, TailFadeLength, 1.0 - UV.y);
+    float tailFade = t * t * t;
+
+    FinalAlpha = texMask * mouthFade * tailFade * TotalAlpha;
 }
 
 void SuckingVFX_half(
@@ -35,6 +40,7 @@ void SuckingVFX_half(
     half              TilingX,
     half              TilingY,
     half              MouthFadeLength,
+    half              TailFadeLength,
     half              TotalAlpha,
     out half          FinalAlpha
 )
@@ -44,5 +50,8 @@ void SuckingVFX_half(
     half sh = smoothstep(0.0h, MouthFadeLength, UV.y);
     half mouthFade = sh * sh * sh;
 
-    FinalAlpha = texMask * mouthFade * TotalAlpha;
+    half th = smoothstep(0.0h, TailFadeLength, 1.0h - UV.y);
+    half tailFade = th * th * th;
+
+    FinalAlpha = texMask * mouthFade * tailFade * TotalAlpha;
 }

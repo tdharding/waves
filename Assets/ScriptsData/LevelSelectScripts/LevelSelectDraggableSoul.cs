@@ -127,7 +127,26 @@ public class LevelSelectDraggableSoul : MonoBehaviour, IPointerClickHandler, IPo
                 if (inserted) { OnPlacedSuccessfully(); return; }
             }
 
-            if (gameplaySlot == null && soulSlot == null && pipeTrigger == null)
+            // Street light bowls take a soul the same way as pipe triggers (range-gated, no tube)
+            StreetLightController streetLight = hit.collider.GetComponent<StreetLightController>()
+                                             ?? hit.collider.GetComponentInParent<StreetLightController>();
+            if (streetLight != null)
+            {
+                var lightIndicator = streetLight.GetComponent<SoulSlotIndicator>()
+                                  ?? streetLight.GetComponentInParent<SoulSlotIndicator>();
+                bool lightInRange = lightIndicator == null || lightIndicator.IsInRange();
+                if (!lightInRange)
+                {
+                    Debug.Log($"[DraggableSoul] StreetLight '{hit.collider.gameObject.name}' out of range — rejected.");
+                    ReturnToInventory();
+                    return;
+                }
+                bool inserted = streetLight.TryInsertSoul(this.soulDataIdentity);
+                Debug.Log($"[DraggableSoul] StreetLight '{hit.collider.gameObject.name}' TryInsert → {inserted}");
+                if (inserted) { OnPlacedSuccessfully(); return; }
+            }
+
+            if (gameplaySlot == null && soulSlot == null && pipeTrigger == null && streetLight == null)
 Debug.Log($"[DraggableSoul] Hit object has neither GameplaySoulSlot nor SoulSlot component.");
         }
         else

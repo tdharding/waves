@@ -69,6 +69,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ShopItemDisplay
   itemName: FigureHead Woman
   price: 10
+  itemID: FigureHead_Woman
+  hideOnceOwned: 1
   verticalOffset: 0.5
   bobAmplitude: 0.15
   bobSpeed: 0.5

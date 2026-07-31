@@ -287,6 +287,7 @@ Vector3 centre = GetArenaCentre();
             mapPointer.BuildMazeWallMap();
             mapPointer.BuildSplineWallMap();
             mapPointer.BuildCubeBuildingMap();
+            mapPointer.BuildStreetLightMap();
             mapPointer.UpdateExitMarkers();
             mapPointer.UpdateEntranceMarkers();
         }

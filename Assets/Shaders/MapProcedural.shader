@@ -59,6 +59,11 @@ Shader "Waves/MapProcedural"
             float  _MapMaskRadius;
             float  _MapMaskFeather;
 
+            // Global fade-OUT amount, also set by UIMapController (0 = fully visible, 1 = gone).
+            // Deliberately inverted so the unset default (globals start at 0) leaves the map
+            // fully drawn in any scene that has no controller driving it.
+            float  _MapUIFadeOut;
+
             struct Attributes
             {
                 float4 positionOS : POSITION;
@@ -96,7 +101,7 @@ Shader "Waves/MapProcedural"
 
                 // Per-vertex tint/alpha — lets generated icons bake shape fades (e.g. spike base).
                 rgb          *= IN.color.rgb;
-                float alpha   = grad.a * _Alpha * IN.color.a;
+                float alpha   = grad.a * _Alpha * IN.color.a * saturate(1.0 - _MapUIFadeOut);
 
                 // Radial mask: fade to nothing past _MapMaskRadius (world distance from centre).
                 if (_MapMaskRadius > 0.0)

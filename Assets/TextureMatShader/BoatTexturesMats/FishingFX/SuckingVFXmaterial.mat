@@ -56,13 +56,14 @@ Material:
     - _FishGlowIntensity: 3
     - _FishGlowRadius: 0.08
     - _FishGlowSoftness: 0.04
-    - _MaterialFadeLength: 0.32
+    - _MaterialFadeLength: 0.52
     - _QueueControl: 0
     - _QueueOffset: 0
     - _ScrollSpeed: -0.29
     - _SrcBlend: 5
     - _SrcBlendAlpha: 1
     - _Surface: 1
+    - _TailFadeLength: 0.68
     - _TilingX: 2.56
     - _TilingY: 1.53
     - _TotalAlpha: -0.02

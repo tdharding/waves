@@ -16,6 +16,14 @@ class GridSnapshot
     public List<List<GridData.PrefabPlacement>> tierPrefabPlacements;
     public List<GridData.LinkedPrefabPair>      linkedPairs;
     public List<GridData.ArenaWaterModifier>    arenaWaterModifiers; // set after construction
+    // Also set after construction (see PushUndoSnapshot) — these GridData collections must be
+    // captured here or the UNDO button won't restore them. Any NEW GridData collection a designer
+    // feature adds needs a field + Copy* helper here, capture in PushUndoSnapshot, and restore in
+    // UndoLastAction. (Saving is handled separately — Save As clones the whole asset.)
+    public List<GridData.SoulZone>       soulZones;
+    public List<GridData.WhirlpoolPoint> whirlpools;
+    public List<GridData.SplineWallPath> splineWallPaths;
+    public List<GridData.CubeBuilding>   cubeBuildings;
 
     public GridSnapshot(int[] square, int[] circle,
                         List<GridData.ArenaEntrance> ents,
@@ -106,14 +114,113 @@ class GridSnapshot
             copy.Add(new GridData.PrefabPlacement
             {
                 cellIndex                = p.cellIndex,
+                position                 = p.position,
+                freePlaced               = p.freePlaced,
                 prefab                   = p.prefab,
                 isCircle                 = p.isCircle,
                 isWorldSpaceProp         = p.isWorldSpaceProp,
                 scale                    = p.scale,
+                statueId                 = p.statueId,
                 overrideModifierSettings = p.overrideModifierSettings,
                 speedBoost               = p.speedBoost,
                 frequencyBoost           = p.frequencyBoost,
                 rippleDepthBoost         = p.rippleDepthBoost
+            });
+        return copy;
+    }
+
+    // Deep-copy of the soul zones (incl. fish-bowl tributaries + street lights) so an UNDO restores
+    // the full zone state independently of the live data. souls are asset refs (shallow is correct).
+    public static List<GridData.SoulZone> CopySoulZones(List<GridData.SoulZone> src)
+    {
+        var copy = new List<GridData.SoulZone>();
+        if (src == null) return copy;
+        foreach (var z in src)
+        {
+            if (z == null) { copy.Add(null); continue; }
+            var c = new GridData.SoulZone
+            {
+                zoneRole           = z.zoneRole,
+                zoneId             = z.zoneId,
+                adjoinZoneId       = z.adjoinZoneId,
+                adjoinNodeIndex    = z.adjoinNodeIndex,
+                entryEntranceIndex = z.entryEntranceIndex,
+                exitEntranceIndex  = z.exitEntranceIndex,
+                externalSourceKey  = z.externalSourceKey,
+                externalTargetKey  = z.externalTargetKey,
+                nodes              = z.nodes != null ? new List<int>(z.nodes) : new List<int>(),
+                nodePositions      = z.nodePositions != null ? new List<Vector2>(z.nodePositions) : new List<Vector2>(),
+                closedLoop         = z.closedLoop,
+                segmentCurved      = z.segmentCurved != null ? new List<bool>(z.segmentCurved) : new List<bool>(),
+                radius             = z.radius,
+                pathWidth          = z.pathWidth,
+                knotCount          = z.knotCount,
+                curveResolution    = z.curveResolution,
+                souls              = z.souls != null ? new List<SoulData>(z.souls) : new List<SoulData>(),
+                statueGuarded      = z.statueGuarded,
+                linkedStatueId     = z.linkedStatueId,
+                ringRadius         = z.ringRadius,
+                towerGuarded       = z.towerGuarded,
+            };
+            c.streetLights = new List<GridData.SoulZone.StreetLight>();
+            if (z.streetLights != null)
+                foreach (var sl in z.streetLights)
+                    c.streetLights.Add(sl == null ? null
+                        : new GridData.SoulZone.StreetLight { nodeIndex = sl.nodeIndex, poolRadius = sl.poolRadius });
+            copy.Add(c);
+        }
+        return copy;
+    }
+
+    public static List<GridData.WhirlpoolPoint> CopyWhirlpools(List<GridData.WhirlpoolPoint> src)
+    {
+        var copy = new List<GridData.WhirlpoolPoint>();
+        if (src == null) return copy;
+        foreach (var w in src)
+            copy.Add(w == null ? null : new GridData.WhirlpoolPoint { cellIndex = w.cellIndex, radius = w.radius });
+        return copy;
+    }
+
+    public static List<GridData.SplineWallPath> CopySplineWalls(List<GridData.SplineWallPath> src)
+    {
+        var copy = new List<GridData.SplineWallPath>();
+        if (src == null) return copy;
+        foreach (var p in src)
+        {
+            if (p == null) { copy.Add(null); continue; }
+            copy.Add(new GridData.SplineWallPath
+            {
+                nodes                      = p.nodes != null ? new List<Vector2>(p.nodes) : new List<Vector2>(),
+                isClosed                   = p.isClosed,
+                segmentCurved              = p.segmentCurved != null ? new List<bool>(p.segmentCurved) : new List<bool>(),
+                segmentGap                 = p.segmentGap != null ? new List<bool>(p.segmentGap) : new List<bool>(),
+                segmentDestructible        = p.segmentDestructible != null ? new List<bool>(p.segmentDestructible) : new List<bool>(),
+                tileSpacing                = p.tileSpacing,
+                prefabOverride             = p.prefabOverride,
+                destructiblePrefabOverride = p.destructiblePrefabOverride,
+                wallHeight                 = p.wallHeight,
+                depthBelowWater            = p.depthBelowWater,
+                wallThickness              = p.wallThickness,
+                nodeHeights                = p.nodeHeights != null ? new List<float>(p.nodeHeights) : new List<float>(),
+                nodeSizeScale              = p.nodeSizeScale,
+                pathScale                  = p.pathScale,
+            });
+        }
+        return copy;
+    }
+
+    public static List<GridData.CubeBuilding> CopyCubeBuildings(List<GridData.CubeBuilding> src)
+    {
+        var copy = new List<GridData.CubeBuilding>();
+        if (src == null) return copy;
+        foreach (var b in src)
+            copy.Add(b == null ? null : new GridData.CubeBuilding
+            {
+                center           = b.center,
+                width            = b.width,
+                length           = b.length,
+                heightAboveWater = b.heightAboveWater,
+                depthBelowWater  = b.depthBelowWater,
             });
         return copy;
     }
@@ -144,8 +251,16 @@ public class GridDesignerWindow : EditorWindow
     // Soul zone drawing state
     int  _activeSoulZoneIndex = -1;
     readonly List<Vector2> _drawingNodes = new List<Vector2>(); // normalized positions being drawn
+
+    // Street-light lamp markers, collected while zones draw and flushed on top afterwards so no
+    // zone band can cover another zone's lamp number. (pixel centre, radius, 1-based order number)
+    readonly List<(Vector2 pos, float radius, int number)> _lampMarkers = new List<(Vector2, float, int)>();
     int _drawingFirstCell = -1; // cell of the first drawn node, for close-loop detection
     bool _isDrawingSoulArea;
+
+    // Sub-zone junction drawing: extend a tributary's path out from its radius; drop the final
+    // node on a Main-Path node to create the junction. -1 = not drawing.
+    int _subZoneDrawIdx = -1;
 
     // Select tool state
     enum SelectionType
@@ -194,6 +309,20 @@ public class GridDesignerWindow : EditorWindow
         new Color(0.9f, 0.9f, 0.2f),
         new Color(0.5f, 0.3f, 1.0f),
     };
+
+    // Sub-zones (bowl/statue tributaries) render with the same visual as main paths but in a
+    // single, distinct teal so they read as tributaries at a glance.
+    static readonly Color SubZoneColor = new Color(0.13f, 0.85f, 0.78f);
+
+    // Colour for a zone's designer visual, chosen by role (main path vs sub-zone).
+    Color SoulZoneColor(GridData.SoulZone zone, int zi)
+    {
+        Color c = (zone != null && zone.zoneRole == GridData.SoulZone.ZoneRole.SubZone)
+            ? SubZoneColor
+            : ZonePalette[Mathf.Max(0, zi) % ZonePalette.Length];
+        c.a = 1f;
+        return c;
+    }
     bool drawWaveModifier;
     int        activeTierIndex  = -1; // -1 = base layer
     List<bool> tierVisible      = new List<bool>();
@@ -355,6 +484,10 @@ public class GridDesignerWindow : EditorWindow
         List<GridData.ArenaEntrance>  entrances = loadedData?.entrances      ?? new List<GridData.ArenaEntrance>();
         var snap = new GridSnapshot(squareGrid, circleGrid, entrances, orbs, souls, waterMods, waveMods, loadedData?.tiers, loadedData?.prefabPlacements, loadedData?.linkedPairs);
         snap.arenaWaterModifiers = GridSnapshot.CopyWaterMods(loadedData?.arenaWaterModifiers);
+        snap.soulZones           = GridSnapshot.CopySoulZones(loadedData?.soulZones);
+        snap.whirlpools          = GridSnapshot.CopyWhirlpools(loadedData?.whirlpools);
+        snap.splineWallPaths     = GridSnapshot.CopySplineWalls(loadedData?.splineWallPaths);
+        snap.cubeBuildings       = GridSnapshot.CopyCubeBuildings(loadedData?.cubeBuildings);
         undoStack.Push(snap);
         if (undoStack.Count > MaxUndoSteps) undoStack.TrimExcess();
     }
@@ -389,12 +522,23 @@ public class GridDesignerWindow : EditorWindow
             loadedData.soulSpawnPoints = new List<GridData.SoulSpawnPoint>();
             foreach (var s in snapshot.soulSpawnPoints)
                 loadedData.soulSpawnPoints.Add(new GridData.SoulSpawnPoint { cellIndex = s.cellIndex, soulData = s.soulData });
+
+            // Soul zones (incl. fish-bowl tributaries + street lights), whirlpools, spline walls and
+            // cube buildings — restored here so the UNDO button covers them, not just Unity's Ctrl+Z.
+            if (snapshot.soulZones      != null) loadedData.soulZones       = GridSnapshot.CopySoulZones(snapshot.soulZones);
+            if (snapshot.whirlpools     != null) loadedData.whirlpools      = GridSnapshot.CopyWhirlpools(snapshot.whirlpools);
+            if (snapshot.splineWallPaths!= null) loadedData.splineWallPaths = GridSnapshot.CopySplineWalls(snapshot.splineWallPaths);
+            if (snapshot.cubeBuildings  != null) loadedData.cubeBuildings   = GridSnapshot.CopyCubeBuildings(snapshot.cubeBuildings);
         }
         Repaint();
     }
 
     void OnGUI()
     {
+        // Draw-mode hotkeys are handled first, before any panel/control can intercept the
+        // key, so Enter/Escape/Delete always act on the centre draw window.
+        HandleModeHotkeys(Event.current);
+
         DrawToolbar();
 
         EditorGUILayout.BeginHorizontal();
@@ -402,6 +546,199 @@ public class GridDesignerWindow : EditorWindow
         DrawPanelResizeHandle();
         DrawRightPanel();
         EditorGUILayout.EndHorizontal();
+    }
+
+    // ── Centralised draw-mode hotkeys ───────────────────────────────────────────
+    // Single source of truth for Enter/Escape/Delete while a draw mode is active.
+    // Runs first in OnGUI so nothing downstream can steal the key. Bails while a panel
+    // text field is being edited — and clicking the grid clears that focus (see DrawGrid),
+    // so interacting with the centre window makes it own all key commands.
+    // Modes are mutually exclusive; the first matching arm handles and consumes the event.
+    void HandleModeHotkeys(Event e)
+    {
+        if (loadedData == null || e.type != EventType.KeyDown) return;
+        if (EditorGUIUtility.editingTextField) return;
+
+        bool enter  = e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter;
+        bool escape = e.keyCode == KeyCode.Escape;
+        bool delete = e.keyCode == KeyCode.Delete || e.keyCode == KeyCode.Backspace;
+        if (!enter && !escape && !delete) return;
+
+        // Soul area draw — Enter commits the node path, Escape cancels.
+        if (_isDrawingSoulArea)
+        {
+            if (enter)
+            {
+                if (_activeSoulZoneIndex >= 0 && _activeSoulZoneIndex < loadedData.soulZones.Count)
+                    CommitDrawingNodes(loadedData.soulZones[_activeSoulZoneIndex]);
+                e.Use(); Repaint();
+            }
+            else if (escape) { CancelDrawingNodes(); e.Use(); Repaint(); }
+            return;
+        }
+
+        // Tube placement (waiting to click a cell) — Escape cancels.
+        if (_isWaitingForTubePlacement)
+        {
+            if (escape)
+            {
+                _isWaitingForTubePlacement = false;
+                _pendingModifierCellIndex = -1;
+                GridLog("Cancelled tube placement.");
+                e.Use(); Repaint();
+            }
+            return;
+        }
+
+        // Lock tube place/edit modes — Enter or Escape exits.
+        if (_tubePlacingEntranceIndex >= 0 || _tubeDrawEntranceIndex >= 0)
+        {
+            if (enter || escape)
+            {
+                _tubePlacingEntranceIndex = -1;
+                _tubeDrawEntranceIndex    = -1;
+                _dragTubeNodeIndex        = -1;
+                _selectedTubeNodeIndex    = -1;
+                e.Use(); Repaint();
+            }
+            return;
+        }
+
+        // Wave-modifier tube edit — Enter or Escape exits.
+        if (_wmTubeDrawPairIdx >= 0)
+        {
+            if (enter || escape)
+            {
+                _wmTubeDrawPairIdx = -1;
+                _wmDragTubeNodeIdx = -1;
+                _wmSelTubeNodeIdx  = -1;
+                e.Use(); Repaint();
+            }
+            return;
+        }
+
+        // Sub-zone junction drawing — Enter or Escape finishes (keeps whatever was placed).
+        if (_subZoneDrawIdx >= 0)
+        {
+            if (enter || escape) { _subZoneDrawIdx = -1; e.Use(); Repaint(); }
+            return;
+        }
+
+        // Spline wall mode — Escape exits, Delete removes the last node on the active path.
+        if (_drawSplineWall)
+        {
+            if (escape) { _drawSplineWall = false; e.Use(); Repaint(); }
+            else if (delete && loadedData.splineWallPaths != null
+                     && _activeSplinePathIdx < loadedData.splineWallPaths.Count)
+            {
+                var activePath = loadedData.splineWallPaths[_activeSplinePathIdx];
+                if (activePath.nodes != null && activePath.nodes.Count > 0)
+                {
+                    Undo.RecordObject(loadedData, "Delete Spline Wall Node");
+                    int lastIdx = activePath.nodes.Count - 1;
+                    activePath.nodes.RemoveAt(lastIdx);
+                    if (activePath.segmentCurved != null && lastIdx < activePath.segmentCurved.Count)
+                        activePath.segmentCurved.RemoveAt(lastIdx);
+                    if (activePath.segmentGap != null && lastIdx < activePath.segmentGap.Count)
+                        activePath.segmentGap.RemoveAt(lastIdx);
+                    if (activePath.segmentDestructible != null && lastIdx < activePath.segmentDestructible.Count)
+                        activePath.segmentDestructible.RemoveAt(lastIdx);
+                    EditorUtility.SetDirty(loadedData);
+                    e.Use(); Repaint();
+                }
+            }
+            return;
+        }
+
+        // Cube building mode — Escape exits, Delete removes the active block.
+        if (_drawCubeBuilding)
+        {
+            if (escape) { _activeCubeIndex = -1; _drawCubeBuilding = false; e.Use(); Repaint(); }
+            else if (delete && loadedData.cubeBuildings != null
+                     && _activeCubeIndex >= 0 && _activeCubeIndex < loadedData.cubeBuildings.Count)
+            {
+                Undo.RecordObject(loadedData, "Delete Cube Building");
+                loadedData.cubeBuildings.RemoveAt(_activeCubeIndex);
+                _activeCubeIndex = -1;
+                EditorUtility.SetDirty(loadedData);
+                e.Use(); Repaint();
+            }
+            return;
+        }
+
+        // Select tool — Escape deselects, Delete removes the selected item.
+        if (drawSelect)
+        {
+            if (escape) { ClearSelectState(); e.Use(); Repaint(); return; }
+            if (delete && _currentSelection.type != SelectionType.None)
+            {
+                Undo.RecordObject(loadedData, "Delete Selection");
+                PushUndoSnapshot();
+
+                switch (_currentSelection.type)
+                {
+                    case SelectionType.SoulZoneNode:
+                        var zone = loadedData.soulZones[_currentSelection.index];
+                        if (zone.nodePositions != null && _currentSelection.subIndex < zone.nodePositions.Count)
+                        {
+                            zone.nodePositions.RemoveAt(_currentSelection.subIndex);
+                            SoulZoneNodeDeleted(zone, _currentSelection.subIndex);
+                        }
+                        break;
+                    case SelectionType.PrefabPlacement:
+                        var placements = _currentSelection.tierIndex == -1 ? loadedData.prefabPlacements : loadedData.tiers[_currentSelection.tierIndex].prefabPlacements;
+                        var removedPlacement = _currentSelection.index < placements.Count ? placements[_currentSelection.index] : null;
+                        placements.RemoveAt(_currentSelection.index);
+                        // Also drop any statue/tower guarded soul zone linked to this placement.
+                        if (removedPlacement != null && removedPlacement.statueId != 0 && loadedData.soulZones != null)
+                            loadedData.soulZones.RemoveAll(z =>
+                                (z.statueGuarded || z.towerGuarded) && z.linkedStatueId == removedPlacement.statueId);
+                        break;
+                    case SelectionType.Whirlpool:
+                        loadedData.whirlpools.RemoveAt(_currentSelection.index);
+                        break;
+                    case SelectionType.Orb:
+                        loadedData.orbCellIndices.Remove(_currentSelection.cellIndex);
+                        break;
+                    case SelectionType.WaterModifier:
+                        var waterMods = _currentSelection.tierIndex == -1 ? loadedData.waterLevelModifierCellIndices : loadedData.tiers[_currentSelection.tierIndex].waterLevelModifierCellIndices;
+                        waterMods.Remove(_currentSelection.cellIndex);
+                        break;
+                    case SelectionType.WaveModifier:
+                        var waveMods = _currentSelection.tierIndex == -1 ? loadedData.waveModifierCellIndices : loadedData.tiers[_currentSelection.tierIndex].waveModifierCellIndices;
+                        waveMods.Remove(_currentSelection.cellIndex);
+                        break;
+                    case SelectionType.GridSlot:
+                        if (_currentSelection.tierIndex >= 0) loadedData.tiers[_currentSelection.tierIndex].cells[_currentSelection.cellIndex] = 0;
+                        else if (_currentSelection.isCircle) circleGrid[_currentSelection.cellIndex] = 0;
+                        else squareGrid[_currentSelection.cellIndex] = 0;
+                        break;
+                    case SelectionType.SplineWallNode:
+                        if (loadedData.splineWallPaths != null
+                            && _currentSelection.index < loadedData.splineWallPaths.Count)
+                        {
+                            var wp = loadedData.splineWallPaths[_currentSelection.index];
+                            int delIdx = _currentSelection.subIndex;
+                            if (wp.nodes != null && delIdx < wp.nodes.Count)
+                            {
+                                wp.nodes.RemoveAt(delIdx);
+                                if (wp.segmentCurved != null && delIdx < wp.segmentCurved.Count)
+                                    wp.segmentCurved.RemoveAt(delIdx);
+                                if (wp.segmentGap != null && delIdx < wp.segmentGap.Count)
+                                    wp.segmentGap.RemoveAt(delIdx);
+                                if (wp.segmentDestructible != null && delIdx < wp.segmentDestructible.Count)
+                                    wp.segmentDestructible.RemoveAt(delIdx);
+                            }
+                        }
+                        break;
+                }
+
+                ClearSelectState();
+                EditorUtility.SetDirty(loadedData);
+                e.Use(); Repaint();
+            }
+            return;
+        }
     }
 
     void DrawToolbar()
@@ -958,6 +1295,8 @@ public class GridDesignerWindow : EditorWindow
                 placements.Add(new GridData.PrefabPlacement
                 {
                     cellIndex = index,
+                    position = GridData.SoulZone.CellToNormalized(index),
+                    freePlaced = true,
                     prefab = tubePrefab,
                     isCircle = drawCircle,
                     isWorldSpaceProp = _activePlacementIsWorldSpaceProp,
@@ -987,6 +1326,8 @@ public class GridDesignerWindow : EditorWindow
             var placement = new GridData.PrefabPlacement
             {
                 cellIndex           = index,
+                position            = GridData.SoulZone.CellToNormalized(index),
+                freePlaced          = true,
                 prefab              = _activePlacementPrefab,
                 isCircle            = drawCircle,
                 isWorldSpaceProp    = _activePlacementIsWorldSpaceProp,
@@ -1135,6 +1476,7 @@ public class GridDesignerWindow : EditorWindow
 
         var zone = new GridData.SoulZone
         {
+            zoneRole       = GridData.SoulZone.ZoneRole.SubZone, // statue sources are tributaries
             statueGuarded  = true,
             linkedStatueId = placement.statueId,
             ringRadius     = 0.08f,
@@ -1165,6 +1507,7 @@ public class GridDesignerWindow : EditorWindow
         // Bowl height + swim radius live on the tower prefab's FishBowlTowerController — not here.
         var zone = new GridData.SoulZone
         {
+            zoneRole       = GridData.SoulZone.ZoneRole.SubZone, // fish-bowl sources are tributaries
             towerGuarded   = true,
             linkedStatueId = placement.statueId,
             knotCount      = 8,
@@ -1182,12 +1525,58 @@ public class GridDesignerWindow : EditorWindow
     static void BuildRing(GridData.SoulZone zone, Vector2 center, float radiusNorm, int count)
     {
         zone.nodePositions = new List<Vector2>(count);
+        zone.segmentCurved = new List<bool>(count);
         for (int i = 0; i < count; i++)
         {
             float ang = (i / (float)count) * Mathf.PI * 2f;
             zone.nodePositions.Add(center + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * radiusNorm);
+            zone.segmentCurved.Add(true);   // rings sample as smooth circles, not polygons
         }
         zone.closedLoop = true;
+    }
+
+    // ── Soul zone segment-curve flag upkeep ──────────────────────
+    // Mirrors the spline wall editor's list alignment: segment i = node[i] → node[i+1].
+    // Zones with no flags yet (authored pre-curves) stay flagless — missing entries read
+    // as straight, so their shape never changes behind the designer's back.
+
+    static void SoulZoneNodeInserted(GridData.SoulZone zone, int newNodeIdx)
+    {
+        if (zone.segmentCurved != null && zone.segmentCurved.Count > 0)
+        {
+            int inheritFrom = Mathf.Clamp(newNodeIdx - 1, 0, zone.segmentCurved.Count - 1);
+            int insertAt    = Mathf.Clamp(newNodeIdx, 0, zone.segmentCurved.Count);
+            zone.segmentCurved.Insert(insertAt, zone.segmentCurved[inheritFrom]);
+        }
+
+        // Street lights on/after the insertion point shift up with their nodes.
+        if (zone.streetLights != null)
+            foreach (var l in zone.streetLights)
+                if (l != null && l.nodeIndex >= newNodeIdx) l.nodeIndex++;
+    }
+
+    static void SoulZoneNodeDeleted(GridData.SoulZone zone, int nodeIdx)
+    {
+        if (zone.segmentCurved != null && zone.segmentCurved.Count > 0)
+            zone.segmentCurved.RemoveAt(Mathf.Min(nodeIdx, zone.segmentCurved.Count - 1));
+
+        // A light standing on the deleted node goes with it; lights beyond shift down.
+        if (zone.streetLights != null)
+        {
+            zone.streetLights.RemoveAll(l => l == null || l.nodeIndex == nodeIdx);
+            foreach (var l in zone.streetLights)
+                if (l.nodeIndex > nodeIdx) l.nodeIndex--;
+        }
+    }
+
+    void SetAllSoulZoneSegmentsCurved(GridData.SoulZone zone, bool curved)
+    {
+        Undo.RecordObject(loadedData, curved ? "Curve Soul Zone Path" : "Straighten Soul Zone Path");
+        int segCount = zone.SegmentCount();
+        zone.segmentCurved = new List<bool>(segCount);
+        for (int i = 0; i < segCount; i++) zone.segmentCurved.Add(curved);
+        EditorUtility.SetDirty(loadedData);
+        Repaint();
     }
 
     static Vector2 Centroid(List<Vector2> pts)
@@ -1222,6 +1611,87 @@ public class GridDesignerWindow : EditorWindow
                 if (t.prefabPlacements != null)
                     foreach (var p in t.prefabPlacements) max = Mathf.Max(max, p.statueId);
         return max + 1;
+    }
+
+    // Assigns a stable, level-unique zoneId to any soul zone that lacks one (0). Junctions and
+    // (later) cross-level routing reference zones by this id rather than fragile list indices.
+    void EnsureZoneIds()
+    {
+        if (loadedData?.soulZones == null) return;
+        int maxId = 0;
+        foreach (var z in loadedData.soulZones) maxId = Mathf.Max(maxId, z.zoneId);
+        bool changed = false;
+        foreach (var z in loadedData.soulZones)
+            if (z.zoneId == 0) { z.zoneId = ++maxId; changed = true; }
+        if (changed) EditorUtility.SetDirty(loadedData);
+    }
+
+    // Keeps each adjoined tributary's final node glued to the main-river node it joins, so the
+    // junction follows when the main path is edited (mirrors WMSyncTubeEndpoints for tube ends).
+    void SyncSubZoneJunctions()
+    {
+        if (loadedData?.soulZones == null) return;
+        bool changed = false;
+        foreach (var z in loadedData.soulZones)
+        {
+            if (z.zoneRole != GridData.SoulZone.ZoneRole.SubZone) continue;
+            if (z.nodePositions == null || z.nodePositions.Count == 0) continue;
+
+            // Lock a fish-bowl tributary's source node (node 0) to its tower placement, so the
+            // pool follows when the prefab is moved.
+            if (z.towerGuarded && z.linkedStatueId != 0)
+            {
+                var pp = FindPlacementByStatueId(z.linkedStatueId);
+                if (pp != null)
+                {
+                    pp.EnsureFreePosition();
+                    Vector2 anchor = pp.position; // track the bowl prefab's exact free position
+                    if (z.nodePositions[0] != anchor) { z.nodePositions[0] = anchor; changed = true; }
+                }
+            }
+
+            // Pin the adjoining node (last) to the main-river node it joins. If the tributary is
+            // adjoined but has no path yet (e.g. the junction was set via the dropdown, not drawn),
+            // CREATE the join node so a bowl→junction path exists and actually draws.
+            if (z.adjoinZoneId != 0)
+            {
+                var main = loadedData.soulZones.Find(m =>
+                    m.zoneId == z.adjoinZoneId && m.zoneRole == GridData.SoulZone.ZoneRole.MainPath);
+                if (main?.nodePositions != null
+                    && z.adjoinNodeIndex >= 0 && z.adjoinNodeIndex < main.nodePositions.Count)
+                {
+                    Vector2 target = main.nodePositions[z.adjoinNodeIndex];
+                    if (z.nodePositions.Count < 2)
+                    {
+                        z.nodePositions.Add(target);   // straight bowl→junction path; draw/edit adds waypoints
+                        changed = true;
+                    }
+                    else
+                    {
+                        int last = z.nodePositions.Count - 1;
+                        if (z.nodePositions[last] != target)
+                        {
+                            z.nodePositions[last] = target;
+                            changed = true;
+                        }
+                    }
+                }
+            }
+        }
+        if (changed) EditorUtility.SetDirty(loadedData);
+    }
+
+    // Finds the prefab placement carrying a given statueId (base layer + tiers), or null.
+    GridData.PrefabPlacement FindPlacementByStatueId(int statueId)
+    {
+        if (loadedData == null || statueId == 0) return null;
+        if (loadedData.prefabPlacements != null)
+            foreach (var p in loadedData.prefabPlacements) if (p != null && p.statueId == statueId) return p;
+        if (loadedData.tiers != null)
+            foreach (var t in loadedData.tiers)
+                if (t.prefabPlacements != null)
+                    foreach (var p in t.prefabPlacements) if (p != null && p.statueId == statueId) return p;
+        return null;
     }
 
     // Removes any statue-guarded zone whose statue is being erased at this cell.
@@ -1928,6 +2398,13 @@ public class GridDesignerWindow : EditorWindow
         if (_drawingNodes.Count > 0)
         {
             zone.nodePositions = new List<Vector2>(_drawingNodes);
+            // Freshly drawn paths default to curved; the zone's Curved Path toggle straightens.
+            // (Filling nodeCount entries covers open and closed paths — a trailing spare on open
+            // paths is never read.)
+            zone.segmentCurved = new List<bool>(zone.nodePositions.Count);
+            for (int i = 0; i < zone.nodePositions.Count; i++) zone.segmentCurved.Add(true);
+            // A redraw invalidates node indices — street lights must be re-placed.
+            zone.streetLights?.Clear();
             EditorUtility.SetDirty(loadedData);
         }
         _drawingNodes.Clear();
@@ -1956,6 +2433,7 @@ public class GridDesignerWindow : EditorWindow
     void DrawSoulZonesSection()
     {
         EnsureSoulZones();
+        EnsureZoneIds();
         EnsureSoulDataCache();
 
         int zoneCount = loadedData.soulZones.Count;
@@ -1993,21 +2471,39 @@ public class GridDesignerWindow : EditorWindow
         for (int zi = 0; zi < loadedData.soulZones.Count; zi++)
         {
             var zone = loadedData.soulZones[zi];
-            Color zc = ZonePalette[zi % ZonePalette.Length];
+            Color zc = SoulZoneColor(zone, zi);
 
             bool isSelected = _activeSoulZoneIndex == zi;
             GUI.backgroundColor = isSelected ? zc : Color.white;
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
             GUI.backgroundColor = Color.white;
 
+            // The first zone drawn is the Main Zone and can never be a sub-zone.
+            bool isMainZone = zi == 0;
+
+            // Name: "Main Zone", "Zone N", or "SubZone N" with a source tag in brackets.
+            string roleLabel;
+            if (!isMainZone && zone.zoneRole == GridData.SoulZone.ZoneRole.SubZone)
+            {
+                int subOrd = 0;
+                for (int k = 0; k <= zi; k++)
+                    if (k != 0 && loadedData.soulZones[k].zoneRole == GridData.SoulZone.ZoneRole.SubZone) subOrd++;
+                string tag = zone.towerGuarded  ? " (Fish Bowl Sub-Zone)"
+                           : zone.statueGuarded ? " (Statue Sub-Zone)"
+                           : "";
+                roleLabel = $"SubZone {subOrd}{tag}";
+            }
+            else
+            {
+                roleLabel = isMainZone ? "Main Zone" : $"Zone {zi}";
+            }
+
             // Zone header row
             EditorGUILayout.BeginHorizontal();
             Color prev = GUI.contentColor;
             GUI.contentColor = zc;
-            EditorGUILayout.LabelField($"● Zone {zi}", EditorStyles.boldLabel, GUILayout.Width(70));
+            EditorGUILayout.LabelField($"● {roleLabel}", EditorStyles.boldLabel);
             GUI.contentColor = prev;
-            string closedLabel = zone.closedLoop ? "● CLOSED" : "○ OPEN";
-            EditorGUILayout.LabelField($"{zone.nodePositions?.Count ?? 0} node(s)   {zone.souls?.Count ?? 0} soul(s)   {closedLabel}", GUILayout.ExpandWidth(true));
 
             if (GUILayout.Button("Select", GUILayout.Width(52)))
             {
@@ -2020,8 +2516,173 @@ public class GridDesignerWindow : EditorWindow
             GUI.backgroundColor = Color.white;
             EditorGUILayout.EndHorizontal();
 
+            string closedLabel = zone.closedLoop ? "● CLOSED" : "○ OPEN";
+            EditorGUILayout.LabelField($"{zone.nodePositions?.Count ?? 0} node(s)   {zone.souls?.Count ?? 0} soul(s)   {closedLabel}", EditorStyles.miniLabel);
+
             if (isSelected)
             {
+                // Role — Main Path vs Sub-Zone (tributary). The Main Zone (first zone) is locked to
+                // MainPath and can't be a sub-zone.
+                if (isMainZone)
+                {
+                    if (zone.zoneRole != GridData.SoulZone.ZoneRole.MainPath)
+                    { zone.zoneRole = GridData.SoulZone.ZoneRole.MainPath; EditorUtility.SetDirty(loadedData); }
+                    EditorGUILayout.LabelField("Main Zone — the level's soul-fish path (can't be a sub-zone).", EditorStyles.miniLabel);
+                }
+                else
+                {
+                    EditorGUI.BeginChangeCheck();
+                    bool isSub = EditorGUILayout.ToggleLeft(
+                        new GUIContent("Sub-Zone (tributary)", "A bowl/statue tributary that adjoins the main path. Rendered in teal; merges onto the main path when unlocked."),
+                        zone.zoneRole == GridData.SoulZone.ZoneRole.SubZone);
+                    if (EditorGUI.EndChangeCheck())
+                    {
+                        Undo.RecordObject(loadedData, "Set Soul Zone Role");
+                        zone.zoneRole = isSub ? GridData.SoulZone.ZoneRole.SubZone : GridData.SoulZone.ZoneRole.MainPath;
+                        EditorUtility.SetDirty(loadedData);
+                        Repaint();
+                    }
+                }
+
+                EditorGUILayout.LabelField($"Zone id: {zone.zoneId}", EditorStyles.miniLabel);
+
+                // Junction — where a Sub-Zone adjoins a Main Path (which path + which node).
+                if (zone.zoneRole == GridData.SoulZone.ZoneRole.SubZone)
+                {
+                    var mainIds    = new List<int> { 0 };
+                    var mainLabels = new List<string> { "(none)" };
+                    for (int mi = 0; mi < loadedData.soulZones.Count; mi++)
+                    {
+                        var mz = loadedData.soulZones[mi];
+                        if (mz.zoneRole == GridData.SoulZone.ZoneRole.MainPath)
+                        {
+                            mainIds.Add(mz.zoneId);
+                            mainLabels.Add($"Zone {mi} (id {mz.zoneId})");
+                        }
+                    }
+                    int curSel = Mathf.Max(0, mainIds.IndexOf(zone.adjoinZoneId));
+
+                    EditorGUI.BeginChangeCheck();
+                    int newSel  = EditorGUILayout.Popup(new GUIContent("Adjoins Main Path", "The main path this tributary merges onto when unlocked."), curSel, mainLabels.ToArray());
+                    int newNode = EditorGUILayout.IntField(new GUIContent("Adjoin Node", "Node index on the main path where this tributary joins (normally a street-light node). -1 = unset."), zone.adjoinNodeIndex);
+                    if (EditorGUI.EndChangeCheck())
+                    {
+                        Undo.RecordObject(loadedData, "Set Sub-Zone Junction");
+                        zone.adjoinZoneId    = mainIds[Mathf.Clamp(newSel, 0, mainIds.Count - 1)];
+                        zone.adjoinNodeIndex = newNode;
+                        EditorUtility.SetDirty(loadedData);
+                    }
+
+                    // Junction + gate status. Mirrors LevelSpawner's bowlTributaryChain test so the
+                    // designer tells the truth about what will actually happen at runtime — a
+                    // tributary is gated by ITS OWN lights, never by the main path's.
+                    {
+                        var mainZ = loadedData.soulZones.Find(m =>
+                            m.zoneId == zone.adjoinZoneId && m.zoneRole == GridData.SoulZone.ZoneRole.MainPath);
+                        bool joined = zone.adjoinZoneId != 0 && mainZ?.nodePositions != null
+                                      && zone.adjoinNodeIndex >= 0
+                                      && zone.adjoinNodeIndex < mainZ.nodePositions.Count;
+
+                        int  nodeCount = zone.nodePositions?.Count ?? 0;
+                        bool hasPath   = nodeCount >= 2;
+                        bool loopBad   = zone.closedLoop && nodeCount >= 3;
+
+                        // The join opens when the river FLOWS PAST the junction node — so the
+                        // junction needs no lamp of its own; the main path just needs lights (a
+                        // frontier that advances). Report which lamp will carry the river past it.
+                        var mainLights = joined ? mainZ.StreetLightsInOrder() : null;
+                        int passLamp = -1;   // 1-based number of the first lamp at/after the junction
+                        if (mainLights != null)
+                            for (int mi = 0; mi < mainLights.Count; mi++)
+                                if (mainLights[mi] != null && mainLights[mi].nodeIndex >= zone.adjoinNodeIndex)
+                                { passLamp = mi + 1; break; }
+
+                        bool mainHasLights = mainLights != null && mainLights.Count > 0;
+
+                        string msg;
+                        MessageType mt;
+                        if (!joined)
+                        {
+                            msg = "NOT CONNECTED — draw the path and finish on a Main-Path node to snap the junction.";
+                            mt  = MessageType.Warning;
+                        }
+                        else if (!hasPath || !mainHasLights || loopBad)
+                        {
+                            msg = $"Connected to node {zone.adjoinNodeIndex} — but WILL NOT JOIN at runtime:";
+                            if (!hasPath) msg += "\n• needs 2+ nodes (path from bowl to river)";
+                            if (!mainHasLights)
+                                msg += "\n• the main path has NO street lights, so its river never flows — "
+                                     + "add at least one so it has an advancing frontier.";
+                            if (loopBad) msg += "\n• closed loop — a tributary must be an open path";
+                            mt = MessageType.Error;
+                        }
+                        else
+                        {
+                            string passBy = passLamp > 0
+                                ? $"street light #{passLamp} is lit"
+                                : "the river reaches its final light";
+                            msg = $"CONNECTED to node {zone.adjoinNodeIndex}. The joining line draws when BOTH:"
+                                + $"\n  1. the fish-bowl tower is toppled and its pool reaches full size, and"
+                                + $"\n  2. the river has flowed past this node — i.e. {passBy}."
+                                + $"\nThe shoal then swims up the river to the newest lit light.";
+                            mt = MessageType.Info;
+                        }
+
+                        EditorGUILayout.HelpBox(msg, mt);
+                    }
+
+                    // Draw the tributary path out from the radius; drop the final node on a
+                    // Main-Path node to snap the junction.
+                    EditorGUILayout.BeginHorizontal();
+                    bool drawingThis = _subZoneDrawIdx == zi;
+                    GUI.backgroundColor = drawingThis ? new Color(0.5f, 0.8f, 1f) : Color.white;
+                    if (GUILayout.Button(drawingThis ? "● Drawing… (click a Main-Path node to finish)" : "Draw Nodes"))
+                    {
+                        if (drawingThis) _subZoneDrawIdx = -1;
+                        else
+                        {
+                            _subZoneDrawIdx    = zi;
+                            _activeSoulZoneIndex = zi;
+                            _isDrawingSoulArea = false;
+                            // Take over the grid so no other tool (esp. Select) intercepts clicks.
+                            drawSelect = drawSoulArea = drawSoul = drawCircle = drawOrb = drawWhirlpool = false;
+                            drawWaterLevelModifier = drawWaveModifier = drawDirectPrefab = _drawSplineWall = _drawCubeBuilding = false;
+                            activeSlot = -1;
+                            ClearSelectState();
+                        }
+                    }
+                    GUI.backgroundColor = Color.white;
+                    // Clear the drawn path (keep node 0, the radius anchor).
+                    if (zone.nodePositions != null && zone.nodePositions.Count > 1)
+                    {
+                        GUI.backgroundColor = new Color(1f, 0.5f, 0.5f);
+                        if (GUILayout.Button("Clear Path", GUILayout.Width(78)))
+                        {
+                            Undo.RecordObject(loadedData, "Clear Sub-Zone Path");
+                            zone.nodePositions.RemoveRange(1, zone.nodePositions.Count - 1);
+                            zone.adjoinZoneId = 0; zone.adjoinNodeIndex = -1;
+                            if (_subZoneDrawIdx == zi) _subZoneDrawIdx = -1;
+                            EditorUtility.SetDirty(loadedData);
+                        }
+                        GUI.backgroundColor = Color.white;
+                    }
+                    EditorGUILayout.EndHorizontal();
+
+                    // Adjoining node is pinned to the main river. Separate to free it (deletes the join node).
+                    if (zone.adjoinZoneId != 0)
+                    {
+                        if (GUILayout.Button(new GUIContent("Separate from Main Path", "Unlinks the junction and deletes the joining node, freeing the tributary end.")))
+                        {
+                            Undo.RecordObject(loadedData, "Separate Sub-Zone Junction");
+                            if (zone.nodePositions != null && zone.nodePositions.Count > 1)
+                                zone.nodePositions.RemoveAt(zone.nodePositions.Count - 1);
+                            zone.adjoinZoneId    = 0;
+                            zone.adjoinNodeIndex = -1;
+                            EditorUtility.SetDirty(loadedData);
+                        }
+                    }
+                }
+
                 if (zone.statueGuarded)
                     EditorGUILayout.HelpBox(
                         $"Guarded by statue #{zone.linkedStatueId} — fish here can't be caught until the statue is destroyed.",
@@ -2035,7 +2696,33 @@ public class GridDesignerWindow : EditorWindow
                 // sliders here — just souls. Everything else authors radius/knots as normal.
                 if (zone.towerGuarded)
                 {
-                    EditorGUILayout.LabelField("Bowl size & height are set on the tower prefab (FishBowlTowerController).", EditorStyles.miniLabel);
+                    // Fish-bowl sub-zone has its own pool radius (same visual as a street light).
+                    EditorGUI.BeginChangeCheck();
+                    float newBowlRadius = EditorGUILayout.Slider(
+                        new GUIContent("Radius", "World-unit radius of the fish-bowl sub-zone's pool, drawn teal in the grid — same as a street-light pool."),
+                        zone.radius, 0.1f, 5f);
+                    if (EditorGUI.EndChangeCheck())
+                    {
+                        Undo.RecordObject(loadedData, "Edit Fish-Bowl Sub-Zone Radius");
+                        zone.radius = newBowlRadius;
+                        EditorUtility.SetDirty(loadedData);
+                        Repaint();
+                    }
+
+                    // Tributary path thickness (band half-width) — separate from the source pool.
+                    EditorGUI.BeginChangeCheck();
+                    float newPathW = EditorGUILayout.Slider(
+                        new GUIContent("Path Width", "Thickness of the connecting river to the junction (world units). Small = thin river; separate from the source pool radius."),
+                        zone.pathWidth, 0f, 2f);
+                    if (EditorGUI.EndChangeCheck())
+                    {
+                        Undo.RecordObject(loadedData, "Edit Tributary Path Width");
+                        zone.pathWidth = newPathW;
+                        EditorUtility.SetDirty(loadedData);
+                        Repaint();
+                    }
+
+                    EditorGUILayout.LabelField("Bowl aloft height is set on the tower prefab (FishBowlTowerController).", EditorStyles.miniLabel);
                 }
                 else
                 {
@@ -2043,11 +2730,15 @@ public class GridDesignerWindow : EditorWindow
                     string scatterLabel = zone.statueGuarded ? "Scatter" : "Radius";
                     float newRadius = EditorGUILayout.Slider(scatterLabel, zone.radius, 0.1f, 5f);
                     int   newKnots  = EditorGUILayout.IntSlider("Knot Count", zone.knotCount, 3, 100);
+                    int   newRes    = EditorGUILayout.IntSlider(
+                        new GUIContent("Curve Resolution", "Max samples per curved segment at runtime. Higher = smoother curves on the water, but the mask's 40-point budget is shared across all zones + fish."),
+                        zone.EffectiveCurveResolution, 2, 16);
                     if (EditorGUI.EndChangeCheck())
                     {
                         Undo.RecordObject(loadedData, "Edit Soul Zone");
-                        zone.radius     = newRadius;
-                        zone.knotCount  = newKnots;
+                        zone.radius          = newRadius;
+                        zone.knotCount       = newKnots;
+                        zone.curveResolution = newRes;
                         EditorUtility.SetDirty(loadedData);
                     }
                 }
@@ -2075,6 +2766,21 @@ public class GridDesignerWindow : EditorWindow
                         zone.closedLoop = newClosed;
                         EditorUtility.SetDirty(loadedData);
                     }
+                }
+
+                // Whole-path curve toggle (per-segment control lives in the selected-node box).
+                // Shown for statue rings and tributaries too — anything with an authored path.
+                if (zone.SegmentCount() > 0)
+                {
+                    int segTotal = zone.SegmentCount();
+                    bool allCurved = true;
+                    for (int s = 0; s < segTotal; s++)
+                        if (!zone.IsSegmentCurved(s)) { allCurved = false; break; }
+
+                    EditorGUI.BeginChangeCheck();
+                    bool newCurvedAll = EditorGUILayout.Toggle("Curved Path", allCurved);
+                    if (EditorGUI.EndChangeCheck())
+                        SetAllSoulZoneSegmentsCurved(zone, newCurvedAll);
                 }
 
                 // Souls list
@@ -2138,9 +2844,9 @@ public class GridDesignerWindow : EditorWindow
                     EditorUtility.SetDirty(loadedData);
                 }
 
-                // Tower zones have a single fixed anchor node co-located with the tower —
-                // no path/node editing UI (fish are contained by the bowl radius).
-                if (!zone.towerGuarded)
+                // Fish-bowl tributaries now have an authored path, so they get the node-editing UI
+                // (select a node → curve toggle / street light). Main paths and statues keep it too.
+                if (!zone.towerGuarded || zone.zoneRole == GridData.SoulZone.ZoneRole.SubZone)
                 {
                 EditorGUILayout.Space(2);
                 int nodeCount = zone.nodePositions?.Count ?? 0;
@@ -2162,6 +2868,7 @@ public class GridDesignerWindow : EditorWindow
                     {
                         Undo.RecordObject(loadedData, "Insert Node Before");
                         zone.nodePositions.Insert(_selectedNodeIndex, InsertedNodePos(zone, _selectedNodeIndex, -1));
+                        SoulZoneNodeInserted(zone, _selectedNodeIndex);
                         EditorUtility.SetDirty(loadedData);
                     }
                     if (GUILayout.Button("Insert After", GUILayout.Height(20)))
@@ -2169,6 +2876,7 @@ public class GridDesignerWindow : EditorWindow
                         Undo.RecordObject(loadedData, "Insert Node After");
                         int insertIdx = _selectedNodeIndex + 1;
                         zone.nodePositions.Insert(insertIdx, InsertedNodePos(zone, _selectedNodeIndex, +1));
+                        SoulZoneNodeInserted(zone, insertIdx);
                         _selectedNodeIndex = insertIdx;
                         EditorUtility.SetDirty(loadedData);
                     }
@@ -2177,26 +2885,101 @@ public class GridDesignerWindow : EditorWindow
                     {
                         Undo.RecordObject(loadedData, "Delete Node");
                         zone.nodePositions.RemoveAt(_selectedNodeIndex);
+                        SoulZoneNodeDeleted(zone, _selectedNodeIndex);
                         _selectedNodeIndex = Mathf.Clamp(_selectedNodeIndex - 1, -1, zone.nodePositions.Count - 1);
                         EditorUtility.SetDirty(loadedData);
                     }
                     GUI.backgroundColor = Color.white;
                     EditorGUILayout.EndHorizontal();
+
+                    // Curve toggle for the segment leaving this node (mirrors the wall editor's ~/—)
+                    int segTotalSel = zone.SegmentCount();
+                    if (_selectedNodeIndex < segTotalSel)
+                    {
+                        bool segCurved = zone.IsSegmentCurved(_selectedNodeIndex);
+                        bool newSegCurved = GUILayout.Toggle(segCurved,
+                            new GUIContent(segCurved ? "~ Curved → next node" : "— Straight → next node",
+                                           "Curve or straighten the segment from this node to the next"),
+                            EditorStyles.miniButton);
+                        if (newSegCurved != segCurved)
+                        {
+                            Undo.RecordObject(loadedData, "Toggle Soul Zone Segment Curve");
+                            if (zone.segmentCurved == null) zone.segmentCurved = new List<bool>();
+                            while (zone.segmentCurved.Count < segTotalSel) zone.segmentCurved.Add(false);
+                            zone.segmentCurved[_selectedNodeIndex] = newSegCurved;
+                            EditorUtility.SetDirty(loadedData);
+                        }
+                    }
+
+                    // Street light on this node — gates zone progression. Lights are numbered
+                    // in path order; only #1 starts lit, feeding a caught fish to the next one
+                    // draws the zone onward (SoulZoneStreetLightChain).
+                    var lightHere = zone.StreetLightAtNode(_selectedNodeIndex);
+                    bool isLight = lightHere != null;
+                    bool newIsLight = GUILayout.Toggle(isLight,
+                        new GUIContent(isLight ? "★ StreetLight" : "☆ StreetLight",
+                                       "Place/remove a street light on this node — gates the zone's fish progression"),
+                        EditorStyles.miniButton);
+                    if (newIsLight != isLight)
+                    {
+                        Undo.RecordObject(loadedData, newIsLight ? "Add Street Light" : "Remove Street Light");
+                        if (zone.streetLights == null) zone.streetLights = new List<GridData.SoulZone.StreetLight>();
+                        if (newIsLight)
+                            zone.streetLights.Add(new GridData.SoulZone.StreetLight
+                            {
+                                nodeIndex  = _selectedNodeIndex,
+                                poolRadius = Mathf.Max(zone.radius, 0.5f)
+                            });
+                        else
+                            zone.streetLights.RemoveAll(l => l == null || l.nodeIndex == _selectedNodeIndex);
+                        lightHere = zone.StreetLightAtNode(_selectedNodeIndex);
+                        EditorUtility.SetDirty(loadedData);
+                    }
+                    if (lightHere != null)
+                    {
+                        EditorGUI.BeginChangeCheck();
+                        float newPool = EditorGUILayout.Slider("Pool Radius", lightHere.poolRadius, 0.1f, 6f);
+                        if (EditorGUI.EndChangeCheck())
+                        {
+                            Undo.RecordObject(loadedData, "Edit Street Light Pool Radius");
+                            lightHere.poolRadius = newPool;
+                            EditorUtility.SetDirty(loadedData);
+                        }
+                    }
                     EditorGUILayout.EndVertical();
                 }
-                bool hasNodes = zone.nodePositions != null && zone.nodePositions.Count > 0;
-                string drawBtnLabel = hasNodes ? "Redraw Nodes" : "Add Nodes";
-                if (GUILayout.Button(drawBtnLabel))
+                // Redraw/Add Nodes uses the main soul-area draw — not for fish bowls, which have
+                // their own "Draw Nodes" junction mode in the sub-zone panel above.
+                if (!zone.towerGuarded)
                 {
-                    _activeSoulZoneIndex = zi;
-                    _drawingNodes.Clear();
-                    _isDrawingSoulArea   = true;
-                    drawSoulArea         = true;
-                    activeSlot           = -1;
-                    drawSoul = drawCircle = drawOrb = drawSelect = false;
-                    ClearSelectState();
+                    bool hasNodes = zone.nodePositions != null && zone.nodePositions.Count > 0;
+                    string drawBtnLabel = hasNodes ? "Redraw Nodes" : "Add Nodes";
+                    if (GUILayout.Button(drawBtnLabel))
+                    {
+                        // Redrawing an authored zone is destructive on commit (path, curve flags and
+                        // street lights are replaced), so confirm first and snapshot for undo.
+                        // Esc while drawing still cancels safely without touching the zone.
+                        int lightCount = zone.streetLights?.Count ?? 0;
+                        bool proceed = !hasNodes || EditorUtility.DisplayDialog(
+                            "Redraw Zone Nodes?",
+                            $"This will replace Zone {zi}'s path ({zone.nodePositions.Count} node(s))" +
+                            (lightCount > 0 ? $" and remove its {lightCount} street light(s)" : "") +
+                            " when you finish drawing.\n\nEsc while drawing cancels safely.",
+                            "Redraw", "Cancel");
+                        if (proceed)
+                        {
+                            if (hasNodes) PushUndoSnapshot();
+                            _activeSoulZoneIndex = zi;
+                            _drawingNodes.Clear();
+                            _isDrawingSoulArea   = true;
+                            drawSoulArea         = true;
+                            activeSlot           = -1;
+                            drawSoul = drawCircle = drawOrb = drawSelect = false;
+                            ClearSelectState();
+                        }
+                    }
                 }
-                } // end if (!zone.towerGuarded)
+                } // end node-editing section
             }
 
             EditorGUILayout.EndVertical();
@@ -3461,6 +4244,16 @@ public class GridDesignerWindow : EditorWindow
         Event e = Event.current;
         bool mouseInView = viewRect.Contains(e.mousePosition);
 
+        // Clicking anywhere in the centre window claims keyboard focus away from any panel
+        // field, so draw-mode hotkeys (Enter to finish a node path, etc.) always land in
+        // HandleModeHotkeys instead of a stale field. This is the "interacting with the
+        // centre window makes it own key commands" guarantee.
+        if (e.type == EventType.MouseDown && mouseInView)
+        {
+            GUIUtility.keyboardControl        = 0;
+            EditorGUIUtility.editingTextField = false;
+        }
+
         // While a panel text/number field is being edited, ignore keyboard events in the
         // centre window so Delete/Escape/Backspace/etc. act on the field, not the grid
         // (selection deletes, mode exits, node removal). Drawing only happens on Repaint
@@ -3570,6 +4363,11 @@ public class GridDesignerWindow : EditorWindow
         if (_drawCubeBuilding && loadedData != null)
             HandleCubeBuildingInput(rect, e);
 
+        // Sub-zone junction drawing runs FIRST so its clicks (incl. snapping onto a main-path node)
+        // are never intercepted by the Select node-pickers below.
+        if (_subZoneDrawIdx >= 0 && loadedData != null)
+            HandleSubZoneJunctionInput(rect, e);
+
         // Select tool — spline wall node picking (pixel-based, before cell loop)
         if (drawSelect && loadedData != null)
             HandleSelectSplineWallInput(rect, e);
@@ -3581,6 +4379,10 @@ public class GridDesignerWindow : EditorWindow
         // Select tool — cube building node picking + free drag (after node pickers so precise picks win)
         if (drawSelect && loadedData != null)
             HandleSelectCubeBuildingInput(rect, e);
+
+        // Select tool — free prefab-placement picking + drag (placements are position-based now)
+        if (drawSelect && loadedData != null)
+            HandleSelectPrefabInput(rect, e);
 
         // Tube path placement mode — mouse preview + click to place
         if (_tubePlacingEntranceIndex >= 0 && loadedData != null)
@@ -3666,24 +4468,26 @@ public class GridDesignerWindow : EditorWindow
                         Handles.Label(cell.center - new Vector2(4f, 6f), "〇");
                     }
 
-                    // Direct prefab placements (base layer)
+                    // Direct prefab placements (base layer) — drawn at their free position.
+                    // Found via the (synced) nearest-cell so the per-cell loop still locates them.
                     var bp = loadedData?.prefabPlacements?.Find(p => p.cellIndex == index);
                     if (bp != null)
                     {
+                        Rect ir = ScaledIconRect(PlacementPixel(rect, bp), bp, GetPixelsPerWorldUnit());
                         Texture2D bpIcon = bp.prefab != null && prefabIcons.TryGetValue(bp.prefab.name, out var bpi) ? bpi : null;
                         if (bpIcon != null)
                         {
                             GUI.color = new Color(1f, 1f, 1f, baseAlpha);
-                            GUI.DrawTexture(ScaledIconRect(cell, bp, GetPixelsPerWorldUnit()), bpIcon, ScaleMode.ScaleToFit);
+                            GUI.DrawTexture(ir, bpIcon, ScaleMode.ScaleToFit);
                             GUI.color = Color.white;
                         }
                         else
                         {
                             Color c = GetPrefabColor(bp.prefab); c.a = baseAlpha;
-                            EditorGUI.DrawRect(cell, c);
+                            EditorGUI.DrawRect(ir, c);
                             Handles.color = new Color(0f, 0f, 0f, baseAlpha);
                             string label = bp.prefab != null ? bp.prefab.name.Substring(0, Mathf.Min(2, bp.prefab.name.Length)) : "?";
-                            Handles.Label(cell.center - new Vector2(5f, 6f), label);
+                            Handles.Label(ir.center - new Vector2(5f, 6f), label);
                         }
                     }
                 }
@@ -3736,24 +4540,25 @@ public class GridDesignerWindow : EditorWindow
                             Handles.Label(cell.center - new Vector2(4f, 6f), "~");
                         }
 
-                        // Direct prefab placements (tier)
+                        // Direct prefab placements (tier) — drawn at their free position.
                         var tp = tier.prefabPlacements?.Find(p => p.cellIndex == index);
                         if (tp != null)
                         {
+                            Rect tir = ScaledIconRect(PlacementPixel(rect, tp), tp, GetPixelsPerWorldUnit());
                             Texture2D tpIcon = tp.prefab != null && prefabIcons.TryGetValue(tp.prefab.name, out var tpi) ? tpi : null;
                             if (tpIcon != null)
                             {
                                 GUI.color = new Color(1f, 1f, 1f, a);
-                                GUI.DrawTexture(ScaledIconRect(cell, tp, GetPixelsPerWorldUnit()), tpIcon, ScaleMode.ScaleToFit);
+                                GUI.DrawTexture(tir, tpIcon, ScaleMode.ScaleToFit);
                                 GUI.color = Color.white;
                             }
                             else
                             {
                                 Color c = GetPrefabColor(tp.prefab); c.a = a;
-                                EditorGUI.DrawRect(cell, c);
+                                EditorGUI.DrawRect(tir, c);
                                 Handles.color = new Color(0f, 0f, 0f, a);
                                 string label = tp.prefab != null ? tp.prefab.name.Substring(0, Mathf.Min(2, tp.prefab.name.Length)) : "?";
-                                Handles.Label(cell.center - new Vector2(5f, 6f), label);
+                                Handles.Label(tir.center - new Vector2(5f, 6f), label);
                             }
                         }
                     }
@@ -3888,6 +4693,7 @@ public class GridDesignerWindow : EditorWindow
             // Soul fish zones — all drawing lives here in one place.
             if (loadedData.soulZones != null && pxPerUnit > 0f)
             {
+                SyncSubZoneJunctions(); // keep adjoined tributary ends pinned to their main-river node
                 for (int zi = 0; zi < loadedData.soulZones.Count; zi++)
                 {
                     var zone = loadedData.soulZones[zi];
@@ -3895,51 +4701,50 @@ public class GridDesignerWindow : EditorWindow
                     var pts = zone.nodePositions;
                     if (pts == null || pts.Count == 0) continue;
 
-                    // Fish-bowl tower zones have no node path — the tower + bowl represent them.
-                    // When the tower is selected, show the bowl's soul-zone footprint instead.
-                    if (zone.towerGuarded)
-                    {
-                        if (!IsSelectedTowerZone(zone)) continue;
-                        var selPP   = GetSelectedPlacement();
-                        var selCtrl = selPP?.prefab != null ? selPP.prefab.GetComponentInChildren<FishBowlTowerController>(true) : null;
-                        float bowlR = selCtrl != null ? selCtrl.bowlRadius : 2f;
-                        Vector2 c   = CellCenter(rect, selPP.cellIndex);
-                        Handles.color = new Color(0.35f, 0.85f, 1f, 0.85f);
-                        Handles.DrawWireDisc(c, Vector3.forward, bowlR * pxPerUnit, 3f);
-                        Handles.DrawSolidDisc(c, Vector3.forward, EffCell * 0.2f);
-                        continue;
-                    }
+                    // Fish-bowl sub-zones now render like any zone: their anchor node draws a teal
+                    // radius pool (same visual as a street light), and any drawn path/junction
+                    // extends from it. (The bowl's aloft height still lives on the tower prefab.)
 
-                    Color lc  = ZonePalette[zi % ZonePalette.Length]; lc.a = 1f;
+                    Color lc  = SoulZoneColor(zone, zi);                // main = palette, sub-zone = distinct
                     float rpx = Mathf.Max(zone.radius * pxPerUnit, 1f); // node marker radius
 
-                    // Single orange line walking node → node, as thick as the node marker.
-                    // Drawn as filled quads (Handles.DrawLine thickness is unreliable in IMGUI);
-                    // the node circles drawn below cover the corner joints.
-                    Handles.color = lc;
-                    int segs = (zone.closedLoop && pts.Count >= 3) ? pts.Count : pts.Count - 1;
-                    for (int ni = 0; ni < segs; ni++)
-                    {
-                        Vector2 a = WorldXZToPixel(rect, pts[ni]);
-                        Vector2 b = WorldXZToPixel(rect, pts[(ni + 1) % pts.Count]);
-                        Vector2 d = b - a;
-                        if (d.sqrMagnitude < 0.0001f) continue;
-                        d.Normalize();
-                        Vector2 n = new Vector2(-d.y, d.x) * rpx; // half-width = node radius
-                        Handles.DrawAAConvexPolygon((Vector3)(a + n), (Vector3)(b + n), (Vector3)(b - n), (Vector3)(a - n));
-                    }
+                    // Sub-zone tributaries (fish bowls / manual sub-zones) draw a pool at the source
+                    // and a thin path to the junction. Statue sub-zones stay rings; main paths stay
+                    // full radius-width bands. Shared with the in-progress preview for consistency.
+                    if (zone.zoneRole == GridData.SoulZone.ZoneRole.SubZone && !zone.statueGuarded)
+                        DrawSubZoneTributary(rect, zone, lc, pxPerUnit);
+                    else
+                        DrawSoulZoneShape(rect, zone, lc, pxPerUnit, drawArrows: true);
 
-                    // Orange circle at each node, then a black dot marks the node.
-                    // (Selection is drawn once, generically, further below.)
-                    float dotR = Mathf.Max(rpx * 0.45f, 3f);
-                    for (int ni = 0; ni < pts.Count; ni++)
+                    // Street light lamps are collected here and drawn AFTER every zone band, so a
+                    // later zone (or a tributary) can never paint over another zone's lamp numbers.
+                    if (zone.streetLights != null && zone.streetLights.Count > 0)
                     {
-                        Vector2 p = WorldXZToPixel(rect, pts[ni]);
-                        Handles.color = lc;
-                        Handles.DrawSolidDisc(p, Vector3.forward, rpx);      // orange circle
-                        Handles.color = Color.black;                         // node dot
-                        Handles.DrawSolidDisc(p, Vector3.forward, dotR);
+                        var orderedLights = zone.StreetLightsInOrder();
+                        for (int li = 0; li < orderedLights.Count; li++)
+                        {
+                            var sl = orderedLights[li];
+                            if (sl == null || sl.nodeIndex < 0 || sl.nodeIndex >= pts.Count) continue;
+                            _lampMarkers.Add((WorldXZToPixel(rect, pts[sl.nodeIndex]),
+                                              Mathf.Max(rpx * 0.55f, 5f), li + 1));
+                        }
                     }
+                }
+
+                // Lamps on top of every band drawn above.
+                if (_lampMarkers.Count > 0)
+                {
+                    var lampLabel = new GUIStyle(EditorStyles.miniBoldLabel);
+                    lampLabel.normal.textColor = Color.black;
+                    foreach (var (p, r, num) in _lampMarkers)
+                    {
+                        Handles.color = Color.black;
+                        Handles.DrawSolidDisc(p, Vector3.forward, r + 1.5f);   // outline so it reads on any band
+                        Handles.color = new Color(1f, 0.95f, 0.5f, 1f);
+                        Handles.DrawSolidDisc(p, Vector3.forward, r);
+                        Handles.Label(p + new Vector2(-3f, -7f), num.ToString(), lampLabel);
+                    }
+                    _lampMarkers.Clear();
                 }
             }
 
@@ -3997,6 +4802,15 @@ public class GridDesignerWindow : EditorWindow
                         ? WorldXZToPixel(rect, pts[_currentSelection.subIndex])
                         : rect.center;
                 }
+                else if (_currentSelection.type == SelectionType.PrefabPlacement)
+                {
+                    var list = _currentSelection.tierIndex == -1 ? loadedData.prefabPlacements
+                             : (loadedData.tiers != null && _currentSelection.tierIndex >= 0 && _currentSelection.tierIndex < loadedData.tiers.Count
+                                ? loadedData.tiers[_currentSelection.tierIndex].prefabPlacements : null);
+                    center = (list != null && _currentSelection.index >= 0 && _currentSelection.index < list.Count)
+                        ? PlacementPixel(rect, list[_currentSelection.index])
+                        : CellCenter(rect, _currentSelection.cellIndex);
+                }
                 else
                 {
                     center = CellCenter(rect, _currentSelection.cellIndex);
@@ -4009,15 +4823,26 @@ public class GridDesignerWindow : EditorWindow
 
             // Bridge mode removed (incompatible with free nodes).
 
-            // In-progress drawing lines + node dots
+            // In-progress drawing preview — rendered with the same visual as a committed zone
+            // (orange band + node markers) so drawing matches the applied result.
             if (_isDrawingSoulArea && _drawingNodes.Count >= 1)
             {
-                Handles.color = new Color(1f, 1f, 1f, 0.7f);
-                for (int ni = 0; ni < _drawingNodes.Count - 1; ni++)
-                    Handles.DrawLine(WorldXZToPixel(rect, _drawingNodes[ni]),
-                                     WorldXZToPixel(rect, _drawingNodes[ni + 1]), 1.5f);
-                foreach (var np in _drawingNodes)
-                    Handles.DrawSolidDisc(WorldXZToPixel(rect, np), Vector3.forward, EffCell * 0.22f);
+                float ppu = GetPixelsPerWorldUnit();
+                if (ppu > 0f)
+                {
+                    bool activeValid = _activeSoulZoneIndex >= 0 && _activeSoulZoneIndex < loadedData.soulZones.Count;
+                    float drawRadius = activeValid ? loadedData.soulZones[_activeSoulZoneIndex].radius : 1f;
+                    var previewZone = new GridData.SoulZone
+                    {
+                        nodePositions = _drawingNodes,
+                        closedLoop    = false,
+                        radius        = drawRadius,
+                        zoneRole      = activeValid ? loadedData.soulZones[_activeSoulZoneIndex].zoneRole
+                                                    : GridData.SoulZone.ZoneRole.MainPath,
+                    };
+                    Color plc = SoulZoneColor(previewZone, _activeSoulZoneIndex);
+                    DrawSoulZoneShape(rect, previewZone, plc, ppu, drawArrows: true);
+                }
             }
 
             // Entrance + lock hub markers on the arena circumference
@@ -4028,6 +4853,9 @@ public class GridDesignerWindow : EditorWindow
 
             // Wave-modifier tube path overlays — draws the node path between a modifier and its tube
             DrawWMTubePathOverlay(rect);
+
+            // Sub-zone junction rubber-band while drawing
+            DrawSubZoneJunctionPreview(rect);
 
             // Water-level exit-pipe perimeter markers + tube path overlays
             DrawWaterModifierOverlay(rect);
@@ -4042,222 +4870,9 @@ public class GridDesignerWindow : EditorWindow
             Handles.EndGUI();
         }
 
-        // Select tool — Escape to deselect, Delete to remove selected node
-        if (drawSelect)
-        {
-            Event sk = Event.current;
-            if (sk.type == EventType.KeyDown)
-            {
-                if (sk.keyCode == KeyCode.Escape)
-                {
-                    ClearSelectState();
-                    sk.Use();
-                    Repaint();
-                }
-                else if (sk.keyCode == KeyCode.Delete || sk.keyCode == KeyCode.Backspace)
-                {
-                    if (_currentSelection.type != SelectionType.None)
-                    {
-                        Undo.RecordObject(loadedData, "Delete Selection");
-                        PushUndoSnapshot();
-
-                        switch (_currentSelection.type)
-                        {
-                            case SelectionType.SoulZoneNode:
-                                var zone = loadedData.soulZones[_currentSelection.index];
-                                if (zone.nodePositions != null && _currentSelection.subIndex < zone.nodePositions.Count)
-                                    zone.nodePositions.RemoveAt(_currentSelection.subIndex);
-                                break;
-                            case SelectionType.PrefabPlacement:
-                                var placements = _currentSelection.tierIndex == -1 ? loadedData.prefabPlacements : loadedData.tiers[_currentSelection.tierIndex].prefabPlacements;
-                                var removedPlacement = _currentSelection.index < placements.Count ? placements[_currentSelection.index] : null;
-                                placements.RemoveAt(_currentSelection.index);
-                                // Also drop any statue/tower guarded soul zone linked to this placement.
-                                if (removedPlacement != null && removedPlacement.statueId != 0 && loadedData.soulZones != null)
-                                    loadedData.soulZones.RemoveAll(z =>
-                                        (z.statueGuarded || z.towerGuarded) && z.linkedStatueId == removedPlacement.statueId);
-                                break;
-                            case SelectionType.Whirlpool:
-                                loadedData.whirlpools.RemoveAt(_currentSelection.index);
-                                break;
-                            case SelectionType.Orb:
-                                loadedData.orbCellIndices.Remove(_currentSelection.cellIndex);
-                                break;
-                            case SelectionType.WaterModifier:
-                                var waterMods = _currentSelection.tierIndex == -1 ? loadedData.waterLevelModifierCellIndices : loadedData.tiers[_currentSelection.tierIndex].waterLevelModifierCellIndices;
-                                waterMods.Remove(_currentSelection.cellIndex);
-                                break;
-                            case SelectionType.WaveModifier:
-                                var waveMods = _currentSelection.tierIndex == -1 ? loadedData.waveModifierCellIndices : loadedData.tiers[_currentSelection.tierIndex].waveModifierCellIndices;
-                                waveMods.Remove(_currentSelection.cellIndex);
-                                break;
-                            case SelectionType.GridSlot:
-                                if (_currentSelection.tierIndex >= 0) loadedData.tiers[_currentSelection.tierIndex].cells[_currentSelection.cellIndex] = 0;
-                                else if (_currentSelection.isCircle) circleGrid[_currentSelection.cellIndex] = 0;
-                                else squareGrid[_currentSelection.cellIndex] = 0;
-                                break;
-                            case SelectionType.SplineWallNode:
-                                if (loadedData.splineWallPaths != null
-                                    && _currentSelection.index < loadedData.splineWallPaths.Count)
-                                {
-                                    var wp = loadedData.splineWallPaths[_currentSelection.index];
-                                    int delIdx = _currentSelection.subIndex;
-                                    if (wp.nodes != null && delIdx < wp.nodes.Count)
-                                    {
-                                        wp.nodes.RemoveAt(delIdx);
-                                        if (wp.segmentCurved != null && delIdx < wp.segmentCurved.Count)
-                                            wp.segmentCurved.RemoveAt(delIdx);
-                                        if (wp.segmentGap != null && delIdx < wp.segmentGap.Count)
-                                            wp.segmentGap.RemoveAt(delIdx);
-                                        if (wp.segmentDestructible != null && delIdx < wp.segmentDestructible.Count)
-                                            wp.segmentDestructible.RemoveAt(delIdx);
-                                    }
-                                }
-                                break;
-                        }
-
-                        ClearSelectState();
-                        EditorUtility.SetDirty(loadedData);
-                        sk.Use();
-                        Repaint();
-                    }
-                }
-            }
-        }
-
-        // Tube modes — consume Enter/Escape before GUI sees them (prevents toggling Locked checkbox)
-        if (loadedData != null && (_tubePlacingEntranceIndex >= 0 || _tubeDrawEntranceIndex >= 0))
-        {
-            Event te = Event.current;
-            if (te.type == EventType.KeyDown &&
-                (te.keyCode == KeyCode.Return || te.keyCode == KeyCode.KeypadEnter || te.keyCode == KeyCode.Escape))
-            {
-                _tubePlacingEntranceIndex = -1;
-                _tubeDrawEntranceIndex    = -1;
-                _dragTubeNodeIndex        = -1;
-                _selectedTubeNodeIndex    = -1;
-                te.Use();
-                Repaint();
-            }
-        }
-
-        // Wave-modifier tube edit mode — Enter/Escape to exit
-        if (loadedData != null && _wmTubeDrawPairIdx >= 0)
-        {
-            Event te = Event.current;
-            if (te.type == EventType.KeyDown &&
-                (te.keyCode == KeyCode.Return || te.keyCode == KeyCode.KeypadEnter || te.keyCode == KeyCode.Escape))
-            {
-                _wmTubeDrawPairIdx = -1;
-                _wmDragTubeNodeIdx = -1;
-                _wmSelTubeNodeIdx  = -1;
-                te.Use();
-                Repaint();
-            }
-        }
-
-        // Soul area draw mode — Enter to commit, Escape to cancel
-        if (_isDrawingSoulArea && loadedData != null)
-        {
-            Event ke = Event.current;
-            if (ke.type == EventType.KeyDown)
-            {
-                if (ke.keyCode == KeyCode.Return || ke.keyCode == KeyCode.KeypadEnter)
-                {
-                    if (_activeSoulZoneIndex >= 0 && _activeSoulZoneIndex < loadedData.soulZones.Count)
-                        CommitDrawingNodes(loadedData.soulZones[_activeSoulZoneIndex]);
-                    ke.Use();
-                    Repaint();
-                }
-                else if (ke.keyCode == KeyCode.Escape)
-                {
-                    CancelDrawingNodes();
-                    ke.Use();
-                    Repaint();
-                }
-            }
-        }
-
         // Portal perimeter overlay
         if (loadedData != null)
             DrawPortalOverlay(rect);
-
-        // Spline wall mode — Escape to exit mode, Delete/Backspace to remove last node on active path
-        if (_drawSplineWall && loadedData != null)
-        {
-            Event sw = Event.current;
-            if (sw.type == EventType.KeyDown)
-            {
-                if (sw.keyCode == KeyCode.Escape)
-                {
-                    _drawSplineWall = false;
-                    sw.Use();
-                    Repaint();
-                }
-                else if ((sw.keyCode == KeyCode.Delete || sw.keyCode == KeyCode.Backspace)
-                         && loadedData.splineWallPaths != null
-                         && _activeSplinePathIdx < loadedData.splineWallPaths.Count)
-                {
-                    var activePath = loadedData.splineWallPaths[_activeSplinePathIdx];
-                    if (activePath.nodes != null && activePath.nodes.Count > 0)
-                    {
-                        Undo.RecordObject(loadedData, "Delete Spline Wall Node");
-                        int lastIdx = activePath.nodes.Count - 1;
-                        activePath.nodes.RemoveAt(lastIdx);
-                        if (activePath.segmentCurved != null && lastIdx < activePath.segmentCurved.Count)
-                            activePath.segmentCurved.RemoveAt(lastIdx);
-                        if (activePath.segmentGap != null && lastIdx < activePath.segmentGap.Count)
-                            activePath.segmentGap.RemoveAt(lastIdx);
-                        if (activePath.segmentDestructible != null && lastIdx < activePath.segmentDestructible.Count)
-                            activePath.segmentDestructible.RemoveAt(lastIdx);
-                        EditorUtility.SetDirty(loadedData);
-                        sw.Use();
-                        Repaint();
-                    }
-                }
-            }
-        }
-
-        // Cube building mode — Escape to exit mode, Delete/Backspace to remove the active block
-        if (_drawCubeBuilding && loadedData != null)
-        {
-            Event cb = Event.current;
-            if (cb.type == EventType.KeyDown)
-            {
-                if (cb.keyCode == KeyCode.Escape)
-                {
-                    _activeCubeIndex = -1;
-                    _drawCubeBuilding = false;
-                    cb.Use();
-                    Repaint();
-                }
-                else if ((cb.keyCode == KeyCode.Delete || cb.keyCode == KeyCode.Backspace)
-                         && loadedData.cubeBuildings != null
-                         && _activeCubeIndex >= 0 && _activeCubeIndex < loadedData.cubeBuildings.Count)
-                {
-                    Undo.RecordObject(loadedData, "Delete Cube Building");
-                    loadedData.cubeBuildings.RemoveAt(_activeCubeIndex);
-                    _activeCubeIndex = -1;
-                    EditorUtility.SetDirty(loadedData);
-                    cb.Use();
-                    Repaint();
-                }
-            }
-        }
-
-        // Tube placement - Escape to cancel
-        if (_isWaitingForTubePlacement)
-        {
-            Event ke = Event.current;
-            if (ke.type == EventType.KeyDown && ke.keyCode == KeyCode.Escape)
-            {
-                _isWaitingForTubePlacement = false;
-                _pendingModifierCellIndex = -1;
-                GridLog("Cancelled tube placement.");
-                ke.Use();
-                Repaint();
-            }
-        }
 
         }
         finally
@@ -4306,6 +4921,10 @@ public class GridDesignerWindow : EditorWindow
     // to the footprint-ring diameter (so the image and ring stay linked); otherwise it
     // falls back to the cell size times the scale. Centred on the cell.
     Rect ScaledIconRect(Rect cell, GridData.PrefabPlacement pp, float pxPerUnit)
+        => ScaledIconRect(cell.center, pp, pxPerUnit);
+
+    // Icon draw rect centred on an arbitrary pixel point (the placement's free position).
+    Rect ScaledIconRect(Vector2 centerPx, GridData.PrefabPlacement pp, float pxPerUnit)
     {
         float s    = pp.scale > 0f ? pp.scale : 1f;
         float size = EffCell * s;
@@ -4315,7 +4934,14 @@ public class GridDesignerWindow : EditorWindow
             size = align.ScaleRadius * s * pxPerUnit * 2f; // match footprint ring diameter
 
         size = Mathf.Max(size, EffCell * 0.5f); // keep tiny-scale icons visible
-        return new Rect(cell.center.x - size * 0.5f, cell.center.y - size * 0.5f, size, size);
+        return new Rect(centerPx.x - size * 0.5f, centerPx.y - size * 0.5f, size, size);
+    }
+
+    // Pixel position of a placement's free position on the grid canvas.
+    Vector2 PlacementPixel(Rect rect, GridData.PrefabPlacement pp)
+    {
+        pp.EnsureFreePosition();
+        return WorldXZToPixel(rect, pp.position);
     }
 
     // Opaque footprint fill for the currently selected prefab placement. Called before
@@ -4345,7 +4971,7 @@ public class GridDesignerWindow : EditorWindow
 
         Handles.BeginGUI();
         Handles.color = new Color(1f, 0.55f, 0.1f, 1f); // opaque footprint fill
-        Handles.DrawSolidDisc(CellCenter(rect, pp.cellIndex), Vector3.forward, radiusPx);
+        Handles.DrawSolidDisc(PlacementPixel(rect, pp), Vector3.forward, radiusPx);
         Handles.EndGUI();
     }
 
@@ -4372,7 +4998,7 @@ public class GridDesignerWindow : EditorWindow
 
             Color c = new Color(1f, 0.55f, 0.1f, activeLayer ? 0.75f : 0.2f);
             Handles.color = c;
-            Handles.DrawWireDisc(CellCenter(rect, pp.cellIndex), Vector3.forward, radiusPx, isSelected ? 3.5f : 2f);
+            Handles.DrawWireDisc(PlacementPixel(rect, pp), Vector3.forward, radiusPx, isSelected ? 3.5f : 2f);
         }
     }
 
@@ -4520,52 +5146,23 @@ public class GridDesignerWindow : EditorWindow
         string path = EditorUtility.SaveFilePanelInProject("Save Grid", "GridData", "asset", "", GridDataFolder);
         if (string.IsNullOrEmpty(path)) return;
 
-        GridData data       = ScriptableObject.CreateInstance<GridData>();
-        data.cells          = (int[])squareGrid.Clone();
-        data.overlayCells   = (int[])circleGrid.Clone();
-        data.slotNotes      = new List<string>(slotNotes);
-        data.slotColors     = new List<Color>(slotColors);
-        data.orbCellIndices = loadedData?.orbCellIndices != null
-            ? new List<int>(loadedData.orbCellIndices) : new List<int>();
-        data.arenaProfile = loadedData?.arenaProfile;
+        // ── SAVE CONTRACT ────────────────────────────────────────────────────────────
+        // "Save As" clones the ENTIRE loaded GridData so every serialized field carries over
+        // automatically — soul zones (incl. fish-bowl tributaries + street lights), whirlpools,
+        // spline walls, cube buildings, modifiers, linked pairs, profiles, etc. Do NOT go back to
+        // copying fields one-by-one: any new GridData field would then be silently dropped here.
+        // Only the working-state the designer holds in local arrays (cells/overlay/slot notes+colours)
+        // is written on top of the clone. New designer features that live on GridData need no change;
+        // features that add NEW local working arrays must also be written here (and into
+        // SaveGridInPlace + the undo GridSnapshot).
+        GridData data = loadedData != null
+            ? Object.Instantiate(loadedData)
+            : ScriptableObject.CreateInstance<GridData>();
 
-        data.entrances = new List<GridData.ArenaEntrance>();
-        if (loadedData?.entrances != null)
-            foreach (var e in loadedData.entrances)
-                data.entrances.Add(new GridData.ArenaEntrance
-                {
-                    id = e.id, prefab = e.prefab, soulPrefab = e.soulPrefab,
-                    perimeterAngle = e.perimeterAngle, tierSlot = e.tierSlot,
-                    spawnRadius = e.spawnRadius,
-                    isLocked = e.isLocked, lockHubPrefab = e.lockHubPrefab,
-                    lockHubAngle = e.lockHubAngle,
-                    tubeSubdivisions = e.tubeSubdivisions,
-                    tubePath = e.tubePath != null
-                        ? new List<UnityEngine.Vector2Int>(e.tubePath)
-                        : new List<UnityEngine.Vector2Int>()
-                });
-
-        data.soulSpawnPoints = new List<GridData.SoulSpawnPoint>();
-        if (loadedData?.soulSpawnPoints != null)
-            foreach (var s in loadedData.soulSpawnPoints)
-                data.soulSpawnPoints.Add(new GridData.SoulSpawnPoint { cellIndex = s.cellIndex, soulData = s.soulData });
-
-        data.prefabPlacements = loadedData?.prefabPlacements != null
-            ? new List<GridData.PrefabPlacement>(loadedData.prefabPlacements)
-            : new List<GridData.PrefabPlacement>();
-
-        data.tiers = new List<GridData.GridTier>();
-        if (loadedData?.tiers != null)
-            foreach (var t in loadedData.tiers)
-                data.tiers.Add(new GridData.GridTier
-                {
-                    name             = t.name,
-                    yOffset          = t.yOffset,
-                    cells            = t.cells != null ? (int[])t.cells.Clone() : new int[GridData.CellCount],
-                    prefabPlacements = t.prefabPlacements != null
-                        ? new List<GridData.PrefabPlacement>(t.prefabPlacements)
-                        : new List<GridData.PrefabPlacement>()
-                });
+        data.cells        = (int[])squareGrid.Clone();
+        data.overlayCells = (int[])circleGrid.Clone();
+        data.slotNotes    = new List<string>(slotNotes);
+        data.slotColors   = new List<Color>(slotColors);
 
         AssetDatabase.CreateAsset(data, path);
         AssetDatabase.SaveAssets();
@@ -4575,6 +5172,11 @@ public class GridDesignerWindow : EditorWindow
     void SaveGridInPlace()
     {
         if (loadedData == null) { Debug.LogWarning("[GridDesigner] No grid loaded. Use Save As."); return; }
+        // Save In Place: the designer edits most collections (soul zones, whirlpools, spline walls,
+        // cube buildings, entrances, modifiers, links…) DIRECTLY on loadedData, so SetDirty +
+        // SaveAssets persists them all. Only the working-state kept in local arrays
+        // (cells/overlay/slot notes+colours) is written back here. A new designer feature that lives
+        // on GridData needs nothing here; a new LOCAL working array must be copied back here too.
         Undo.RecordObject(loadedData, "Save Grid");
         loadedData.cells        = (int[])squareGrid.Clone();
         loadedData.overlayCells = (int[])circleGrid.Clone();
@@ -4628,6 +5230,9 @@ public class GridDesignerWindow : EditorWindow
         if (loadedData.tiers != null)
             foreach (var tier in loadedData.tiers)
                 NormalizePlacementScales(tier.prefabPlacements);
+
+        // Untether legacy grid-bound placements to free positions (cell centre). Idempotent.
+        loadedData.MigratePlacementPositions();
 
         _baselineAlignCache.Clear();
 
@@ -5149,11 +5754,13 @@ public class GridDesignerWindow : EditorWindow
             float best    = pickRadius;
             for (int zi = 0; zi < loadedData.soulZones.Count; zi++)
             {
-                // Tower zones aren't hand-editable — their node is fixed to the tower.
-                if (loadedData.soulZones[zi].towerGuarded) continue;
-                var pts = loadedData.soulZones[zi].nodePositions;
+                var z = loadedData.soulZones[zi];
+                var pts = z.nodePositions;
                 if (pts == null) continue;
-                for (int ni = 0; ni < pts.Count; ni++)
+                // Fish-bowl tributaries: node 0 is the pool anchor (locked to the bowl); its path
+                // nodes are selectable/adjustable like the main river.
+                int startNi = z.towerGuarded ? 1 : 0;
+                for (int ni = startNi; ni < pts.Count; ni++)
                 {
                     float d = Vector2.Distance(WorldXZToPixel(rect, pts[ni]), e.mousePosition);
                     if (d < best) { best = d; hitZone = zi; hitNode = ni; }
@@ -5184,8 +5791,12 @@ public class GridDesignerWindow : EditorWindow
             int ni = _currentSelection.subIndex;
             if (zi < loadedData.soulZones.Count)
             {
-                var pts = loadedData.soulZones[zi].nodePositions;
-                if (pts != null && ni < pts.Count)
+                var z   = loadedData.soulZones[zi];
+                var pts = z.nodePositions;
+                // The adjoining node is pinned to its main-river node — use "Separate" to free it.
+                bool pinned = z.zoneRole == GridData.SoulZone.ZoneRole.SubZone
+                           && z.adjoinZoneId != 0 && pts != null && ni == pts.Count - 1;
+                if (pts != null && ni < pts.Count && !pinned)
                 {
                     Undo.RecordObject(loadedData, "Move Soul Zone Node");
                     pts[ni] = PixelToWorldXZ(rect, e.mousePosition);
@@ -5199,6 +5810,100 @@ public class GridDesignerWindow : EditorWindow
                  && _currentSelection.type == SelectionType.SoulZoneNode)
         {
             _isDraggingNode = false;
+            e.Use();
+        }
+    }
+
+    // Position-based prefab-placement picking + free drag (placements are no longer grid-bound).
+    // Runs before the cell loop so it takes precedence near a prefab; other cell-based selections
+    // (grid slots, orbs, modifiers) still work when no prefab is under the cursor.
+    void HandleSelectPrefabInput(Rect rect, Event e)
+    {
+        if (loadedData?.prefabPlacements == null) return;
+        float pick = Mathf.Max(EffCell * 0.5f, 10f);
+
+        if (e.type == EventType.MouseDown && e.button == 0 && rect.Contains(e.mousePosition))
+        {
+            int   bestTier = -1, bestIdx = -1;
+            float best     = pick;
+
+            for (int i = 0; i < loadedData.prefabPlacements.Count; i++)
+            {
+                var pp = loadedData.prefabPlacements[i];
+                if (pp == null) continue;
+                float d = Vector2.Distance(PlacementPixel(rect, pp), e.mousePosition);
+                if (d < best) { best = d; bestTier = -1; bestIdx = i; }
+            }
+            if (loadedData.tiers != null)
+                for (int ti = 0; ti < loadedData.tiers.Count; ti++)
+                {
+                    if (ti < tierVisible.Count && !tierVisible[ti]) continue;
+                    var list = loadedData.tiers[ti].prefabPlacements;
+                    if (list == null) continue;
+                    for (int i = 0; i < list.Count; i++)
+                    {
+                        var pp = list[i]; if (pp == null) continue;
+                        float d = Vector2.Distance(PlacementPixel(rect, pp), e.mousePosition);
+                        if (d < best) { best = d; bestTier = ti; bestIdx = i; }
+                    }
+                }
+
+            if (bestIdx >= 0)
+            {
+                var list = bestTier == -1 ? loadedData.prefabPlacements : loadedData.tiers[bestTier].prefabPlacements;
+                _currentSelection = new SelectionInfo
+                {
+                    type      = SelectionType.PrefabPlacement,
+                    index     = bestIdx,
+                    tierIndex = bestTier,
+                    cellIndex = list[bestIdx].cellIndex,
+                };
+                _selectedZoneIndex = -1;
+                _selectedNodeIndex = -1;
+                _isDraggingNode    = true;
+                _dragUndoPushed    = false;
+                LogSelection(_currentSelection);
+                e.Use();
+                Repaint();
+            }
+        }
+        else if (e.type == EventType.MouseDrag && e.button == 0 && _isDraggingNode
+                 && _currentSelection.type == SelectionType.PrefabPlacement)
+        {
+            var list = _currentSelection.tierIndex == -1 ? loadedData.prefabPlacements
+                     : (loadedData.tiers != null && _currentSelection.tierIndex < loadedData.tiers.Count
+                        ? loadedData.tiers[_currentSelection.tierIndex].prefabPlacements : null);
+            if (list != null && _currentSelection.index < list.Count)
+            {
+                var pp = list[_currentSelection.index];
+                if (!_dragUndoPushed) { PushUndoSnapshot(); _dragUndoPushed = true; }
+                Undo.RecordObject(loadedData, "Move Prefab Placement");
+                int oldCell = pp.cellIndex;
+                pp.position   = PixelToWorldXZ(rect, e.mousePosition);
+                pp.freePlaced = true;
+                pp.SyncCellIndex();
+                int newCell = pp.cellIndex;
+                // Keep cell-keyed modifier↔tube links pointing at this placement as it moves.
+                if (newCell != oldCell && loadedData.linkedPairs != null)
+                    for (int li = 0; li < loadedData.linkedPairs.Count; li++)
+                    {
+                        var lp = loadedData.linkedPairs[li];
+                        bool ch = false;
+                        if (lp.modifierTierIndex  == _currentSelection.tierIndex && lp.modifierCellIndex  == oldCell) { lp.modifierCellIndex  = newCell; ch = true; }
+                        if (lp.inputTubeTierIndex == _currentSelection.tierIndex && lp.inputTubeCellIndex == oldCell) { lp.inputTubeCellIndex = newCell; ch = true; }
+                        if (ch) loadedData.linkedPairs[li] = lp;
+                    }
+                _currentSelection.cellIndex = pp.cellIndex;
+                EditorUtility.SetDirty(loadedData);
+            }
+            e.Use();
+            Repaint();
+        }
+        else if (e.type == EventType.MouseUp && e.button == 0
+                 && _currentSelection.type == SelectionType.PrefabPlacement)
+        {
+            _isDraggingNode = false;
+            _dragUndoPushed = false;
             e.Use();
         }
     }
@@ -6128,6 +6833,267 @@ public class GridDesignerWindow : EditorWindow
         return 0.5f * (2f * p1 + (-p0 + p2) * t + (2f * p0 - 5f * p1 + 4f * p2 - p3) * t2 + (-p0 + 3f * p1 - 3f * p2 + p3) * t3);
     }
 
+    // Soul zone path sampled to canvas pixels, curved segments via the same Catmull-Rom the
+    // walls (and LevelSpawner's runtime densification) use. Closed loops end back at node 0.
+    // Snaps a pixel position to the nearest Main-Path node (within a small radius). Returns its
+    // zoneId, node index and normalized position — the junction endpoint for a sub-zone path.
+    bool TrySnapToMainNode(Rect rect, Vector2 mousePx, out int zoneId, out int nodeIdx, out Vector2 pos)
+    {
+        zoneId = 0; nodeIdx = -1; pos = Vector2.zero;
+        if (loadedData?.soulZones == null) return false;
+
+        float best = Mathf.Max(EffCell * 0.6f, 12f); // snap radius (px)
+        for (int zi = 0; zi < loadedData.soulZones.Count; zi++)
+        {
+            var mz = loadedData.soulZones[zi];
+            if (mz.zoneRole != GridData.SoulZone.ZoneRole.MainPath || mz.nodePositions == null) continue;
+            for (int ni = 0; ni < mz.nodePositions.Count; ni++)
+            {
+                float d = Vector2.Distance(WorldXZToPixel(rect, mz.nodePositions[ni]), mousePx);
+                if (d < best) { best = d; zoneId = mz.zoneId; nodeIdx = ni; pos = mz.nodePositions[ni]; }
+            }
+        }
+        return nodeIdx >= 0;
+    }
+
+    // Sub-zone junction drawing: click empty grid to add a path node extending from the radius;
+    // click a Main-Path node to snap the junction and finish.
+    void HandleSubZoneJunctionInput(Rect rect, Event e)
+    {
+        if (_subZoneDrawIdx < 0 || _subZoneDrawIdx >= loadedData.soulZones.Count) { _subZoneDrawIdx = -1; return; }
+        var zone = loadedData.soulZones[_subZoneDrawIdx];
+        if (zone.zoneRole != GridData.SoulZone.ZoneRole.SubZone) { _subZoneDrawIdx = -1; return; }
+
+        if (e.type == EventType.MouseMove || e.type == EventType.MouseDrag) Repaint();
+        if (!(e.type == EventType.MouseDown && e.button == 0 && rect.Contains(e.mousePosition))) return;
+
+        if (zone.nodePositions == null) zone.nodePositions = new List<Vector2>();
+        if (zone.nodePositions.Count == 0) zone.nodePositions.Add(Vector2.zero); // ensure a radius anchor
+
+        if (TrySnapToMainNode(rect, e.mousePosition, out int snapZoneId, out int snapNodeIdx, out Vector2 snapPos))
+        {
+            Undo.RecordObject(loadedData, "Connect Sub-Zone Junction");
+            zone.nodePositions.Add(snapPos);          // final node coincides with the main-path node
+            zone.adjoinZoneId    = snapZoneId;
+            zone.adjoinNodeIndex = snapNodeIdx;
+            _subZoneDrawIdx      = -1;                 // done
+            GridLog($"Sub-zone junction: adjoined main path id {snapZoneId} at node {snapNodeIdx}.");
+            EditorUtility.SetDirty(loadedData);
+            e.Use(); Repaint();
+        }
+        else
+        {
+            Undo.RecordObject(loadedData, "Add Sub-Zone Path Node");
+            zone.nodePositions.Add(PixelToWorldXZ(rect, e.mousePosition)); // normalized grid position
+            EditorUtility.SetDirty(loadedData);
+            e.Use(); Repaint();
+        }
+    }
+
+    // Live preview while drawing a sub-zone junction: a teal rubber-band from the last node to the
+    // cursor, snapping (white ring) onto a Main-Path node when hovered.
+    void DrawSubZoneJunctionPreview(Rect rect)
+    {
+        if (_subZoneDrawIdx < 0 || _subZoneDrawIdx >= loadedData.soulZones.Count) return;
+        var zone = loadedData.soulZones[_subZoneDrawIdx];
+        var pts  = zone.nodePositions;
+        if (pts == null || pts.Count == 0) return;
+
+        Vector2 mouse = Event.current.mousePosition;
+        Vector2 last  = WorldXZToPixel(rect, pts[pts.Count - 1]);
+        bool snapping = TrySnapToMainNode(rect, mouse, out _, out _, out Vector2 snapPos);
+        Vector2 end   = snapping ? WorldXZToPixel(rect, snapPos) : mouse;
+
+        Handles.color = snapping ? Color.white : new Color(SubZoneColor.r, SubZoneColor.g, SubZoneColor.b, 0.85f);
+        Handles.DrawLine(last, end, 2f);
+        if (snapping) Handles.DrawWireDisc(end, Vector3.forward, EffCell * 0.5f, 2f);
+    }
+
+    // Draws a Sub-Zone tributary: the radius pool ONLY around the source (node 0), then a THIN
+    // connecting path out to the junction (unlike a main path, which is a full radius-width band).
+    void DrawSubZoneTributary(Rect rect, GridData.SoulZone zone, Color lc, float pxPerUnit)
+    {
+        var pts = zone.nodePositions;
+        if (pts == null || pts.Count == 0) return;
+
+        // Source pool: one opaque circle (street-light simplicity), nothing else.
+        float poolPx = Mathf.Max(zone.radius * pxPerUnit, 3f);
+        Vector2 src  = WorldXZToPixel(rect, pts[0]);
+        Handles.color = lc;
+        Handles.DrawSolidDisc(src, Vector3.forward, poolPx);
+
+        // "FB" tag, bold, above-centre of the bowl pool.
+        if (zone.towerGuarded)
+        {
+            var fb = new GUIStyle(EditorStyles.boldLabel)
+            { alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold, fontSize = 12, normal = { textColor = Color.black } };
+            Vector2 sz = fb.CalcSize(new GUIContent("FB"));
+            Handles.Label(new Vector2(src.x - sz.x * 0.5f, src.y - poolPx - sz.y), "FB", fb);
+        }
+
+        // Connecting path (curved where authored). Draws as a band of pathWidth, or a thin line
+        // when pathWidth is ~0.
+        if (pts.Count >= 2)
+        {
+            var   pixelPath = BuildZonePixelPath(rect, zone);
+            float bandPx    = zone.pathWidth * pxPerUnit;
+            Handles.color = lc;
+            if (bandPx >= 1.5f)
+            {
+                for (int i = 0; i < pixelPath.Count - 1; i++)
+                {
+                    Vector2 a = pixelPath[i], b = pixelPath[i + 1];
+                    Vector2 d = b - a;
+                    if (d.sqrMagnitude < 0.0001f) continue;
+                    d.Normalize();
+                    Vector2 n = new Vector2(-d.y, d.x) * bandPx;
+                    Handles.DrawAAConvexPolygon((Vector3)(a + n), (Vector3)(b + n), (Vector3)(b - n), (Vector3)(a - n));
+                    if (i > 0) Handles.DrawSolidDisc(a, Vector3.forward, bandPx);
+                }
+            }
+            else
+            {
+                for (int i = 0; i < pixelPath.Count - 1; i++)
+                    Handles.DrawAAPolyLine(3f, (Vector3)pixelPath[i], (Vector3)pixelPath[i + 1]);
+            }
+
+            // Street-light pools on the tributary (gates), under the node markers.
+            if (zone.streetLights != null)
+                foreach (var sl in zone.streetLights)
+                {
+                    if (sl == null || sl.nodeIndex < 0 || sl.nodeIndex >= pts.Count) continue;
+                    Handles.color = lc;
+                    Handles.DrawSolidDisc(WorldXZToPixel(rect, pts[sl.nodeIndex]), Vector3.forward,
+                                          Mathf.Max(sl.poolRadius * pxPerUnit, 5f));
+                }
+
+            // Flow arrows riding the path — same as the main river, showing the fish direction.
+            DrawZoneFlowArrows(pixelPath, Mathf.Max(bandPx, 6f));
+
+            // Small dots at each authored waypoint (node 0 is the pool centre).
+            for (int ni = 1; ni < pts.Count; ni++)
+            {
+                Vector2 p = WorldXZToPixel(rect, pts[ni]);
+                Handles.color = lc;
+                Handles.DrawSolidDisc(p, Vector3.forward, 4.5f);
+                Handles.color = Color.black;
+                Handles.DrawSolidDisc(p, Vector3.forward, 2.25f);
+            }
+        }
+    }
+
+    // Draws a soul zone's core visual — the orange band, street-light pools, node markers and
+    // flow arrows. Shared by committed zones and the in-progress drawing preview so drawing a
+    // zone looks identical to the applied result.
+    void DrawSoulZoneShape(Rect rect, GridData.SoulZone zone, Color lc, float pxPerUnit, bool drawArrows)
+    {
+        var pts = zone.nodePositions;
+        if (pts == null || pts.Count == 0) return;
+
+        float rpx       = Mathf.Max(zone.radius * pxPerUnit, 1f);
+        var   pixelPath = BuildZonePixelPath(rect, zone);
+
+        // Band — filled quads along the sampled path, discs at interior joints keep it gapless.
+        Handles.color = lc;
+        for (int si = 0; si < pixelPath.Count - 1; si++)
+        {
+            Vector2 a = pixelPath[si];
+            Vector2 b = pixelPath[si + 1];
+            Vector2 d = b - a;
+            if (d.sqrMagnitude < 0.0001f) continue;
+            d.Normalize();
+            Vector2 n = new Vector2(-d.y, d.x) * rpx; // half-width = node radius
+            Handles.DrawAAConvexPolygon((Vector3)(a + n), (Vector3)(b + n), (Vector3)(b - n), (Vector3)(a - n));
+            if (si > 0) Handles.DrawSolidDisc(a, Vector3.forward, rpx);
+        }
+
+        // Street-light pools — part of the footprint, under the node markers.
+        if (zone.streetLights != null)
+            foreach (var slPool in zone.streetLights)
+            {
+                if (slPool == null || slPool.nodeIndex < 0 || slPool.nodeIndex >= pts.Count) continue;
+                Handles.color = lc;
+                Handles.DrawSolidDisc(WorldXZToPixel(rect, pts[slPool.nodeIndex]), Vector3.forward,
+                                      Mathf.Max(slPool.poolRadius * pxPerUnit, 5f));
+            }
+
+        // Orange circle + black dot at each node.
+        float dotR = Mathf.Max(rpx * 0.45f, 3f);
+        for (int ni = 0; ni < pts.Count; ni++)
+        {
+            Vector2 p = WorldXZToPixel(rect, pts[ni]);
+            Handles.color = lc;
+            Handles.DrawSolidDisc(p, Vector3.forward, rpx);
+            Handles.color = Color.black;
+            Handles.DrawSolidDisc(p, Vector3.forward, dotR);
+        }
+
+        if (drawArrows) DrawZoneFlowArrows(pixelPath, rpx);
+    }
+
+    List<Vector2> BuildZonePixelPath(Rect rect, GridData.SoulZone zone)
+    {
+        var pts  = zone.nodePositions;
+        var path = new List<Vector2>();
+        int n = pts?.Count ?? 0;
+        if (n == 0) return path;
+
+        bool closed   = zone.closedLoop && n >= 3;
+        int  segCount = zone.SegmentCount();
+
+        path.Add(WorldXZToPixel(rect, pts[0]));
+        for (int seg = 0; seg < segCount; seg++)
+        {
+            bool curved = n >= 3 && zone.IsSegmentCurved(seg);
+            int  i2     = (seg + 1) % n;
+            if (curved)
+            {
+                const int samplesPerSeg = 16;
+                for (int s = 1; s <= samplesPerSeg; s++)
+                    path.Add(WorldXZToPixel(rect, SplineWallSample(pts, seg, (float)s / samplesPerSeg, closed)));
+            }
+            else
+            {
+                path.Add(WorldXZToPixel(rect, pts[i2]));
+            }
+        }
+        return path;
+    }
+
+    // Chevrons spaced along the sampled band, pointing in node order — the flow direction the
+    // runtime path UV scrolls along. Drawn on top of the band and node markers.
+    static void DrawZoneFlowArrows(List<Vector2> pixelPath, float rpx)
+    {
+        if (pixelPath == null || pixelPath.Count < 2) return;
+
+        float spacing = Mathf.Max(rpx * 3f, 28f);
+        float size    = Mathf.Clamp(rpx * 0.8f, 5f, 16f);
+        Handles.color = new Color(0f, 0f, 0f, 0.6f);
+
+        float next        = spacing * 0.5f;  // start half an interval in so path ends stay clean
+        float accumulated = 0f;
+        for (int i = 0; i < pixelPath.Count - 1; i++)
+        {
+            Vector2 a   = pixelPath[i];
+            Vector2 b   = pixelPath[i + 1];
+            float   len = Vector2.Distance(a, b);
+            if (len < 0.0001f) continue;
+            Vector2 dir = (b - a) / len;
+
+            while (next <= accumulated + len)
+            {
+                Vector2 p     = a + dir * (next - accumulated);
+                Vector2 perp  = new Vector2(-dir.y, dir.x);
+                Vector2 tip   = p + dir * size;
+                Vector2 backL = p - dir * size * 0.4f + perp * size * 0.7f;
+                Vector2 backR = p - dir * size * 0.4f - perp * size * 0.7f;
+                Handles.DrawAAConvexPolygon((Vector3)tip, (Vector3)backL, (Vector3)backR);
+                next += spacing;
+            }
+            accumulated += len;
+        }
+    }
+
     GameObject GetDefaultSplineWallPrefab()
     {
         // Prefer the procedural wall, then the legacy mesh wall, then any name containing "SplineWall"
@@ -6401,41 +7367,59 @@ public class GridDesignerWindow : EditorWindow
 
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
 
+            // Header row: select button, compact info (when collapsed), delete.
             EditorGUILayout.BeginHorizontal();
             GUI.backgroundColor = isActive ? new Color(0.5f, 0.8f, 1f) : Color.white;
             if (GUILayout.Button($"Block {i + 1}", GUILayout.Width(72)))
             {
-                _activeCubeIndex  = i;
-                _drawCubeBuilding = true; // so the overlay highlights it
+                // Toggle selection: click again to collapse back to the info line.
+                if (isActive) { _activeCubeIndex = -1; }
+                else          { _activeCubeIndex = i; _drawCubeBuilding = true; } // overlay highlights it
             }
             GUI.backgroundColor = Color.white;
-            GUILayout.FlexibleSpace();
+
+            if (!isActive)
+            {
+                string info = aw > 0f
+                    ? $"{b.width * aw:0.##}×{b.length * aw:0.##} m · H {b.heightAboveWater:0.##} · D {b.depthBelowWater:0.##}"
+                    : $"{b.width:0.###}×{b.length:0.###} · H {b.heightAboveWater:0.##} · D {b.depthBelowWater:0.##}";
+                EditorGUILayout.LabelField(info, EditorStyles.miniLabel);
+            }
+            else
+            {
+                GUILayout.FlexibleSpace();
+            }
+
             GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
             if (GUILayout.Button("✕", GUILayout.Width(24))) toRemove = i;
             GUI.backgroundColor = Color.white;
             EditorGUILayout.EndHorizontal();
 
-            EditorGUI.BeginChangeCheck();
-            float width  = EditorGUILayout.Slider("Width (norm)",  b.width,  0.005f, 1f);
-            float length = EditorGUILayout.Slider("Length (norm)", b.length, 0.005f, 1f);
-            float height = EditorGUILayout.FloatField("Height (above water)", b.heightAboveWater);
-            float depth  = EditorGUILayout.FloatField("Depth (below water)",  b.depthBelowWater);
-            Vector2 center = EditorGUILayout.Vector2Field("Centre X/Z (norm)", b.center);
-            if (EditorGUI.EndChangeCheck())
+            // Adjustable settings only for the selected block.
+            if (isActive)
             {
-                Undo.RecordObject(loadedData, "Edit Cube Building");
-                b.width            = Mathf.Max(0.001f, width);
-                b.length           = Mathf.Max(0.001f, length);
-                b.heightAboveWater = height;
-                b.depthBelowWater  = Mathf.Max(0f, depth);
-                b.center           = new Vector2(Mathf.Clamp(center.x, -0.5f, 0.5f),
-                                                 Mathf.Clamp(center.y, -0.5f, 0.5f));
-                EditorUtility.SetDirty(loadedData);
-                Repaint();
-            }
+                EditorGUI.BeginChangeCheck();
+                float width  = EditorGUILayout.Slider("Width (norm)",  b.width,  0.005f, 1f);
+                float length = EditorGUILayout.Slider("Length (norm)", b.length, 0.005f, 1f);
+                float height = EditorGUILayout.FloatField("Height (above water)", b.heightAboveWater);
+                float depth  = EditorGUILayout.FloatField("Depth (below water)",  b.depthBelowWater);
+                Vector2 center = EditorGUILayout.Vector2Field("Centre X/Z (norm)", b.center);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    Undo.RecordObject(loadedData, "Edit Cube Building");
+                    b.width            = Mathf.Max(0.001f, width);
+                    b.length           = Mathf.Max(0.001f, length);
+                    b.heightAboveWater = height;
+                    b.depthBelowWater  = Mathf.Max(0f, depth);
+                    b.center           = new Vector2(Mathf.Clamp(center.x, -0.5f, 0.5f),
+                                                     Mathf.Clamp(center.y, -0.5f, 0.5f));
+                    EditorUtility.SetDirty(loadedData);
+                    Repaint();
+                }
 
-            if (aw > 0f)
-                EditorGUILayout.LabelField($"≈ {b.width * aw:0.##} × {b.length * aw:0.##} m footprint · {b.heightAboveWater:0.##} m tall", EditorStyles.miniLabel);
+                if (aw > 0f)
+                    EditorGUILayout.LabelField($"≈ {b.width * aw:0.##} × {b.length * aw:0.##} m footprint · {b.heightAboveWater:0.##} m tall", EditorStyles.miniLabel);
+            }
 
             EditorGUILayout.EndVertical();
         }

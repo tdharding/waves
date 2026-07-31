@@ -28,10 +28,16 @@ public class SonarUIMapController : MonoBehaviour
     private Material pointerMaterial;
 
     [Header("Map Rotation")]
-    [Tooltip("Rotates fish marker positions and the map material. 180 = compensate for flipped quad. Try -200 to align with camera angle.")]
+    [Tooltip("Base rotation applied to fish marker positions and the map material. 180 = compensate for flipped quad. Try -200 to align with camera angle.")]
     [SerializeField] private float mapRotationDegrees = -200f;
     [Tooltip("Shader property name for map material rotation (leave blank if unused).")]
     [SerializeField] private string materialRotationProperty = "_Rotation";
+    [Tooltip("Spin the map with the boat's heading so boat-forward always reads as 'up' on the sonar map. Off = fixed north-up.")]
+    [SerializeField] private bool  rotateWithBoatForward = true;
+    [Tooltip("Flip if the map spins the wrong way relative to the boat.")]
+    [SerializeField] private bool  invertBoatRotation = false;
+    [Tooltip("How fast the map eases toward the boat's heading (per second). 0 = snap, which can read jittery.")]
+    [SerializeField] private float boatRotationLerpSpeed = 8f;
 
     [Header("Debug")]
     [SerializeField] private bool drawDebugRadius = true;
@@ -45,6 +51,11 @@ public class SonarUIMapController : MonoBehaviour
 
     private Material runtimeMaterial;
 
+    // Live map angle — mapRotationDegrees on its own when fixed, plus the boat's heading when
+    // rotateWithBoatForward is on. Smoothed with LerpAngle so crossing 0/360 doesn't whip round.
+    private float currentRotationDegrees;
+    private bool  rotationInitialised;
+
     // --------------------------------------------------
 
     private bool TryResolveSonarBoat()
@@ -55,6 +66,8 @@ public class SonarUIMapController : MonoBehaviour
 
     void Awake()
     {
+        currentRotationDegrees = mapRotationDegrees;
+
         if (sonarMapRenderer != null)
         {
             runtimeMaterial = sonarMapRenderer.material;
@@ -76,6 +89,8 @@ public class SonarUIMapController : MonoBehaviour
     if (!TryResolveSonarBoat())
         return;
 
+    UpdateMapRotation();
+
     float normalized = sonarSystem.CurrentNormalizedRadius;
 
     SetOverlayAlpha(normalized);
@@ -87,6 +102,40 @@ public class SonarUIMapController : MonoBehaviour
     else
         ClearAllMarkers();
 }
+
+    // --------------------------------------------------
+
+    // Boat-forward-up: rotating the world-space fish offsets by MINUS the boat's yaw parks
+    // whatever the boat is pointing at on a fixed axis of the map. mapRotationDegrees stays
+    // as the base offset that aligns the quad/camera, so tuning it still works unchanged.
+    float TargetRotationDegrees()
+    {
+        if (!rotateWithBoatForward || sonarBoat == null)
+            return mapRotationDegrees;
+
+        float yaw = sonarBoat.eulerAngles.y;
+        return mapRotationDegrees + (invertBoatRotation ? yaw : -yaw);
+    }
+
+    void UpdateMapRotation()
+    {
+        float target = TargetRotationDegrees();
+
+        if (!rotationInitialised || boatRotationLerpSpeed <= 0f)
+        {
+            currentRotationDegrees = target;
+            rotationInitialised    = true;
+        }
+        else
+        {
+            currentRotationDegrees = Mathf.LerpAngle(
+                currentRotationDegrees, target,
+                1f - Mathf.Exp(-boatRotationLerpSpeed * Time.deltaTime));
+        }
+
+        // Material has to follow every frame now, not just once in Awake.
+        ApplyMaterialRotation();
+    }
 
 void SetPointerAlpha(float value)
 {
@@ -162,7 +211,7 @@ void SetPointerAlpha(float value)
         Vector2 planar = new Vector2(delta.x, delta.z);
         Vector2 normalized = planar / sonarWorldRadius;
 
-        float rad = mapRotationDegrees * Mathf.Deg2Rad;
+        float rad = currentRotationDegrees * Mathf.Deg2Rad;
         float cos = Mathf.Cos(rad);
         float sin = Mathf.Sin(rad);
 
@@ -205,7 +254,7 @@ void SetPointerAlpha(float value)
     {
         if (runtimeMaterial == null || string.IsNullOrEmpty(materialRotationProperty)) return;
         if (runtimeMaterial.HasProperty(materialRotationProperty))
-            runtimeMaterial.SetFloat(materialRotationProperty, mapRotationDegrees);
+            runtimeMaterial.SetFloat(materialRotationProperty, currentRotationDegrees);
     }
 
     void OnDrawGizmosSelected()

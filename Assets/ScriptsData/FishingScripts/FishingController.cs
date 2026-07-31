@@ -194,6 +194,9 @@ public class FishingController : MonoBehaviour
         }
     }
 
+    // Hold Up/Down to push the whirl tube out or pull it in, moving the mouth with it.
+    public void AdjustWhirlLength(float axis) => soulWhirlDirection?.AdjustLength(axis);
+
     public void StartFishing()
     {
         if (innerFishWhirlRenderer != null)
