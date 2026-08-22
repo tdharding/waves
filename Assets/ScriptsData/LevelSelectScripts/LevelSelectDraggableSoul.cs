@@ -162,8 +162,7 @@ Debug.Log($"[DraggableSoul] Hit object has neither GameplaySoulSlot nor SoulSlot
         Debug.Log($"[DraggableSoul] OnPlacedSuccessfully — identity={soulDataIdentity}");
         Time.timeScale = 1f;
         SoulPickupEvents.FireReleased();
-        GameProgressData.RemoveSoulFromBoat(soulDataIdentity);
-        SoulsOnBoatDisplayManager.Instance?.ConsumeSoulFromDisplay(soulDataIdentity);
+        SoulConsumption.SpendSoulFromBoat(soulDataIdentity);
         Destroy(gameObject);
     }
 

@@ -21,6 +21,9 @@ public class SonarLatticeFollow : MonoBehaviour
     {
         if (boatTransform == null || generator == null) return;
 
+        // Grid parent is switched off while sonar is idle — nothing to follow
+        if (!generator.gameObject.activeInHierarchy) return;
+
         // Follow boat in XZ — Y stays at wherever the lattice is placed
         Vector3 pos = transform.position;
         pos.x = boatTransform.position.x;

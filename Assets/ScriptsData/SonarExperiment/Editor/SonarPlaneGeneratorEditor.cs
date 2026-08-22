@@ -47,13 +47,18 @@ public class SonarPlaneGeneratorEditor : Editor
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
             GUI.backgroundColor = prevBg;
 
-            int poolSize = gen.Columns * gen.Rows * gen.Levels;
-            int vTotal   = gt.spawnVertical      ? poolSize : 0;
-            int xTotal   = gt.spawnCrossVertical ? poolSize : 0;
+            // One merged mesh per upright axis, plus one renderer per horizontal level.
+            int vWalls   = gt.spawnVertical      ? gen.Rows    + 1 : 0;
+            int xWalls   = gt.spawnCrossVertical ? gen.Columns + 1 : 0;
+            int renderers = gen.Levels
+                          + (gt.spawnVertical      ? 1 : 0)
+                          + (gt.spawnCrossVertical ? 1 : 0);
 
             EditorGUILayout.LabelField($"Formation   {gen.Columns} cols × {gen.Rows} rows × {gen.Levels} levels", _statStyle);
             EditorGUILayout.LabelField($"Cell size   {gen.CellSize:F3}u  (set by SonarController)", _statStyle);
-            EditorGUILayout.LabelField($"Renderers   H:{poolSize}  V:{vTotal}  X:{xTotal}  =  {poolSize + vTotal + xTotal}", _statStyle);
+            EditorGUILayout.LabelField($"Footprint   {gen.Width:F2} × {gen.Depth:F2}u  ·  depth {gen.StackHeight:F2}u", _statStyle);
+            EditorGUILayout.LabelField($"Walls       Z:{vWalls}  X:{xWalls}  (merged)", _statStyle);
+            EditorGUILayout.LabelField($"Renderers   {renderers}", _statStyle);
 
             EditorGUILayout.EndVertical();
         }

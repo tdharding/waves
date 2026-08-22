@@ -106,7 +106,7 @@ Material:
     - _ClearCoatSmoothness: 0
     - _Cull: 2
     - _Cutoff: 0.5
-    - _DestructableFactor: 1
+    - _DestructableFactor: 0
     - _DetailAlbedoMapScale: 1
     - _DetailNormalMapScale: 1
     - _DitherFactor1: 0.24
@@ -117,7 +117,7 @@ Material:
     - _Edge1: 2.2
     - _Edge2: 0.28
     - _EnvironmentReflections: 0
-    - _Float: 0
+    - _Float: 2.38
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0

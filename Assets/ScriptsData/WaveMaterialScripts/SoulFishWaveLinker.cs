@@ -224,6 +224,10 @@ public class SoulFishWaveLinker : MonoBehaviour
 
     public static IReadOnlyList<Transform> ActiveFish => activeFish;
 
+    // Debug surface (SoulFishDebugTracer): how many zone entries and packed points are live.
+    public static int ActiveZoneCount  => activeZones.Count;
+    public static int PackedPointCount => PackAll().Count;
+
     void OnDrawGizmos()
     {
         var packed = PackAll();

@@ -314,6 +314,8 @@ MonoBehaviour:
   forwardEuler: {x: 0, y: 0, z: 0}
   useUpOverride: 0
   upEuler: {x: 0, y: 0, z: 0}
+  useWallDepth: 0
+  wallDepth: 0
   useScaleRadius: 1
   scaleRadius: 0.38
   usePrefabTopMarker: 1
@@ -327,6 +329,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 3714185085028481474}
+  - component: {fileID: 1213645128892241296}
   m_Layer: 0
   m_Name: BigSpike
   m_TagString: Untagged
@@ -351,6 +354,25 @@ Transform:
   - {fileID: 7577451828491289521}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1213645128892241296
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4089478517322769272}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0b0361b026ad988408fb061fe6eb75d6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CreepClimbingArea
+  centreOffset: {x: -0.14, y: 0, z: 0}
+  lowerRingRadius: 0.31
+  lowerRingHeight: -1.41
+  upperRingRadius: 0.1
+  upperRingHeight: -0.92
+  spawnRingRadius: 0.37
+  spawnRingHeight: -2.74
 --- !u!1 &7122047091635616103
 GameObject:
   m_ObjectHideFlags: 0

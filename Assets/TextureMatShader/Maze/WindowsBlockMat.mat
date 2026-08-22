@@ -70,21 +70,21 @@ Material:
     - _SonarRadius: 0
     - _VertexColorMultiplier: 1
     - _WindowCellSize: -0.05
-    - _WindowEmissionIntensity: 0.52
+    - _WindowEmissionIntensity: 0.25
     m_Colors:
     - _BaseColour: {r: 1, g: 1, b: 1, a: 1}
     - _InMinMax1: {r: 0.2, g: -1.19, b: 0, a: 0}
     - _LightAngle1: {r: 1.96, g: -132.9, b: -177.8, a: 0}
-    - _SmoothnessTiling: {r: -0.16, g: 0.3, b: 0, a: 0}
+    - _SmoothnessTiling: {r: -0.03, g: 0.03, b: 0, a: 0}
     - _SonarCenter: {r: 0.50011003, g: 0.49993333, b: 0, a: 0}
     - _Tiling: {r: 1, g: 1, b: 0, a: 0}
     - _Tiling_1: {r: 1, g: 1, b: 0, a: 0}
     - _WindowAtlasGrid: {r: 32, g: 48, b: 0, a: 0}
     - _WindowEmissionColor: {r: 1, g: 1, b: 1, a: 1}
-    - _WindowFlickerParams: {r: 0.15, g: 2, b: 0.02, a: 0.25}
-    - _WindowLightParams: {r: 1, g: 8.57, b: 0.07, a: -1.49}
+    - _WindowFlickerParams: {r: 0.85, g: 2, b: 0.02, a: 0.25}
+    - _WindowLightParams: {r: 1, g: 6.99, b: 0.07, a: -1.34}
     - _WindowSpacing: {r: 0.12, g: 0.16, b: 0, a: 0}
-    - _WindowStyleParams: {r: 0.35, g: 1, b: 0, a: 0}
+    - _WindowStyleParams: {r: 0.35, g: 0.28, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
 --- !u!114 &453698593309518614

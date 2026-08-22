@@ -61,6 +61,9 @@ public class LevelSpawner : MonoBehaviour
     [Header("Cube Buildings")]
     [SerializeField] GameObject cubeBuildingPrefab;
 
+    [Header("Procedural Spikes")]
+    [SerializeField] GameObject proceduralSpikePrefab;
+
     [Header("Fishing")]
     [SerializeField] FishingController fishingController;
 
@@ -166,6 +169,25 @@ public class LevelSpawner : MonoBehaviour
             // Record the scale so the UI minimap can size its marker to match.
             go.AddComponent<PlacementScaleMarker>().scale = s;
         }
+    }
+
+    // Builds a spike rock carried by a placed prefab, rather than one drawn with the ▲ Spikes
+    // tool — the creepy guy brings his own starting rock this way, so he arrives standing on
+    // something instead of needing a separate spike placed under him.
+    //
+    // Built at the preset's own size: ApplyPlacementScale already scales the whole instance, so
+    // scaling the mesh as well would square it. Always climbable, because a rock a creeper is
+    // carried in on is by definition one he stands on — ProceduralSpike then fits the very
+    // CreepClimbingArea his controller is pointing at.
+    private void BuildPlacementSpike(GameObject go, GridData.PrefabPlacement pp)
+    {
+        if (go == null || pp == null) return;
+
+        var spike = go.GetComponentInChildren<ProceduralSpike>(true);
+        if (spike == null) return;   // an ordinary prefab — nothing to build
+
+        spike.Build(pp.spikePreset != null ? pp.spikePreset.config : new SpikeShapeConfig(),
+                    1f, climbable: true);
     }
 
     // Statues spawned this pass, keyed by PrefabPlacement.statueId, so guarded soul-fish
@@ -326,6 +348,7 @@ float   tileZ  = b.size.z / GridData.GridSize;
                 Quaternion rot = hasBaselineAlign ? baselineRot : par.rotation;
                 var instance = Instantiate(pp.prefab, pos, rot, par);
                 ApplyPlacementScale(instance, pp);
+                BuildPlacementSpike(instance, pp);
                 RegisterStatue(instance, pp);
                 RegisterTower(instance, pp);
                 spawnedByCell[$"-1_{pp.cellIndex}"] = instance;
@@ -410,6 +433,7 @@ float   tileZ  = b.size.z / GridData.GridSize;
                         if (applyMinus90XRotation) rot2 *= Quaternion.Euler(-90f, 0f, 0f);
                         var instance = Instantiate(pp.prefab, pos2, rot2, spawnParent);
                         ApplyPlacementScale(instance, pp);
+                        BuildPlacementSpike(instance, pp);
                         RegisterStatue(instance, pp);
                         RegisterTower(instance, pp);
                         spawnedByCell[$"{ti}_{pp.cellIndex}"] = instance;
@@ -428,6 +452,9 @@ float   tileZ  = b.size.z / GridData.GridSize;
 
         // ── Cube Buildings — before Y180 rotation so they move with spawnParent ──
         SpawnCubeBuildings();
+
+        // ── Procedural Spikes — before Y180 rotation so they move with spawnParent ──
+        SpawnProceduralSpikes();
 
         if (!mazeRotated)
         {
@@ -601,6 +628,13 @@ float   tileZ  = b.size.z / GridData.GridSize;
         float contactY = align != null ? align.transform.localPosition.y : 0f;
         float spawnY   = spawnedBaselineWaterY - contactY;
 
+        // Stepped-rooftop presets: every asset dropped in a Resources/Buildings folder is a
+        // candidate. Blocks flagged Stepped Top pick one at random (deterministically per block,
+        // so a building looks the same each load). Empty pool → those blocks fall back to a box.
+        var steppedPresets = Resources.LoadAll<SteppedBuildingPreset>("Buildings");
+        var windowPresets  = Resources.LoadAll<WindowFieldPreset>("WindowFields");
+        bool warnedNoPresets = false;
+
         foreach (var b in activeGridData.cubeBuildings)
         {
             if (b == null) continue;
@@ -609,10 +643,90 @@ float   tileZ  = b.size.z / GridData.GridSize;
             var instance = Instantiate(cubeBuildingPrefab, pos, spawnParent.rotation, spawnParent);
 
             var builder = instance.GetComponent<ProceduralCubeBuilding>();
-            if (builder != null)
-                builder.Build(b.width * arenaWidth, b.length * arenaWidth, b.heightAboveWater, b.depthBelowWater);
-            else
+            if (builder == null)
+            {
                 Debug.LogWarning($"[LevelSpawner] cubeBuildingPrefab '{cubeBuildingPrefab.name}' has no ProceduralCubeBuilding component — box not generated.");
+                continue;
+            }
+
+            float w = b.width * arenaWidth, l = b.length * arenaWidth;
+
+            if (b.steppedTop && steppedPresets != null && steppedPresets.Length > 0)
+            {
+                // Stable per-block seed from the footprint centre → same preset + same skyline each load.
+                int seed = Mathf.RoundToInt(b.center.x * 100000f) * 73856093
+                         ^ Mathf.RoundToInt(b.center.y * 100000f) * 19349663;
+                var rand   = new System.Random(seed);
+                var preset = steppedPresets[rand.Next(steppedPresets.Length)];
+                // A SteppedBuildingInstance does the initial build and (in-editor) live-rebuilds
+                // when the preset is edited during play.
+                var inst = instance.GetComponent<SteppedBuildingInstance>();
+                if (inst == null) inst = instance.AddComponent<SteppedBuildingInstance>();
+                inst.Init(builder, preset, w, l, b.heightAboveWater, b.depthBelowWater, seed);
+            }
+            else
+            {
+                if (b.steppedTop && !warnedNoPresets)
+                {
+                    Debug.LogWarning("[LevelSpawner] A block is flagged Stepped Top but no SteppedBuildingPreset assets were found in a Resources/Buildings folder — falling back to plain boxes.");
+                    warnedNoPresets = true;
+                }
+                builder.Build(w, l, b.heightAboveWater, b.depthBelowWater);
+            }
+
+            // Window sheet: every building draws a random sheet + cell size from the pool
+            // (stable per block, independent of the rooftop pick). Empty pool → the material's
+            // own _WindowAtlas / _WindowCellSize stay in effect for every building.
+            if (windowPresets != null && windowPresets.Length > 0)
+            {
+                int wseed = Mathf.RoundToInt(b.center.x * 100000f) * 40503
+                          ^ Mathf.RoundToInt(b.center.y * 100000f) * 12289;
+                var wp = windowPresets[new System.Random(wseed).Next(windowPresets.Length)];
+                builder.ApplyWindowField(wp.fieldTexture, wp.cellSize, wp.gridDims);
+            }
+        }
+    }
+
+    // =====================================================
+    // PROCEDURAL SPIKE SPAWNING
+    // =====================================================
+
+    private void SpawnProceduralSpikes()
+    {
+        if (activeGridData?.proceduralSpikes == null || activeGridData.proceduralSpikes.Count == 0) return;
+
+        if (proceduralSpikePrefab == null)
+        {
+            Debug.LogWarning("[LevelSpawner] proceduralSpikePrefab not assigned — procedural spikes not spawned.");
+            return;
+        }
+
+        // Positions are normalized (fraction of the arena); the SHAPE is already in world units,
+        // authored in the Spike Studio, so only the centre needs scaling by the arena.
+        float arenaWidth = activeArenaProfile != null ? activeArenaProfile.WorldArenaWidth : 12f;
+
+        // Offset the prefab so its PrefabBaselineAlignment disc (origin) meets the baseline water
+        // plane — the spike mesh puts its waterline ring at the origin, so the rock then meets the
+        // water exactly where the designer drew it.
+        var   align    = proceduralSpikePrefab.GetComponentInChildren<PrefabBaselineAlignment>();
+        float contactY = align != null ? align.transform.localPosition.y : 0f;
+        float spawnY   = spawnedBaselineWaterY - contactY;
+
+        foreach (var s in activeGridData.proceduralSpikes)
+        {
+            if (s == null) continue;
+
+            Vector3 pos = new Vector3(s.center.x * arenaWidth, spawnY, s.center.y * arenaWidth);
+            var instance = Instantiate(proceduralSpikePrefab, pos, spawnParent.rotation, spawnParent);
+
+            var builder = instance.GetComponent<ProceduralSpike>();
+            if (builder == null)
+            {
+                Debug.LogWarning($"[LevelSpawner] proceduralSpikePrefab '{proceduralSpikePrefab.name}' has no ProceduralSpike component — spike not generated.");
+                continue;
+            }
+
+            builder.Build(s.Config, s.EffectiveScale, s.climbable);
         }
     }
 
@@ -727,10 +841,10 @@ float   tileZ  = b.size.z / GridData.GridSize;
 
         bool anyCurved = false;
         for (int s = 0; s < segCount; s++)
-            if (zone.IsSegmentCurved(s)) { anyCurved = true; break; }
+            if (!zone.SegmentIsStraight(s)) { anyCurved = true; break; }
 
-        // Catmull-Rom needs neighbours on both sides to bend; with < 3 nodes it degenerates
-        // to the straight segment anyway.
+        // A 2-node path has no neighbours to bend around, and an all-straight path is already
+        // its own polyline.
         if (n < 3 || !anyCurved)
         {
             result.AddRange(src);
@@ -739,26 +853,18 @@ float   tileZ  = b.size.z / GridData.GridSize;
             return result;
         }
 
-        // Per-zone curve resolution: the max samples any one curved segment gets. The per-zone
-        // point budget scales with it (but never past the shared 40-point shader ceiling), so
-        // raising resolution actually reaches the mask instead of being shaved back. At the
-        // default resolution (6) the budget is 24, preserving prior behaviour exactly.
-        int perSegMax   = zone.EffectiveCurveResolution;
-        int zoneBudget  = Mathf.Clamp(perSegMax * 4, 24, SoulZoneMaxRenderPoints);
+        // The per-zone point budget scales with curve resolution (never past the shared 40-point
+        // shader ceiling), so raising resolution actually reaches the mask instead of being shaved
+        // back. At the default resolution (6) the budget is 24, preserving prior behaviour.
+        int zoneBudget = Mathf.Clamp(zone.EffectiveCurveResolution * 4, 24, SoulZoneMaxRenderPoints);
 
-        // Subdivisions per segment: straight = 1, curved scales with normalized length
-        // (nodes are in -0.5..0.5 arena space, so len * 40 ≈ 4 samples per 10% of the arena).
+        // Subdivision counts come from the zone itself (GridData.SoulZone.SegmentSubdivisions), the
+        // same call the Grid Designer preview uses — so designer and runtime cannot disagree.
         var subdiv = new int[segCount];
         int total  = 1; // starting node
         for (int s = 0; s < segCount; s++)
         {
-            if (!zone.IsSegmentCurved(s))
-                subdiv[s] = 1;
-            else
-            {
-                float len = Vector2.Distance(src[s], src[(s + 1) % n]);
-                subdiv[s] = Mathf.Clamp(Mathf.CeilToInt(len * 40f), 2, perSegMax);
-            }
+            subdiv[s] = zone.SegmentSubdivisions(s);
             total += subdiv[s];
         }
 
@@ -778,14 +884,9 @@ float   tileZ  = b.size.z / GridData.GridSize;
         denseIndexOfNode[0] = 0;
         for (int s = 0; s < segCount; s++)
         {
-            bool curved = zone.IsSegmentCurved(s);
-            int  i2     = (s + 1) % n;
+            int i2 = (s + 1) % n;
             for (int k = 1; k <= subdiv[s]; k++)
-            {
-                float t = (float)k / subdiv[s];
-                result.Add(curved ? SplineSample(src, s, t, closed)
-                                  : Vector2.Lerp(src[s], src[i2], t));
-            }
+                result.Add(zone.SamplePath(s, (float)k / subdiv[s]));
             // The segment's final sample (t = 1) is exactly the authored end node.
             if (i2 != 0) denseIndexOfNode[i2] = result.Count - 1;
         }

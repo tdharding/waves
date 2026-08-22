@@ -36,7 +36,7 @@ public class BoatCollisionHandler : MonoBehaviour
     static readonly int OffsetID = Shader.PropertyToID("_Offset");
 
     readonly string[] validTags =
-        { "MazeWalls", "LowHMazeWall", "TallHMazeWall", "LowSpikeTrap", "BadGuySnake", "OuterWalls" };
+        { "MazeWalls", "LowHMazeWall", "TallHMazeWall", "LowSpikeTrap", "BadGuySnake", "CreepyGuy", "OuterWalls" };
 
     private bool canCrash = true;
     private Coroutine materialRoutine;

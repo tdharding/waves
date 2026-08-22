@@ -26,9 +26,13 @@ public class WindowFieldGenerator : EditorWindow
     [SerializeField] int   maxThick   = 2;       // 1 = thin snakes only, higher = blocky windows
     [SerializeField] int   gap        = 1;       // empty cells forced between windows
     [SerializeField] bool  noDiagonal = true;    // also keep windows apart at diagonal corners
+    [SerializeField] bool  openPaths  = false;   // forbid a snake closing into a ring/hollow loop
+    [SerializeField] bool  limitTurns = false;   // cap how many direction changes a snake may make
+    [SerializeField] int   maxTurns   = 2;       // 0 = straight lines, 1 = L, 2 = U/Z, …
+    [SerializeField] float cellSize   = 0.37f;   // world size per cell — stored on the preset
     [SerializeField] int   seed       = 12345;
 
-    const string OutputPath = "Assets/TextureMatShader/Maze/WindowField.png";
+    const string PresetFolder = "Assets/Resources/WindowFields";
     static readonly Vector2Int[] Dirs =
         { new Vector2Int(1, 0), new Vector2Int(-1, 0), new Vector2Int(0, 1), new Vector2Int(0, -1) };
 
@@ -47,12 +51,20 @@ public class WindowFieldGenerator : EditorWindow
         EditorGUILayout.LabelField("Shape & density", EditorStyles.boldLabel);
         density    = EditorGUILayout.Slider("Density", density, 0.02f, 0.8f);
         straight   = EditorGUILayout.Slider("Straightness", straight, 0f, 1f);
-        maxLength  = EditorGUILayout.IntSlider("Max length", maxLength, 1, 20);
+        maxLength  = EditorGUILayout.IntSlider("Max length", maxLength, 1, 200);
         lengthSkew = EditorGUILayout.Slider("Length skew (short↔long)", lengthSkew, 0.5f, 6f);
         dotFrac    = EditorGUILayout.Slider("Dot fraction", dotFrac, 0f, 1f);
         maxThick   = EditorGUILayout.IntSlider("Max thickness (1 = thin)", maxThick, 1, 4);
         gap        = EditorGUILayout.IntSlider("Gap (cells)", gap, 1, 4);
         noDiagonal = EditorGUILayout.Toggle("No diagonal touching", noDiagonal);
+        openPaths  = EditorGUILayout.Toggle(new GUIContent("Open paths only (no loops)",
+                        "Stop snakes closing into rings/hollow rectangles. Keeps windows open " +
+                        "shapes (lines, corners, hooks) — so they stay thin, overriding Max thickness."),
+                        openPaths);
+        limitTurns = EditorGUILayout.Toggle("Limit turns", limitTurns);
+        using (new EditorGUI.DisabledScope(!limitTurns))
+            maxTurns = EditorGUILayout.IntSlider("Max turns", maxTurns, 0, 10);
+        cellSize   = Mathf.Max(0.001f, EditorGUILayout.FloatField("Cell size (world)", cellSize));
         seed       = EditorGUILayout.IntField("Seed", seed);
 
         EditorGUILayout.Space();
@@ -61,25 +73,8 @@ public class WindowFieldGenerator : EditorWindow
             if (GUILayout.Button("Generate Preview")) Generate();
             if (GUILayout.Button("Reroll Seed")) { seed = Random.Range(0, 999999); Generate(); }
         }
-        if (GUILayout.Button("Bake to PNG")) Bake();
-
-        EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Bakes to", OutputPath);
-        using (new EditorGUILayout.HorizontalScope())
-        {
-            bool exists = File.Exists(OutputPath);
-            using (new EditorGUI.DisabledScope(!exists))
-            {
-                if (GUILayout.Button("Ping in Project"))
-                {
-                    var asset = AssetDatabase.LoadAssetAtPath<Texture2D>(OutputPath);
-                    EditorGUIUtility.PingObject(asset);
-                    Selection.activeObject = asset;
-                }
-                if (GUILayout.Button("Reveal in Explorer"))
-                    EditorUtility.RevealInFinder(OutputPath);
-            }
-        }
+        if (GUILayout.Button("Bake as Preset…")) BakePreset();
+        EditorGUILayout.LabelField("Pool folder", PresetFolder, EditorStyles.miniLabel);
 
         if (preview != null)
         {
@@ -89,7 +84,8 @@ public class WindowFieldGenerator : EditorWindow
             Rect r = GUILayoutUtility.GetRect(w, h);
             EditorGUI.DrawPreviewTexture(r, preview, null, ScaleMode.ScaleToFit);
             EditorGUILayout.HelpBox("Preview: white = window cell (id shown as brightness). " +
-                                    "Bake writes " + OutputPath + " (R = mask, G = id).", MessageType.None);
+                                    "Bake saves a sheet PNG + a WindowFieldPreset into " + PresetFolder +
+                                    ", which every building randomly draws from at spawn.", MessageType.None);
         }
     }
 
@@ -115,17 +111,26 @@ public class WindowFieldGenerator : EditorWindow
         preview.Apply();
     }
 
-    void Bake()
+    // Writes the current sheet as a PNG plus a WindowFieldPreset (sheet + cell size + grid)
+    // into the Resources/WindowFields pool. Buildings randomly draw from that pool at spawn.
+    void BakePreset()
     {
         if (preview == null) Generate();
 
-        File.WriteAllBytes(OutputPath, preview.EncodeToPNG());
-        AssetDatabase.ImportAsset(OutputPath);
+        EnsureFolder(PresetFolder);
+        string assetPath = EditorUtility.SaveFilePanelInProject(
+            "Save Window Field Preset", "WindowField1", "asset",
+            "Choose where to save the preset (Resources/WindowFields).", PresetFolder);
+        if (string.IsNullOrEmpty(assetPath)) return;
 
-        var importer = AssetImporter.GetAtPath(OutputPath) as TextureImporter;
+        string pngPath = System.IO.Path.ChangeExtension(assetPath, ".png");
+        File.WriteAllBytes(pngPath, preview.EncodeToPNG());
+        AssetDatabase.ImportAsset(pngPath);
+
+        var importer = AssetImporter.GetAtPath(pngPath) as TextureImporter;
         if (importer == null)
         {
-            Debug.LogError($"[WindowFieldGenerator] No TextureImporter for {OutputPath} — set it manually " +
+            Debug.LogError($"[WindowFieldGenerator] No TextureImporter for {pngPath} — set it manually " +
                            "(Point, uncompressed, no mips, sRGB off, Repeat, NPOT None).");
             return;
         }
@@ -139,8 +144,32 @@ public class WindowFieldGenerator : EditorWindow
         importer.isReadable         = false;
         importer.SaveAndReimport();
 
-        Debug.Log($"[WindowFieldGenerator] Baked {OutputPath} ({cols}×{rows} cells). " +
-                  $"Assign it to _WindowAtlas and set _WindowAtlasGrid = ({cols}, {rows}).");
+        var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(pngPath);
+        var preset = AssetDatabase.LoadAssetAtPath<WindowFieldPreset>(assetPath);
+        bool isNew = preset == null;
+        if (isNew) preset = ScriptableObject.CreateInstance<WindowFieldPreset>();
+        preset.fieldTexture = tex;
+        preset.cellSize     = cellSize;
+        preset.gridDims     = new Vector2(cols, rows);
+        if (isNew) AssetDatabase.CreateAsset(preset, assetPath);
+        else       EditorUtility.SetDirty(preset);
+        AssetDatabase.SaveAssets();
+
+        EditorGUIUtility.PingObject(preset);
+        Debug.Log($"[WindowFieldGenerator] Baked preset {assetPath} ({cols}×{rows} cells, cell size {cellSize}).");
+    }
+
+    static void EnsureFolder(string folder)
+    {
+        if (AssetDatabase.IsValidFolder(folder)) return;
+        string[] parts = folder.Split('/');
+        string path = parts[0];
+        for (int i = 1; i < parts.Length; i++)
+        {
+            string next = path + "/" + parts[i];
+            if (!AssetDatabase.IsValidFolder(next)) AssetDatabase.CreateFolder(path, parts[i]);
+            path = next;
+        }
     }
 
     // Self-avoiding random-walk packer. Returns owner[] (-1 = empty, else window index)
@@ -174,9 +203,11 @@ public class WindowFieldGenerator : EditorWindow
 
             int cx = sc, cy = sr;
             Vector2Int last = Vector2Int.zero;
+            int turns = 0;
             for (int step = 1; step < len; step++)
             {
-                if (!PickNext(owner, wi, cx, cy, last, rng, out Vector2Int dir)) break;
+                if (!PickNext(owner, wi, cx, cy, last, turns, rng, out Vector2Int dir)) break;
+                if (last != Vector2Int.zero && dir != last) turns++;
                 cx += dir.x; cy += dir.y;
                 Set(owner, cx, cy, wi);
                 filled++;
@@ -196,10 +227,26 @@ public class WindowFieldGenerator : EditorWindow
     // A cell may SEED a window if it is empty and no OTHER window lies within `gap` cells.
     bool CanSeed(int[] owner, int c, int r) => CanPlace(owner, -1, c, r);
 
-    // A cell may EXTEND window wi if placement is legal AND it would not thicken the window
-    // past maxThick (so a snake may curl beside itself into a slab, but only so chunky).
-    bool CanExtend(int[] owner, int wi, int c, int r)
-        => CanPlace(owner, wi, c, r) && !WouldExceedThickness(owner, wi, c, r);
+    // A cell may EXTEND window wi if placement is legal AND either:
+    //  • open-paths mode: it touches none of wi's own cells except the head we came from,
+    //    so the snake can never lie beside itself or close a ring; or
+    //  • normal mode: it would not thicken the window past maxThick.
+    bool CanExtend(int[] owner, int wi, int c, int r, int headC, int headR)
+    {
+        if (!CanPlace(owner, wi, c, r)) return false;
+
+        if (openPaths)
+        {
+            foreach (var d in Dirs)
+            {
+                int nc = c + d.x, nr = r + d.y;
+                if (!In(nc, nr)) continue;
+                if (Get(owner, nc, nr) == wi && !(nc == headC && nr == headR)) return false;
+            }
+            return true;
+        }
+        return !WouldExceedThickness(owner, wi, c, r);
+    }
 
     // True if adding (c,r) to wi would complete a solid (maxThick+1) square of wi's cells —
     // i.e. push the window thicker than allowed. maxThick 1 forbids any 2×2, keeping windows
@@ -242,16 +289,26 @@ public class WindowFieldGenerator : EditorWindow
         return true;
     }
 
-    // Chooses the next step, biasing toward continuing straight by `straight`.
-    bool PickNext(int[] owner, int wi, int cx, int cy, Vector2Int last, System.Random rng, out Vector2Int dir)
+    // Chooses the next step, biasing toward continuing straight by `straight`. Once the snake
+    // has used its turn budget it may only carry straight on; if it can't, the walk ends.
+    bool PickNext(int[] owner, int wi, int cx, int cy, Vector2Int last, int turns, System.Random rng, out Vector2Int dir)
     {
         dir = Vector2Int.zero;
         var valid = new List<Vector2Int>(4);
         foreach (var d in Dirs)
-            if (CanExtend(owner, wi, cx + d.x, cy + d.y)) valid.Add(d);
+            if (CanExtend(owner, wi, cx + d.x, cy + d.y, cx, cy)) valid.Add(d);
         if (valid.Count == 0) return false;
 
         bool straightOk = last != Vector2Int.zero && valid.Contains(last);
+
+        // Out of turns: continue straight or stop (turning is no longer allowed).
+        if (limitTurns && last != Vector2Int.zero && turns >= maxTurns)
+        {
+            if (!straightOk) return false;
+            dir = last;
+            return true;
+        }
+
         if (straightOk && rng.NextDouble() < straight) { dir = last; return true; }
 
         dir = valid[rng.Next(valid.Count)];

@@ -3,26 +3,42 @@ using Unity.Cinemachine;
 
 public class BoatCameraZoom : MonoBehaviour
 {
+    [Tooltip("Camera whose lens is driven. Assigned at spawn by CameraController.SetTargets.")]
     public CinemachineCamera cam;
 
     [Header("Scroll Zoom")]
+    [Tooltip("Degrees of FOV per notch of the scroll wheel, before Scroll FOV Weight is applied.")]
     public float zoomSpeed = 10f;
+    [Tooltip("Narrowest lens. Also the FOV the whirl (Space) zoom drives toward.")]
     public float minFOV = 2f;
+    [Tooltip("Widest lens the scroll zoom can reach.")]
     public float maxFOV = 60f;
 
+    [Tooltip("How much of the scroll zoom comes from narrowing the lens. The rest is the camera " +
+             "actually moving closer (CameraController's Manual Distance). 0 = pure camera movement.")]
+    [Range(0f, 1f)] public float scrollFOVWeight = 0.2f;
+
     [Header("Default / Sonar")]
+    [Tooltip("Starting FOV for normal play. Narrow values look telephoto and flatten the sense of " +
+             "moving closer — raise this if the dolly zoom feels weak.")]
     public float defaultFOV = 14f;
+    [Tooltip("FOV while sonar is running — wider, to take in more of the revealed level.")]
     public float sonarFOV = 40f;
+    [Tooltip("Seconds to tween in and out of the sonar FOV.")]
     public float sonarTweenTime = 0.25f;
 
 [Header("Whirl (Space)")]
+[Tooltip("How far toward Min FOV the whirl pushes the lens. 1 = all the way in.")]
 [Range(0f, 1f)]
 public float whirlMultiplier = 0.5f;
+[Tooltip("Seconds to tween the whirl zoom in and out.")]
 public float whirlTweenTime = 0.25f;
 
 
     [Header("Anchor")]
+    [Tooltip("FOV held while the anchor is down.")]
     public float anchorFOV = 35f;
+    [Tooltip("Seconds to tween in and out of the anchor FOV.")]
     public float anchorTweenTime = 0.25f;
 
     [Header("Soul Camera")]
@@ -77,7 +93,7 @@ public float whirlTweenTime = 0.25f;
             return;
 
         gameplayBaseFOV = Mathf.Clamp(
-            gameplayBaseFOV - scroll * zoomSpeed,
+            gameplayBaseFOV - scroll * zoomSpeed * scrollFOVWeight,
             minFOV,
             maxFOV
         );

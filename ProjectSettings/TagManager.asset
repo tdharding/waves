@@ -24,6 +24,7 @@ TagManager:
   - BadGuySnake
   - OuterWalls
   - LevelCenter
+  - CreepyGuy
   layers:
   - Default
   - TransparentFX

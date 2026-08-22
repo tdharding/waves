@@ -24,6 +24,7 @@ class GridSnapshot
     public List<GridData.WhirlpoolPoint> whirlpools;
     public List<GridData.SplineWallPath> splineWallPaths;
     public List<GridData.CubeBuilding>   cubeBuildings;
+    public List<GridData.ProceduralSpike> proceduralSpikes;
 
     public GridSnapshot(int[] square, int[] circle,
                         List<GridData.ArenaEntrance> ents,
@@ -120,6 +121,7 @@ class GridSnapshot
                 isCircle                 = p.isCircle,
                 isWorldSpaceProp         = p.isWorldSpaceProp,
                 scale                    = p.scale,
+                spikePreset              = p.spikePreset,
                 statueId                 = p.statueId,
                 overrideModifierSettings = p.overrideModifierSettings,
                 speedBoost               = p.speedBoost,
@@ -221,6 +223,22 @@ class GridSnapshot
                 length           = b.length,
                 heightAboveWater = b.heightAboveWater,
                 depthBelowWater  = b.depthBelowWater,
+                steppedTop       = b.steppedTop,
+            });
+        return copy;
+    }
+
+    public static List<GridData.ProceduralSpike> CopySpikes(List<GridData.ProceduralSpike> src)
+    {
+        var copy = new List<GridData.ProceduralSpike>();
+        if (src == null) return copy;
+        foreach (var s in src)
+            copy.Add(s == null ? null : new GridData.ProceduralSpike
+            {
+                center    = s.center,
+                preset    = s.preset,
+                scale     = s.scale,
+                climbable = s.climbable,
             });
         return copy;
     }
@@ -261,6 +279,13 @@ public class GridDesignerWindow : EditorWindow
     // Sub-zone junction drawing: extend a tributary's path out from its radius; drop the final
     // node on a Main-Path node to create the junction. -1 = not drawing.
     int _subZoneDrawIdx = -1;
+
+    // Duplicate-carry: press D over a selected prefab, block or spike to clone it; the copy
+    // follows the cursor (and stays selected) until a left-click drops it. Escape cancels +
+    // removes the copy. Which list the copy went into decides how it's moved and un-made.
+    enum CarryKind { Prefab, Cube, Spike }
+    bool      _carryDuplicate;
+    CarryKind _carryKind = CarryKind.Prefab;
 
     // Select tool state
     enum SelectionType
@@ -331,7 +356,7 @@ public class GridDesignerWindow : EditorWindow
     float[] cachedTierYOffsets; // pulled from LevelSpawner in scene
 
     // ── Direct Prefab Library ──
-    enum PrefabLibraryTab { MazePieces, SetPieces, Statues, Modifiers }
+    enum PrefabLibraryTab { MazePieces, SetPieces, Statues, Modifiers, BadGuys }
     PrefabLibraryTab              _prefabLibTab       = PrefabLibraryTab.MazePieces;
     string                        prefabFolderPath    = "Assets/Prefab/MazePieces";
     string                        iconsFolderPath     = "";
@@ -353,6 +378,33 @@ public class GridDesignerWindow : EditorWindow
     List<GameObject>              scannedModifiersLib = new List<GameObject>();
     int                           selectedModifierIndex = -1;
     Vector2                       modifierScrollPos;
+    const string BadGuysPrefabsFolder   = "Assets/Prefab/BadGuys";
+    List<GameObject>              scannedBadGuysLib   = new List<GameObject>();
+    int                           selectedBadGuyIndex = -1;
+    Vector2                       badGuyScrollPos;
+
+    // The creepy guy carries his own big spike, so on the grid he is drawn as one, tagged "Creep".
+    const string CreepIconSource = "BigSpike";
+    const string CreepAffix      = "Creeper";
+    Dictionary<GameObject, bool> _creepPrefabCache = new Dictionary<GameObject, bool>();
+
+    // ── Creeper hop routes ──
+    const float CreeperRouteWidth    = 5f;   // thick lines only
+    const float CreeperLampDotRadius = 4f;
+
+    bool showEnemies       = true;
+    bool showCreeperRoutes = true;
+
+    Dictionary<GameObject, bool>      _climbingRockCache = new Dictionary<GameObject, bool>();
+    Dictionary<GameObject, bool>      _badGuyPrefabCache = new Dictionary<GameObject, bool>();
+    bool                              _showBadGuys       = false;   // placed-bad-guy list, collapsed by default
+    List<GridData.PrefabPlacement>    _allPlacements     = new List<GridData.PrefabPlacement>();
+    List<GridData.PrefabPlacement>    _climbingRocks     = new List<GridData.PrefabPlacement>();
+    List<Vector2>                     _rockPixels        = new List<Vector2>();
+    List<bool>                        _rockReached       = new List<bool>();
+    Queue<int>                        _rockQueue         = new Queue<int>();
+    List<Vector2>                     _lampPixels        = new List<Vector2>();
+    List<float>                       _lampRadii         = new List<float>();
     bool                          drawDirectPrefab    = false;
     GameObject                    _activePlacementPrefab;
     bool                          _activePlacementIsWorldSpaceProp = false;
@@ -374,13 +426,23 @@ public class GridDesignerWindow : EditorWindow
 
     // ── Cube building mode ──
     bool    _drawCubeBuilding   = false;
-    bool    _showCubeBuildings  = true;
+    bool    _showCubeBuildings  = false;  // foldout collapsed by default
     int     _activeCubeIndex    = -1;   // selected/active block, edited in the panel
     bool    _isDraggingCubeBox  = false; // click-drag rubber-band creating a new block
     Vector2 _cubeDragStartNorm  = Vector2.zero;
     Vector2 _cubeDragCurrentNorm = Vector2.zero;
     int     _dragCubeCenterIndex = -1;  // block being dragged (grabbed anywhere inside its footprint)
     Vector2 _cubeDragOffsetNorm  = Vector2.zero; // centre − grab point, so the block doesn't jump to the cursor
+
+    // ── Procedural spike mode ──
+    bool    _drawSpike           = false;
+    bool    _showSpikes          = false;  // foldout collapsed by default
+    int     _activeSpikeIndex    = -1;   // selected/active spike, edited in the panel
+    bool    _isDraggingSpike     = false; // click-drag from centre outward, sizing a new spike
+    Vector2 _spikeDragStartNorm  = Vector2.zero;
+    Vector2 _spikeDragCurrentNorm = Vector2.zero;
+    int     _dragSpikeCenterIndex = -1;  // spike being dragged by its centre
+    Vector2 _spikeDragOffsetNorm  = Vector2.zero; // centre − grab point, so the spike doesn't jump to the cursor
 
     // ── Tube path modes ──
     int _tubePlacingEntranceIndex = -1; // -1 = not in placement mode
@@ -410,8 +472,30 @@ public class GridDesignerWindow : EditorWindow
     // ── Grid display settings (persisted via EditorPrefs) ──
     float _gridLineOpacity    = 1f;
     float _backdropBrightness = 0.08f;
-    const string PrefKeyGridOpacity    = "GridDesigner_GridLineOpacity";
-    const string PrefKeyBackdropBright = "GridDesigner_BackdropBrightness";
+    // Radius of the white opaque selection dot, as a fraction of a grid cell. Drives the generic
+    // prefab/node marker AND the procedural-spike/block selection marker, so one setting styles all.
+    float _selectionCircleFactor = 0.32f;
+    // Gradient resolution (columns) the procedural spikes are drawn at in the designer — higher is
+    // smoother, at a little more draw cost.
+    int   _spikeDisplayResolution = 8;
+    // Radius of the orb cell marker, as a fraction of a grid cell.
+    float _orbCircleFactor = 0.35f;
+    // When true (default), a newly drawn object snaps to the centre of the cell under the pointer;
+    // when false it drops at the exact pointer position (free placement). Applies to every drawn
+    // instance, not just prefabs.
+    bool  _clampToCellWhenDrawing = true;
+    // The pointer position (normalised grid space) captured on the click/drag that placed a prefab,
+    // used as the drop point when cell clamping is off.
+    Vector2 _drawPointerNorm;
+    // Per-element colour + fill/outline appearance for every overlay marker (JSON in EditorPrefs).
+    GridDesignerStyle _style = new GridDesignerStyle();
+    const string PrefKeyGridOpacity     = "GridDesigner_GridLineOpacity";
+    const string PrefKeyBackdropBright  = "GridDesigner_BackdropBrightness";
+    const string PrefKeySelectionCircle = "GridDesigner_SelectionCircleFactor";
+    const string PrefKeySpikeResolution = "GridDesigner_SpikeResolution";
+    const string PrefKeyOrbSize         = "GridDesigner_OrbSize";
+    const string PrefKeyClampToCell     = "GridDesigner_ClampToCellWhenDrawing";
+    const string PrefKeyStyle           = "GridDesigner_Style";
 
     Stack<GridSnapshot> undoStack = new Stack<GridSnapshot>();
     const int MaxUndoSteps = 50;
@@ -457,15 +541,26 @@ public class GridDesignerWindow : EditorWindow
 
     void OnEnable()
     {
+        wantsMouseMove = true;          // needed so a carried duplicate follows the cursor
+        drawSelect = true;              // default tool on open is Select, not the eraser
+        activeSlot = -1;
         RefreshDiscoveredGrids();
         prefabFolderPath    = EditorPrefs.GetString("GridDesigner_PrefabFolder", "Assets/Prefab/MazePieces");
         iconsFolderPath     = EditorPrefs.GetString("GridDesigner_IconsFolder",  "");
-        _gridLineOpacity    = EditorPrefs.GetFloat(PrefKeyGridOpacity,    1f);
-        _backdropBrightness = EditorPrefs.GetFloat(PrefKeyBackdropBright, 0.08f);
+        _gridLineOpacity        = EditorPrefs.GetFloat(PrefKeyGridOpacity,     1f);
+        _backdropBrightness     = EditorPrefs.GetFloat(PrefKeyBackdropBright,  0.08f);
+        _selectionCircleFactor  = EditorPrefs.GetFloat(PrefKeySelectionCircle, 0.32f);
+        _spikeDisplayResolution = EditorPrefs.GetInt(PrefKeySpikeResolution,   8);
+        _orbCircleFactor        = EditorPrefs.GetFloat(PrefKeyOrbSize,         0.35f);
+        _clampToCellWhenDrawing = EditorPrefs.GetBool(PrefKeyClampToCell,      true);
+        string styleJson = EditorPrefs.GetString(PrefKeyStyle, "");
+        if (!string.IsNullOrEmpty(styleJson))
+            try { JsonUtility.FromJsonOverwrite(styleJson, _style); } catch { /* keep defaults on bad data */ }
         ScanPrefabFolder();
         ScanSetPiecesLib();
         ScanStatuesLib();
         ScanModifiersLib();
+        ScanBadGuysLib();
         LoadPanelWidth();
     }
 
@@ -488,6 +583,7 @@ public class GridDesignerWindow : EditorWindow
         snap.whirlpools          = GridSnapshot.CopyWhirlpools(loadedData?.whirlpools);
         snap.splineWallPaths     = GridSnapshot.CopySplineWalls(loadedData?.splineWallPaths);
         snap.cubeBuildings       = GridSnapshot.CopyCubeBuildings(loadedData?.cubeBuildings);
+        snap.proceduralSpikes    = GridSnapshot.CopySpikes(loadedData?.proceduralSpikes);
         undoStack.Push(snap);
         if (undoStack.Count > MaxUndoSteps) undoStack.TrimExcess();
     }
@@ -529,6 +625,7 @@ public class GridDesignerWindow : EditorWindow
             if (snapshot.whirlpools     != null) loadedData.whirlpools      = GridSnapshot.CopyWhirlpools(snapshot.whirlpools);
             if (snapshot.splineWallPaths!= null) loadedData.splineWallPaths = GridSnapshot.CopySplineWalls(snapshot.splineWallPaths);
             if (snapshot.cubeBuildings  != null) loadedData.cubeBuildings   = GridSnapshot.CopyCubeBuildings(snapshot.cubeBuildings);
+            if (snapshot.proceduralSpikes != null) loadedData.proceduralSpikes = GridSnapshot.CopySpikes(snapshot.proceduralSpikes);
         }
         Repaint();
     }
@@ -563,6 +660,36 @@ public class GridDesignerWindow : EditorWindow
         bool escape = e.keyCode == KeyCode.Escape;
         bool delete = e.keyCode == KeyCode.Delete || e.keyCode == KeyCode.Backspace;
         if (!enter && !escape && !delete) return;
+
+        // Carried duplicate — Escape cancels and removes the copy.
+        if (_carryDuplicate && escape)
+        {
+            if (_carryKind == CarryKind.Cube)
+            {
+                if (loadedData.cubeBuildings != null && _activeCubeIndex >= 0 && _activeCubeIndex < loadedData.cubeBuildings.Count)
+                    loadedData.cubeBuildings.RemoveAt(_activeCubeIndex);
+                _activeCubeIndex = -1;
+            }
+            else if (_carryKind == CarryKind.Spike)
+            {
+                if (loadedData.proceduralSpikes != null && _activeSpikeIndex >= 0 && _activeSpikeIndex < loadedData.proceduralSpikes.Count)
+                    loadedData.proceduralSpikes.RemoveAt(_activeSpikeIndex);
+                _activeSpikeIndex = -1;
+            }
+            else if (_currentSelection.type == SelectionType.PrefabPlacement)
+            {
+                var list = _currentSelection.tierIndex == -1 ? loadedData.prefabPlacements
+                         : (loadedData.tiers != null && _currentSelection.tierIndex >= 0 && _currentSelection.tierIndex < loadedData.tiers.Count
+                            ? loadedData.tiers[_currentSelection.tierIndex].prefabPlacements : null);
+                if (list != null && _currentSelection.index >= 0 && _currentSelection.index < list.Count)
+                    list.RemoveAt(_currentSelection.index);
+                ClearSelectState();
+            }
+            _carryDuplicate = false;
+            EditorUtility.SetDirty(loadedData);
+            e.Use(); Repaint();
+            return;
+        }
 
         // Soul area draw — Enter commits the node path, Escape cancels.
         if (_isDrawingSoulArea)
@@ -653,7 +780,7 @@ public class GridDesignerWindow : EditorWindow
         // Cube building mode — Escape exits, Delete removes the active block.
         if (_drawCubeBuilding)
         {
-            if (escape) { _activeCubeIndex = -1; _drawCubeBuilding = false; e.Use(); Repaint(); }
+            if (escape) { _activeCubeIndex = -1; _drawCubeBuilding = false; _drawSpike = false; e.Use(); Repaint(); }
             else if (delete && loadedData.cubeBuildings != null
                      && _activeCubeIndex >= 0 && _activeCubeIndex < loadedData.cubeBuildings.Count)
             {
@@ -666,10 +793,43 @@ public class GridDesignerWindow : EditorWindow
             return;
         }
 
+        // Spike mode — Escape exits, Delete removes the active spike.
+        if (_drawSpike)
+        {
+            if (escape) { _activeSpikeIndex = -1; _drawSpike = false; e.Use(); Repaint(); }
+            else if (delete && loadedData.proceduralSpikes != null
+                     && _activeSpikeIndex >= 0 && _activeSpikeIndex < loadedData.proceduralSpikes.Count)
+            {
+                Undo.RecordObject(loadedData, "Delete Spike");
+                loadedData.proceduralSpikes.RemoveAt(_activeSpikeIndex);
+                _activeSpikeIndex = -1;
+                EditorUtility.SetDirty(loadedData);
+                e.Use(); Repaint();
+            }
+            return;
+        }
+
         // Select tool — Escape deselects, Delete removes the selected item.
         if (drawSelect)
         {
             if (escape) { ClearSelectState(); e.Use(); Repaint(); return; }
+
+            // A spike picked with the Select tool is tracked by _activeSpikeIndex, not as a
+            // SelectionType, so Delete it here too (otherwise the selection-type switch below
+            // would ignore it and the spike couldn't be deleted without switching tools). Gated on
+            // no other selection being active, so a selected prefab/node's Delete isn't stolen by a
+            // stale active spike — the same rule the spike selection marker uses.
+            if (delete && _currentSelection.type == SelectionType.None
+                && _activeSpikeIndex >= 0 && loadedData.proceduralSpikes != null
+                && _activeSpikeIndex < loadedData.proceduralSpikes.Count)
+            {
+                Undo.RecordObject(loadedData, "Delete Spike");
+                loadedData.proceduralSpikes.RemoveAt(_activeSpikeIndex);
+                _activeSpikeIndex = -1;
+                EditorUtility.SetDirty(loadedData);
+                e.Use(); Repaint(); return;
+            }
+
             if (delete && _currentSelection.type != SelectionType.None)
             {
                 Undo.RecordObject(loadedData, "Delete Selection");
@@ -778,13 +938,14 @@ public class GridDesignerWindow : EditorWindow
     {
         EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
 
-        SetToolbarButton("⊕ Select",  drawSelect,    new Color(0.4f,0.8f,1f),  () => { activeSlot = -1; _drawSplineWall = false; _drawCubeBuilding = false; drawSelect = true; drawSoulArea = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false; });
-        SetToolbarButton("★ Soul",    drawSoulArea,  Color.yellow,             () => { activeSlot = -1; _drawSplineWall = false; _drawCubeBuilding = false; drawSoulArea = true; drawSelect = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false; ClearSelectState(); LogSelection(_currentSelection); });
-        SetToolbarButton("◎ Orb",     drawOrb,       Color.white,              () => { activeSlot = -1; _drawSplineWall = false; _drawCubeBuilding = false; drawOrb = true; drawCircle = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = false; });
-        SetToolbarButton("〇 Whirl",  drawWhirlpool, new Color(0.7f,0.4f,1f), () => { activeSlot = -1; _drawSplineWall = false; _drawCubeBuilding = false; drawWhirlpool = true; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = false; });
-        SetToolbarButton("✕ Eraser", activeSlot == 0, new Color(1f,0.5f,0.5f), () => { activeSlot = 0; _drawSplineWall = false; _drawCubeBuilding = false; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = drawDirectPrefab = drawSelect = false; ClearSelectState(); LogSelection(_currentSelection); _isWaitingForTubePlacement = false; });
-        SetToolbarButton("≋ Walls",  _drawSplineWall, new Color(1f,0.7f,0.2f), () => { activeSlot = -1; _drawSplineWall = true; _drawCubeBuilding = false; drawSelect = drawSoulArea = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = drawDirectPrefab = false; ClearSelectState(); _isWaitingForTubePlacement = false; });
-        SetToolbarButton("▦ Blocks", _drawCubeBuilding, new Color(0.55f,0.55f,0.6f), () => { activeSlot = -1; _drawCubeBuilding = true; _drawSplineWall = false; drawSelect = drawSoulArea = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = drawDirectPrefab = false; ClearSelectState(); _isWaitingForTubePlacement = false; });
+        SetToolbarButton("⊕ Select",  drawSelect,    new Color(0.4f,0.8f,1f),  () => { activeSlot = -1; _drawSplineWall = false; _drawCubeBuilding = false; _drawSpike = false; drawSelect = true; drawSoulArea = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false; });
+        SetToolbarButton("★ Soul",    drawSoulArea,  Color.yellow,             () => { activeSlot = -1; _drawSplineWall = false; _drawCubeBuilding = false; _drawSpike = false; drawSoulArea = true; drawSelect = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false; ClearSelectState(); LogSelection(_currentSelection); });
+        SetToolbarButton("◎ Orb",     drawOrb,       Color.white,              () => { activeSlot = -1; _drawSplineWall = false; _drawCubeBuilding = false; _drawSpike = false; drawOrb = true; drawCircle = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = false; });
+        SetToolbarButton("〇 Whirl",  drawWhirlpool, new Color(0.7f,0.4f,1f), () => { activeSlot = -1; _drawSplineWall = false; _drawCubeBuilding = false; _drawSpike = false; drawWhirlpool = true; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = false; });
+        SetToolbarButton("✕ Eraser", activeSlot == 0, new Color(1f,0.5f,0.5f), () => { activeSlot = 0; _drawSplineWall = false; _drawCubeBuilding = false; _drawSpike = false; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = drawDirectPrefab = drawSelect = false; ClearSelectState(); LogSelection(_currentSelection); _isWaitingForTubePlacement = false; });
+        SetToolbarButton("≋ Walls",  _drawSplineWall, new Color(1f,0.7f,0.2f), () => { activeSlot = -1; _drawSplineWall = true; _drawCubeBuilding = false; _drawSpike = false; drawSelect = drawSoulArea = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = drawDirectPrefab = false; ClearSelectState(); _isWaitingForTubePlacement = false; });
+        SetToolbarButton("▦ Blocks", _drawCubeBuilding, new Color(0.55f,0.55f,0.6f), () => { activeSlot = -1; _drawCubeBuilding = true; _drawSpike = false; _drawSplineWall = false; drawSelect = drawSoulArea = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = drawDirectPrefab = false; ClearSelectState(); _isWaitingForTubePlacement = false; });
+        SetToolbarButton("▲ Spikes", _drawSpike, new Color(0.65f,0.55f,0.85f), () => { activeSlot = -1; _drawSpike = true; _drawCubeBuilding = false; _drawSplineWall = false; drawSelect = drawSoulArea = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = drawDirectPrefab = false; ClearSelectState(); _isWaitingForTubePlacement = false; });
 
         EditorGUILayout.EndHorizontal();
 
@@ -799,6 +960,11 @@ public class GridDesignerWindow : EditorWindow
         {
             hint.normal.textColor = new Color(0.75f, 0.75f, 0.8f);
             GUILayout.Label("Drag out a box to create  |  Click a box to select  |  Drag centre node to move  |  Edit W/L/H in the Cube Buildings panel  |  Del: remove  |  Esc: exit", hint);
+        }
+        else if (_drawSpike)
+        {
+            hint.normal.textColor = new Color(0.75f, 0.65f, 0.95f);
+            GUILayout.Label("Drag out from a point to size the rock  |  Click a spike to select  |  Drag centre to move  |  Right-click a rock to toggle CLIMBABLE (green dot)  |  D: duplicate (click to drop)  |  Pick its shape preset in the Spikes panel  |  Del: remove  |  Esc: exit", hint);
         }
         else if (_isDrawingSoulArea || drawSelect || _isWaitingForTubePlacement)
         {
@@ -1241,7 +1407,10 @@ public class GridDesignerWindow : EditorWindow
             }
 
             if (_drawingNodes.Count == 0) _drawingFirstCell = index;
-            _drawingNodes.Add(GridData.SoulZone.CellToNormalized(index));
+            // Snap the node to the cell centre when clamping is on, else drop it at the exact pointer.
+            _drawingNodes.Add(_clampToCellWhenDrawing
+                              ? GridData.SoulZone.CellToNormalized(index)
+                              : _drawPointerNorm);
             EditorUtility.SetDirty(loadedData);
             Repaint();
             return;
@@ -1319,6 +1488,67 @@ public class GridDesignerWindow : EditorWindow
                 return;
             }
 
+            // A creeper with no rock of its own is ALLOCATED to a spike rather than placed freely.
+            // It snaps onto the rock it is given to, so which spike he belongs to is unambiguous
+            // both here and at runtime, where he adopts the nearest climbing area.
+            if (IsCreepPlacement(_activePlacementPrefab) && !IsClimbingRock(_activePlacementPrefab))
+            {
+                Vector2 clickNorm = GridData.SoulZone.CellToNormalized(index);
+
+                // He can be allocated to a climbing-rock PREFAB or to a climbable PROCEDURAL SPIKE —
+                // both grow a climbing area at spawn, so he adopts whichever he is snapped onto. Take
+                // whichever is nearer to where you clicked.
+                var rockHost  = FindClimbingRockNear(index);
+                int spikeIdx  = FindClimbableSpikeNear(clickNorm);
+                bool haveRock  = rockHost != null;
+                bool haveSpike = spikeIdx >= 0;
+
+                if (!haveRock && !haveSpike)
+                {
+                    GridLog("[Creeper] Can only be allocated to a climbable rock/spike — click on one " +
+                            "(right-click a spike in ▲ Spikes to make it climbable).");
+                    return;
+                }
+                if (haveRock && haveSpike)
+                {
+                    float dRock  = Vector2.Distance(rockHost.position, clickNorm);
+                    float dSpike = Vector2.Distance(loadedData.proceduralSpikes[spikeIdx].center, clickNorm);
+                    if (dSpike <= dRock) haveRock = false; else haveSpike = false;
+                }
+
+                Vector2 snapPos; int hostCell; string hostName;
+                if (haveRock)
+                {
+                    rockHost.EnsureFreePosition();
+                    snapPos = rockHost.position; hostCell = rockHost.cellIndex; hostName = rockHost.prefab.name;
+                }
+                else
+                {
+                    var s = loadedData.proceduralSpikes[spikeIdx];
+                    snapPos = s.center; hostCell = GridData.NormalizedToCell(s.center); hostName = $"spike {spikeIdx + 1}";
+                }
+
+                var creeperList = GetActivePrefabPlacements();
+                // Clear any creeper already on this host, but NOT the host itself.
+                creeperList.RemoveAll(p => p?.prefab != null
+                                           && IsCreepPlacement(p.prefab) && !IsClimbingRock(p.prefab)
+                                           && p.cellIndex == hostCell);
+
+                creeperList.Add(new GridData.PrefabPlacement
+                {
+                    cellIndex        = hostCell,
+                    position         = snapPos,     // snapped onto the rock/spike
+                    freePlaced       = true,
+                    prefab           = _activePlacementPrefab,
+                    isCircle         = false,
+                    isWorldSpaceProp = _activePlacementIsWorldSpaceProp,
+                });
+
+                GridLog($"[Creeper] Allocated to '{hostName}' at cell {hostCell}.");
+                EditorUtility.SetDirty(loadedData);
+                return;
+            }
+
             // First click (or normal placement)
             var placementsBase = GetActivePrefabPlacements();
             RemoveGuardedZonesForCell(index); // clean up a prior statue's zone at this cell
@@ -1326,7 +1556,10 @@ public class GridDesignerWindow : EditorWindow
             var placement = new GridData.PrefabPlacement
             {
                 cellIndex           = index,
-                position            = GridData.SoulZone.CellToNormalized(index),
+                // Snap to the cell centre when clamping is on; otherwise drop at the exact pointer.
+                position            = _clampToCellWhenDrawing
+                                      ? GridData.SoulZone.CellToNormalized(index)
+                                      : _drawPointerNorm,
                 freePlaced          = true,
                 prefab              = _activePlacementPrefab,
                 isCircle            = drawCircle,
@@ -1540,8 +1773,24 @@ public class GridDesignerWindow : EditorWindow
     // Zones with no flags yet (authored pre-curves) stay flagless — missing entries read
     // as straight, so their shape never changes behind the designer's back.
 
-    static void SoulZoneNodeInserted(GridData.SoulZone zone, int newNodeIdx)
+    void SoulZoneNodeInserted(GridData.SoulZone zone, int newNodeIdx)
     {
+        // Tributaries adjoined to THIS zone reference the junction by node index — shift them up so
+        // the junction stays on the SAME logical node when a node is inserted before it.
+        if (loadedData?.soulZones != null && zone.zoneId != 0)
+            foreach (var t in loadedData.soulZones)
+                if (t != zone && t.zoneRole == GridData.SoulZone.ZoneRole.SubZone
+                    && t.adjoinZoneId == zone.zoneId && t.adjoinNodeIndex >= newNodeIdx)
+                    t.adjoinNodeIndex++;
+
+        // New node inherits its neighbour's curvature so inserting doesn't kink the path.
+        if (zone.nodeTension != null && zone.nodeTension.Count > 0)
+        {
+            int inheritFrom = Mathf.Clamp(newNodeIdx - 1, 0, zone.nodeTension.Count - 1);
+            int insertAt    = Mathf.Clamp(newNodeIdx, 0, zone.nodeTension.Count);
+            zone.nodeTension.Insert(insertAt, zone.nodeTension[inheritFrom]);
+        }
+
         if (zone.segmentCurved != null && zone.segmentCurved.Count > 0)
         {
             int inheritFrom = Mathf.Clamp(newNodeIdx - 1, 0, zone.segmentCurved.Count - 1);
@@ -1555,8 +1804,20 @@ public class GridDesignerWindow : EditorWindow
                 if (l != null && l.nodeIndex >= newNodeIdx) l.nodeIndex++;
     }
 
-    static void SoulZoneNodeDeleted(GridData.SoulZone zone, int nodeIdx)
+    void SoulZoneNodeDeleted(GridData.SoulZone zone, int nodeIdx)
     {
+        // Tributaries adjoined to THIS zone: shift the junction down so it stays on the SAME logical
+        // node when an earlier node is removed. (Deleting the junction node itself leaves the index
+        // pointing at the next node, or out of range — SyncSubZoneJunctions guards that.)
+        if (loadedData?.soulZones != null && zone.zoneId != 0)
+            foreach (var t in loadedData.soulZones)
+                if (t != zone && t.zoneRole == GridData.SoulZone.ZoneRole.SubZone
+                    && t.adjoinZoneId == zone.zoneId && t.adjoinNodeIndex > nodeIdx)
+                    t.adjoinNodeIndex--;
+
+        if (zone.nodeTension != null && nodeIdx < zone.nodeTension.Count)
+            zone.nodeTension.RemoveAt(nodeIdx);
+
         if (zone.segmentCurved != null && zone.segmentCurved.Count > 0)
             zone.segmentCurved.RemoveAt(Mathf.Min(nodeIdx, zone.segmentCurved.Count - 1));
 
@@ -1572,11 +1833,48 @@ public class GridDesignerWindow : EditorWindow
     void SetAllSoulZoneSegmentsCurved(GridData.SoulZone zone, bool curved)
     {
         Undo.RecordObject(loadedData, curved ? "Curve Soul Zone Path" : "Straighten Soul Zone Path");
-        int segCount = zone.SegmentCount();
-        zone.segmentCurved = new List<bool>(segCount);
-        for (int i = 0; i < segCount; i++) zone.segmentCurved.Add(curved);
+        SetAllNodeTension(zone, curved ? 0.5f : 0f);
         EditorUtility.SetDirty(loadedData);
         Repaint();
+    }
+
+    // ── Per-node curvature ───────────────────────────────
+    // nodeTension is the authoritative curve control (GridData.SoulZone.SamplePath reads it).
+    // The legacy segmentCurved list is kept in step so anything still reading it stays sane.
+
+    static void EnsureNodeTension(GridData.SoulZone zone)
+    {
+        int n = zone.nodePositions?.Count ?? 0;
+        if (zone.nodeTension == null) zone.nodeTension = new List<float>();
+        // Seed from whatever the legacy flags implied, so existing zones keep their exact shape.
+        while (zone.nodeTension.Count < n)
+            zone.nodeTension.Add(zone.NodeTension(zone.nodeTension.Count));
+        while (zone.nodeTension.Count > n)
+            zone.nodeTension.RemoveAt(zone.nodeTension.Count - 1);
+    }
+
+    static void SetNodeTension(GridData.SoulZone zone, int nodeIdx, float tension)
+    {
+        EnsureNodeTension(zone);
+        if (nodeIdx < 0 || nodeIdx >= zone.nodeTension.Count) return;
+        zone.nodeTension[nodeIdx] = Mathf.Clamp01(tension);
+        SyncLegacyCurvedFlags(zone);
+    }
+
+    static void SetAllNodeTension(GridData.SoulZone zone, float tension)
+    {
+        EnsureNodeTension(zone);
+        for (int i = 0; i < zone.nodeTension.Count; i++) zone.nodeTension[i] = Mathf.Clamp01(tension);
+        SyncLegacyCurvedFlags(zone);
+    }
+
+    // A segment counts as "curved" for the legacy flag when either end has any tension.
+    static void SyncLegacyCurvedFlags(GridData.SoulZone zone)
+    {
+        int segCount = zone.SegmentCount();
+        if (zone.segmentCurved == null) zone.segmentCurved = new List<bool>();
+        while (zone.segmentCurved.Count < segCount) zone.segmentCurved.Add(false);
+        for (int s = 0; s < segCount; s++) zone.segmentCurved[s] = !zone.SegmentIsStraight(s);
     }
 
     static Vector2 Centroid(List<Vector2> pts)
@@ -1628,10 +1926,56 @@ public class GridDesignerWindow : EditorWindow
 
     // Keeps each adjoined tributary's final node glued to the main-river node it joins, so the
     // junction follows when the main path is edited (mirrors WMSyncTubeEndpoints for tube ends).
+    // Normalized-grid position of an arena entrance. Entrances are placed by perimeter angle, so
+    // this mirrors SpawnPortalPrefab's world formula in the designer's -0.5..0.5 space: normalized
+    // 0.5 IS the arena radius (the grid spans -r..+r), and spawnRadius pulls the door inward.
+    // Y is flipped relative to the pixel drawing in DrawPortalOverlay because normalized +y is north.
+    Vector2 EntranceNormalizedPos(GridData.ArenaEntrance ent)
+    {
+        float rad = ent.perimeterAngle * Mathf.Deg2Rad;
+        Vector2 dir = new Vector2(Mathf.Sin(rad), Mathf.Cos(rad));
+
+        float rWorld = loadedData?.arenaProfile != null ? loadedData.arenaProfile.WorldArenaRadius : 0f;
+        float frac = rWorld > 0.0001f ? (rWorld - ent.spawnRadius) / (2f * rWorld) : 0.5f;
+        return dir * frac;
+    }
+
+    // Pins a zone's first/last node onto its chosen entrances, so a path runs door-to-door and the
+    // ends follow if an entrance angle is edited. Returns true when something moved.
+    bool SyncZoneEntrances(GridData.SoulZone z)
+    {
+        if (!z.attachToEntrances || z.nodePositions == null || z.nodePositions.Count == 0) return false;
+        if (loadedData.entrances == null || loadedData.entrances.Count == 0) return false;
+
+        bool changed = false;
+
+        if (z.entryEntranceIndex >= 0 && z.entryEntranceIndex < loadedData.entrances.Count)
+        {
+            Vector2 target = EntranceNormalizedPos(loadedData.entrances[z.entryEntranceIndex]);
+            if (z.nodePositions[0] != target) { z.nodePositions[0] = target; changed = true; }
+        }
+
+        // Needs at least two nodes for the exit to be a different node from the entry.
+        if (z.exitEntranceIndex >= 0 && z.exitEntranceIndex < loadedData.entrances.Count
+            && z.nodePositions.Count >= 2)
+        {
+            Vector2 target = EntranceNormalizedPos(loadedData.entrances[z.exitEntranceIndex]);
+            int last = z.nodePositions.Count - 1;
+            if (z.nodePositions[last] != target) { z.nodePositions[last] = target; changed = true; }
+        }
+
+        return changed;
+    }
+
     void SyncSubZoneJunctions()
     {
         if (loadedData?.soulZones == null) return;
         bool changed = false;
+
+        // Entrance pinning applies to any zone that opts in, so it runs before the SubZone filter.
+        foreach (var z in loadedData.soulZones)
+            if (SyncZoneEntrances(z)) changed = true;
+
         foreach (var z in loadedData.soulZones)
         {
             if (z.zoneRole != GridData.SoulZone.ZoneRole.SubZone) continue;
@@ -2038,6 +2382,22 @@ public class GridDesignerWindow : EditorWindow
         scannedModifiersLib.Sort((a, b) => string.Compare(a.name, b.name, System.StringComparison.Ordinal));
     }
 
+    // Enemies placed by hand on the grid (creepy guy ships with his own rock, so he is a
+    // single placement). Recurses subfolders, so BadGuys/CreepGuy/ is picked up too.
+    void ScanBadGuysLib()
+    {
+        scannedBadGuysLib.Clear();
+        selectedBadGuyIndex = -1;
+        if (!AssetDatabase.IsValidFolder(BadGuysPrefabsFolder)) return;
+        string[] guids = AssetDatabase.FindAssets("t:Prefab", new[] { BadGuysPrefabsFolder });
+        foreach (string guid in guids)
+        {
+            var go = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(guid));
+            if (go != null) scannedBadGuysLib.Add(go);
+        }
+        scannedBadGuysLib.Sort((a, b) => string.Compare(a.name, b.name, System.StringComparison.Ordinal));
+    }
+
     void DrawStartRitualSection()
     {
         _showStartRitual = EditorGUILayout.Foldout(_showStartRitual, "Start Ritual", true, EditorStyles.foldoutHeader);
@@ -2063,6 +2423,60 @@ public class GridDesignerWindow : EditorWindow
         _dragUndoPushed    = false;
         _currentSelection  = new SelectionInfo { type = SelectionType.None };
         CancelBridge();
+    }
+
+    // ── UI display settings, exposed for the separate Grid Designer Settings window ──
+    // Each setter clamps, persists to EditorPrefs and repaints, so edits from the settings window
+    // apply live to the open designer and survive a restart. No explicit Save needed.
+    public float GridLineOpacity
+    {
+        get => _gridLineOpacity;
+        set { _gridLineOpacity = Mathf.Clamp01(value); EditorPrefs.SetFloat(PrefKeyGridOpacity, _gridLineOpacity); Repaint(); }
+    }
+    public float BackdropBrightness
+    {
+        get => _backdropBrightness;
+        set { _backdropBrightness = Mathf.Clamp01(value); EditorPrefs.SetFloat(PrefKeyBackdropBright, _backdropBrightness); Repaint(); }
+    }
+    public float SelectionCircleFactor
+    {
+        get => _selectionCircleFactor;
+        set { _selectionCircleFactor = Mathf.Clamp(value, 0.05f, 1f); EditorPrefs.SetFloat(PrefKeySelectionCircle, _selectionCircleFactor); Repaint(); }
+    }
+    public int SpikeDisplayResolution
+    {
+        get => _spikeDisplayResolution;
+        set { _spikeDisplayResolution = Mathf.Clamp(value, 3, 32); EditorPrefs.SetInt(PrefKeySpikeResolution, _spikeDisplayResolution); Repaint(); }
+    }
+    public bool ClampToCellWhenDrawing
+    {
+        get => _clampToCellWhenDrawing;
+        set { _clampToCellWhenDrawing = value; EditorPrefs.SetBool(PrefKeyClampToCell, _clampToCellWhenDrawing); Repaint(); }
+    }
+    public float OrbCircleSize
+    {
+        get => _orbCircleFactor;
+        set { _orbCircleFactor = Mathf.Clamp(value, 0.1f, 1f); EditorPrefs.SetFloat(PrefKeyOrbSize, _orbCircleFactor); Repaint(); }
+    }
+
+    // The overlay appearance settings, edited by the settings window. Call SaveStyle() after mutating.
+    public GridDesignerStyle Style => _style;
+    public void SaveStyle()
+    {
+        EditorPrefs.SetString(PrefKeyStyle, JsonUtility.ToJson(_style));
+        Repaint();
+    }
+
+    // Draws a marker disc for `st` — filled or an outline ring per its mode — at `center`/`radius`.
+    // `alphaMul` dims it for base/tier visibility. The single choke point every themeable disc/ring
+    // marker goes through, so colour and fill/outline are honoured everywhere.
+    void DrawMarker(Vector2 center, float radius, GridMarkerStyle st, float alphaMul = 1f)
+    {
+        if (st == null) return;
+        Color col = st.color; col.a *= alphaMul;
+        Handles.color = col;
+        if (st.outline) Handles.DrawWireDisc(center, Vector3.forward, radius, Mathf.Max(1f, st.width));
+        else            Handles.DrawSolidDisc(center, Vector3.forward, radius);
     }
 
     void CancelBridge()
@@ -2403,6 +2817,8 @@ public class GridDesignerWindow : EditorWindow
             // paths is never read.)
             zone.segmentCurved = new List<bool>(zone.nodePositions.Count);
             for (int i = 0; i < zone.nodePositions.Count; i++) zone.segmentCurved.Add(true);
+            zone.nodeTension = new List<float>(zone.nodePositions.Count);
+            for (int i = 0; i < zone.nodePositions.Count; i++) zone.nodeTension.Add(0.5f);
             // A redraw invalidates node indices — street lights must be re-placed.
             zone.streetLights?.Clear();
             EditorUtility.SetDirty(loadedData);
@@ -2646,7 +3062,7 @@ public class GridDesignerWindow : EditorWindow
                             _isDrawingSoulArea = false;
                             // Take over the grid so no other tool (esp. Select) intercepts clicks.
                             drawSelect = drawSoulArea = drawSoul = drawCircle = drawOrb = drawWhirlpool = false;
-                            drawWaterLevelModifier = drawWaveModifier = drawDirectPrefab = _drawSplineWall = _drawCubeBuilding = false;
+                            drawWaterLevelModifier = drawWaveModifier = drawDirectPrefab = _drawSplineWall = _drawCubeBuilding = false; _drawSpike = false;
                             activeSlot = -1;
                             ClearSelectState();
                         }
@@ -2765,6 +3181,66 @@ public class GridDesignerWindow : EditorWindow
                         Undo.RecordObject(loadedData, "Toggle Closed Loop");
                         zone.closedLoop = newClosed;
                         EditorUtility.SetDirty(loadedData);
+                    }
+
+                    // Door-to-door: pin the path's ends to arena entrances, so the river of souls
+                    // arrives through one door and leaves by another. The pinned nodes track their
+                    // entrance, so moving an entrance angle drags the path end with it.
+                    EditorGUI.BeginChangeCheck();
+                    bool newAttach = EditorGUILayout.Toggle(
+                        new GUIContent("Attach To Entrances",
+                                       "Clamp the first and last nodes onto chosen arena entrances."),
+                        zone.attachToEntrances);
+                    if (EditorGUI.EndChangeCheck())
+                    {
+                        Undo.RecordObject(loadedData, "Toggle Attach To Entrances");
+                        zone.attachToEntrances = newAttach;
+                        EditorUtility.SetDirty(loadedData);
+                    }
+
+                    if (zone.attachToEntrances)
+                    {
+                        int entCount = loadedData.entrances?.Count ?? 0;
+                        if (entCount == 0)
+                        {
+                            EditorGUILayout.HelpBox("This level has no entrances yet — add one in the Entrances section.",
+                                                    MessageType.Warning);
+                        }
+                        else
+                        {
+                            var labels = new string[entCount + 1];
+                            labels[0] = "(none)";
+                            for (int ei = 0; ei < entCount; ei++)
+                            {
+                                var e = loadedData.entrances[ei];
+                                labels[ei + 1] = $"{ei}: {e.id}  ({e.perimeterAngle:0.#}°)";
+                            }
+
+                            EditorGUI.BeginChangeCheck();
+                            int entrySel = Mathf.Clamp(zone.entryEntranceIndex + 1, 0, entCount);
+                            int exitSel  = Mathf.Clamp(zone.exitEntranceIndex  + 1, 0, entCount);
+                            entrySel = EditorGUILayout.Popup(
+                                new GUIContent("  From Entrance", "Entrance the path's FIRST node clamps to."),
+                                entrySel, labels);
+                            exitSel = EditorGUILayout.Popup(
+                                new GUIContent("  To Entrance", "Entrance the path's LAST node clamps to."),
+                                exitSel, labels);
+                            if (EditorGUI.EndChangeCheck())
+                            {
+                                Undo.RecordObject(loadedData, "Set Zone Entrances");
+                                zone.entryEntranceIndex = entrySel - 1;
+                                zone.exitEntranceIndex  = exitSel  - 1;
+                                EditorUtility.SetDirty(loadedData);
+                            }
+
+                            if (zone.entryEntranceIndex >= 0 && zone.entryEntranceIndex == zone.exitEntranceIndex)
+                                EditorGUILayout.HelpBox("Both ends are pinned to the same entrance — pick two different doors.",
+                                                        MessageType.Warning);
+                            else if (zone.nodePositions != null && zone.nodePositions.Count < 2
+                                     && zone.exitEntranceIndex >= 0)
+                                EditorGUILayout.HelpBox("Needs at least 2 nodes before the exit end can be pinned.",
+                                                        MessageType.Info);
+                        }
                     }
                 }
 
@@ -2892,23 +3368,31 @@ public class GridDesignerWindow : EditorWindow
                     GUI.backgroundColor = Color.white;
                     EditorGUILayout.EndHorizontal();
 
-                    // Curve toggle for the segment leaving this node (mirrors the wall editor's ~/—)
-                    int segTotalSel = zone.SegmentCount();
-                    if (_selectedNodeIndex < segTotalSel)
+                    // Curvature AT this node: 0 = sharp corner, 0.5 = natural, 1 = very round.
+                    // The same value drives the painted mask and the fish's swim spline, because
+                    // both sample GridData.SoulZone.SamplePath.
                     {
-                        bool segCurved = zone.IsSegmentCurved(_selectedNodeIndex);
-                        bool newSegCurved = GUILayout.Toggle(segCurved,
-                            new GUIContent(segCurved ? "~ Curved → next node" : "— Straight → next node",
-                                           "Curve or straighten the segment from this node to the next"),
-                            EditorStyles.miniButton);
-                        if (newSegCurved != segCurved)
+                        float curTension = zone.NodeTension(_selectedNodeIndex);
+                        EditorGUI.BeginChangeCheck();
+                        float newTension = EditorGUILayout.Slider(
+                            new GUIContent("Node Curve", "Curvature at this node. 0 = sharp corner, " +
+                                           "0.5 = natural smoothing, 1 = very round. Drives the mask and the fish path alike."),
+                            curTension, 0f, 1f);
+                        if (EditorGUI.EndChangeCheck())
                         {
-                            Undo.RecordObject(loadedData, "Toggle Soul Zone Segment Curve");
-                            if (zone.segmentCurved == null) zone.segmentCurved = new List<bool>();
-                            while (zone.segmentCurved.Count < segTotalSel) zone.segmentCurved.Add(false);
-                            zone.segmentCurved[_selectedNodeIndex] = newSegCurved;
+                            Undo.RecordObject(loadedData, "Edit Node Curve");
+                            SetNodeTension(zone, _selectedNodeIndex, newTension);
                             EditorUtility.SetDirty(loadedData);
                         }
+
+                        EditorGUILayout.BeginHorizontal();
+                        if (GUILayout.Button(new GUIContent("Sharp", "Tension 0 — hard corner"), EditorStyles.miniButtonLeft))
+                        { Undo.RecordObject(loadedData, "Sharpen Node"); SetNodeTension(zone, _selectedNodeIndex, 0f); EditorUtility.SetDirty(loadedData); }
+                        if (GUILayout.Button(new GUIContent("Natural", "Tension 0.5 — the classic curve"), EditorStyles.miniButtonMid))
+                        { Undo.RecordObject(loadedData, "Smooth Node"); SetNodeTension(zone, _selectedNodeIndex, 0.5f); EditorUtility.SetDirty(loadedData); }
+                        if (GUILayout.Button(new GUIContent("Round", "Tension 1 — wide sweeping bend"), EditorStyles.miniButtonRight))
+                        { Undo.RecordObject(loadedData, "Round Node"); SetNodeTension(zone, _selectedNodeIndex, 1f); EditorUtility.SetDirty(loadedData); }
+                        EditorGUILayout.EndHorizontal();
                     }
 
                     // Street light on this node — gates zone progression. Lights are numbered
@@ -3627,23 +4111,18 @@ public class GridDesignerWindow : EditorWindow
 
         // ── Scale controls for a selected prefab — appears directly under the tools ──
         DrawSelectedPrefabScaleSection();
+        DrawSelectedPlacementSpikeSection();
 
         // ── Grid display controls ──
+        // All display sliders now live in the dockable Grid Designer Settings window — dock it beside
+        // the designer and tune while watching the grid update live.
         EditorGUILayout.BeginHorizontal();
-        float prevLW = EditorGUIUtility.labelWidth;
-        EditorGUIUtility.labelWidth = 80f;
-        EditorGUI.BeginChangeCheck();
-        float newOpacity    = EditorGUILayout.Slider("Grid Lines", _gridLineOpacity,    0f, 1f);
-        float newBrightness = EditorGUILayout.Slider("Backdrop",   _backdropBrightness, 0f, 1f);
-        if (EditorGUI.EndChangeCheck())
-        {
-            _gridLineOpacity    = newOpacity;
-            _backdropBrightness = newBrightness;
-            EditorPrefs.SetFloat(PrefKeyGridOpacity,    _gridLineOpacity);
-            EditorPrefs.SetFloat(PrefKeyBackdropBright, _backdropBrightness);
-            Repaint();
-        }
-        EditorGUIUtility.labelWidth = prevLW;
+        if (GUILayout.Button(new GUIContent("⚙ Settings",
+                                            "Open the Grid Designer Settings window (display, drawing " +
+                                            "and appearance settings)."),
+                             GUILayout.Width(110)))
+            GridDesignerSettingsWindow.ShowFor(this);
+        GUILayout.FlexibleSpace();
         EditorGUILayout.EndHorizontal();
 
         DrawGrid();
@@ -3664,8 +4143,10 @@ public class GridDesignerWindow : EditorWindow
             _prefabLibTab = PrefabLibraryTab.SetPieces;
         if (GUILayout.Toggle(_prefabLibTab == PrefabLibraryTab.Statues,    "Statues",    EditorStyles.miniButtonMid))
             _prefabLibTab = PrefabLibraryTab.Statues;
-        if (GUILayout.Toggle(_prefabLibTab == PrefabLibraryTab.Modifiers,  "Modifiers",  EditorStyles.miniButtonRight))
+        if (GUILayout.Toggle(_prefabLibTab == PrefabLibraryTab.Modifiers,  "Modifiers",  EditorStyles.miniButtonMid))
             _prefabLibTab = PrefabLibraryTab.Modifiers;
+        if (GUILayout.Toggle(_prefabLibTab == PrefabLibraryTab.BadGuys,    "BadGuys",    EditorStyles.miniButtonRight))
+            _prefabLibTab = PrefabLibraryTab.BadGuys;
         EditorGUILayout.EndHorizontal();
 
         if (_prefabLibTab == PrefabLibraryTab.MazePieces)
@@ -3716,12 +4197,14 @@ public class GridDesignerWindow : EditorWindow
                         selectedPrefabIndex   = i;
                         selectedSetPieceIndex = -1;
                         selectedStatueIndex   = -1;
+                        selectedModifierIndex = -1;
+                        selectedBadGuyIndex   = -1;
                         _activePlacementPrefab = scannedPrefabs[i];
                         _activePlacementIsWorldSpaceProp = false;
                         drawDirectPrefab = true;
                         activeSlot = -1;
                         _drawSplineWall = false;
-                        _drawCubeBuilding = false;
+                        _drawCubeBuilding = false; _drawSpike = false;
                         drawCircle = drawOrb = drawSoul = drawSoulArea = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false;
                         drawSelect = false;
                         ClearSelectState();
@@ -3760,12 +4243,14 @@ public class GridDesignerWindow : EditorWindow
                         selectedSetPieceIndex  = i;
                         selectedPrefabIndex    = -1;
                         selectedStatueIndex    = -1;
+                        selectedModifierIndex  = -1;
+                        selectedBadGuyIndex    = -1;
                         _activePlacementPrefab = scannedSetPiecesLib[i];
                         _activePlacementIsWorldSpaceProp = false;
                         drawDirectPrefab = true;
                         activeSlot = -1;
                         _drawSplineWall = false;
-                        _drawCubeBuilding = false;
+                        _drawCubeBuilding = false; _drawSpike = false;
                         drawCircle = drawOrb = drawSoul = drawSoulArea = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false;
                         drawSelect = false;
                         ClearSelectState();
@@ -3805,12 +4290,13 @@ public class GridDesignerWindow : EditorWindow
                         selectedPrefabIndex    = -1;
                         selectedSetPieceIndex  = -1;
                         selectedModifierIndex  = -1;
+                        selectedBadGuyIndex    = -1;
                         _activePlacementPrefab = scannedStatuesLib[i];
                         _activePlacementIsWorldSpaceProp = true;
                         drawDirectPrefab = true;
                         activeSlot = -1;
                         _drawSplineWall = false;
-                        _drawCubeBuilding = false;
+                        _drawCubeBuilding = false; _drawSpike = false;
                         drawCircle = drawOrb = drawSoul = drawSoulArea = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false;
                         drawSelect = false;
                         ClearSelectState();
@@ -3824,7 +4310,7 @@ public class GridDesignerWindow : EditorWindow
                 EditorGUILayout.EndScrollView();
             }
         }
-        else // Modifiers tab
+        else if (_prefabLibTab == PrefabLibraryTab.Modifiers)
         {
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField("Folder", GUILayout.Width(42));
@@ -3850,12 +4336,13 @@ public class GridDesignerWindow : EditorWindow
                         selectedPrefabIndex    = -1;
                         selectedSetPieceIndex  = -1;
                         selectedStatueIndex    = -1;
+                        selectedBadGuyIndex    = -1;
                         _activePlacementPrefab = scannedModifiersLib[i];
                         _activePlacementIsWorldSpaceProp = false;
                         drawDirectPrefab = true;
                         activeSlot = -1;
                         _drawSplineWall = false;
-                        _drawCubeBuilding = false;
+                        _drawCubeBuilding = false; _drawSpike = false;
                         drawCircle = drawOrb = drawSoul = drawSoulArea = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false;
                         drawSelect = false;
                         ClearSelectState();
@@ -3869,9 +4356,187 @@ public class GridDesignerWindow : EditorWindow
                 EditorGUILayout.EndScrollView();
             }
         }
+        else // BadGuys tab
+        {
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField("Folder", GUILayout.Width(42));
+            EditorGUILayout.LabelField(BadGuysPrefabsFolder, EditorStyles.miniLabel);
+            if (GUILayout.Button("↺", GUILayout.Width(22))) ScanBadGuysLib();
+            EditorGUILayout.EndHorizontal();
+
+            if (scannedBadGuysLib.Count == 0)
+            {
+                EditorGUILayout.LabelField("  (no prefabs found)", EditorStyles.miniLabel);
+            }
+            else
+            {
+                badGuyScrollPos = EditorGUILayout.BeginScrollView(badGuyScrollPos, GUILayout.Height(160));
+                for (int i = 0; i < scannedBadGuysLib.Count; i++)
+                {
+                    bool isSelected = drawDirectPrefab && _prefabLibTab == PrefabLibraryTab.BadGuys && selectedBadGuyIndex == i;
+                    GUI.backgroundColor = isSelected ? Color.yellow : Color.white;
+                    EditorGUILayout.BeginHorizontal();
+                    if (GUILayout.Button(scannedBadGuysLib[i].name))
+                    {
+                        selectedBadGuyIndex    = i;
+                        selectedPrefabIndex    = -1;
+                        selectedSetPieceIndex  = -1;
+                        selectedStatueIndex    = -1;
+                        selectedModifierIndex  = -1;
+                        _activePlacementPrefab = scannedBadGuysLib[i];
+                        _activePlacementIsWorldSpaceProp = false;
+                        drawDirectPrefab = true;
+                        activeSlot = -1;
+                        _drawSplineWall = false;
+                        _drawCubeBuilding = false; _drawSpike = false;
+                        drawCircle = drawOrb = drawSoul = drawSoulArea = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false;
+                        drawSelect = false;
+                        ClearSelectState();
+                        LogSelection(_currentSelection);
+                    }
+                    GUI.backgroundColor = Color.white;
+                    if (GUILayout.Button("⊙", GUILayout.Width(22)))
+                        EditorGUIUtility.PingObject(scannedBadGuysLib[i]);
+                    EditorGUILayout.EndHorizontal();
+                }
+                EditorGUILayout.EndScrollView();
+            }
+        }
 
         if (drawDirectPrefab && _activePlacementPrefab != null)
             EditorGUILayout.HelpBox($"Placing: {_activePlacementPrefab.name}", MessageType.None);
+    }
+
+    // Only appears once a creeper is actually placed — with no creeper there are no routes to show.
+    void DrawEnemiesSection()
+    {
+        CollectAllPlacements(_allPlacements);
+        float hopDistance = PlacedCreeperHopDistance(_allPlacements);
+        if (hopDistance <= 0f) return;
+
+        showEnemies = EditorGUILayout.Foldout(showEnemies, "Enemies", true, EditorStyles.foldoutHeader);
+        if (!showEnemies) return;
+
+        showCreeperRoutes = EditorGUILayout.ToggleLeft(
+            new GUIContent("Creeper hop routes",
+                           "Green lines between the rocks he can reach, spreading out from where he is placed. " +
+                           "Amber dots mark rocks inside a street light's radius — the ones he is driven off."),
+            showCreeperRoutes);
+
+        int creepers = CountPlacedCreepers(_allPlacements);
+        EditorGUILayout.LabelField(
+            creepers > 1
+                ? $"  {creepers} creepers placed · hop distance {hopDistance:0.##} (widest of them)"
+                : $"  hop distance {hopDistance:0.##} (from the placed creeper)",
+            EditorStyles.miniLabel);
+        EditorGUILayout.Space(4);
+    }
+
+    // A flat list of every bad-guy prefab placed on the grid — base layer plus every tier — mirroring
+    // the Spikes list. Each row selects that exact placement with the Select tool, or removes it.
+    // "Bad guys" are prefabs from the BadGuys library folder (see IsBadGuyPrefab). Collapsed by default.
+    void DrawBadGuysSection()
+    {
+        _showBadGuys = EditorGUILayout.Foldout(_showBadGuys, "Bad Guys", true, EditorStyles.foldoutHeader);
+        if (!_showBadGuys) return;
+
+        // Gather placements with their home list (base = tier -1) and index, so a row can select or
+        // remove the exact one. Rebuilt each repaint — cheap, and always in step with edits.
+        var rows = new List<(int tier, int idx, GridData.PrefabPlacement pp)>();
+        if (loadedData.prefabPlacements != null)
+            for (int i = 0; i < loadedData.prefabPlacements.Count; i++)
+            {
+                var pp = loadedData.prefabPlacements[i];
+                if (pp?.prefab != null && IsBadGuyPrefab(pp.prefab)) rows.Add((-1, i, pp));
+            }
+        if (loadedData.tiers != null)
+            for (int t = 0; t < loadedData.tiers.Count; t++)
+            {
+                var tl = loadedData.tiers[t].prefabPlacements;
+                if (tl == null) continue;
+                for (int i = 0; i < tl.Count; i++)
+                {
+                    var pp = tl[i];
+                    if (pp?.prefab != null && IsBadGuyPrefab(pp.prefab)) rows.Add((t, i, pp));
+                }
+            }
+
+        if (rows.Count == 0)
+        {
+            EditorGUILayout.LabelField("  None placed. Drop one from the BadGuys library.", EditorStyles.miniLabel);
+            EditorGUILayout.Space(4);
+            return;
+        }
+
+        // Removal is deferred so the list isn't mutated mid-draw.
+        int removeTier = -2, removeIdx = -1;
+
+        int shown = 0;
+        foreach (var row in rows)
+        {
+            var  pp    = row.pp;
+            bool isSel = _currentSelection.type == SelectionType.PrefabPlacement
+                         && _currentSelection.tierIndex == row.tier
+                         && _currentSelection.index == row.idx;
+
+            EditorGUILayout.BeginHorizontal();
+
+            string where = row.tier == -1 ? "" : $"  (tier {row.tier + 1})";
+            GUI.backgroundColor = isSel ? new Color(1f, 0.7f, 0.4f) : Color.white;
+            if (GUILayout.Button(new GUIContent($"{++shown}. {pp.prefab.name}{where}",
+                                                "Select this bad guy on the grid (switches to the Select tool)."),
+                                 EditorStyles.miniButton))
+            {
+                activeSlot = -1;
+                _drawSplineWall = _drawCubeBuilding = _drawSpike = false;
+                drawSelect = true;
+                drawSoulArea = drawSoul = drawCircle = drawOrb = drawWhirlpool
+                             = drawWaterLevelModifier = drawWaveModifier = drawDirectPrefab = false;
+                _currentSelection = new SelectionInfo
+                {
+                    type      = SelectionType.PrefabPlacement,
+                    tierIndex = row.tier,
+                    index     = row.idx,
+                    cellIndex = pp.cellIndex,
+                };
+                LogSelection(_currentSelection);
+                Repaint();
+            }
+            GUI.backgroundColor = Color.white;
+
+            GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
+            if (GUILayout.Button(new GUIContent("✕", "Remove this bad guy from the grid."), GUILayout.Width(24)))
+            {
+                removeTier = row.tier; removeIdx = row.idx;
+            }
+            GUI.backgroundColor = Color.white;
+
+            EditorGUILayout.EndHorizontal();
+        }
+
+        if (removeIdx >= 0)
+        {
+            var list = removeTier == -1 ? loadedData.prefabPlacements
+                     : (loadedData.tiers != null && removeTier >= 0 && removeTier < loadedData.tiers.Count
+                        ? loadedData.tiers[removeTier].prefabPlacements : null);
+            if (list != null && removeIdx < list.Count)
+            {
+                Undo.RecordObject(loadedData, "Delete Bad Guy");
+                var removed = list[removeIdx];
+                list.RemoveAt(removeIdx);
+                // Drop any statue/tower-guarded zone linked to this placement (mirrors the delete-key path).
+                if (removed != null && removed.statueId != 0 && loadedData.soulZones != null)
+                    loadedData.soulZones.RemoveAll(z =>
+                        (z.statueGuarded || z.towerGuarded) && z.linkedStatueId == removed.statueId);
+                if (_currentSelection.type == SelectionType.PrefabPlacement
+                    && _currentSelection.tierIndex == removeTier && _currentSelection.index == removeIdx)
+                    ClearSelectState();
+                EditorUtility.SetDirty(loadedData);
+                Repaint();
+            }
+        }
+
+        EditorGUILayout.Space(4);
     }
 
     void DrawDebugConsole()
@@ -3880,8 +4545,11 @@ public class GridDesignerWindow : EditorWindow
         _rightPanelScroll = EditorGUILayout.BeginScrollView(_rightPanelScroll, GUILayout.ExpandHeight(true));
 
         DrawPrefabLibrarySection();
+        if (loadedData != null) DrawEnemiesSection();
+        if (loadedData != null) DrawBadGuysSection();
         if (loadedData != null) DrawSplineWallsSection();
         if (loadedData != null) DrawCubeBuildingsSection();
+        if (loadedData != null) DrawSpikesSection();
         if (loadedData != null) DrawSoulZonesSection();
 
         if (loadedData != null && loadedData.linkedPairs != null && loadedData.linkedPairs.Count > 0)
@@ -4107,6 +4775,65 @@ public class GridDesignerWindow : EditorWindow
 
     // Scale slider for the currently-selected prefab placement. Only shown when the
     // selected prefab has a PrefabBaselineAlignment scale radius enabled.
+    /// <summary>
+    /// Shape picker for a spike rock the selected prefab carries with it — the creepy guy brings
+    /// his own starting rock, so he arrives standing on something rather than needing a separate
+    /// spike placed under him. Only appears when the prefab actually has a ProceduralSpike on it,
+    /// so it stays out of the way for every other placement.
+    /// </summary>
+    void DrawSelectedPlacementSpikeSection()
+    {
+        if (loadedData == null || _currentSelection.type != SelectionType.PrefabPlacement) return;
+
+        List<GridData.PrefabPlacement> placements =
+            _currentSelection.tierIndex == -1
+                ? loadedData.prefabPlacements
+                : (loadedData.tiers != null && _currentSelection.tierIndex < loadedData.tiers.Count
+                    ? loadedData.tiers[_currentSelection.tierIndex].prefabPlacements
+                    : null);
+
+        if (placements == null || _currentSelection.index < 0 || _currentSelection.index >= placements.Count) return;
+
+        var pp = placements[_currentSelection.index];
+        if (pp?.prefab == null) return;
+        if (pp.prefab.GetComponentInChildren<ProceduralSpike>(true) == null) return;
+
+        RefreshSpikePresets();
+
+        float prevLW = EditorGUIUtility.labelWidth;
+        EditorGUIUtility.labelWidth = 160f;
+
+        EditorGUILayout.Space(4);
+        EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+        EditorGUILayout.LabelField($"Rock carried by {pp.prefab.name}", EditorStyles.miniBoldLabel);
+
+        int cur  = System.Array.IndexOf(_spikePresets, pp.spikePreset);
+        int pick = EditorGUILayout.Popup(
+            new GUIContent("Shape preset", "Authored in the Spike Studio. This rock is always built " +
+                                           "climbable, since it's the one he stands on."),
+            cur + 1, _spikePresetNames);
+
+        SpikeShapePreset chosen = pick <= 0 ? null : _spikePresets[pick - 1];
+        if (chosen != pp.spikePreset)
+        {
+            Undo.RecordObject(loadedData, "Set Carried Spike Preset");
+            pp.spikePreset = chosen;
+            EditorUtility.SetDirty(loadedData);
+            Repaint();
+        }
+
+        EditorGUILayout.LabelField(
+            "Built at the preset's own size — the placement's Scale already sizes the whole prefab.",
+            EditorStyles.miniLabel);
+
+        if (_spikePresets.Length == 0)
+            EditorGUILayout.HelpBox($"No presets in {SpikeShapePreset.AssetFolder} yet — the rock will " +
+                                    "use the default shape. Save one from the Spike Studio.", MessageType.Info);
+
+        EditorGUILayout.EndVertical();
+        EditorGUIUtility.labelWidth = prevLW;
+    }
+
     void DrawSelectedPrefabScaleSection()
     {
         if (loadedData == null || _currentSelection.type != SelectionType.PrefabPlacement) return;
@@ -4262,11 +4989,16 @@ public class GridDesignerWindow : EditorWindow
             (e.type == EventType.KeyDown || e.type == EventType.KeyUp))
             return;
 
+        // D over the draw window duplicates the selected prefab/block; the copy then follows the
+        // cursor (carried) until a left-click drops it. Soul zones + walls are not duplicated.
+        if (e.type == EventType.KeyDown && e.keyCode == KeyCode.D && mouseInView && !_carryDuplicate)
+            TryStartDuplicateCarry(e);
+
         // Fit + centre the grid within the viewport the first time we know its real size.
         if (!_gridViewInit && e.type != EventType.Layout && viewRect.width > 1f && viewRect.height > 1f)
         {
             float fit = Mathf.Min(viewRect.width, viewRect.height) / GridPixelSize * 0.95f;
-            _gridZoom = Mathf.Clamp(fit, 0.3f, 4f);
+            _gridZoom = Mathf.Clamp(fit, 0.2f, 16f);
             _gridPanOffset = new Vector2(
                 (viewRect.width  - ZoomedGridSize) * 0.5f,
                 (viewRect.height - ZoomedGridSize) * 0.5f);
@@ -4297,7 +5029,9 @@ public class GridDesignerWindow : EditorWindow
             if (e.type == EventType.ScrollWheel)
             {
                 float prevZoom = _gridZoom;
-                _gridZoom = Mathf.Clamp(_gridZoom - e.delta.y * 0.05f, 0.3f, 4f);
+                // Proportional (multiplicative) step so zooming stays smooth all the way in, and a
+                // much higher cap for fine-tuning map content up close.
+                _gridZoom = Mathf.Clamp(_gridZoom * (1f - e.delta.y * 0.05f), 0.2f, 16f);
                 // Zoom around mouse position
                 Vector2 mouseLocal = e.mousePosition - viewRect.position - _gridPanOffset;
                 _gridPanOffset    -= mouseLocal * (_gridZoom / prevZoom - 1f);
@@ -4323,11 +5057,51 @@ public class GridDesignerWindow : EditorWindow
             e.Use();
         }
 
+        // ── Navigation scrollbars ──
+        // Once zoomed in far enough that the grid overflows the viewport, show real scrollbars on
+        // the right/bottom edges so you can slide around without the pan gesture. The pan offset is
+        // the grid's top-left relative to the viewport, so the scroll value is its negation. The bar
+        // only writes back the offset while it's actually being dragged (BeginChangeCheck), so free
+        // panning with Space/middle-mouse still keeps its margins — the bar just reflects the offset.
+        const float ScrollbarThickness = 14f;
+        bool needH = ZoomedGridSize > viewRect.width  + 1f;
+        bool needV = ZoomedGridSize > viewRect.height + 1f;
+        if (needH || needV)
+        {
+            // Reserve the perpendicular strip so the two bars don't fight over the corner.
+            float barViewW = viewRect.width  - (needV ? ScrollbarThickness : 0f);
+            float barViewH = viewRect.height - (needH ? ScrollbarThickness : 0f);
+
+            if (needH)
+            {
+                var hRect = new Rect(viewRect.x, viewRect.yMax - ScrollbarThickness, barViewW, ScrollbarThickness);
+                float max = Mathf.Max(0f, ZoomedGridSize - barViewW);
+                float cur = Mathf.Clamp(-_gridPanOffset.x, 0f, max);
+                EditorGUI.BeginChangeCheck();
+                float val = GUI.HorizontalScrollbar(hRect, cur, barViewW, 0f, ZoomedGridSize);
+                if (EditorGUI.EndChangeCheck()) { _gridPanOffset.x = -val; Repaint(); }
+            }
+            if (needV)
+            {
+                var vRect = new Rect(viewRect.xMax - ScrollbarThickness, viewRect.y, ScrollbarThickness, barViewH);
+                float max = Mathf.Max(0f, ZoomedGridSize - barViewH);
+                float cur = Mathf.Clamp(-_gridPanOffset.y, 0f, max);
+                EditorGUI.BeginChangeCheck();
+                float val = GUI.VerticalScrollbar(vRect, cur, barViewH, 0f, ZoomedGridSize);
+                if (EditorGUI.EndChangeCheck()) { _gridPanOffset.y = -val; Repaint(); }
+            }
+        }
+
         // Clip everything below to the viewport so the panned/zoomed grid and its
         // overlays never bleed over the side panels. Inside the clip, coordinates
         // are relative to the viewport's top-left, so the draw rect drops viewRect.position.
-        GUI.BeginClip(viewRect);
-        Rect localView = new Rect(0f, 0f, viewRect.width, viewRect.height);
+        // The clip stops short of the scrollbar strips (drawn just above) so the grid never
+        // paints over them — the bars stay visible on top. Same top-left, so input coords are
+        // unchanged; only the drawn area is trimmed by the bar thickness on the used edges.
+        float clipW = viewRect.width  - (needV ? ScrollbarThickness : 0f);
+        float clipH = viewRect.height - (needH ? ScrollbarThickness : 0f);
+        GUI.BeginClip(new Rect(viewRect.x, viewRect.y, clipW, clipH));
+        Rect localView = new Rect(0f, 0f, clipW, clipH);
         try
         {
 
@@ -4336,6 +5110,9 @@ public class GridDesignerWindow : EditorWindow
             _gridPanOffset.x,
             _gridPanOffset.y,
             ZoomedGridSize, ZoomedGridSize);
+
+        // A carried duplicate follows the cursor and swallows input until it's dropped.
+        if (_carryDuplicate) HandleDuplicateCarry(rect, e);
 
         Handles.BeginGUI();
         Handles.color = new Color(1f, 1f, 1f, _backdropBrightness);
@@ -4363,6 +5140,10 @@ public class GridDesignerWindow : EditorWindow
         if (_drawCubeBuilding && loadedData != null)
             HandleCubeBuildingInput(rect, e);
 
+        // Spike input — drag out from a point to size a new rock, centre drag to move
+        if (_drawSpike && loadedData != null)
+            HandleSpikeInput(rect, e);
+
         // Sub-zone junction drawing runs FIRST so its clicks (incl. snapping onto a main-path node)
         // are never intercepted by the Select node-pickers below.
         if (_subZoneDrawIdx >= 0 && loadedData != null)
@@ -4379,6 +5160,10 @@ public class GridDesignerWindow : EditorWindow
         // Select tool — cube building node picking + free drag (after node pickers so precise picks win)
         if (drawSelect && loadedData != null)
             HandleSelectCubeBuildingInput(rect, e);
+
+        // Select tool — spike picking + free drag (same ordering rule as the blocks above)
+        if (drawSelect && loadedData != null)
+            HandleSelectSpikeInput(rect, e);
 
         // Select tool — free prefab-placement picking + drag (placements are position-based now)
         if (drawSelect && loadedData != null)
@@ -4434,62 +5219,36 @@ public class GridDesignerWindow : EditorWindow
                     // Soul-zone node markers are free-positioned now — drawn at rect level
                     // (see the soul-zone drawing block after the cell loop), not per-cell.
 
-                    // Orb
+                    // Orb — size from the Orb size setting; colour + fill/outline from the Orb appearance.
                     if (loadedData?.orbCellIndices != null && loadedData.orbCellIndices.Contains(index))
-                    {
-                        Handles.color = new Color(1f, 1f, 0f, baseAlpha);
-                        Handles.DrawWireDisc(cell.center, Vector3.forward, EffCell * 0.35f);
-                    }
+                        DrawMarker(cell.center, EffCell * _orbCircleFactor, _style.orb, baseAlpha);
 
-                    // Water Level Modifier
+                    // Water Level Modifier — the labelled cell disc takes its colour from the setting.
                     if (loadedData?.waterLevelModifierCellIndices != null && loadedData.waterLevelModifierCellIndices.Contains(index))
                     {
-                        Handles.color = new Color(0.4f, 0.8f, 1f, baseAlpha);
-                        Handles.DrawSolidDisc(cell.center, Vector3.forward, EffCell * 0.38f);
+                        DrawMarker(cell.center, EffCell * 0.38f, _style.waterModifier, baseAlpha);
                         Handles.color = new Color(1f, 1f, 1f, baseAlpha);
                         Handles.Label(cell.center - new Vector2(4f, 6f), "W");
                     }
 
-                    // Wave Modifier
+                    // Wave Modifier — cell disc colour from the setting.
                     if (loadedData?.waveModifierCellIndices != null && loadedData.waveModifierCellIndices.Contains(index))
                     {
-                        Handles.color = new Color(0.4f, 1f, 0.4f, baseAlpha);
-                        Handles.DrawSolidDisc(cell.center, Vector3.forward, EffCell * 0.38f);
+                        DrawMarker(cell.center, EffCell * 0.38f, _style.waveModifier, baseAlpha);
                         Handles.color = new Color(0f, 0f, 0f, baseAlpha);
                         Handles.Label(cell.center - new Vector2(4f, 6f), "~");
                     }
 
-                    // Whirlpool
+                    // Whirlpool — cell disc colour from the setting (the radius ring uses it too).
                     if (loadedData?.whirlpools != null && loadedData.whirlpools.Exists(w => w.cellIndex == index))
                     {
-                        Handles.color = new Color(0.6f, 0.2f, 1f, baseAlpha);
-                        Handles.DrawSolidDisc(cell.center, Vector3.forward, EffCell * 0.38f);
+                        DrawMarker(cell.center, EffCell * 0.38f, _style.whirlpool, baseAlpha);
                         Handles.color = new Color(1f, 1f, 1f, baseAlpha);
                         Handles.Label(cell.center - new Vector2(4f, 6f), "〇");
                     }
 
-                    // Direct prefab placements (base layer) — drawn at their free position.
-                    // Found via the (synced) nearest-cell so the per-cell loop still locates them.
-                    var bp = loadedData?.prefabPlacements?.Find(p => p.cellIndex == index);
-                    if (bp != null)
-                    {
-                        Rect ir = ScaledIconRect(PlacementPixel(rect, bp), bp, GetPixelsPerWorldUnit());
-                        Texture2D bpIcon = bp.prefab != null && prefabIcons.TryGetValue(bp.prefab.name, out var bpi) ? bpi : null;
-                        if (bpIcon != null)
-                        {
-                            GUI.color = new Color(1f, 1f, 1f, baseAlpha);
-                            GUI.DrawTexture(ir, bpIcon, ScaleMode.ScaleToFit);
-                            GUI.color = Color.white;
-                        }
-                        else
-                        {
-                            Color c = GetPrefabColor(bp.prefab); c.a = baseAlpha;
-                            EditorGUI.DrawRect(ir, c);
-                            Handles.color = new Color(0f, 0f, 0f, baseAlpha);
-                            string label = bp.prefab != null ? bp.prefab.name.Substring(0, Mathf.Min(2, bp.prefab.name.Length)) : "?";
-                            Handles.Label(ir.center - new Vector2(5f, 6f), label);
-                        }
-                    }
+                    // Direct prefab placements (base layer) are drawn in a dedicated overlay pass
+                    // AFTER the soul zones (see DrawPrefabPlacementIcons), so the icons sit on top.
                 }
 
                 // Tiers — inset squares + modifiers, active = full opacity, others = faint if visible
@@ -4522,45 +5281,23 @@ public class GridDesignerWindow : EditorWindow
                             }
                         }
 
-                        // Water Level Modifier
+                        // Water Level Modifier — colour from the setting (dimmed for inactive tiers).
                         if (tier.waterLevelModifierCellIndices != null && tier.waterLevelModifierCellIndices.Contains(index))
                         {
-                            Handles.color = new Color(0.4f, 0.8f, 1f, a);
-                            Handles.DrawSolidDisc(cell.center, Vector3.forward, EffCell * 0.38f);
+                            DrawMarker(cell.center, EffCell * 0.38f, _style.waterModifier, a);
                             Handles.color = new Color(1f, 1f, 1f, a);
                             Handles.Label(cell.center - new Vector2(4f, 6f), "W");
                         }
 
-                        // Wave Modifier
+                        // Wave Modifier — colour from the setting (dimmed for inactive tiers).
                         if (tier.waveModifierCellIndices != null && tier.waveModifierCellIndices.Contains(index))
                         {
-                            Handles.color = new Color(0.4f, 1f, 0.4f, a);
-                            Handles.DrawSolidDisc(cell.center, Vector3.forward, EffCell * 0.38f);
+                            DrawMarker(cell.center, EffCell * 0.38f, _style.waveModifier, a);
                             Handles.color = new Color(0f, 0f, 0f, a);
                             Handles.Label(cell.center - new Vector2(4f, 6f), "~");
                         }
 
-                        // Direct prefab placements (tier) — drawn at their free position.
-                        var tp = tier.prefabPlacements?.Find(p => p.cellIndex == index);
-                        if (tp != null)
-                        {
-                            Rect tir = ScaledIconRect(PlacementPixel(rect, tp), tp, GetPixelsPerWorldUnit());
-                            Texture2D tpIcon = tp.prefab != null && prefabIcons.TryGetValue(tp.prefab.name, out var tpi) ? tpi : null;
-                            if (tpIcon != null)
-                            {
-                                GUI.color = new Color(1f, 1f, 1f, a);
-                                GUI.DrawTexture(tir, tpIcon, ScaleMode.ScaleToFit);
-                                GUI.color = Color.white;
-                            }
-                            else
-                            {
-                                Color c = GetPrefabColor(tp.prefab); c.a = a;
-                                EditorGUI.DrawRect(tir, c);
-                                Handles.color = new Color(0f, 0f, 0f, a);
-                                string label = tp.prefab != null ? tp.prefab.name.Substring(0, Mathf.Min(2, tp.prefab.name.Length)) : "?";
-                                Handles.Label(tir.center - new Vector2(5f, 6f), label);
-                            }
-                        }
+                        // Tier prefab placements are drawn in the overlay pass (on top of zones) too.
                     }
                 }
 
@@ -4631,6 +5368,7 @@ public class GridDesignerWindow : EditorWindow
                 {
                     PushUndoSnapshot();
                     isDragging = true;
+                    _drawPointerNorm = PixelToWorldXZ(rect, e.mousePosition); // exact drop point if unclamped
                     ApplyToolToCell(index);
                     lastDraggedCellIndex = index;
                     e.Use();
@@ -4640,6 +5378,7 @@ public class GridDesignerWindow : EditorWindow
                 {
                     if (index != lastDraggedCellIndex && !drawSoul && !drawSoulArea)
                     {
+                        _drawPointerNorm = PixelToWorldXZ(rect, e.mousePosition);
                         ApplyToolToCell(index);
                         lastDraggedCellIndex = index;
                         Repaint();
@@ -4653,7 +5392,9 @@ public class GridDesignerWindow : EditorWindow
 
                 if (_gridLineOpacity > 0f)
                 {
-                    Color gridLineCol = new Color(0f, 0f, 0f, _gridLineOpacity);
+                    // Grid line colour from the appearance setting, faded by the Grid lines opacity.
+                    Color gridLineCol = _style.gridLineColor;
+                    gridLineCol.a *= _gridLineOpacity;
                     // Line thickness tracks zoom so the grid reads consistently at any scale.
                     float lw = Mathf.Max(1f, Mathf.Round(_gridZoom));
                     EditorGUI.DrawRect(new Rect(cell.x, cell.y, EffCell, lw), gridLineCol);
@@ -4674,9 +5415,8 @@ public class GridDesignerWindow : EditorWindow
             {
                 foreach (var wp in loadedData.whirlpools)
                 {
-                    Handles.color = new Color(0.7f, 0.4f, 1f, 0.55f);
                     float radiusPx = wp.radius * pxPerUnit;
-                    Handles.DrawWireDisc(CellCenter(rect, wp.cellIndex), Vector3.forward, radiusPx, 2f);
+                    DrawMarker(CellCenter(rect, wp.cellIndex), radiusPx, _style.whirlpool);
                 }
             }
 
@@ -4748,6 +5488,16 @@ public class GridDesignerWindow : EditorWindow
                 }
             }
 
+            // Creeper hop routes — under the icons, so the rocks sit on top of their own lines.
+            DrawCreeperHopRoutes(rect, pxPerUnit);
+
+            // Prefab icons — drawn here (after the soul zones/tributaries) so they sit ON TOP of
+            // the zone bands + pools instead of being hidden beneath them.
+            DrawPrefabPlacementIcons(rect);
+
+            // Lamp markers on climbing rocks — above the icons they belong to.
+            DrawCreeperLampMarkers(rect, pxPerUnit);
+
             // Linked Prefab Pairs
             if (loadedData.linkedPairs != null)
             {
@@ -4816,9 +5566,9 @@ public class GridDesignerWindow : EditorWindow
                     center = CellCenter(rect, _currentSelection.cellIndex);
                 }
 
-                // Single thick white dot at the centre of whatever is selected — nothing else.
-                Handles.color = Color.white;
-                Handles.DrawSolidDisc(center, Vector3.forward, EffCell * 0.32f);
+                // Single dot at the centre of whatever is selected. Colour + fill/outline come from
+                // the Selection appearance setting; size from the Selection circle size setting.
+                DrawMarker(center, EffCell * _selectionCircleFactor, _style.selection);
             }
 
             // Bridge mode removed (incompatible with free nodes).
@@ -4866,6 +5616,9 @@ public class GridDesignerWindow : EditorWindow
 
             // Cube building overlay — dark grey footprint boxes with centre nodes
             DrawCubeBuildingOverlay(rect);
+
+            // Spike overlay — the four radii as concentric rings, plus centre nodes
+            DrawSpikeOverlay(rect);
 
             Handles.EndGUI();
         }
@@ -4944,6 +5697,245 @@ public class GridDesignerWindow : EditorWindow
         return WorldXZToPixel(rect, pp.position);
     }
 
+    // Draws every prefab-placement icon at its free position. Called from the overlays pass AFTER
+    // the soul zones/tributaries so the icons sit on top of them. Robust to overlaps (per-placement,
+    // not per-cell). Alpha follows the base/tier visibility the cell loop used.
+    void DrawPrefabPlacementIcons(Rect rect)
+    {
+        if (loadedData == null) return;
+        float ppu = GetPixelsPerWorldUnit();
+
+        float baseAlpha = (!baseLayerVisible) ? 0f : (activeTierIndex < 0) ? 1f : 0.12f;
+        if (baseAlpha > 0f && loadedData.prefabPlacements != null)
+            foreach (var pp in loadedData.prefabPlacements)
+                DrawOnePlacementIcon(rect, pp, ppu, baseAlpha);
+
+        if (loadedData.tiers != null)
+            for (int ti = 0; ti < loadedData.tiers.Count; ti++)
+            {
+                if (!(ti < tierVisible.Count && tierVisible[ti])) continue;
+                float a = activeTierIndex == ti ? 1f : 0.12f;
+                var list = loadedData.tiers[ti].prefabPlacements;
+                if (list != null)
+                    foreach (var pp in list)
+                        DrawOnePlacementIcon(rect, pp, ppu, a);
+            }
+    }
+
+    void DrawOnePlacementIcon(Rect rect, GridData.PrefabPlacement pp, float ppu, float alpha)
+    {
+        if (pp?.prefab == null) return;
+        Rect ir = ScaledIconRect(PlacementPixel(rect, pp), pp, ppu);
+
+        bool isCreep = IsCreepPlacement(pp.prefab);
+
+        // A creeper allocated to a spike has no rock of its own and sits exactly on top of one, so
+        // it draws as black text centred directly over that rock rather than as a second overlapping
+        // icon. Handles.color doesn't tint label text — the colour must come from the style.
+        if (isCreep && !IsClimbingRock(pp.prefab))
+        {
+            var creepStyle = new GUIStyle(EditorStyles.boldLabel)
+            {
+                alignment = TextAnchor.MiddleCenter,
+            };
+            creepStyle.normal.textColor = new Color(0f, 0f, 0f, alpha);
+            Vector2 sz = creepStyle.CalcSize(new GUIContent(CreepAffix));
+            Vector2 at = new Vector2(ir.center.x - sz.x * 0.5f, ir.center.y - sz.y * 0.5f);
+            Handles.Label(at, CreepAffix, creepStyle);
+            return;
+        }
+
+        // Creepers don't read as a spike on the grid — use their own icon if any, else the plain
+        // fallback swatch. (No BigSpike icon borrow.)
+        Texture2D icon = prefabIcons.TryGetValue(pp.prefab.name, out var i) ? i : null;
+
+        if (icon != null)
+        {
+            GUI.color = new Color(1f, 1f, 1f, alpha);
+            GUI.DrawTexture(ir, icon, ScaleMode.ScaleToFit);
+            GUI.color = Color.white;
+        }
+        else
+        {
+            Color c = GetPrefabColor(pp.prefab); c.a = alpha;
+            EditorGUI.DrawRect(ir, c);
+            Handles.color = new Color(0f, 0f, 0f, alpha);
+            string label = pp.prefab.name.Substring(0, Mathf.Min(2, pp.prefab.name.Length));
+            Handles.Label(ir.center - new Vector2(5f, 6f), label);
+        }
+
+        if (isCreep)
+        {
+            Handles.color = new Color(0f, 0f, 0f, alpha);
+            Handles.Label(new Vector2(ir.center.x - 16f, ir.yMax - 3f), CreepAffix);
+        }
+    }
+
+    // Press D over a selected prefab/block: clone it, select the copy, and carry it (below).
+    // Soul zones and walls are deliberately not duplicated.
+    void TryStartDuplicateCarry(Event e)
+    {
+        if (loadedData == null) return;
+
+        if (_currentSelection.type == SelectionType.PrefabPlacement)
+        {
+            var list = _currentSelection.tierIndex == -1 ? loadedData.prefabPlacements
+                     : (loadedData.tiers != null && _currentSelection.tierIndex >= 0 && _currentSelection.tierIndex < loadedData.tiers.Count
+                        ? loadedData.tiers[_currentSelection.tierIndex].prefabPlacements : null);
+            if (list != null && _currentSelection.index >= 0 && _currentSelection.index < list.Count)
+            {
+                PushUndoSnapshot();
+                var src = list[_currentSelection.index];
+                var dup = new GridData.PrefabPlacement
+                {
+                    cellIndex        = src.cellIndex,
+                    position         = src.position,
+                    freePlaced       = true,
+                    prefab           = src.prefab,
+                    isCircle         = src.isCircle,
+                    isWorldSpaceProp = src.isWorldSpaceProp,
+                    scale            = src.scale,
+                    spikePreset      = src.spikePreset,
+                    statueId         = 0,   // a duplicate is not the same statue/tower — no zone link
+                    overrideModifierSettings = src.overrideModifierSettings,
+                    speedBoost       = src.speedBoost,
+                    frequencyBoost   = src.frequencyBoost,
+                    rippleDepthBoost = src.rippleDepthBoost,
+                };
+                list.Add(dup);
+                _currentSelection = new SelectionInfo
+                {
+                    type      = SelectionType.PrefabPlacement,
+                    index     = list.Count - 1,
+                    tierIndex = _currentSelection.tierIndex,
+                    cellIndex = dup.cellIndex,
+                };
+                _carryDuplicate = true; _carryKind = CarryKind.Prefab;
+                EditorUtility.SetDirty(loadedData);
+                e.Use(); Repaint();
+            }
+            return;
+        }
+
+        // Both indices survive a tool change, so whichever you touched last would otherwise win.
+        // Hold the ▲ Spikes tool and D means the spike; otherwise it means the block.
+        if (_drawSpike)
+        {
+            if (TryDuplicateSpike(e)) return;
+            TryDuplicateCube(e);
+        }
+        else
+        {
+            if (TryDuplicateCube(e)) return;
+            TryDuplicateSpike(e);
+        }
+    }
+
+    bool TryDuplicateCube(Event e)
+    {
+        if (_activeCubeIndex < 0 || loadedData.cubeBuildings == null ||
+            _activeCubeIndex >= loadedData.cubeBuildings.Count) return false;
+
+        PushUndoSnapshot();
+        var src = loadedData.cubeBuildings[_activeCubeIndex];
+        loadedData.cubeBuildings.Add(new GridData.CubeBuilding
+        {
+            center           = src.center,
+            width            = src.width,
+            length           = src.length,
+            heightAboveWater = src.heightAboveWater,
+            depthBelowWater  = src.depthBelowWater,
+            steppedTop       = src.steppedTop,
+        });
+        _activeCubeIndex = loadedData.cubeBuildings.Count - 1;
+        _carryDuplicate  = true; _carryKind = CarryKind.Cube;
+        EditorUtility.SetDirty(loadedData);
+        e.Use(); Repaint();
+        return true;
+    }
+
+    // A spike carries its whole placement across — same shape preset, same size, same climbable
+    // flag — so duplicating is how you lay out a run of matching rocks.
+    bool TryDuplicateSpike(Event e)
+    {
+        if (_activeSpikeIndex < 0 || loadedData.proceduralSpikes == null ||
+            _activeSpikeIndex >= loadedData.proceduralSpikes.Count) return false;
+
+        PushUndoSnapshot();
+        var src = loadedData.proceduralSpikes[_activeSpikeIndex];
+        loadedData.proceduralSpikes.Add(new GridData.ProceduralSpike
+        {
+            center    = src.center,
+            preset    = src.preset,
+            scale     = src.scale,
+            climbable = src.climbable,
+        });
+        _activeSpikeIndex = loadedData.proceduralSpikes.Count - 1;
+        _carryDuplicate   = true; _carryKind = CarryKind.Spike;
+        EditorUtility.SetDirty(loadedData);
+        e.Use(); Repaint();
+        return true;
+    }
+
+    // While carrying a duplicate: it tracks the cursor; left-click drops it, Escape cancels (handled
+    // in HandleModeHotkeys and removes the copy).
+    void HandleDuplicateCarry(Rect rect, Event e)
+    {
+        if (e.type == EventType.MouseDown && e.button == 0)
+        {
+            _carryDuplicate = false; // drop where it is
+            e.Use(); Repaint();
+            return;
+        }
+        if (e.type == EventType.MouseMove || e.type == EventType.MouseDrag)
+        {
+            if (rect.Contains(e.mousePosition))
+            {
+                Vector2 norm = PixelToWorldXZ(rect, e.mousePosition);
+                if (_carryKind == CarryKind.Cube)
+                {
+                    if (loadedData.cubeBuildings != null && _activeCubeIndex >= 0 && _activeCubeIndex < loadedData.cubeBuildings.Count)
+                        loadedData.cubeBuildings[_activeCubeIndex].center =
+                            new Vector2(Mathf.Clamp(norm.x, -0.5f, 0.5f), Mathf.Clamp(norm.y, -0.5f, 0.5f));
+                }
+                else if (_carryKind == CarryKind.Spike)
+                {
+                    if (loadedData.proceduralSpikes != null && _activeSpikeIndex >= 0 && _activeSpikeIndex < loadedData.proceduralSpikes.Count)
+                        loadedData.proceduralSpikes[_activeSpikeIndex].center =
+                            new Vector2(Mathf.Clamp(norm.x, -0.5f, 0.5f), Mathf.Clamp(norm.y, -0.5f, 0.5f));
+                }
+                else if (_currentSelection.type == SelectionType.PrefabPlacement)
+                {
+                    var list = _currentSelection.tierIndex == -1 ? loadedData.prefabPlacements
+                             : (loadedData.tiers != null && _currentSelection.tierIndex >= 0 && _currentSelection.tierIndex < loadedData.tiers.Count
+                                ? loadedData.tiers[_currentSelection.tierIndex].prefabPlacements : null);
+                    if (list != null && _currentSelection.index >= 0 && _currentSelection.index < list.Count)
+                    {
+                        var pp = list[_currentSelection.index];
+                        pp.position   = norm;
+                        pp.freePlaced = true;
+                        pp.SyncCellIndex();
+                        _currentSelection.cellIndex = pp.cellIndex;
+                    }
+                }
+                EditorUtility.SetDirty(loadedData);
+            }
+            e.Use(); Repaint();
+        }
+    }
+
+    // Cached per prefab asset — DrawOnePlacementIcon runs for every placement on every repaint,
+    // so this must not call GetComponentInChildren each time.
+    bool IsCreepPlacement(GameObject prefab)
+    {
+        if (prefab == null) return false;
+        if (_creepPrefabCache.TryGetValue(prefab, out bool cached)) return cached;
+
+        bool isCreep = prefab.GetComponentInChildren<CreepyGuyController>(true) != null;
+        _creepPrefabCache[prefab] = isCreep;
+        return isCreep;
+    }
+
     // Opaque footprint fill for the currently selected prefab placement. Called before
     // the cell loop so the prefab icon renders on top of it. Radius logic mirrors
     // DrawPrefabScaleRings so the fill and the outline ring stay aligned.
@@ -4978,6 +5970,235 @@ public class GridDesignerWindow : EditorWindow
     // Draws a world-proportional footprint ring for every placement whose prefab has
     // a PrefabBaselineAlignment scale radius enabled. The ring grows with the
     // placement's stored scale so the designer preview matches the spawned size.
+    // ─────────────────────────────────────────────
+    // CREEPER — HOP ROUTES AND LAMP MARKERS
+    // ─────────────────────────────────────────────
+
+    // Every placement across the base layer and all tiers, since rocks may be placed on either.
+    void CollectAllPlacements(List<GridData.PrefabPlacement> into)
+    {
+        into.Clear();
+        if (loadedData == null) return;
+        if (loadedData.prefabPlacements != null) into.AddRange(loadedData.prefabPlacements);
+        if (loadedData.tiers != null)
+            foreach (var t in loadedData.tiers)
+                if (t?.prefabPlacements != null) into.AddRange(t.prefabPlacements);
+    }
+
+    bool IsClimbingRock(GameObject prefab)
+    {
+        if (prefab == null) return false;
+        if (_climbingRockCache.TryGetValue(prefab, out bool cached)) return cached;
+
+        bool isRock = prefab.GetComponentInChildren<CreepClimbingArea>(true) != null;
+        _climbingRockCache[prefab] = isRock;
+        return isRock;
+    }
+
+    // A placement is a "bad guy" when its prefab lives in the BadGuys library folder — the same
+    // set the BadGuys library tab offers. Path-based so any prefab dropped in that folder counts,
+    // without needing a shared marker component.
+    bool IsBadGuyPrefab(GameObject prefab)
+    {
+        if (prefab == null) return false;
+        if (_badGuyPrefabCache.TryGetValue(prefab, out bool cached)) return cached;
+
+        string path = AssetDatabase.GetAssetPath(prefab);
+        bool isBad = !string.IsNullOrEmpty(path)
+                     && path.StartsWith(BadGuysPrefabsFolder + "/", System.StringComparison.OrdinalIgnoreCase);
+        _badGuyPrefabCache[prefab] = isBad;
+        return isBad;
+    }
+
+    // Reach read straight off the placed creeper prefabs, so the routes drawn here are the ones
+    // they will actually be able to take. With several placed, the widest reach is used — the
+    // routes then show everywhere any of them could go.
+    float PlacedCreeperHopDistance(List<GridData.PrefabPlacement> all)
+    {
+        float widest = -1f;
+        foreach (var pp in all)
+        {
+            if (pp?.prefab == null || !IsCreepPlacement(pp.prefab)) continue;
+            var ctrl = pp.prefab.GetComponentInChildren<CreepyGuyController>(true);
+            if (ctrl != null) widest = Mathf.Max(widest, ctrl.MaxHopDistance);
+        }
+        return widest;
+    }
+
+    // The spike nearest the clicked cell, within a couple of cells so a near miss still lands on
+    // the rock you meant rather than silently doing nothing.
+    GridData.PrefabPlacement FindClimbingRockNear(int cellIndex)
+    {
+        Vector2 target = GridData.SoulZone.CellToNormalized(cellIndex);
+        float   maxDist = 2f / GridData.GridSize;
+
+        CollectAllPlacements(_allPlacements);
+
+        GridData.PrefabPlacement best = null;
+        float bestDist = maxDist;
+
+        foreach (var pp in _allPlacements)
+        {
+            if (pp?.prefab == null || !IsClimbingRock(pp.prefab)) continue;
+            pp.EnsureFreePosition();
+            float d = Vector2.Distance(pp.position, target);
+            if (d < bestDist) { bestDist = d; best = pp; }
+        }
+        return best;
+    }
+
+    // Nearest CLIMBABLE procedural spike whose footprint the click lands on (with a couple of cells
+    // of edge forgiveness), or -1. Lets a rockless creeper be allocated to a drawn spike, not only to
+    // a climbing-rock prefab. clickNorm is the click in normalized grid space (-0.5..0.5).
+    int FindClimbableSpikeNear(Vector2 clickNorm)
+    {
+        if (loadedData?.proceduralSpikes == null) return -1;
+        float arena = Mathf.Max(0.0001f, SpikeArenaWidth());
+        float slack = 2f / GridData.GridSize;      // same edge forgiveness as the rock search
+        int best = -1; float bestDist = float.MaxValue;
+        for (int i = 0; i < loadedData.proceduralSpikes.Count; i++)
+        {
+            var s = loadedData.proceduralSpikes[i];
+            if (s == null || !s.climbable) continue;
+            float radN = (s.Config.radiusWaterline * s.EffectiveScale) / arena;   // footprint in normalized units
+            float d    = Vector2.Distance(clickNorm, s.center);
+            if (d <= radN + slack && d < bestDist) { bestDist = d; best = i; }
+        }
+        return best;
+    }
+
+    int CountPlacedCreepers(List<GridData.PrefabPlacement> all)
+    {
+        int n = 0;
+        foreach (var pp in all)
+            if (pp?.prefab != null && IsCreepPlacement(pp.prefab)) n++;
+        return n;
+    }
+
+    /// <summary>
+    /// Thick green lines between climbing rocks he can actually get to, spreading outward from
+    /// wherever the creeper is placed. A rock beyond his reach simply gets no line — move it
+    /// closer and the line appears. Nothing is drawn at all when no creeper is placed.
+    /// </summary>
+    void DrawCreeperHopRoutes(Rect rect, float pxPerUnit)
+    {
+        if (!showCreeperRoutes || loadedData == null || pxPerUnit <= 0f) return;
+
+        CollectAllPlacements(_allPlacements);
+        float hopDistance = PlacedCreeperHopDistance(_allPlacements);
+        if (hopDistance <= 0f) return;                       // no creeper placed — draw nothing
+
+        _climbingRocks.Clear();
+        foreach (var pp in _allPlacements)
+            if (pp?.prefab != null && IsClimbingRock(pp.prefab)) _climbingRocks.Add(pp);
+
+        float reachPx = hopDistance * pxPerUnit;
+
+        // Spread outward one hop at a time from EVERY placed creeper, so a rock only earns a line
+        // if some creeper has a chain of hops that actually reaches it.
+        _rockPixels.Clear();
+        foreach (var pp in _climbingRocks) _rockPixels.Add(PlacementPixel(rect, pp));
+
+        // Spikes drawn with the ▲ Spikes tool and flagged climbable are rocks too — they get their
+        // climbing rings fitted at spawn, so he can hop to AND from them just the same. Appended after
+        // the placed rocks; both rock prefabs and climbable spikes host a creeper and seed the spread.
+        if (loadedData.proceduralSpikes != null)
+            foreach (var s in loadedData.proceduralSpikes)
+                if (s != null && s.climbable) _rockPixels.Add(WorldXZToPixel(rect, s.center));
+
+        _rockReached.Clear();
+        for (int i = 0; i < _rockPixels.Count; i++) _rockReached.Add(false);
+        _rockQueue.Clear();
+
+        // Seed from the rock each creeper is standing on. One that carries its own spike IS that
+        // rock; one allocated to a spike is snapped onto it — so both resolve by position.
+        bool anySeed = false;
+        foreach (var pp in _allPlacements)
+        {
+            if (pp?.prefab == null || !IsCreepPlacement(pp.prefab)) continue;
+            pp.EnsureFreePosition();
+            Vector2 creepPx = PlacementPixel(rect, pp);
+
+            // The creeper is snapped onto its host — a climbing-rock prefab OR a climbable spike — so
+            // the nearest marker pixel IS its host. Search all of them, not just the rock prefabs, or a
+            // creeper allocated to a spike would never seed the spread.
+            int   host     = -1;
+            float bestDist = float.MaxValue;
+            for (int i = 0; i < _rockPixels.Count; i++)
+            {
+                float d = Vector2.Distance(_rockPixels[i], creepPx);
+                if (d < bestDist) { bestDist = d; host = i; }
+            }
+
+            if (host < 0 || _rockReached[host]) continue;
+            _rockReached[host] = true;
+            _rockQueue.Enqueue(host);
+            anySeed = true;
+        }
+        if (!anySeed) return;                                // no creeper is standing on a rock
+
+        Handles.color = new Color(0.25f, 0.95f, 0.35f, 0.95f);
+
+        while (_rockQueue.Count > 0)
+        {
+            int from = _rockQueue.Dequeue();
+            for (int to = 0; to < _rockPixels.Count; to++)
+            {
+                if (_rockReached[to] || to == from) continue;
+                if (Vector2.Distance(_rockPixels[from], _rockPixels[to]) > reachPx) continue;
+
+                Handles.DrawAAPolyLine(CreeperRouteWidth, _rockPixels[from], _rockPixels[to]);
+                _rockReached[to] = true;
+                _rockQueue.Enqueue(to);
+            }
+        }
+    }
+
+    /// <summary>
+    /// A small opaque circle above every climbing rock that falls inside a street light's radius —
+    /// the rocks he will be driven off once that lamp is lit.
+    /// </summary>
+    void DrawCreeperLampMarkers(Rect rect, float pxPerUnit)
+    {
+        if (!showCreeperRoutes || loadedData == null || pxPerUnit <= 0f) return;
+
+        CollectAllPlacements(_allPlacements);
+        if (PlacedCreeperHopDistance(_allPlacements) <= 0f) return;
+
+        // Lamps first — position and radius both come off the placed street light prefabs.
+        _lampPixels.Clear();
+        _lampRadii.Clear();
+        foreach (var pp in _allPlacements)
+        {
+            if (pp?.prefab == null) continue;
+            var lamp = pp.prefab.GetComponentInChildren<StreetLightController>(true);
+            if (lamp == null) continue;
+            _lampPixels.Add(PlacementPixel(rect, pp));
+            _lampRadii.Add(lamp.InstLightRadius * pxPerUnit);
+        }
+        if (_lampPixels.Count == 0) return;
+
+        foreach (var pp in _allPlacements)
+        {
+            if (pp?.prefab == null || !IsClimbingRock(pp.prefab)) continue;
+
+            Vector2 rockPx = PlacementPixel(rect, pp);
+            bool    lit    = false;
+            for (int i = 0; i < _lampPixels.Count && !lit; i++)
+                lit = Vector2.Distance(rockPx, _lampPixels[i]) <= _lampRadii[i];
+
+            if (!lit) continue;
+
+            Rect    ir  = ScaledIconRect(rockPx, pp, pxPerUnit);
+            Vector2 dot = new Vector2(ir.center.x, ir.yMin - CreeperLampDotRadius - 2f);
+
+            Handles.color = Color.black;
+            Handles.DrawSolidDisc(dot, Vector3.forward, CreeperLampDotRadius + 1.5f);
+            Handles.color = new Color(1f, 0.65f, 0.15f, 1f);
+            Handles.DrawSolidDisc(dot, Vector3.forward, CreeperLampDotRadius);
+        }
+    }
+
     void DrawPrefabScaleRings(Rect rect, List<GridData.PrefabPlacement> placements, int tierIndex, float pxPerUnit)
     {
         if (placements == null) return;
@@ -4992,13 +6213,8 @@ public class GridDesignerWindow : EditorWindow
             float radiusPx = align.ScaleRadius * s * pxPerUnit;
             if (radiusPx <= 0f) continue;
 
-            bool isSelected = _currentSelection.type == SelectionType.PrefabPlacement
-                           && _currentSelection.tierIndex == tierIndex
-                           && _currentSelection.cellIndex == pp.cellIndex;
-
-            Color c = new Color(1f, 0.55f, 0.1f, activeLayer ? 0.75f : 0.2f);
-            Handles.color = c;
-            Handles.DrawWireDisc(PlacementPixel(rect, pp), Vector3.forward, radiusPx, isSelected ? 3.5f : 2f);
+            // Colour + fill/outline from the Prefab ring appearance setting; inactive layers dim.
+            DrawMarker(PlacementPixel(rect, pp), radiusPx, _style.prefabRing, activeLayer ? 1f : 0.3f);
         }
     }
 
@@ -5236,8 +6452,13 @@ public class GridDesignerWindow : EditorWindow
 
         _baselineAlignCache.Clear();
 
-        activeSlot = 0; drawCircle = drawSoul = drawSoulArea = false;
+        // Default tool on open is Select (not the eraser).
+        drawSelect = true;
+        activeSlot = -1;
+        drawCircle = drawSoul = drawSoulArea = drawOrb = drawWhirlpool = false;
+        drawWaterLevelModifier = drawWaveModifier = drawDirectPrefab = _drawSplineWall = _drawCubeBuilding = false; _drawSpike = false;
         _isDrawingSoulArea = false; _drawingNodes.Clear();
+        ClearSelectState();
     }
 
     static void NormalizePlacementScales(List<GridData.PrefabPlacement> placements)
@@ -5796,6 +7017,14 @@ public class GridDesignerWindow : EditorWindow
                 // The adjoining node is pinned to its main-river node — use "Separate" to free it.
                 bool pinned = z.zoneRole == GridData.SoulZone.ZoneRole.SubZone
                            && z.adjoinZoneId != 0 && pts != null && ni == pts.Count - 1;
+
+                // Path ends clamped to entrances are owned by those doors — dragging them would
+                // just be undone by SyncZoneEntrances on the next repaint, so block it outright.
+                if (z.attachToEntrances && pts != null)
+                {
+                    if (ni == 0 && z.entryEntranceIndex >= 0) pinned = true;
+                    if (ni == pts.Count - 1 && z.exitEntranceIndex >= 0 && pts.Count >= 2) pinned = true;
+                }
                 if (pts != null && ni < pts.Count && !pinned)
                 {
                     Undo.RecordObject(loadedData, "Move Soul Zone Node");
@@ -7041,16 +8270,19 @@ public class GridDesignerWindow : EditorWindow
         bool closed   = zone.closedLoop && n >= 3;
         int  segCount = zone.SegmentCount();
 
+        // Sampled through GridData.SoulZone.SamplePath — the exact call LevelSpawner densifies
+        // with — so what you draw here is the curve the mask paints AND the one the fish swim.
+        // Preview uses more samples than the runtime budget purely for a smooth on-screen line;
+        // the underlying curve is identical.
         path.Add(WorldXZToPixel(rect, pts[0]));
         for (int seg = 0; seg < segCount; seg++)
         {
-            bool curved = n >= 3 && zone.IsSegmentCurved(seg);
-            int  i2     = (seg + 1) % n;
-            if (curved)
+            int i2 = (seg + 1) % n;
+            if (n >= 3 && !zone.SegmentIsStraight(seg))
             {
                 const int samplesPerSeg = 16;
                 for (int s = 1; s <= samplesPerSeg; s++)
-                    path.Add(WorldXZToPixel(rect, SplineWallSample(pts, seg, (float)s / samplesPerSeg, closed)));
+                    path.Add(WorldXZToPixel(rect, zone.SamplePath(seg, (float)s / samplesPerSeg)));
             }
             else
             {
@@ -7205,6 +8437,9 @@ public class GridDesignerWindow : EditorWindow
             int hit = PickCubeBuilding(rect, e.mousePosition);
             if (hit >= 0)
             {
+                // Single-selection: clear any prefab/node selection so only the block's marker shows
+                // (BeginCubeMove clears the active spike). Matches the spike select path.
+                ClearSelectState();
                 BeginCubeMove(rect, hit, e.mousePosition);
                 e.Use();
                 Repaint();
@@ -7240,6 +8475,7 @@ public class GridDesignerWindow : EditorWindow
 
     void BeginCubeMove(Rect rect, int index, Vector2 mouse)
     {
+        _activeSpikeIndex    = -1;   // block and spike selection are mutually exclusive
         _activeCubeIndex     = index;
         _dragCubeCenterIndex = index;
         _isDraggingCubeBox   = false;
@@ -7312,23 +8548,25 @@ public class GridDesignerWindow : EditorWindow
 
             Vector2 c  = WorldXZToPixel(rect, b.center);
 
-            // Centre node handle — drawn large so it's an easy target for the Select tool
-            // and roomy enough to hold the block number legibly.
-            // A faint outer ring shows the clickable radius on the active block.
-            float nr = active ? 15f : 13f;
-            if (active)
+            // No default circle on blocks anymore: only the SELECTED block wears a marker — the shared
+            // white select circle (sized by the UI setting, floored so the number still fits) — and it's
+            // suppressed while a prefab/node selection owns the marker so the two never draw at once.
+            bool selected = active && _currentSelection.type == SelectionType.None;
+            if (selected)
             {
-                Handles.color = new Color(0.5f, 0.8f, 1f, 0.25f);
-                Handles.DrawSolidDisc((Vector3)c, Vector3.forward, CubeNodePickRadius);
+                float nr = Mathf.Max(EffCell * _selectionCircleFactor, 13f);
+                DrawMarker(c, nr, _style.selection);
+                if (!_style.selection.outline)   // crisp black edge behind the number when filled
+                {
+                    Handles.color = Color.black;
+                    Handles.DrawWireDisc((Vector3)c, Vector3.forward, nr);
+                }
             }
-            Handles.color = active ? new Color(0.5f, 0.8f, 1f) : new Color(0.85f, 0.85f, 0.9f);
-            Handles.DrawSolidDisc((Vector3)c, Vector3.forward, nr);
-            Handles.color = Color.black;
-            Handles.DrawWireDisc((Vector3)c, Vector3.forward, nr);
 
-            // Block number (matches the "Block N" entries in the Cube Buildings panel),
-            // centred on the node using the measured label size.
+            // Block number (matches the "Block N" entries in the Cube Buildings panel). White so it
+            // reads on the dark block with no disc behind it; black on the light selection circle.
             string  numLabel = (i + 1).ToString();
+            blockNumStyle.normal.textColor = selected ? Color.black : Color.white;
             Vector2 numSize  = blockNumStyle.CalcSize(new GUIContent(numLabel));
             Handles.Label(new Vector2(c.x - numSize.x * 0.5f, c.y - numSize.y * 0.5f), numLabel, blockNumStyle);
         }
@@ -7404,6 +8642,9 @@ public class GridDesignerWindow : EditorWindow
                 float height = EditorGUILayout.FloatField("Height (above water)", b.heightAboveWater);
                 float depth  = EditorGUILayout.FloatField("Depth (below water)",  b.depthBelowWater);
                 Vector2 center = EditorGUILayout.Vector2Field("Centre X/Z (norm)", b.center);
+                bool stepped = EditorGUILayout.Toggle(
+                    new GUIContent("Stepped top", "Build as a stepped-rooftop building using a random preset from Resources/Buildings at spawn."),
+                    b.steppedTop);
                 if (EditorGUI.EndChangeCheck())
                 {
                     Undo.RecordObject(loadedData, "Edit Cube Building");
@@ -7413,6 +8654,7 @@ public class GridDesignerWindow : EditorWindow
                     b.depthBelowWater  = Mathf.Max(0f, depth);
                     b.center           = new Vector2(Mathf.Clamp(center.x, -0.5f, 0.5f),
                                                      Mathf.Clamp(center.y, -0.5f, 0.5f));
+                    b.steppedTop       = stepped;
                     EditorUtility.SetDirty(loadedData);
                     Repaint();
                 }
@@ -7439,6 +8681,460 @@ public class GridDesignerWindow : EditorWindow
             loadedData.cubeBuildings.Add(new GridData.CubeBuilding());
             _activeCubeIndex  = loadedData.cubeBuildings.Count - 1;
             _drawCubeBuilding = true;
+            EditorUtility.SetDirty(loadedData);
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    // PROCEDURAL SPIKES
+    // Rocks stored the same way as blocks — centre normalized to the arena, radii as a
+    // fraction of the arena width — so they move, scale and save exactly like blocks do.
+    // Drag out from a point to set how wide the rock sits in the water; the other three
+    // radii come in proportioned to it and are shaped afterwards in the panel.
+    // ─────────────────────────────────────────────
+
+    // Pixel radius around a spike's centre node that counts as a hit.
+    const float SpikeNodePickRadius = 14f;
+
+
+    // Shape presets on offer, rescanned from Resources/Spikes each time the panel draws so a
+    // preset saved in the Spike Studio shows up without reopening this window.
+    SpikeShapePreset[] _spikePresets     = new SpikeShapePreset[0];
+    string[]           _spikePresetNames = { "Default shape" };
+
+    void RefreshSpikePresets()
+    {
+        var guids = AssetDatabase.FindAssets("t:SpikeShapePreset", new[] { SpikeShapePreset.AssetFolder });
+        var found = new List<SpikeShapePreset>(guids.Length);
+        foreach (var g in guids)
+        {
+            var p = AssetDatabase.LoadAssetAtPath<SpikeShapePreset>(AssetDatabase.GUIDToAssetPath(g));
+            if (p != null) found.Add(p);
+        }
+        found.Sort((a, b) => string.Compare(a.name, b.name, System.StringComparison.OrdinalIgnoreCase));
+
+        _spikePresets     = found.ToArray();
+        _spikePresetNames = new string[found.Count + 1];
+        _spikePresetNames[0] = "Default shape";
+        for (int i = 0; i < found.Count; i++) _spikePresetNames[i + 1] = found[i].name;
+    }
+
+    // First preset in the folder, so a rock dropped on the grid wears a real shape rather than
+    // the built-in default. Null when the folder is empty, which the profile handles.
+    SpikeShapePreset FirstSpikePreset()
+    {
+        if (_spikePresets.Length == 0) RefreshSpikePresets();
+        return _spikePresets.Length > 0 ? _spikePresets[0] : null;
+    }
+
+    // Arena width used to turn normalized grid positions into the world units the shapes live in.
+    float SpikeArenaWidth() =>
+        loadedData != null && loadedData.arenaProfile != null && loadedData.arenaProfile.WorldArenaWidth > 0f
+            ? loadedData.arenaProfile.WorldArenaWidth : 12f;
+
+
+    void HandleSpikeInput(Rect rect, Event e)
+    {
+        if (loadedData.proceduralSpikes == null)
+            loadedData.proceduralSpikes = new List<GridData.ProceduralSpike>();
+
+        if (e.type == EventType.MouseDown && e.button == 0 && rect.Contains(e.mousePosition))
+        {
+            int hit = PickSpike(rect, e.mousePosition);
+            if (hit >= 0)
+            {
+                BeginSpikeMove(rect, hit, e.mousePosition);
+            }
+            else
+            {
+                // Empty water → drag outward from here to size a new rock.
+                _isDraggingSpike     = true;
+                _spikeDragStartNorm  = PixelToWorldXZ(rect, e.mousePosition);
+                _spikeDragCurrentNorm = _spikeDragStartNorm;
+            }
+            e.Use();
+            Repaint();
+        }
+        else if (e.type == EventType.MouseDrag && e.button == 0)
+        {
+            if (DragSpikeMove(rect, e.mousePosition)) { e.Use(); Repaint(); }
+            else if (_isDraggingSpike)
+            {
+                _spikeDragCurrentNorm = PixelToWorldXZ(rect, e.mousePosition);
+                e.Use();
+                Repaint();
+            }
+        }
+        else if (e.type == EventType.MouseUp && e.button == 0)
+        {
+            if (_dragSpikeCenterIndex >= 0)
+            {
+                _dragSpikeCenterIndex = -1;
+                e.Use();
+            }
+            else if (_isDraggingSpike)
+            {
+                _isDraggingSpike = false;
+                float r = Vector2.Distance(_spikeDragStartNorm, _spikeDragCurrentNorm);
+                if (r > 0.004f) // ignore stray clicks
+                {
+                    Undo.RecordObject(loadedData, "Add Spike");
+                    var preset = FirstSpikePreset();
+                    loadedData.proceduralSpikes.Add(new GridData.ProceduralSpike
+                    {
+                        center = _spikeDragStartNorm,
+                        preset = preset,
+                        // How far you dragged is the rock's radius at the water; the preset
+                        // supplies the shape, so the drag becomes its size multiplier.
+                        scale  = SpikeScaleForWaterRadius(preset, r * SpikeArenaWidth()),
+                    });
+                    _activeSpikeIndex = loadedData.proceduralSpikes.Count - 1;
+                    EditorUtility.SetDirty(loadedData);
+                }
+                e.Use();
+                Repaint();
+            }
+        }
+        else if (e.type == EventType.MouseDown && e.button == 1 && rect.Contains(e.mousePosition))
+        {
+            // Right-click a rock toggles whether the creepy guy can climb it (Del still removes it).
+            int hit = PickSpike(rect, e.mousePosition);
+            if (hit >= 0 && loadedData.proceduralSpikes[hit] != null)
+            {
+                Undo.RecordObject(loadedData, "Toggle Spike Climbable");
+                loadedData.proceduralSpikes[hit].climbable = !loadedData.proceduralSpikes[hit].climbable;
+                _activeSpikeIndex = hit;
+                EditorUtility.SetDirty(loadedData);
+                e.Use();
+                Repaint();
+            }
+        }
+    }
+
+    // Spike selection for the ⊕ Select tool, matching the block equivalent.
+    void HandleSelectSpikeInput(Rect rect, Event e)
+    {
+        if (loadedData?.proceduralSpikes == null || loadedData.proceduralSpikes.Count == 0) return;
+
+        if (e.type == EventType.MouseDown && e.button == 0 && rect.Contains(e.mousePosition))
+        {
+            int hit = PickSpike(rect, e.mousePosition);
+            if (hit >= 0)
+            {
+                // Selecting a spike is a single-selection: clear any prefab/node selection so only
+                // the spike's marker shows (and Delete targets the spike, not a stale selection).
+                ClearSelectState();
+                BeginSpikeMove(rect, hit, e.mousePosition);
+                e.Use();
+                Repaint();
+            }
+        }
+        else if (e.type == EventType.MouseDrag && e.button == 0)
+        {
+            if (DragSpikeMove(rect, e.mousePosition)) { e.Use(); Repaint(); }
+        }
+        else if (e.type == EventType.MouseUp && e.button == 0 && _dragSpikeCenterIndex >= 0)
+        {
+            _dragSpikeCenterIndex = -1;
+            e.Use();
+        }
+    }
+
+    // Spike whose centre node is nearest the pixel (within SpikeNodePickRadius), or -1.
+    int PickSpike(Rect rect, Vector2 mouse)
+    {
+        if (loadedData?.proceduralSpikes == null) return -1;
+        int hit = -1; float best = SpikeNodePickRadius;
+        for (int i = 0; i < loadedData.proceduralSpikes.Count; i++)
+        {
+            var s = loadedData.proceduralSpikes[i];
+            if (s == null) continue;
+            float d = Vector2.Distance(WorldXZToPixel(rect, s.center), mouse);
+            if (d < best) { best = d; hit = i; }
+        }
+        return hit;
+    }
+
+    // Scale that makes a preset sit `worldRadius` wide at the waterline.
+    static float SpikeScaleForWaterRadius(SpikeShapePreset preset, float worldRadius)
+    {
+        var   cfg  = preset != null ? preset.config : new SpikeShapeConfig();
+        float baseR = Mathf.Max(0.0001f, cfg.radiusWaterline);
+        return Mathf.Clamp(worldRadius / baseR, 0.05f, 20f);
+    }
+
+    void BeginSpikeMove(Rect rect, int index, Vector2 mouse)
+    {
+        _activeCubeIndex      = -1;   // spike and block selection are mutually exclusive
+        _activeSpikeIndex     = index;
+        _dragSpikeCenterIndex = index;
+        _isDraggingSpike      = false;
+        _spikeDragOffsetNorm  = loadedData.proceduralSpikes[index].center - PixelToWorldXZ(rect, mouse);
+        Undo.RecordObject(loadedData, "Move Spike");
+    }
+
+    bool DragSpikeMove(Rect rect, Vector2 mouse)
+    {
+        if (_dragSpikeCenterIndex < 0 || _dragSpikeCenterIndex >= loadedData.proceduralSpikes.Count)
+            return false;
+        loadedData.proceduralSpikes[_dragSpikeCenterIndex].center =
+            PixelToWorldXZ(rect, mouse) + _spikeDragOffsetNorm;
+        EditorUtility.SetDirty(loadedData);
+        return true;
+    }
+
+    // Top-layer pass, in three sweeps so they stack properly across neighbouring rocks: the
+    // circle of water each spike occupies, then every spike's side-on shape, then the centre
+    // nodes and numbers. Grid Designer only — the Map UI draws the shape alone.
+    void DrawSpikeOverlay(Rect rect)
+    {
+        if (loadedData == null) return;
+
+        float gridPx = EffCell * GridSize;
+
+        // In-progress drag while sizing a new rock — the shape it will wear, growing under the
+        // cursor, so you're placing the actual rock rather than an abstract radius.
+        if (_drawSpike && _isDraggingSpike)
+        {
+            Vector2 c    = WorldXZToPixel(rect, _spikeDragStartNorm);
+            float   norm = Vector2.Distance(_spikeDragStartNorm, _spikeDragCurrentNorm);
+            var     pre  = FirstSpikePreset();
+            var     pcfg = pre != null ? pre.config : new SpikeShapeConfig();
+            float   psc  = SpikeScaleForWaterRadius(pre, norm * SpikeArenaWidth());
+
+            SpikeSilhouetteGUI.Draw(pcfg, psc, c, gridPx / SpikeArenaWidth(),
+                                    belowDepth: pcfg.heightAboveWater * psc * 0.3f,
+                                    columns: _spikeDisplayResolution, steps: _spikeDisplayResolution);
+        }
+
+        if (loadedData.proceduralSpikes == null) return;
+
+        // Silhouettes are drawn at true world scale, so a tall rock reads as tall against a
+        // squat one, and two rocks placed close show whether the boat can get between them.
+        float pxPerUnit = gridPx / SpikeArenaWidth();
+
+        GUIStyle numStyle = new GUIStyle(EditorStyles.boldLabel)
+        { alignment = TextAnchor.MiddleCenter, fontSize = 10 };
+
+        for (int i = 0; i < loadedData.proceduralSpikes.Count; i++)
+        {
+            var s = loadedData.proceduralSpikes[i];
+            if (s == null) continue;
+            bool active = (_drawSpike || drawSelect) && i == _activeSpikeIndex;
+
+            Vector2 c = WorldXZToPixel(rect, s.center);
+
+            // The rock drawn as its actual shape, standing on its position with the waterline at
+            // the node — the same read as the Map UI's spike icon, and the profile you authored.
+            // No climbable tint: which rocks the creepy guy can use is already said by the green
+            // hop-route lines, and saying it twice just costs the spikes their own look.
+            var   cfg = s.Config;
+            float sc  = s.EffectiveScale;
+
+            // Every rock gets enough of a stub to sink into the water instead of stopping at a
+            // hard line; the one being edited gets more of it. Never the full depth, or a field
+            // of spikes reads as a field of their underwater halves.
+            float above = cfg.heightAboveWater * sc;
+            SpikeSilhouetteGUI.Draw(cfg, sc, c, pxPerUnit,
+                                    belowDepth: Mathf.Min(cfg.depthBelowWater * sc,
+                                                          above * (active ? 0.40f : 0.18f)),
+                                    columns: _spikeDisplayResolution, steps: _spikeDisplayResolution);
+
+            // No handle disc is drawn — the rock is its own handle. Picking and dragging still
+            // work off SpikeNodePickRadius around this point, which was never the drawn size
+            // anyway, so nothing about grabbing them changes.
+            //
+            // The number sits just under the waterline, on the dark sunken stub, with a shadow
+            // behind it so it holds up over the pale part of a rock and over bare grid alike.
+            // Selection shows in the number's colour now the disc has gone.
+            // Selection marker — the SAME white opaque circle used for prefab/node selection, sized
+            // by the shared UI setting (Settings ▸ Selection circle size). Shown for the active spike
+            // whether it was picked with the ▲ Spikes or ⊕ Select tool, but suppressed while a
+            // prefab/node selection owns the marker so the two never draw at once. Drawn first, so the
+            // green climbable dot and the number still read on top of it.
+            if (active && (_drawSpike || drawSelect) && _currentSelection.type == SelectionType.None)
+                DrawMarker(c, Mathf.Max(EffCell * _selectionCircleFactor, 3f), _style.selection);
+
+            // Only in the ▲ Spikes tool: mark the climbable rocks (so you can see which the creepy
+            // guy can use) with a dot on centre (colour + fill/outline from the Climbable spike
+            // appearance setting), and show the spike numbers. Both are authoring aids, off otherwise.
+            // The green climbable dot is part of the same "where can the creeper go" picture as the
+            // hop routes, so the Creeper hop routes toggle hides it too.
+            if (_drawSpike)
+            {
+                if (s.climbable && showCreeperRoutes)
+                    DrawMarker(c, Mathf.Max(EffCell * 0.18f, 5f), _style.spikeClimbable);
+
+                string  numLabel = (i + 1).ToString();
+                Vector2 numSize  = numStyle.CalcSize(new GUIContent(numLabel));
+                Vector2 numAt    = new Vector2(c.x - numSize.x * 0.5f, c.y + 3f);
+
+                numStyle.normal.textColor = new Color(0f, 0f, 0f, 0.65f);
+                Handles.Label(numAt + Vector2.one, numLabel, numStyle);
+
+                numStyle.normal.textColor = active ? new Color(1f, 0.95f, 0.5f) : new Color(0.92f, 0.92f, 0.95f);
+                Handles.Label(numAt, numLabel, numStyle);
+            }
+        }
+    }
+
+    // A slider whose travel is weighted toward the low end (power > 1), so small values are easy to
+    // dial in while a wide top range stays reachable, paired with a box for typing an exact value.
+    // The handle position is power-mapped but the number shown is the real value.
+    static float LowEndSlider(GUIContent label, float value, float min, float max, float power)
+    {
+        value = Mathf.Clamp(value, min, max);
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            EditorGUILayout.PrefixLabel(label);
+            // Position along the bar: the value's fraction of the range, un-powered so equal drags
+            // near the bottom cover smaller value steps than near the top.
+            float t = Mathf.Pow(Mathf.InverseLerp(min, max, value), 1f / Mathf.Max(0.01f, power));
+            t = GUILayout.HorizontalSlider(t, 0f, 1f);
+            value = Mathf.Lerp(min, max, Mathf.Pow(Mathf.Clamp01(t), power));
+            value = EditorGUILayout.FloatField(value, GUILayout.Width(52));
+        }
+        return Mathf.Clamp(value, min, max);
+    }
+
+    void DrawSpikesSection()
+    {
+        EditorGUILayout.Space();
+        _showSpikes = EditorGUILayout.Foldout(_showSpikes, "Spikes", true, EditorStyles.foldoutHeader);
+        if (!_showSpikes) return;
+
+        if (loadedData.proceduralSpikes == null)
+            loadedData.proceduralSpikes = new List<GridData.ProceduralSpike>();
+
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            EditorGUILayout.HelpBox("Pick the ▲ Spikes tool, then drag out from a point on the grid — the drag " +
+                                    "sets how big the rock is, the preset sets what shape it is. " +
+                                    "Climbable fits the creepy guy's rings to that shape at spawn.", MessageType.None);
+            if (GUILayout.Button("Spike\nStudio…", GUILayout.Width(64), GUILayout.Height(38)))
+                EditorApplication.ExecuteMenuItem("Tools/Waves/Spike Studio");
+        }
+
+        RefreshSpikePresets();
+        if (_spikePresets.Length == 0)
+            EditorGUILayout.HelpBox($"No shape presets found in {SpikeShapePreset.AssetFolder}. " +
+                                    "Spikes will use the default shape until you save one from the Spike Studio.",
+                                    MessageType.Warning);
+
+        int toRemove = -1;
+
+        // Draw order: the selected spike first (pinned to the top of the list, expanded), then the
+        // rest in index order. Only the display order changes — indices/removal are unaffected.
+        var spikeOrder = new List<int>();
+        if (_activeSpikeIndex >= 0 && _activeSpikeIndex < loadedData.proceduralSpikes.Count)
+            spikeOrder.Add(_activeSpikeIndex);
+        for (int k = 0; k < loadedData.proceduralSpikes.Count; k++)
+            if (k != _activeSpikeIndex) spikeOrder.Add(k);
+
+        foreach (int i in spikeOrder)
+        {
+            var  s        = loadedData.proceduralSpikes[i];
+            if (s == null) continue;
+            bool isActive = i == _activeSpikeIndex;
+
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+            EditorGUILayout.BeginHorizontal();
+            GUI.backgroundColor = isActive ? new Color(0.8f, 0.72f, 1f) : Color.white;
+            if (GUILayout.Button($"Spike {i + 1}", GUILayout.Width(72)))
+            {
+                if (isActive) { _activeSpikeIndex = -1; }
+                else          { _activeSpikeIndex = i; _drawSpike = true; }
+            }
+            GUI.backgroundColor = Color.white;
+
+            if (!isActive)
+            {
+                var   cfg = s.Config;
+                float sc  = s.EffectiveScale;
+                string climb = s.climbable ? " · climbable" : "";
+                string name  = s.preset != null ? s.preset.name : "default shape";
+                EditorGUILayout.LabelField(
+                    $"{name} · ⌀{cfg.radiusWaterline * 2f * sc:0.##} m · {cfg.heightAboveWater * sc:0.##} m tall{climb}",
+                    EditorStyles.miniLabel);
+            }
+            else
+            {
+                GUILayout.FlexibleSpace();
+            }
+
+            GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
+            if (GUILayout.Button("✕", GUILayout.Width(24))) toRemove = i;
+            GUI.backgroundColor = Color.white;
+            EditorGUILayout.EndHorizontal();
+
+            if (isActive)
+            {
+                // No shape diagram here — shaping a rock is the Spike Studio's job, and this
+                // panel is only about which shape stands where.
+                EditorGUI.BeginChangeCheck();
+
+                // Which shape it wears. Listed from Resources/Spikes so saving one in the Spike
+                // Studio makes it placeable here immediately, with no wiring.
+                int cur = System.Array.IndexOf(_spikePresets, s.preset);
+                int pick = EditorGUILayout.Popup(
+                    new GUIContent("Shape preset", "Authored in the Spike Studio. Editing the preset restyles " +
+                                                   "every rock using it."),
+                    cur + 1, _spikePresetNames);
+                SpikeShapePreset preset = pick <= 0 ? null : _spikePresets[pick - 1];
+
+                float scale = LowEndSlider(
+                    new GUIContent("Size", "Multiplier on the whole preset, so one shape furnishes boulders and " +
+                                           "pebbles alike. 1 = the preset's own size. The slider is weighted toward " +
+                                           "the low end for fine-tuning small rocks; type an exact value in the box."),
+                    s.EffectiveScale, 0.1f, 6f, power: 3f);
+
+                bool climbable = EditorGUILayout.Toggle(
+                    new GUIContent("Climbable", "Fit the creepy guy's rings to this rock at spawn so he can surface on it, climb it and leap from it."),
+                    s.climbable);
+
+                Vector2 center = EditorGUILayout.Vector2Field("Centre X/Z (norm)", s.center);
+
+                if (EditorGUI.EndChangeCheck())
+                {
+                    Undo.RecordObject(loadedData, "Edit Spike");
+                    s.preset    = preset;
+                    s.scale     = Mathf.Max(0.01f, scale);
+                    s.climbable = climbable;
+                    s.center    = new Vector2(Mathf.Clamp(center.x, -0.5f, 0.5f),
+                                              Mathf.Clamp(center.y, -0.5f, 0.5f));
+                    EditorUtility.SetDirty(loadedData);
+                    Repaint();
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    using (new EditorGUI.DisabledScope(s.preset == null))
+                        if (GUILayout.Button("Select preset asset"))
+                            EditorGUIUtility.PingObject(s.preset);
+                    if (GUILayout.Button("Edit in Spike Studio"))
+                        EditorApplication.ExecuteMenuItem("Tools/Waves/Spike Studio");
+                }
+            }
+
+            EditorGUILayout.EndVertical();
+        }
+
+        if (toRemove >= 0)
+        {
+            Undo.RecordObject(loadedData, "Delete Spike");
+            loadedData.proceduralSpikes.RemoveAt(toRemove);
+            if (_activeSpikeIndex == toRemove) _activeSpikeIndex = -1;
+            else if (_activeSpikeIndex > toRemove) _activeSpikeIndex--;
+            EditorUtility.SetDirty(loadedData);
+        }
+
+        if (GUILayout.Button("+ Add Spike (centred)"))
+        {
+            Undo.RecordObject(loadedData, "Add Spike");
+            loadedData.proceduralSpikes.Add(new GridData.ProceduralSpike { preset = FirstSpikePreset() });
+            _activeSpikeIndex = loadedData.proceduralSpikes.Count - 1;
+            _drawSpike        = true;
             EditorUtility.SetDirty(loadedData);
         }
     }

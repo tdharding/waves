@@ -85,6 +85,7 @@ public class SoulShoalController : MonoBehaviour
             SoulFishWaveLinker.UnregisterZone(_nodePositions);
             SoulFishMapLinker.UnregisterZone(_nodePositions);
         }
+        SoulFishController.UnregisterShoal(this);
     }
 
     // Called by LevelSpawner to instantiate fish meshes for each soul in the zone
@@ -135,6 +136,9 @@ public class SoulShoalController : MonoBehaviour
         }
 
         _fishSpawned = true;
+
+        // The level-wide controller owns swim speed and the fish-count readout.
+        SoulFishController.RegisterShoal(this);
     }
 
     // ---------------------------------------------------------

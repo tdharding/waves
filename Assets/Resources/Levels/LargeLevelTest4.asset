@@ -15,7 +15,7 @@ MonoBehaviour:
   levelID: LargeLevelTest4
   displayName: LargeLevelTest4
   cameraProfile: {fileID: 0}
-  gameplayWavePreset: {fileID: 0}
+  gameplayWavePreset: {fileID: 11400000, guid: 7b44327b8a695e8499633a917141d38f, type: 2}
   gongWavePreset: {fileID: 0}
   runtimeWavePresetOverride: {fileID: 0}
   sonarGridType: {fileID: 11400000, guid: 3be5995da1a80714985097d390d15042, type: 2}
@@ -40,11 +40,28 @@ MonoBehaviour:
     nodes: 
     nodePositions:
     - {x: 0.18600011, y: -0.47350818}
+    - {x: 0.16831566, y: -0.4257946}
     - {x: 0.12654272, y: -0.3835397}
+    - {x: 0.14126222, y: -0.32456246}
     - {x: 0.12302969, y: -0.25614828}
-    - {x: -0.21064366, y: -0.2513251}
+    - {x: 0.07326921, y: -0.2622881}
+    - {x: 0.0480956, y: -0.26865384}
+    - {x: 0.020896541, y: -0.26315615}
+    - {x: -0.0031196806, y: -0.27588764}
+    - {x: -0.028675785, y: -0.27385563}
+    - {x: -0.05867524, y: -0.27125806}
+    - {x: -0.08944893, y: -0.2412128}
+    - {x: -0.16119349, y: -0.28003928}
+    - {x: -0.20930453, y: -0.25387362}
+    - {x: -0.2278861, y: -0.1744596}
+    - {x: -0.21967895, y: -0.13595997}
+    - {x: -0.20324726, y: -0.08420005}
     - {x: -0.21064366, y: -0.040877044}
+    - {x: -0.13012606, y: -0.050515015}
+    - {x: -0.0808309, y: -0.03654804}
     - {x: 0.0032839812, y: -0.03803998}
+    - {x: -0.014328209, y: 0.026352106}
+    - {x: 0.0118374685, y: 0.07615126}
     - {x: -0.004971944, y: 0.15270971}
     - {x: 0.16957109, y: 0.14766568}
     - {x: 0.1781768, y: 0.30178565}
@@ -52,11 +69,41 @@ MonoBehaviour:
     - {x: -0.05417664, y: 0.39957753}
     - {x: -0.07842904, y: 0.4950224}
     closedLoop: 0
-    segmentCurved: 0000000000000000000000
+    segmentCurved: 01010101010101010101010101010101010101010101010101010101
+    nodeTension:
+    - 0.5
+    - 0.839
+    - 0.5
+    - 0.892
+    - 0.201
+    - 1
+    - 1
+    - 1
+    - 0.739
+    - 0.739
+    - 0.739
+    - 0.661
+    - 0.618
+    - 1
+    - 0.5
+    - 0.5
+    - 0.171
+    - 0.5
+    - 0.5
+    - 0.5
+    - 1
+    - 0.598
+    - 0.512
+    - 0.5
+    - 0.143
+    - 0.098
+    - 0.5
+    - 0.5
+    - 0.5
     radius: 0.29
     pathWidth: 0.15
-    knotCount: 8
-    curveResolution: 6
+    knotCount: 67
+    curveResolution: 16
     souls:
     - {fileID: 11400000, guid: 87ebe8d28160a494c80690cd4a0a5aeb, type: 2}
     - {fileID: 11400000, guid: ab353967b8827484988f1e7d391f4605, type: 2}
@@ -65,21 +112,31 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 9ba552b8ebe30fc4e80e9bb5b213e6bc, type: 2}
     - {fileID: 11400000, guid: 4b7fa0fa01fa14e47ad1ff389ebac37c, type: 2}
     - {fileID: 11400000, guid: 30103818d550b73419b6e3b284a760d9, type: 2}
+    - {fileID: 11400000, guid: c25f7a84ad8b77c4bb4aee14ad98113d, type: 2}
+    - {fileID: 11400000, guid: 242dafe454d1d3d42a4c35b2a7dbca4a, type: 2}
+    - {fileID: 11400000, guid: 2cb9a8ce8efcf1e48ba10a4bd9870d89, type: 2}
+    - {fileID: 11400000, guid: e3fcc291421f1f24d990bd57f7f3260c, type: 2}
+    - {fileID: 11400000, guid: d962b87689ec602478f1744eee173334, type: 2}
+    - {fileID: 11400000, guid: a1cd9a6b2b79a6445a63fabd64cac109, type: 2}
     statueGuarded: 0
     linkedStatueId: 0
     ringRadius: 0.08
     towerGuarded: 0
     streetLights:
-    - nodeIndex: 2
-      poolRadius: 1.05
     - nodeIndex: 4
+      poolRadius: 1.05
+    - nodeIndex: 17
       poolRadius: 1.63
-    - nodeIndex: 6
+    - nodeIndex: 23
       poolRadius: 1.47
+    - nodeIndex: 11
+      poolRadius: 1.11
+    - nodeIndex: 14
+      poolRadius: 1.15
   - zoneRole: 1
     zoneId: 2
-    adjoinZoneId: 1
-    adjoinNodeIndex: 6
+    adjoinZoneId: 0
+    adjoinNodeIndex: -1
     entryEntranceIndex: -1
     exitEntranceIndex: -1
     externalSourceKey: 
@@ -89,6 +146,7 @@ MonoBehaviour:
     - {x: -0.18538249, y: 0.19532637}
     closedLoop: 0
     segmentCurved: 
+    nodeTension: []
     radius: 1.3
     pathWidth: 0.266
     knotCount: 8
@@ -136,7 +194,7 @@ MonoBehaviour:
     targetIsLeftPath: 0
     targetIsRightPath: 0
   arenaWaterModifiers: []
-  orbCellIndices: 
+  orbCellIndices: 6d0200006c0200006b0200006e020000
   waterLevelModifierCellIndices: 
   waveModifierCellIndices: 
   prefabPlacements:
@@ -231,7 +289,7 @@ MonoBehaviour:
     position: {x: -0.18538249, y: 0.19532637}
     freePlaced: 1
     statueId: 1
-    scale: 1.727
+    scale: 0.39
     overrideModifierSettings: 0
     speedBoost: 0
     frequencyBoost: 0
@@ -272,6 +330,114 @@ MonoBehaviour:
     speedBoost: 0
     frequencyBoost: 0
     rippleDepthBoost: 0
+  - cellIndex: 744
+    prefab: {fileID: 270666992747770035, guid: 456f1ee0aa8fbf44c9a87128f0123d5b, type: 3}
+    isCircle: 0
+    isWorldSpaceProp: 0
+    position: {x: -0.23748568, y: -0.24602026}
+    freePlaced: 1
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
+  - cellIndex: 814
+    prefab: {fileID: 270666992747770035, guid: 456f1ee0aa8fbf44c9a87128f0123d5b, type: 3}
+    isCircle: 0
+    isWorldSpaceProp: 0
+    position: {x: -0.042002905, y: -0.3071086}
+    freePlaced: 1
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
+  - cellIndex: 791
+    prefab: {fileID: 7908351074804680416, guid: 38185431f200fc143852a29148c62b70, type: 3}
+    isCircle: 0
+    isWorldSpaceProp: 0
+    position: {x: 0.23036262, y: -0.2600818}
+    freePlaced: 1
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
+  - cellIndex: 760
+    prefab: {fileID: 4089478517322769272, guid: 0ad9522f599f9b64d8410dc3a60b232a, type: 3}
+    isCircle: 0
+    isWorldSpaceProp: 0
+    position: {x: 0.25277218, y: -0.23169436}
+    freePlaced: 1
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
+  - cellIndex: 759
+    prefab: {fileID: 4089478517322769272, guid: 0ad9522f599f9b64d8410dc3a60b232a, type: 3}
+    isCircle: 0
+    isWorldSpaceProp: 0
+    position: {x: 0.22852273, y: -0.23614006}
+    freePlaced: 1
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
+  - cellIndex: 760
+    prefab: {fileID: 4089478517322769272, guid: 0ad9522f599f9b64d8410dc3a60b232a, type: 3}
+    isCircle: 0
+    isWorldSpaceProp: 0
+    position: {x: 0.2733842, y: -0.22361118}
+    freePlaced: 1
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
+  - cellIndex: 728
+    prefab: {fileID: 4089478517322769272, guid: 0ad9522f599f9b64d8410dc3a60b232a, type: 3}
+    isCircle: 0
+    isWorldSpaceProp: 0
+    position: {x: 0.27217174, y: -0.20259501}
+    freePlaced: 1
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
+  - cellIndex: 696
+    prefab: {fileID: 4089478517322769272, guid: 0ad9522f599f9b64d8410dc3a60b232a, type: 3}
+    isCircle: 0
+    isWorldSpaceProp: 0
+    position: {x: 0.2628761, y: -0.18400376}
+    freePlaced: 1
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
+  - cellIndex: 695
+    prefab: {fileID: 4089478517322769272, guid: 0ad9522f599f9b64d8410dc3a60b232a, type: 3}
+    isCircle: 0
+    isWorldSpaceProp: 0
+    position: {x: 0.24953888, y: -0.16460419}
+    freePlaced: 1
+    statueId: 0
+    scale: 1
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
   linkedPairs: []
   tiers: []
   whirlpools: []
@@ -281,63 +447,59 @@ MonoBehaviour:
   - 
   slotColors: []
   arenaProfile: {fileID: 11400000, guid: 590ba1b3bf09c884c99e7e16b8011417, type: 2}
-  splineWallPaths:
-  - nodes:
-    - {x: -0.17319374, y: -0.4778475}
-    - {x: -0.1717732, y: -0.3840908}
-    - {x: 0.024263458, y: -0.38267025}
-    - {x: 0.03278679, y: -0.16248417}
-    - {x: 0.20325343, y: -0.16390473}
-    - {x: 0.20183289, y: -0.068727516}
-    - {x: 0.2899073, y: -0.06588641}
-    - {x: 0.39786953, y: -0.06446585}
-    - {x: 0.49588785, y: -0.067306966}
-    isClosed: 0
-    segmentCurved: 0000000000000000
-    segmentGap: 0000000000000000
-    segmentDestructible: 0000000000000100
-    tileSpacing: 0.09
-    prefabOverride: {fileID: 7000000000000000001, guid: d287e903f8a075c418e3d937873ec0c7, type: 3}
-    destructiblePrefabOverride: {fileID: 101384417285704880, guid: 4d50559f4f19fee47b5e220ea91d92ae, type: 3}
-    wallHeight: 1
-    depthBelowWater: 7
-    wallThickness: 0.2
-    nodeHeights: []
-    nodeSizeScale: 1.1
-    pathScale: 1
+  splineWallPaths: []
   cubeBuildings:
-  - center: {x: -0.0907968, y: -0.11167832}
-    width: 0.075886436
-    length: 0.07275714
-    heightAboveWater: 2
+  - center: {x: -0.15985948, y: -0.22259279}
+    width: 0.043
+    length: 0.043
+    heightAboveWater: 5
     depthBelowWater: 5
-  - center: {x: -0.08116719, y: 0.033053637}
-    width: 0.09622719
-    length: 0.083709806
-    heightAboveWater: 2
+    steppedTop: 1
+  - center: {x: -0.09551614, y: -0.30625585}
+    width: 0.043
+    length: 0.043
+    heightAboveWater: 5
     depthBelowWater: 5
+    steppedTop: 1
   - center: {x: 0.07060575, y: 0.07842904}
     width: 0.07275714
     length: 0.07432186
     heightAboveWater: 2
     depthBelowWater: 5
-  - center: {x: -0.13984235, y: -0.19499698}
-    width: 0.0790158
-    length: 0.06415141
+    steppedTop: 1
+  - center: {x: 0.13192995, y: -0.14644027}
+    width: 0.043
+    length: 0.043
+    heightAboveWater: 5
+    depthBelowWater: 5
+    steppedTop: 1
+  - center: {x: -0.3595183, y: -0.10207737}
+    width: 0.039
+    length: 0.381
     heightAboveWater: 2
     depthBelowWater: 5
-  - center: {x: -0.39006245, y: 0.048898235}
-    width: 0.07901579
-    length: 0.08058052
+    steppedTop: 1
+  - center: {x: -0.29419786, y: -0.2430885}
+    width: 0.051
+    length: 0.182
     heightAboveWater: 2
     depthBelowWater: 5
-  - center: {x: -0.3373855, y: -0.048309203}
-    width: 0.093097836
-    length: 0.08214516
-    heightAboveWater: 2
+    steppedTop: 1
+  - center: {x: -0.22829568, y: -0.3112692}
+    width: 0.043
+    length: 0.043
+    heightAboveWater: 5
     depthBelowWater: 5
-  - center: {x: -0.28731245, y: -0.15548906}
-    width: 0.09075087
-    length: 0.10092119
-    heightAboveWater: 2
+    steppedTop: 1
+  - center: {x: -0.022768687, y: -0.2344604}
+    width: 0.0506432
+    length: 0.045578867
+    heightAboveWater: 6
     depthBelowWater: 5
+    steppedTop: 1
+  - center: {x: -0.052911513, y: -0.16747805}
+    width: 0.2644254
+    length: 0.03839837
+    heightAboveWater: 4.5
+    depthBelowWater: 5
+    steppedTop: 1

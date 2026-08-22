@@ -8,6 +8,8 @@ using UnityEngine;
 /// Keeps a running history of recently selected/opened prefabs, materials and
 /// scene GameObjects so you can jump back to them without hunting the project.
 /// History is recorded even when the window is closed and persists across sessions.
+/// The panel is split in two: recent history on the left, a highlighted pinned
+/// column on the right, ordered by how often each entry gets visited.
 /// </summary>
 [InitializeOnLoad]
 public class RecentAssetsWindow : EditorWindow
@@ -27,6 +29,7 @@ public class RecentAssetsWindow : EditorWindow
         public string typeName;  // "Prefab", "Material", "GameObject", ...
         public bool   pinned;
         public long   ticks;
+        public int    visits;    // how many times this entry has been selected
 
         [NonSerialized] public UnityEngine.Object cached;
         [NonSerialized] public bool resolved;
@@ -46,7 +49,19 @@ public class RecentAssetsWindow : EditorWindow
     bool showScene     = true;
     bool showOther     = true;
     string search      = "";
-    Vector2 scroll;
+
+    // Two-column layout
+    const float DividerWidth = 6f;
+    const float ColumnMin    = 150f;
+    const float RowHeight    = 20f;
+    const float HeaderHeight = 18f;
+
+    [SerializeField] float pinnedWidth = 220f;
+    Vector2 recentScroll;
+    Vector2 pinnedScroll;
+    bool    draggingDivider;
+
+    static GUIStyle labelStyle, missingStyle, countStyle;
 
     // -------------------------------------------------------------------------
     // Recording (runs regardless of whether the window is open)
@@ -106,14 +121,16 @@ public class RecentAssetsWindow : EditorWindow
             };
         }
 
-        e.ticks  = DateTime.Now.Ticks;
-        e.cached = obj;
+        e.ticks    = DateTime.Now.Ticks;
+        e.visits   = 1;
+        e.cached   = obj;
         e.resolved = true;
 
         int existing = history.FindIndex(x => x.kind == e.kind && x.id == e.id);
         if (existing >= 0)
         {
             e.pinned = history[existing].pinned;
+            e.visits = history[existing].visits + 1;
             history.RemoveAt(existing);
         }
 
@@ -159,6 +176,9 @@ public class RecentAssetsWindow : EditorWindow
             Kind kind;
             if (!Enum.TryParse(f[0], out kind)) continue;
 
+            int visits = 1;
+            if (f.Length > 6 && int.TryParse(f[6], out var v)) visits = Mathf.Max(1, v);
+
             history.Add(new Entry
             {
                 kind     = kind,
@@ -166,7 +186,8 @@ public class RecentAssetsWindow : EditorWindow
                 name     = f[2],
                 typeName = f[3],
                 pinned   = f[4] == "1",
-                ticks    = long.TryParse(f[5], out var t) ? t : 0
+                ticks    = long.TryParse(f[5], out var t) ? t : 0,
+                visits   = visits
             });
         }
     }
@@ -181,7 +202,8 @@ public class RecentAssetsWindow : EditorWindow
               .Append(e.name).Append(FieldSep)
               .Append(e.typeName).Append(FieldSep)
               .Append(e.pinned ? "1" : "0").Append(FieldSep)
-              .Append(e.ticks).Append(RecordSep);
+              .Append(e.ticks).Append(FieldSep)
+              .Append(e.visits).Append(RecordSep);
         }
         EditorPrefs.SetString(PrefsKey, sb.ToString());
     }
@@ -236,25 +258,47 @@ public class RecentAssetsWindow : EditorWindow
 
     void OnGUI()
     {
+        EnsureStyles();
         DrawToolbar();
 
         var filtered = history.Where(Passes).ToList();
 
-        if (filtered.Count == 0)
-        {
-            EditorGUILayout.HelpBox(
-                "Nothing here yet. Select prefabs, materials or scene objects and they'll be listed.",
-                MessageType.Info);
-            return;
-        }
+        var pinned = filtered.Where(x => x.pinned)
+                             .OrderByDescending(x => x.visits)
+                             .ThenByDescending(x => x.ticks)
+                             .ToList();
 
-        scroll = EditorGUILayout.BeginScrollView(scroll);
+        var recent = filtered.Where(x => !x.pinned)
+                             .OrderByDescending(x => x.ticks)
+                             .ToList();
 
-        // Pinned first, then most recent.
-        foreach (var e in filtered.OrderByDescending(x => x.pinned).ThenByDescending(x => x.ticks).ToList())
-            DrawRow(e);
+        var body = GUILayoutUtility.GetRect(0f, 0f, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+        if (body.height < RowHeight) return;
 
-        EditorGUILayout.EndScrollView();
+        float minCol = Mathf.Min(ColumnMin, (body.width - DividerWidth) * 0.5f);
+        pinnedWidth  = Mathf.Clamp(pinnedWidth, minCol, Mathf.Max(minCol, body.width - DividerWidth - minCol));
+
+        var leftRect  = new Rect(body.x, body.y, body.width - pinnedWidth - DividerWidth, body.height);
+        var divRect   = new Rect(leftRect.xMax, body.y, DividerWidth, body.height);
+        var rightRect = new Rect(divRect.xMax, body.y, pinnedWidth, body.height);
+
+        DrawColumn(leftRect, "Recent", recent, ref recentScroll, false,
+            "Nothing here yet. Select prefabs, materials or scene objects and they'll be listed.");
+
+        DrawDivider(divRect);
+
+        DrawColumn(rightRect, "Pinned", pinned, ref pinnedScroll, true,
+            "Right-click anything on the left and choose Add to Pinned.");
+    }
+
+    static void EnsureStyles()
+    {
+        if (labelStyle != null) return;
+
+        labelStyle   = new GUIStyle(EditorStyles.label);
+        missingStyle = new GUIStyle(EditorStyles.label);
+        missingStyle.normal.textColor = Color.gray;
+        countStyle   = new GUIStyle(EditorStyles.miniLabel) { alignment = TextAnchor.MiddleRight };
     }
 
     void DrawToolbar()
@@ -293,43 +337,131 @@ public class RecentAssetsWindow : EditorWindow
         }
     }
 
-    void DrawRow(Entry e)
+    // -------------------------------------------------------------------------
+    // Columns
+    // -------------------------------------------------------------------------
+
+    void DrawColumn(Rect area, string title, List<Entry> entries, ref Vector2 scrollPos,
+                    bool highlight, string emptyHint)
     {
-        var obj     = Resolve(e);
+        if (highlight)
+        {
+            EditorGUI.DrawRect(area, new Color(0.35f, 0.55f, 0.85f, 0.07f));
+            EditorGUI.DrawRect(new Rect(area.x, area.y, 2f, area.height), new Color(0.35f, 0.6f, 0.95f, 0.55f));
+        }
+
+        var headerRect = new Rect(area.x + 6, area.y + 2, area.width - 12, HeaderHeight);
+        GUI.Label(headerRect, entries.Count > 0 ? title + "  (" + entries.Count + ")" : title,
+                  EditorStyles.miniBoldLabel);
+
+        var listRect = new Rect(area.x + 4, area.y + HeaderHeight + 4,
+                                area.width - 8, area.height - HeaderHeight - 8);
+        if (listRect.height < RowHeight) return;
+
+        if (entries.Count == 0)
+        {
+            GUI.Label(new Rect(listRect.x, listRect.y, listRect.width, listRect.height),
+                      emptyHint, EditorStyles.wordWrappedMiniLabel);
+            return;
+        }
+
+        float contentHeight = entries.Count * RowHeight;
+        bool  needsBar      = contentHeight > listRect.height;
+        var   content       = new Rect(0, 0, listRect.width - (needsBar ? 16f : 0f), contentHeight);
+
+        scrollPos = GUI.BeginScrollView(listRect, scrollPos, content);
+        for (int i = 0; i < entries.Count; i++)
+            DrawRow(new Rect(0, i * RowHeight, content.width, RowHeight), entries[i]);
+        GUI.EndScrollView();
+    }
+
+    void DrawDivider(Rect rect)
+    {
+        EditorGUI.DrawRect(new Rect(rect.center.x - 0.5f, rect.y, 1f, rect.height), new Color(0f, 0f, 0f, 0.35f));
+        EditorGUIUtility.AddCursorRect(rect, MouseCursor.ResizeHorizontal);
+
+        var ev = Event.current;
+        switch (ev.type)
+        {
+            case EventType.MouseDown:
+                if (ev.button == 0 && rect.Contains(ev.mousePosition))
+                {
+                    draggingDivider = true;
+                    ev.Use();
+                }
+                break;
+
+            case EventType.MouseDrag:
+                if (draggingDivider)
+                {
+                    pinnedWidth -= ev.delta.x;
+                    ev.Use();
+                    Repaint();
+                }
+                break;
+
+            case EventType.MouseUp:
+                if (draggingDivider)
+                {
+                    draggingDivider = false;
+                    ev.Use();
+                }
+                break;
+        }
+    }
+
+    void DrawRow(Rect rect, Entry e)
+    {
+        var  obj     = Resolve(e);
         bool missing = obj == null;
+        var  ev      = Event.current;
 
-        var rect = EditorGUILayout.GetControlRect(false, 20f);
-
-        if (Event.current.type == EventType.Repaint && rect.Contains(Event.current.mousePosition))
+        if (ev.type == EventType.Repaint && rect.Contains(ev.mousePosition))
             EditorGUI.DrawRect(rect, new Color(1f, 1f, 1f, 0.05f));
 
+        float x = rect.x;
+        var pinRect  = new Rect(x, rect.y + 2, 16, 16); x += 18;
+        var iconRect = new Rect(x, rect.y + 2, 16, 16); x += 20;
+
+        bool  showCount = e.visits > 1;
+        bool  showType  = rect.width > 260f;
+        float tail      = (showCount ? 34f : 0f) + (showType ? 70f : 0f);
+
+        var labelRect = new Rect(x, rect.y, Mathf.Max(20f, rect.xMax - x - tail - 4f), rect.height);
+
         // Pin toggle
-        var pinRect = new Rect(rect.x, rect.y + 2, 16, 16);
         bool newPinned = GUI.Toggle(pinRect, e.pinned,
             EditorGUIUtility.IconContent(e.pinned ? "d_Favorite On Icon" : "d_Favorite"), GUIStyle.none);
         if (newPinned != e.pinned)
         {
             e.pinned = newPinned;
             Save();
+            RepaintAll();
         }
-
-        // Icon + label
-        var iconRect  = new Rect(rect.x + 18, rect.y + 2, 16, 16);
-        var labelRect = new Rect(rect.x + 38, rect.y, rect.width - 38 - 70, rect.height);
-        var typeRect  = new Rect(rect.xMax - 70, rect.y, 70, rect.height);
 
         if (!missing)
             GUI.DrawTexture(iconRect, AssetPreview.GetMiniThumbnail(obj), ScaleMode.ScaleToFit);
 
-        var style = new GUIStyle(EditorStyles.label);
-        if (missing) style.normal.textColor = Color.gray;
+        GUI.Label(labelRect, new GUIContent(missing ? e.name + "  (missing)" : e.name),
+                  missing ? missingStyle : labelStyle);
 
-        GUI.Label(labelRect, new GUIContent(missing ? e.name + "  (missing)" : e.name), style);
-        GUI.Label(typeRect, e.typeName, EditorStyles.miniLabel);
+        float t = rect.xMax - tail;
+        if (showCount)
+        {
+            GUI.Label(new Rect(t, rect.y, 34, rect.height),
+                      new GUIContent("×" + e.visits, "Visited " + e.visits + " times"), countStyle);
+            t += 34f;
+        }
+        if (showType)
+            GUI.Label(new Rect(t, rect.y, 70, rect.height), e.typeName, EditorStyles.miniLabel);
 
-        // Interaction
-        var ev = Event.current;
-        if (ev.type == EventType.MouseDown && rect.Contains(ev.mousePosition) && ev.button == 0 && ev.mousePosition.x > rect.x + 16)
+        // Interaction (the pin toggle owns the left-most strip)
+        if (ev.type != EventType.MouseDown ||
+            !rect.Contains(ev.mousePosition) ||
+            ev.mousePosition.x <= pinRect.xMax)
+            return;
+
+        if (ev.button == 0)
         {
             if (!missing)
             {
@@ -343,17 +475,19 @@ public class RecentAssetsWindow : EditorWindow
             }
             ev.Use();
         }
-
-        if (ev.type == EventType.MouseDown && rect.Contains(ev.mousePosition) && ev.button == 1)
+        else if (ev.button == 1)
         {
             var menu = new GenericMenu();
             if (!missing)
             {
-                menu.AddItem(new GUIContent("Ping"),  false, () => EditorGUIUtility.PingObject(obj));
-                menu.AddItem(new GUIContent("Open"),  false, () => AssetDatabase.OpenAsset(obj));
+                menu.AddItem(new GUIContent("Ping"), false, () => EditorGUIUtility.PingObject(obj));
+                menu.AddItem(new GUIContent("Open"), false, () => AssetDatabase.OpenAsset(obj));
+                menu.AddSeparator("");
             }
-            menu.AddItem(new GUIContent(e.pinned ? "Unpin" : "Pin"), false, () => { e.pinned = !e.pinned; Save(); });
-            menu.AddItem(new GUIContent("Remove"), false, () => { history.Remove(e); Save(); });
+            menu.AddItem(new GUIContent(e.pinned ? "Remove from Pinned" : "Add to Pinned"), false,
+                         () => { e.pinned = !e.pinned; Save(); RepaintAll(); });
+            menu.AddItem(new GUIContent("Remove"), false,
+                         () => { history.Remove(e); Save(); RepaintAll(); });
             menu.ShowAsContext();
             ev.Use();
         }

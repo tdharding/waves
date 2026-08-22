@@ -13,7 +13,7 @@ GameObject:
   - component: {fileID: 8278740392756435368}
   - component: {fileID: 3591305005463281525}
   - component: {fileID: 1293493957933528433}
-  m_Layer: 11
+  m_Layer: 0
   m_Name: SoulFishShoalPrefab
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -53,6 +53,7 @@ MonoBehaviour:
   fishMeshPrefab: {fileID: 8601840276035815252, guid: 3df4a022ec2860e40a6cb67f5b4b16f4, type: 3}
   soulCount: 1
   fishingDistance: 0.4
+  maskOwnedExternally: 0
 --- !u!114 &8278740392756435368
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -131,7 +132,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5185137460010661905}
-  m_Layer: 11
+  m_Layer: 0
   m_Name: Fish
   m_TagString: Untagged
   m_Icon: {fileID: 0}

@@ -64,14 +64,43 @@ public class BrightnessGlowController : MonoBehaviour
     [Header("Persistent Points")]
     [SerializeField] List<GlowPoint> persistentPoints = new();
 
+    [Header("Occlusion")]
+    [Tooltip("Which layers can hide a light. A point with one of these between it and the camera is " +
+             "dropped for that frame, so a lamp behind a rock stops glowing through it. Set to Nothing " +
+             "to switch the check off. Narrow it the way CameraOccluderFader's mask wants narrowing if " +
+             "the water plane or arena floor starts swallowing lights.")]
+    [SerializeField] LayerMask occluderLayers = ~0;
+
+    [Tooltip("Stops the ray short of the point, so a lamp's or the boat's own colliders never hide " +
+             "their own glow.")]
+    [SerializeField] float occluderPadding = 0.6f;
+
+    [Tooltip("Colliders with this tag are seen through. The arena walls are masked out in the shader " +
+             "but still have colliders on Default, so without this the camera looking in over a wall " +
+             "hides every light behind it at once. Blank = nothing is ignored.")]
+    [SerializeField] string ignoredOccluderTag = "OuterWalls";
+
+    [Header("Occlusion Debug")]
+    [Tooltip("Logs every glow point's state twice a second: on screen or not, blocked or not, and the " +
+             "name of the collider blocking it. If the log shows the points differing while the screen " +
+             "shows them all flipping together, the problem is in the graph, not here.")]
+    [SerializeField] bool logGlowPoints = false;
+
+    [Tooltip("Draws each camera-to-point ray in the scene view — red where something is blocking it.")]
+    [SerializeField] bool drawGlowRays = false;
+
     [Header("Street Lights")]
     [Tooltip("Give every lit street light a persistent glow point. The lights are found automatically " +
              "via StreetLightController.LitLights — nothing to wire, and nothing to tune on the prefab.")]
     [SerializeField] bool streetLightGlow = true;
 
-    [Tooltip("Shared settings for every lit street light — same four knobs as a persistent point, " +
-             "minus the target (the lamps supply that).")]
+    [Tooltip("The tight core of each lamp's glow — same four knobs as a persistent point, minus the " +
+             "target (the lamps supply that).")]
     [SerializeField] GlowSettings streetLights = new();
+
+    [Tooltip("The soft halo around each lamp: bigger and fainter than the core, sitting on the same " +
+             "point. Set its Opacity to 0 to switch the halo off and go back to one point per lamp.")]
+    [SerializeField] GlowSettings streetLightHalo = new() { radius = 0.22f, softness = 0.12f, opacity = 0.22f };
 
     // Triggered glow (fish catch, events etc.)
     class TriggerEntry
@@ -79,6 +108,11 @@ public class BrightnessGlowController : MonoBehaviour
         public Vector3 worldPos;
         public Vector2 viewportPos;
         public bool    isViewportSpace;
+
+        // Followed every frame so a burst rides with the boat instead of being left behind at the
+        // spot it fired from. Null for a burst fired at a bare world position; if the target is
+        // destroyed mid-burst, worldPos/viewportPos hold the last place it was seen.
+        public Transform follow;
         public float radiusStart;
         public float radiusEnd;
         public float softness;
@@ -99,6 +133,14 @@ public class BrightnessGlowController : MonoBehaviour
     readonly Vector4[] pointBuffer = new Vector4[MAX_POINTS];   // xy = uv, z = radius, w = softness
     readonly Vector4[] paramBuffer = new Vector4[MAX_POINTS];   // x  = per-point opacity
     int lastBuiltFrame = -1;
+
+    // Blockers considered in one cast, matching CameraOccluderFader's cap. More than this stacked in
+    // a single line of sight and the nearest ones have already decided the answer.
+    readonly RaycastHit[] occluderHits = new RaycastHit[16];
+
+    readonly System.Text.StringBuilder dbg = new();
+    float nextLogTime;
+    bool  logThisFrame;
 
     /// <summary>Master fade, 0-1. Settable from code for fades; mirrors the inspector slider.</summary>
     public static float Opacity
@@ -153,9 +195,21 @@ public class BrightnessGlowController : MonoBehaviour
         });
     }
 
-    // Convenience overload for a Transform
+    // Convenience overload for a Transform — this one follows the transform for its whole life.
     public static void TriggerGlow(Transform t, float duration, float radius = 0.2f, float softness = 0.07f)
-        => TriggerGlow(t.position, duration, radius, softness);
+    {
+        if (t == null) return;
+        triggers.Add(new TriggerEntry
+        {
+            follow      = t,
+            worldPos    = t.position,
+            radiusStart = radius,
+            radiusEnd   = 0f,
+            softness    = softness,
+            duration    = duration,
+            elapsed     = 0f
+        });
+    }
 
     // World-space capture burst — uses Capture Burst Settings from inspector
     public static void TriggerCaptureGlow(Transform t)
@@ -164,8 +218,10 @@ public class BrightnessGlowController : MonoBehaviour
         float softness = instance != null ? instance.captureSoftness    : 0.08f;
         float duration = instance != null ? instance.captureDuration    : 2f;
         float intensity = instance != null ? instance.captureIntensity : 3f;
+        if (t == null) return;
         triggers.Add(new TriggerEntry
         {
+            follow      = t,          // rides with the boat rather than staying where it fired
             worldPos    = t.position,
             radiusStart = range.x,
             radiusEnd   = range.y,
@@ -183,11 +239,14 @@ public class BrightnessGlowController : MonoBehaviour
         float softness = instance != null ? instance.burstSoftness : 0.07f;
         float duration = instance != null ? instance.burstDuration : 1.5f;
 
+        if (rt == null) return;
+
         Vector2 screenPos = rt.position;
         Vector2 vp = new Vector2(screenPos.x / Screen.width, screenPos.y / Screen.height);
         triggers.Add(new TriggerEntry
         {
             isViewportSpace = true,
+            follow          = rt,     // a HUD element that slides keeps its glow attached
             viewportPos     = vp,
             radiusStart     = r,
             radiusEnd       = 0f,
@@ -239,6 +298,13 @@ public class BrightnessGlowController : MonoBehaviour
     {
         int count = 0;
 
+        logThisFrame = logGlowPoints && Time.unscaledTime >= nextLogTime;
+        if (logThisFrame)
+        {
+            nextLogTime = Time.unscaledTime + 0.5f;
+            dbg.Clear();
+        }
+
         // Inspector points first, then bursts, then street lights — so a fish-catch burst can never
         // be the thing squeezed out by a level full of lit lamps.
         for (int i = 0; i < persistentPoints.Count && count < MAX_POINTS; i++)
@@ -250,28 +316,45 @@ public class BrightnessGlowController : MonoBehaviour
             float norm = Mathf.Clamp01(t.elapsed / t.duration);
             float r    = Mathf.Lerp(t.radiusStart, t.radiusEnd, norm);
 
-            // Bursts carry their own falloff through radius/intensity, so they ride at full opacity.
+            // A burst's intensity rides in its own mask value instead of the shared
+            // _BrightnessIntensity, so catching a fish flares that one point and leaves every other
+            // light alone. The graph does Lerp(scene, scene + I, mask) = scene + mask * I, so a mask
+            // of intensity/I lands exactly on the intensity asked for — including above 1, which the
+            // Lerp extrapolates rather than clamps.
+            float ceiling = Mathf.Max(brightnessIntensity, 0.0001f);
+            float burst   = t.intensity <= 0f
+                          ? 1f
+                          : Mathf.Lerp(t.intensity, brightnessIntensity, norm) / ceiling;
+
             if (t.isViewportSpace)
             {
-                AddSlot(t.viewportPos, r, t.softness, 1f, ref count);
+                // Re-read the HUD element each frame so the burst tracks it if it moves.
+                if (t.follow != null)
+                {
+                    Vector2 sp = t.follow.position;
+                    t.viewportPos = new Vector2(sp.x / Screen.width, sp.y / Screen.height);
+                }
+                AddSlot(t.viewportPos, r, t.softness, burst, ref count);
                 continue;
             }
 
+            if (t.follow != null) t.worldPos = t.follow.position;
+
             if (TryProject(cam, t.worldPos, r, out Vector2 uv))
-                AddSlot(uv, r, t.softness, 1f, ref count);
+                AddSlot(uv, r, t.softness, burst, ref count);
         }
 
         // Lit street lights, last. No registration step: the lamps already maintain LitLights, and
         // the glow sits on InstLightPosition — the exact point they hand InstancedLightManager, the
         // one their scene gizmo draws — so the screen bloom can never drift off the lit-from point.
-        if (streetLightGlow && streetLights.opacity > 0f && streetLights.weight > 0f)
+        if (streetLightGlow)
         {
             var lamps = StreetLightController.LitLights;
             for (int i = 0; i < lamps.Count && count < MAX_POINTS; i++)
             {
                 var lamp = lamps[i];
                 if (lamp == null) continue;   // destroyed on level teardown but still listed
-                TryAddPointAt(cam, lamp.InstLightPosition, streetLights, ref count);
+                AddLamp(cam, lamp, ref count);
             }
         }
 
@@ -286,16 +369,16 @@ public class BrightnessGlowController : MonoBehaviour
         Shader.SetGlobalFloat(GlowPointCountPID, count);
         Shader.SetGlobalFloat(GlowOpacityPID, opacity);
 
+        if (logThisFrame)
+            Debug.Log($"[Glow] pushed _GlowPointCount {count}, _GlowOpacity {opacity:0.00}, " +
+                      $"{StreetLightController.LitLights.Count} lit lamps{dbg}");
+
+        // _BrightnessIntensity stays put at the authored value — it is the shared ceiling every point
+        // scales against, not a per-event knob. Raising it for a burst was what flared every light
+        // on screen at once; that ramp now lives in the burst's own mask value above.
         if (glowMaterial != null)
         {
-            float matIntensity = brightnessIntensity;
-            foreach (var t in triggers)
-            {
-                float norm   = Mathf.Clamp01(t.elapsed / t.duration);
-                float tValue = Mathf.Lerp(t.intensity, brightnessIntensity, norm);
-                matIntensity = Mathf.Max(matIntensity, tValue);
-            }
-            glowMaterial.SetFloat(BrightnessIntensityPID, matIntensity);
+            glowMaterial.SetFloat(BrightnessIntensityPID, brightnessIntensity);
             // Bare $Globals uniform: dual-write so a material-scoped read sees the same value.
             glowMaterial.SetFloat(GlowOpacityPID, opacity);
         }
@@ -308,17 +391,115 @@ public class BrightnessGlowController : MonoBehaviour
         float r = p.radius * p.weight;
         if (r <= 0f) return;
 
-        if (TryProject(cam, p.target.position, r, out Vector2 uv))
-            AddSlot(uv, r, p.softness, p.opacity, ref count);
+        TryAddWorld(cam, p.target.position, r, p.softness, p.opacity, p.target.name, ref count);
     }
 
-    void TryAddPointAt(Camera cam, Vector3 worldPos, GlowSettings s, ref int count)
+    // Both of a lamp's points — the tight core and the soft halo — sit on InstLightPosition, so they
+    // share one occlusion ray rather than casting the same ray twice. The core is added first, so a
+    // lamp that runs into the point budget loses its halo and keeps its light.
+    void AddLamp(Camera cam, StreetLightController lamp, ref int count)
     {
-        float r = s.radius * s.weight;
-        if (r <= 0f) return;
+        Vector3 p = lamp.InstLightPosition;
 
-        if (TryProject(cam, worldPos, r, out Vector2 uv))
-            AddSlot(uv, r, s.softness, s.opacity, ref count);
+        float coreR = streetLights.opacity    > 0f ? streetLights.radius    * streetLights.weight    : 0f;
+        float haloR = streetLightHalo.opacity > 0f ? streetLightHalo.radius * streetLightHalo.weight : 0f;
+        if (coreR <= 0f && haloR <= 0f) return;
+
+        Vector2 coreUV  = default, haloUV = default;
+        bool    coreOn  = coreR > 0f && TryProject(cam, p, coreR, out coreUV);
+        bool    haloOn  = haloR > 0f && TryProject(cam, p, haloR, out haloUV);
+        string  blocker = null;
+        bool    blocked = (coreOn || haloOn) && IsOccluded(cam, p, out blocker);
+
+        if (coreR > 0f)
+            AddResolved(coreUV, coreOn, blocked, blocker, coreR, streetLights.softness,
+                        streetLights.opacity, lamp.name, ref count);
+
+        if (haloR > 0f && count < MAX_POINTS)
+            AddResolved(haloUV, haloOn, blocked, blocker, haloR, streetLightHalo.softness,
+                        streetLightHalo.opacity, lamp.name + " halo", ref count);
+    }
+
+    void TryAddWorld(Camera cam, Vector3 worldPos, float radius, float softness, float pointOpacity,
+                     string label, ref int count)
+    {
+        string blocker  = null;
+        bool   onScreen = TryProject(cam, worldPos, radius, out Vector2 uv);
+        bool   blocked  = onScreen && IsOccluded(cam, worldPos, out blocker);
+
+        AddResolved(uv, onScreen, blocked, blocker, radius, softness, pointOpacity, label, ref count);
+    }
+
+    void AddResolved(Vector2 uv, bool onScreen, bool blocked, string blocker, float radius,
+                     float softness, float pointOpacity, string label, ref int count)
+    {
+        if (logThisFrame)
+        {
+            dbg.Append("\n  ").Append(label).Append(": ");
+            if (!onScreen)     dbg.Append("OFF SCREEN");
+            else if (blocked)  dbg.Append("blocked by '").Append(blocker).Append('\'');
+            else               dbg.Append("visible → slot ").Append(count)
+                                  .Append(" uv(").Append(uv.x.ToString("0.00")).Append(", ")
+                                  .Append(uv.y.ToString("0.00")).Append(") r ").Append(radius.ToString("0.000"))
+                                  .Append(" opacity ").Append(pointOpacity.ToString("0.00"));
+        }
+
+        if (onScreen && !blocked)
+            AddSlot(uv, radius, softness, pointOpacity, ref count);
+    }
+
+    // One ray per point, and only for points that already passed the on-screen test above — a level
+    // full of lamps costs at most MAX_POINTS casts a frame. Runs at render time against the physics
+    // state from the last FixedUpdate, which is what the frame is drawing anyway.
+    bool IsOccluded(Camera cam, Vector3 worldPos, out string blocker)
+    {
+        blocker = null;
+        if (occluderLayers.value == 0) return false;
+
+        Vector3 from  = cam.transform.position;
+        Vector3 delta = worldPos - from;
+        float   full  = delta.magnitude;
+        float   dist  = full - occluderPadding;
+
+        // Point is nearer than the padding — there is no room for anything to be in the way.
+        if (full <= 0.0001f || dist <= 0.01f) return false;
+
+        Vector3 dir = delta / full;
+
+        // Every hit, not just the nearest: the nearest one is usually an arena wall, and stopping
+        // there would report "blocked" for a wall the player is already seeing straight through.
+        int hits = Physics.RaycastNonAlloc(from, dir, occluderHits, dist, occluderLayers, QueryTriggerInteraction.Ignore);
+        hits = Mathf.Min(hits, occluderHits.Length);
+
+        bool ignoreByTag = !string.IsNullOrEmpty(ignoredOccluderTag);
+        bool report      = logThisFrame || drawGlowRays;
+        int  seenThrough = 0;
+        bool occluded    = false;
+
+        // Scan every hit rather than stopping at the first blocker — RaycastNonAlloc does not return
+        // them in distance order, so an early exit would under-report the walls we saw through.
+        for (int i = 0; i < hits; i++)
+        {
+            Collider col = occluderHits[i].collider;
+            if (col == null) continue;
+
+            if (ignoreByTag && col.CompareTag(ignoredOccluderTag)) { seenThrough++; continue; }
+
+            if (report && !occluded)
+                blocker = $"{col.name} [{LayerMask.LayerToName(col.gameObject.layer)}] " +
+                          $"at {occluderHits[i].distance:0.0}m of {dist:0.0}m";
+
+            occluded = true;
+            if (!report) break;   // nothing left to learn once we know it is blocked
+        }
+
+        if (report && occluded && seenThrough > 0)
+            blocker += $" (saw through {seenThrough} '{ignoredOccluderTag}')";
+
+        if (drawGlowRays)
+            Debug.DrawLine(from, worldPos, occluded ? Color.red : Color.green);
+
+        return occluded;
     }
 
     void AddSlot(Vector2 uv, float radius, float softness, float pointOpacity, ref int count)

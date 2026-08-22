@@ -229,24 +229,29 @@ Vector3 centre = GetArenaCentre();
 
         if (sonarGridParent != null)
         {
+            // The lattice is arena-centred and static, so sit it on the same centre the
+            // shader masks against (_ArenaMask below) rather than wherever the scene left it.
             Vector3 sp = sonarGridParent.position;
             sp.y = baselineWaterY;
+            if (arenaProfile != null)
+            {
+                sp.x = arenaProfile.arenaCentreOffset.x;
+                sp.z = arenaProfile.arenaCentreOffset.y;
+            }
             sonarGridParent.position = sp;
 
             if (arenaProfile != null)
             {
-                var sonarGen = sonarGridParent.GetComponentInChildren<SonarPlaneGenerator>();
+                // Include inactive — the grid parent is switched off while sonar is idle
+                var sonarGen = sonarGridParent.GetComponentInChildren<SonarPlaneGenerator>(true);
 
                 // Load this level's sonar grid formation (set in the Grid Designer).
                 // Null keeps whatever formation is already on the scene generator.
                 if (sonarGen != null && activeGridData != null && activeGridData.sonarGridType != null)
                     sonarGen.SetGridType(activeGridData.sonarGridType);
 
-                if (sonarController != null)
-                {
-                    float sonarScale = arenaProfile.WorldArenaWidth * arenaProfile.wavePlaneCoverageMultiplier;
-                    sonarController.SetGridArea(sonarScale, 5f);
-                }
+                // Lattice size is not pushed from here — SonarController derives the arena square
+                // from the BaselineMarker handed to it by LevelSpawner (BaselineMarker.discRadius x 2).
 
                 Material sonarMat = sonarGen?.GridType?.planeMaterial;
                 if (sonarMat != null)
@@ -287,6 +292,7 @@ Vector3 centre = GetArenaCentre();
             mapPointer.BuildMazeWallMap();
             mapPointer.BuildSplineWallMap();
             mapPointer.BuildCubeBuildingMap();
+            mapPointer.BuildProceduralSpikeMap();
             mapPointer.BuildStreetLightMap();
             mapPointer.UpdateExitMarkers();
             mapPointer.UpdateEntranceMarkers();
@@ -552,7 +558,7 @@ Vector3 centre = GetArenaCentre();
     public Material GetSonarGridMaterial()
     {
         if (sonarGridParent == null) return null;
-        var sonarGen = sonarGridParent.GetComponentInChildren<SonarPlaneGenerator>();
+        var sonarGen = sonarGridParent.GetComponentInChildren<SonarPlaneGenerator>(true);
         return sonarGen != null && sonarGen.GridType != null ? sonarGen.GridType.planeMaterial : null;
     }
 

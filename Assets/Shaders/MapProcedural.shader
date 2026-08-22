@@ -14,6 +14,7 @@ Shader "Waves/MapProcedural"
         _GradientPower ("Gradient Power", Range(0.1, 4)) = 1
         _RockStrength  ("Rock Overlay Strength", Range(0, 1)) = 1
         _Alpha         ("Overall Alpha", Range(0, 1)) = 1
+        [Toggle] _FlatVertexColor ("Flat Vertex Colour (skip gradient)", Float) = 0
     }
 
     SubShader
@@ -50,6 +51,7 @@ Shader "Waves/MapProcedural"
                 float  _GradientPower;
                 float  _RockStrength;
                 float  _Alpha;
+                float  _FlatVertexColor;
             CBUFFER_END
 
             // Global radial mask — set by UIMapController via Shader.SetGlobal* so map
@@ -102,6 +104,14 @@ Shader "Waves/MapProcedural"
                 // Per-vertex tint/alpha — lets generated icons bake shape fades (e.g. spike base).
                 rgb          *= IN.color.rgb;
                 float alpha   = grad.a * _Alpha * IN.color.a * saturate(1.0 - _MapUIFadeOut);
+
+                // Flat mode: output the vertex colour directly (used by street-light bulb/halo so a
+                // lit bulb can be pure white / a visible halo, unbounded by the dark gradient).
+                if (_FlatVertexColor > 0.5)
+                {
+                    rgb   = IN.color.rgb;
+                    alpha = IN.color.a * _Alpha * saturate(1.0 - _MapUIFadeOut);
+                }
 
                 // Radial mask: fade to nothing past _MapMaskRadius (world distance from centre).
                 if (_MapMaskRadius > 0.0)

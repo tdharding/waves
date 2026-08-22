@@ -26,22 +26,24 @@ MonoBehaviour:
     TwirlScale: 0.48
     DepthTwirlStrength: 4.17
     DepthFadeStrength: 1.99
-    DepthFadeLine: 3.66
+    DepthFadeLine: 1.74
     WhirlpoolTwirlStrength: 11.52
     WhirlpoolAreaTwirlStrength: 14.55
     SoulFishTwirlStrength: 0.78
-    SoulFishMaskStrength: 0.059
+    SoulFishMaskStrength: 0.036
     SoulFishRadius: 1.49
-    SoulFishBrightness1: 3
-    SoulFishFadeStart: 0
-    SoulFishEdgeNoiseStrength: 0.17
+    SoulFishBrightness1: 1.66
+    SoulFishFadeStart: 0.3
+    SoulFishEdgeNoiseStrength: -0.06
     SoulFishEdgeNoiseScale: 6.19
     SoulFishEdgeNoiseScale2: 160.3
     SoulFishEdgeNoiseSpeed: 0.25
-    ZoneTiling: {x: -0.67, y: 0.98}
+    SoulFishTaperStrength: 0.925
+    SoulFishTaperScale: 1.48
+    ZoneTiling: {x: -0.1, y: 3.3}
     ZoneScrollSpeed: 0.015
     ZoneNoiseStrength: 0.16
-    ZoneTexture: {fileID: 2800000, guid: f0208073e7e1ff74f8d935f89de3e807, type: 3}
+    ZoneTexture: {fileID: 2800000, guid: 4379fff8590b78646a3dd7b4b565120e, type: 3}
     WhirlpoolTaper: 1.49
     WhirlpoolDarkRadiusMult: 2.25
     WhirlpoolDarkStrength: 1
@@ -49,11 +51,11 @@ MonoBehaviour:
     WaveStepRate: 4000
     BaseColor: {r: 0.9245283, g: 0.9245283, b: 0.9245283, a: 1}
     LightDirection: {x: 1.85, y: -50.8, z: 54.72}
-    FoamDitherSize: 2.74
+    FoamDitherSize: 3.89
     FoamDistanceDepth: -0.47
-    FoamDepthFade: -0.2
+    FoamDepthFade: -0.29
     FoamColor: {r: 0, g: 0, b: 0, a: 1}
-    FoamLine: 0.09
+    FoamLine: 0.02
     DepthFade: 1.13
     DepthColour: {r: 1, g: 1, b: 1, a: 0}
     DistanceDepth: 0.78

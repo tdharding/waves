@@ -156,6 +156,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 3714185085028481474}
+  - component: {fileID: 4632395437468142111}
   m_Layer: 0
   m_Name: SmallMazeSpike
   m_TagString: Untagged
@@ -179,6 +180,25 @@ Transform:
   - {fileID: 1742056185244653183}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &4632395437468142111
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4089478517322769272}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0b0361b026ad988408fb061fe6eb75d6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CreepClimbingArea
+  centreOffset: {x: -0.16, y: -0.13, z: 0}
+  lowerRingRadius: 0.17
+  lowerRingHeight: -1.41
+  upperRingRadius: 0.03
+  upperRingHeight: -1
+  spawnRingRadius: 0.23
+  spawnRingHeight: -2.06
 --- !u!1 &6432240223041932546
 GameObject:
   m_ObjectHideFlags: 0
@@ -336,4 +356,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 627096fb1bde93746bf66ff381d6378c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PrefabBaselineAlignment
-  showDebug: 0
+  showDebug: 1
+  useForwardOverride: 0
+  forwardEuler: {x: 0, y: 0, z: 0}
+  useUpOverride: 0
+  upEuler: {x: 0, y: 0, z: 0}
+  useWallDepth: 0
+  wallDepth: 0
+  useScaleRadius: 0
+  scaleRadius: 3
+  usePrefabTopMarker: 0
+  prefabTopHeight: 3

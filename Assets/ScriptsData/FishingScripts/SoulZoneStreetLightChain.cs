@@ -33,6 +33,11 @@ public class SoulZoneStreetLightChain : MonoBehaviour
     [Tooltip("Seconds the newly lit light's pool takes to bloom to full radius before the path draws.")]
     public float poolOpenSeconds = 0.75f;
 
+    // The fish orbit radius (as a fraction of each light's painted pool) lives on
+    // SoulFishController so it's one knob for the whole level — see SwimRadiusFactor there.
+    // Changing it rebuilds this spline live; _builtRadiusFactor tracks what we last built with.
+    float _builtRadiusFactor = -1f;
+
     // ── wired by Init ────────────────────────────────────
     List<Vector3> _regPath;               // dense path, final/mask space
     List<Vector3> _worldPath;             // dense path, world space (for re-baking local after a move)
@@ -65,6 +70,18 @@ public class SoulZoneStreetLightChain : MonoBehaviour
     public int   FrontierIndex  => Mathf.Clamp(_litCount - 1, 0, _lights.Count - 1);
     public int   FrontierDense  => _lightDense[FrontierIndex];
     public float FrontierRadius => _poolRadii[FrontierIndex];
+
+    // ── Debug surface (SoulFishDebugTracer) ──────────────
+    public int LitCount   => _litCount;
+    public int LightCount => _lights != null ? _lights.Count : 0;
+    public bool IsRevealing => _revealing;
+    public IReadOnlyList<SplineAnimate> DebugFish => _fish;
+    public void DebugWindow(out float start, out float end)
+    {
+        int f = FrontierIndex;
+        start = (_circleStartNorm != null && f < _circleStartNorm.Length) ? _circleStartNorm[f] : 0f;
+        end   = (_circleEndNorm   != null && f < _circleEndNorm.Length)   ? _circleEndNorm[f]   : 0f;
+    }
 
     public void Init(
         List<Vector3> regPath, List<Vector3> worldPath, List<int> lightDenseIndices,
@@ -121,37 +138,82 @@ public class SoulZoneStreetLightChain : MonoBehaviour
     {
         var knots = new List<Vector3>();
         var cum   = new List<float>();
+        var round = new List<bool>();   // true = circle knot (smooth), false = corridor knot (linear)
         _circleStartNorm = new float[_lights.Count];
         _circleEndNorm   = new float[_lights.Count];
         var csIdx = new int[_lights.Count];
         var ceIdx = new int[_lights.Count];
 
-        void Add(Vector3 p)
+        void Add(Vector3 p, bool isCircle)
         {
             cum.Add(knots.Count == 0 ? 0f : cum[cum.Count - 1] + Vector3.Distance(knots[knots.Count - 1], p));
             knots.Add(p);
+            round.Add(isCircle);
         }
 
-        // Lead-in: start node up to light #1.
-        for (int i = 0; i <= _lightDense[0]; i++) Add(_localPath[i]);
-
+        const float TAU = Mathf.PI * 2f;
         int n = _knotCount;
+
         for (int k = 0; k < _lights.Count; k++)
         {
+            // Orbit inside the painted pool rather than on its rim, so the shoal reads as held by
+            // the light's zone instead of skating around its edge.
             Vector3 center = _localPath[_lightDense[k]];
-            float   r      = Mathf.Max(_poolRadii[k], 0.05f);
+            float   r      = Mathf.Max(_poolRadii[k] * SoulFishController.SwimRadiusFactor, 0.05f);
 
+            // Corridor INTO this light — deliberately stopping one node short of the light's own
+            // node. Running all the way to the centre and then starting the ring at a fixed angle
+            // is what produced the spike from the middle out to the rim; fish should meet the orbit
+            // where the path crosses it.
+            int from = (k == 0) ? 0 : _lightDense[k - 1] + 1;
+            int to   = _lightDense[k] - 1;
+            for (int i = from; i <= to; i++) Add(_localPath[i], false);
+
+            // Direction of travel arriving at the light, so the entry point is the ring crossing on
+            // the side the fish actually come from.
+            Vector3 inDir;
+            if (knots.Count > 0) inDir = center - knots[knots.Count - 1];
+            else if (_localPath.Length > _lightDense[k] + 1) inDir = _localPath[_lightDense[k] + 1] - center;
+            else inDir = Vector3.forward;
+            inDir.y = 0f;
+            if (inDir.sqrMagnitude < 1e-8f) inDir = Vector3.forward;
+            inDir.Normalize();
+
+            Vector3 entryOff = -inDir * r;                              // near side of the ring
+            float   entryAng = Mathf.Atan2(entryOff.z, entryOff.x);
+
+            // The circle starts AT that crossing and sweeps a full turn back to it. Start and end
+            // are therefore the same position, so the gate's wrap is a zero-distance hop and the
+            // orbit reads as one continuous loop.
             csIdx[k] = knots.Count;
-            for (int a = 0; a < n; a++)
+            Add(center + entryOff, true);
+            for (int a = 1; a <= n; a++)
             {
-                float ang = (a / (float)n) * Mathf.PI * 2f;
-                Add(center + new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang)) * r);
+                float ang = entryAng + (a / (float)n) * TAU;
+                Add(center + new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang)) * r, true);
             }
             ceIdx[k] = knots.Count - 1;
 
-            // Corridor to the next light.
+            // Once the frontier moves on, fish carry on around the ring to the crossing that faces
+            // the next light and leave from there — again meeting the corridor on the rim, not the
+            // centre. The following light's block adds the corridor itself.
             if (k < _lights.Count - 1)
-                for (int i = _lightDense[k] + 1; i <= _lightDense[k + 1]; i++) Add(_localPath[i]);
+            {
+                int nextIdx = Mathf.Min(_lightDense[k] + 1, _localPath.Length - 1);
+                Vector3 outDir = _localPath[nextIdx] - center;
+                outDir.y = 0f;
+                if (outDir.sqrMagnitude < 1e-8f) outDir = inDir;
+                outDir.Normalize();
+
+                float exitAng = Mathf.Atan2(outDir.z, outDir.x);
+                float delta   = Mathf.Repeat(exitAng - entryAng, TAU);   // keep turning the same way
+                int   arcN    = Mathf.Max(1, Mathf.CeilToInt(n * delta / TAU));
+                for (int a = 1; a <= arcN; a++)
+                {
+                    float ang = entryAng + delta * a / arcN;
+                    Add(center + new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang)) * r, true);
+                }
+            }
         }
 
         float total = Mathf.Max(cum[cum.Count - 1], 1e-4f);
@@ -161,11 +223,19 @@ public class SoulZoneStreetLightChain : MonoBehaviour
             _circleEndNorm[k]   = cum[ceIdx[k]] / total;
         }
 
+        // Corridor knots are LINEAR: the mask paints straight bands between the dense path points
+        // (distToSegment in SoulFishWaveMask.hlsl), so smoothing here would bow the swim path
+        // outside the painted zone — worst at corners. Curvature belongs to the authored path and
+        // already arrives baked into _localPath, so linear tangents reproduce it exactly.
+        // Circle knots keep AutoSmooth so a light's ring stays round with few knots.
         var spline = _splineContainer.Spline;
         spline.Clear();
-        foreach (var p in knots)
-            spline.Add(new BezierKnot((float3)p), TangentMode.AutoSmooth);
+        for (int i = 0; i < knots.Count; i++)
+            spline.Add(new BezierKnot((float3)knots[i]),
+                       round[i] ? TangentMode.AutoSmooth : TangentMode.Linear);
         spline.Closed = false;
+
+        _builtRadiusFactor = SoulFishController.SwimRadiusFactor;
 
         var win = new System.Text.StringBuilder();
         for (int k = 0; k < _lights.Count; k++)
@@ -225,20 +295,40 @@ public class SoulZoneStreetLightChain : MonoBehaviour
     // naturally flow out of the old circle and on to the new one.
     void LateUpdate()
     {
+        // Live retune: rebuilding is safe because the route is rebuilt in the SAME container-local
+        // space it was baked in, so the fish stay attached to the level.
+        if (_localPath != null && !Mathf.Approximately(_builtRadiusFactor, SoulFishController.SwimRadiusFactor))
+            BuildSwimSpline();
+
         if (!_fishCached) { CacheFish(); return; }
 
-        int   frontier = Mathf.Clamp(_litCount - 1, 0, _lights.Count - 1);
+        int frontier = Mathf.Clamp(_litCount - 1, 0, _lights.Count - 1);
+
+        // Fish "arrive" once they first reach the frontier circle; only then are they held in it.
+        // Reset on a frontier change so a newly opened light lets them swim on.
+        if (frontier != _gateFrontier) { _arrived.Clear(); _gateFrontier = frontier; }
+
         float cs = _circleStartNorm[frontier];
-        float ce = _circleEndNorm[frontier];
+        // The last light's circle ends exactly at 1.0 — the end of the spline. SplineAnimate's own
+        // Loop wraps 1.0 -> 0 inside its update, which would fling the fish back to the lead-in
+        // before this gate ever saw them. Wrapping fractionally early keeps ownership here.
+        float ce = Mathf.Min(_circleEndNorm[frontier], 0.999f);
+        float span = Mathf.Max(ce - cs, 1e-4f);
 
         foreach (var sa in _fish)
         {
             if (sa == null) continue;
             float t = sa.NormalizedTime;
+
+            if (!_arrived.Contains(sa))
+            {
+                if (t >= cs) _arrived.Add(sa);   // reached the circle for the first time
+                else continue;                    // still swimming in — leave it alone
+            }
+
             if (t >= ce)
             {
-                float nt = cs + (t - ce);   // carry the small per-frame overflow
-                if (nt < cs || nt >= ce) nt = cs;
+                float nt = cs + Mathf.Repeat(t - ce, span);
                 sa.NormalizedTime = nt;
                 if (!_gateFiredLogged)
                 {
@@ -247,9 +337,20 @@ public class SoulZoneStreetLightChain : MonoBehaviour
                               $"(frontier #{frontier + 1}, window [{cs:F3}..{ce:F3}]).");
                 }
             }
+            else if (t < cs)
+            {
+                // Arrived but now behind the circle: SplineAnimate looped past the spline end.
+                // Pull it back into the circle rather than let it re-swim the whole river.
+                sa.NormalizedTime = cs;
+            }
         }
+
+        // Spread the shoal across the corridor instead of single file down its centre.
+        SoulFishController.ApplyLateralSpread(_fish, _pathRadius);
     }
     bool _gateFiredLogged;
+    int  _gateFrontier = -1;
+    readonly HashSet<SplineAnimate> _arrived = new HashSet<SplineAnimate>();
 
     /// <summary>Only the next unlit light accepts a soul, and never while a sequence runs.</summary>
     public bool CanFeed(StreetLightController light) =>

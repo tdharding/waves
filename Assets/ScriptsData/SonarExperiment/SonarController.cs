@@ -12,8 +12,14 @@ public class SonarController : MonoBehaviour
     [SerializeField] Transform            boatTransform;
 
     [Header("Grid Coverage")]
-    [SerializeField] float horizontalGridArea = 10f;
-    [SerializeField] float verticalGridArea   = 5f;
+    [Tooltip("Depth of the lattice below the surface. The horizontal footprint is not set here — " +
+             "it comes from the BaselineMarker's disc radius.")]
+    [SerializeField] float verticalGridArea = 5f;
+
+    // The square the arena disc fits into neatly. BaselineMarker.discRadius is the arena size
+    // authority (the same value ArenaProfile.GetDiscRadius reads off the outer walls prefab),
+    // so the lattice is always exactly the arena's bounding square.
+    public float ArenaSquareSide => baselineMarker != null ? baselineMarker.discRadius * 2f : 0f;
 
     [Header("Wave Mask")]
     [SerializeField] Transform      waterTransform;
@@ -26,6 +32,7 @@ public class SonarController : MonoBehaviour
     {
         baselineMarker = marker;
         RecalculateWaveMaskBias();
+        ConfigureGenerator();   // the marker's disc radius sizes the lattice — rebuild on it
     }
 
     public void RecalculateWaveMaskBias()
@@ -85,13 +92,6 @@ public class SonarController : MonoBehaviour
 
     public void SetBoat(Transform boat) => boatTransform = boat;
 
-    public void SetGridArea(float horizontal, float vertical)
-    {
-        horizontalGridArea = horizontal;
-        verticalGridArea = vertical;
-        ConfigureGenerator();
-    }
-
     void OnEnable()
     {
         _hBlock = new MaterialPropertyBlock();
@@ -113,16 +113,33 @@ public class SonarController : MonoBehaviour
     void ConfigureGenerator()
     {
         if (generator == null || generator.GridType == null) return;
+
+        float side = ArenaSquareSide;
+        if (side <= 0f)
+        {
+            Debug.LogWarning("[SonarController] No BaselineMarker assigned — the arena square is " +
+                             "unknown, so the sonar lattice was left as-is.", this);
+            return;
+        }
+
         var   gt           = generator.GridType;
         int   maxAxis      = Mathf.Max(1, gt.columns, gt.rows);
-        float cellSize     = horizontalGridArea / maxAxis;
-        float levelSpacing = verticalGridArea   / Mathf.Max(1, gt.levels);
+        float cellSize     = side / maxAxis;
+        float levelSpacing = verticalGridArea / Mathf.Max(1, gt.levels);
         float surfaceY     = waterTransform != null ? waterTransform.position.y : 0f;
         generator.Configure(cellSize, levelSpacing, surfaceY);
+
+        if (debugLog)
+            Debug.Log($"[SonarController] Arena square {side:F2}u (discRadius {baselineMarker.discRadius:F2}) " +
+                      $"/ {maxAxis} = cell {cellSize:F3}u — {gt.columns}x{gt.rows}x{gt.levels}", this);
     }
 
     void Update()
     {
+        // The grid parent is switched off while sonar is idle — skip the per-frame pushes
+        // (this controller may live outside that parent, so it keeps ticking otherwise).
+        if (generator != null && !generator.gameObject.activeInHierarchy) return;
+
         int count     = PackOrigins();
         int lureCount = PackLureOrigins();
 

@@ -151,7 +151,7 @@ Material:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _BlackColor: {r: 0, g: 0, b: 0, a: 1}
     - _BoatForward: {r: 0.0077015324, g: -0.105086625, b: 0.9944332, a: 0}
-    - _BoatPosition: {r: 2.3875408, g: -5.446693, b: -4.1136127, a: 0}
+    - _BoatPosition: {r: -6.370233, g: -5.4458046, b: 10.671818, a: 0}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _Color1: {r: 1, g: 1, b: 1, a: 1}
     - _Color2: {r: 1, g: 1, b: 1, a: 1}

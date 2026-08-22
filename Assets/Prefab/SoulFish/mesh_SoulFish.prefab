@@ -117,10 +117,9 @@ GameObject:
   - component: {fileID: 7610767233691522748}
   - component: {fileID: 8433909322147317333}
   - component: {fileID: 1482573791322986164}
-  - component: {fileID: 5888994491461129825}
   - component: {fileID: 264990646817891965}
   - component: {fileID: 6357842169553546364}
-  m_Layer: 11
+  m_Layer: 0
   m_Name: mesh_SoulFish
   m_TagString: Fish
   m_Icon: {fileID: 0}
@@ -250,19 +249,6 @@ MonoBehaviour:
   fishing: {fileID: 0}
   CatchSuppressed: 0
   WaterSnapBlend: 1
---- !u!210 &5888994491461129825
-SortingGroup:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8601840276035815252}
-  m_Enabled: 1
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
-  m_SortingOrder: 3
-  m_SortAtRoot: 0
-  m_Sort3DAs2D: 0
 --- !u!114 &264990646817891965
 MonoBehaviour:
   m_ObjectHideFlags: 0

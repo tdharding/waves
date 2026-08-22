@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aa6733965f8f67c4f9ffee59697153ef, type: 3}
+  m_Name: SteppedBuildingPreset1
+  m_EditorClassIdentifier: Assembly-CSharp::SteppedBuildingPreset
+  config:
+    cellSize: 0.31
+    rimCells: 1
+    stepCount: 32
+    levelCount: 4
+    levelSpacing: 0.23
+    variation: 0.89
+    persistence: 0.51
+    dropFraction: 0.288

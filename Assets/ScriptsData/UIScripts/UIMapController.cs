@@ -71,10 +71,14 @@ public class UIMapController : MonoBehaviour
     [SerializeField] private Transform splineWallMapParent;
     [Tooltip("Parent for generated cube-building quads. Falls back to mazeWallMarkerParent if unset.")]
     [SerializeField] private Transform cubeBuildingMapParent;
+    [Tooltip("Parent for generated procedural-spike rings. Falls back to mazeWallMarkerParent if unset.")]
+    [SerializeField] private Transform proceduralSpikeMapParent;
     [Tooltip("World-unit width of the spline-wall line ribbon, for a path of reference thickness. Thicker/thinner paths scale from this. Tune per map scale.")]
     [SerializeField] private float splineLineWidth   = 0.02f;
     [Tooltip("The SplineWallPath thickness that draws at exactly splineLineWidth / nodeCircleRadius. Paths thicker than this widen proportionally; thinner ones narrow. 0.09 = the historic default wall thickness.")]
     [SerializeField] private float splineReferenceThickness = 0.09f;
+    [Tooltip("Caps how much thicker a fat wall draws than the base line width. Keeps a huge wallThickness (e.g. 1, which is ~11x the 0.09 reference) from blowing up the map line.")]
+    [SerializeField] private float splineMaxThicknessFactor = 2f;
     [Tooltip("Curved-segment sampling density. Higher = smoother lines that hug the map warp.")]
     [SerializeField] private int   splineSampleSteps = 30;
     [Tooltip("World-unit radius of the (slightly larger) circle drawn at each spline node.")]
@@ -170,6 +174,7 @@ public class UIMapController : MonoBehaviour
     private readonly List<GameObject> _mazeWallMapInstances     = new List<GameObject>();
     private readonly List<GameObject> _splineWallMapInstances   = new List<GameObject>();
     private readonly List<GameObject> _cubeBuildingMapInstances = new List<GameObject>();
+    private readonly List<GameObject> _spikeMapInstances        = new List<GameObject>();
     // Spline LineRenderers — tracked so their (world-space) width can be scaled with zoom.
     private readonly List<LineRenderer> _splineLines            = new List<LineRenderer>();
     // Live street-light markers, keyed by their controller so state (lit/unlit) can be pushed each frame.
@@ -503,6 +508,114 @@ void UpdateBoatPointer(Transform boat)
     }
 
     // ─────────────────────────────────────────
+    // PROCEDURAL SPIKES (procedural — data-driven from GridData)
+    // ─────────────────────────────────────────
+
+    /// <summary>
+    /// Draws every GridData.proceduralSpikes rock with the same read as the modelled spikes'
+    /// map icon (BuildBigSpikeIcon): a side-on silhouette pointing up the map, gradient-filled,
+    /// its base fading into the water. The one difference is that the outline follows the
+    /// AUTHORED profile instead of a fixed triangle, so a bellied or waisted rock shows as one —
+    /// and it's sized from the real radii and height, so a needle reads narrow and a boulder wide.
+    /// </summary>
+    public void BuildProceduralSpikeMap()
+    {
+        ClearInstances(_spikeMapInstances);
+
+        if (!MapProjection.IsReady || activeGridData?.proceduralSpikes == null) return;
+        if (mapMarkerMaterial == null)
+        {
+            Debug.LogWarning("[UIMapController] BuildProceduralSpikeMap — mapMarkerMaterial not assigned.");
+            return;
+        }
+
+        float     arenaWidth = _activeArenaProfile != null ? _activeArenaProfile.WorldArenaWidth : 12f;
+        Vector3   normal     = MapPlaneNormal();
+        Transform parent     = ContentParent(proceduralSpikeMapParent != null ? proceduralSpikeMapParent : mazeWallMarkerParent);
+
+        foreach (var s in activeGridData.proceduralSpikes)
+        {
+            if (s == null) continue;
+            var go = BuildSpikeProfileIcon(s, arenaWidth, normal, parent);
+            if (go != null) _spikeMapInstances.Add(go);
+        }
+    }
+
+    // Side-on silhouette swept from the rock's own profile. Mirrors BuildBigSpikeIcon's
+    // conventions exactly — planar UVs off the icon centre for the shared gradient material,
+    // vertex alpha carrying the base fade — so procedural and modelled spikes sit together
+    // on the map without looking like two different systems.
+    private GameObject BuildSpikeProfileIcon(GridData.ProceduralSpike s, float arenaWidth,
+                                             Vector3 normal, Transform parent)
+    {
+        Vector3 u = Vector3.Cross(normal, Vector3.up);
+        if (u.sqrMagnitude < 1e-6f) u = Vector3.right;
+        u.Normalize();
+        Vector3 v = Vector3.Cross(normal, u).normalized;
+
+        // Map units per world unit here, measured through the projection so the icon inherits
+        // whatever warp the map applies at this spot rather than assuming a flat scale.
+        Vector3 c0 = ProjectNorm(s.center, arenaWidth, normal);
+        Vector3 c1 = ProjectNorm(s.center + new Vector2(0.02f, 0f), arenaWidth, normal);
+        float   mapPerWorld = Vector3.Distance(c0, c1) / Mathf.Max(0.02f * arenaWidth, 1e-4f);
+        if (mapPerWorld <= 1e-6f) return null;
+
+        var   profile = SpikeProfile.From(s.Config, s.EffectiveScale);
+        float halfH   = 0.5f * profile.topY * mapPerWorld;      // only what stands out of the water
+        if (halfH <= 1e-5f) return null;
+
+        // UV size reference, matching BuildIconMarker: the icon's half-extent.
+        float size     = halfH;
+        float fadeFrac = Lib.spike.baseFadeFraction;
+        int   steps    = Mathf.Max(6, Lib.fanSegments);
+
+        var go = new GameObject("MapIcon_ProceduralSpike");
+        go.transform.SetParent(parent, false);
+
+        var verts = new List<Vector3>();
+        var uvs   = new List<Vector2>();
+        var cols  = new List<Color>();
+        var tris  = new List<int>();
+
+        int Add(Vector3 world, Color col)
+        {
+            Vector3 rel = world - c0;
+            uvs.Add(new Vector2(0.5f + Vector3.Dot(rel, u) / (2f * size),
+                                0.5f + Vector3.Dot(rel, v) / (2f * size)));
+            verts.Add(go.transform.InverseTransformPoint(world));
+            cols.Add(col);
+            return verts.Count - 1;
+        }
+
+        // Walk the profile from the waterline to the tip, laying a left/right pair per step.
+        int prevL = -1, prevR = -1;
+        for (int i = 0; i <= steps; i++)
+        {
+            float t = i / (float)steps;                       // 0 at the waterline, 1 at the tip
+            float y = t * profile.topY;
+            float halfW = profile.RadiusAt(y) * mapPerWorld;
+
+            // Centred on the marker like the other icons: base below, tip above.
+            Vector3 row = c0 + v * (halfH * (2f * t - 1f));
+            Color   col = new Color(1f, 1f, 1f, fadeFrac > 0f ? Mathf.Clamp01(t / fadeFrac) : 1f);
+
+            int l = Add(row - u * halfW, col);
+            int r = Add(row + u * halfW, col);
+
+            if (prevL >= 0)
+            {
+                tris.Add(prevL); tris.Add(r);     tris.Add(prevR);
+                tris.Add(prevL); tris.Add(l);     tris.Add(r);
+            }
+            prevL = l; prevR = r;
+        }
+
+        AssignMesh(go, verts.ToArray(), uvs.ToArray(), tris.ToArray(),
+                   "MapIcon_ProceduralSpike", cols.ToArray());
+        return go;
+    }
+
+    // ─────────────────────────────────────────
     // STREET LIGHTS (live markers — reflect StreetLightController.IsLit)
     // ─────────────────────────────────────────
 
@@ -572,6 +685,13 @@ void UpdateBoatPointer(Transform boat)
             foreach (var k in dead)
                 _streetLightMarkers.Remove(k);
     }
+
+    /// <summary>Debug read-only: the marker built for a lamp, or null if it never got one.</summary>
+    public MapStreetLightMarker DebugMarkerFor(StreetLightController light) =>
+        light != null && _streetLightMarkers.TryGetValue(light, out var marker) ? marker : null;
+
+    /// <summary>Debug read-only: how many street-light markers the map is driving.</summary>
+    public int DebugStreetLightMarkerCount => _streetLightMarkers.Count;
 
     private void ClearStreetLightMarkers()
     {
@@ -858,6 +978,10 @@ void UpdateBoatPointer(Transform boat)
         u.Normalize();
         Vector3 v = Vector3.Cross(normal, u).normalized;
 
+        // Anchor the icon at the BOTTOM of the post: the light's mapped position becomes the base
+        // of the stick, and the lamp rises upward from there.
+        center += v * size;
+
         var go = new GameObject("MapIcon_StreetLight");
         go.transform.SetParent(parent, false);
 
@@ -897,9 +1021,9 @@ void UpdateBoatPointer(Transform boat)
         float   halfStickW = size * sl.stickWidthFactor;
         Vector3 stickBot   = center - v * size;
 
-        Color offHalo = new Color(1f, 1f, 1f, 0f);  // hidden until lit
-        Color offBulb = new Color(0f, 0f, 0f, 1f);  // black until lit
-        Color white   = Color.white;
+        Color offHalo = new Color(1f, 1f, 1f, 0f);          // hidden until lit
+        Color offBulb = new Color(0f, 0f, 0f, 1f);          // black until lit
+        Color stick   = new Color(0.35f, 0.35f, 0.35f, 1f); // dark-grey post (flat)
 
         // Halo (drawn first = behind).
         int haloStart = verts.Count;
@@ -907,10 +1031,10 @@ void UpdateBoatPointer(Transform boat)
         int haloCount = verts.Count - haloStart;
 
         // Stick.
-        int sbl = Add(stickBot - u * halfStickW, white);
-        int sbr = Add(stickBot + u * halfStickW, white);
-        int stl = Add(bulbC    - u * halfStickW, white);
-        int str = Add(bulbC    + u * halfStickW, white);
+        int sbl = Add(stickBot - u * halfStickW, stick);
+        int sbr = Add(stickBot + u * halfStickW, stick);
+        int stl = Add(bulbC    - u * halfStickW, stick);
+        int str = Add(bulbC    + u * halfStickW, stick);
         Tri(sbl, sbr, str);
         Tri(sbl, str, stl);
 
@@ -921,6 +1045,14 @@ void UpdateBoatPointer(Transform boat)
 
         Color[] colArray = cols.ToArray();
         Mesh mesh = AssignMesh(go, verts.ToArray(), uvs.ToArray(), tris.ToArray(), "MapIcon_StreetLight", colArray);
+
+        // Flat rendering (skip the gradient) so the bulb reads pure black/white and the halo is a
+        // clear light — set per-renderer so the shared material asset is untouched.
+        var mr  = go.GetComponent<MeshRenderer>();
+        var mpb = new MaterialPropertyBlock();
+        mr.GetPropertyBlock(mpb);
+        mpb.SetFloat("_FlatVertexColor", 1f);
+        mr.SetPropertyBlock(mpb);
 
         var marker = go.AddComponent<MapStreetLightMarker>();
         marker.Init(mesh, colArray, bulbStart, bulbCount, haloStart, haloCount, sl.haloAlpha);
@@ -1143,7 +1275,10 @@ void UpdateBoatPointer(Transform boat)
     private float SplineThicknessFactor(GridData.SplineWallPath path)
     {
         if (path == null || path.wallThickness <= 0f || splineReferenceThickness <= 0f) return 1f;
-        return path.wallThickness / splineReferenceThickness;
+        // Compress with sqrt so a fat wall still reads as fatter, but a huge wallThickness
+        // (e.g. 1 vs the 0.09 reference = 11x) doesn't explode the line; then clamp to a sane max.
+        float factor = Mathf.Sqrt(path.wallThickness / splineReferenceThickness);
+        return Mathf.Clamp(factor, 0.5f, splineMaxThicknessFactor);
     }
 
     // ─────────────────────────────────────────

@@ -135,6 +135,10 @@ public class GridData : ScriptableObject
         [Tooltip("SubZone only: the node index on the adjoined MainPath where this tributary merges (normally a street-light node).")]
         public int adjoinNodeIndex = -1;
 
+        [Tooltip("Pin this path's first and last nodes to arena entrances, so the river of souls runs " +
+                 "door-to-door. The pinned nodes follow their entrance if its angle changes.")]
+        public bool attachToEntrances = false;
+
         [Tooltip("MainPath only: entrance index (into GridData.entrances) that is door A / the path's start. -1 = unset.")]
         public int entryEntranceIndex = -1;
 
@@ -156,8 +160,13 @@ public class GridData : ScriptableObject
         [Tooltip("True = the path closes back on itself into a loop.")]
         public bool closedLoop = false;
 
-        [Tooltip("Per-segment curve flags: index i = segment node[i]→node[i+1] (closing segment last on loops). Missing entries = straight, so pre-curve zones keep their shape.")]
+        [Tooltip("LEGACY per-segment curve flags: index i = segment node[i]→node[i+1]. Superseded by " +
+                 "nodeTension, which still falls back to these so old zones keep their exact shape.")]
         public List<bool> segmentCurved = new List<bool>();
+
+        [Tooltip("Per-node curvature, 0..1. 0 = sharp corner, 0.5 = natural smoothing, 1 = very round. " +
+                 "Missing entries fall back to the legacy segmentCurved flags.")]
+        public List<float> nodeTension = new List<float>();
 
         [Tooltip("Scatter/path radius for spline knot generation and wave mask (fish swim-band width). For a SubZone tributary this is the SOURCE pool radius (around the bowl).")]
         public float radius = 0.5f;
@@ -226,6 +235,86 @@ public class GridData : ScriptableObject
         // every zone authored before curve support must keep its rectilinear shape.
         public bool IsSegmentCurved(int seg) =>
             segmentCurved != null && seg >= 0 && seg < segmentCurved.Count && segmentCurved[seg];
+
+        // ─────────────────────────────────────────────
+        // PATH CURVATURE — the single source of truth
+        //
+        // Both the Grid Designer preview and the runtime densification sample through here, so the
+        // painted mask and the fish's swim spline are the same curve by construction. Anything added
+        // to this sampler shows up in both automatically.
+        //
+        // The curve is a Cardinal/Hermite spline whose tangent at each node is scaled by that node's
+        // tension. Tension 0 at both ends of a segment yields tangents of zero, which collapses the
+        // Hermite exactly to a straight line — so the old binary curved/straight system is just the
+        // special case tension ∈ {0, 0.5}.
+        // ─────────────────────────────────────────────
+
+        /// <summary>Curvature at a node: 0 = sharp corner, 0.5 = natural, 1 = very round.</summary>
+        public float NodeTension(int i)
+        {
+            if (nodeTension != null && i >= 0 && i < nodeTension.Count)
+                return Mathf.Clamp01(nodeTension[i]);
+
+            // Legacy fallback: a node is smoothed if either segment touching it was flagged curved,
+            // at the 0.5 that reproduces the old Catmull-Rom exactly.
+            bool inCurved  = IsSegmentCurved(i - 1);
+            bool outCurved = IsSegmentCurved(i);
+            return (inCurved || outCurved) ? 0.5f : 0f;
+        }
+
+        /// <summary>Position along segment `seg` (node[seg] → node[seg+1]) at local t (0..1).</summary>
+        public Vector2 SamplePath(int seg, float t)
+        {
+            var pts = nodePositions;
+            int n = pts?.Count ?? 0;
+            if (n == 0) return Vector2.zero;
+            if (n == 1) return pts[0];
+
+            bool closed = closedLoop && n >= 3;
+            int i1 = Mathf.Clamp(seg, 0, n - 1);
+            int i2 = closed ? (seg + 1) % n : Mathf.Min(seg + 1, n - 1);
+            int i0 = closed ? (seg - 1 + n) % n : Mathf.Max(seg - 1, 0);
+            int i3 = closed ? (seg + 2) % n : Mathf.Min(seg + 2, n - 1);
+
+            Vector2 p1 = pts[i1], p2 = pts[i2];
+            Vector2 m1 = NodeTension(i1) * (pts[i2] - pts[i0]);
+            Vector2 m2 = NodeTension(i2) * (pts[i3] - pts[i1]);
+
+            float t2 = t * t, t3 = t2 * t;
+            return (2f * t3 - 3f * t2 + 1f) * p1
+                 + (t3 - 2f * t2 + t)       * m1
+                 + (-2f * t3 + 3f * t2)     * p2
+                 + (t3 - t2)                * m2;
+        }
+
+        /// <summary>True when a segment is dead straight, so it needs no subdivision.</summary>
+        public bool SegmentIsStraight(int seg)
+        {
+            int n = nodePositions?.Count ?? 0;
+            if (n < 2) return true;
+            bool closed = closedLoop && n >= 3;
+            int i1 = Mathf.Clamp(seg, 0, n - 1);
+            int i2 = closed ? (seg + 1) % n : Mathf.Min(seg + 1, n - 1);
+            return NodeTension(i1) <= 0.001f && NodeTension(i2) <= 0.001f;
+        }
+
+        /// <summary>
+        /// How many samples this segment needs. Straight segments take one; curved ones scale with
+        /// length and curvature, capped by the zone's curveResolution.
+        /// </summary>
+        public int SegmentSubdivisions(int seg)
+        {
+            if (SegmentIsStraight(seg)) return 1;
+
+            int n = nodePositions.Count;
+            bool closed = closedLoop && n >= 3;
+            int i2 = closed ? (seg + 1) % n : Mathf.Min(seg + 1, n - 1);
+
+            float len  = Vector2.Distance(nodePositions[Mathf.Clamp(seg, 0, n - 1)], nodePositions[i2]);
+            float curl = Mathf.Max(NodeTension(Mathf.Clamp(seg, 0, n - 1)), NodeTension(i2));
+            int   want = Mathf.CeilToInt(len * 40f * Mathf.Max(curl, 0.25f) * 2f);
+            return Mathf.Clamp(want, 2, EffectiveCurveResolution);
+        }
 
         // Segment count of the node path: one per gap between nodes, plus the closing segment on a loop.
         public int SegmentCount()
@@ -420,6 +509,11 @@ public class GridData : ScriptableObject
         // Stamped onto the spawned StatueBehaviour and matched by SoulZone.linkedStatueId.
         public int        statueId;
 
+        [Tooltip("Shape for a spike rock carried by this prefab — the creepy guy brings his own " +
+                 "starting rock, for one. Only used when the prefab has a ProceduralSpike on it. " +
+                 "Unset falls back to the default shape so the rock still stands up.")]
+        public SpikeShapePreset spikePreset;
+
         // Uniform scale multiplier applied to the spawned instance. Driven by the
         // Grid Designer when the prefab has a PrefabBaselineAlignment scale radius.
         // 1 = prefab default. 0 (legacy/unset) is treated as 1 everywhere it is read.
@@ -606,7 +700,48 @@ public class GridData : ScriptableObject
 
         [Tooltip("World-units the bottom face drops below the waterline so the block appears bottomless.")]
         public float depthBelowWater = 5f;
+
+        [Tooltip("Build this block as a stepped-rooftop building using a random preset from Resources/Buildings at spawn (instead of a plain box).")]
+        public bool steppedTop = false;
     }
 
     public List<CubeBuilding> cubeBuildings = new List<CubeBuilding>();
+
+    // ─────────────────────────────────────────────
+    // PROCEDURAL SPIKES
+    // Rocks placed in the Grid Designer and built as a mesh at spawn, instead of being
+    // dropped in as a fixed prefab. This is only WHERE a rock stands and which shape it
+    // wears — the shape itself lives in a SpikeShapePreset, authored in the Spike Studio
+    // and shared between every rock that uses it, so restyling a preset restyles the field.
+    //
+    // A spike flagged climbable fits the creepy guy's three rings to its own silhouette at
+    // spawn, so placing the rock is all it takes to make it climbable.
+    // ─────────────────────────────────────────────
+
+    [System.Serializable]
+    public class ProceduralSpike
+    {
+        [Tooltip("Centre in normalized grid space (-0.5..0.5 from centre), same space as CubeBuilding.center.")]
+        public Vector2 center = Vector2.zero;
+
+        [Tooltip("Shape this rock wears, authored in the Spike Studio. Presets live in Resources/Spikes. " +
+                 "Unset falls back to the default shape so the rock still stands up.")]
+        public SpikeShapePreset preset;
+
+        [Tooltip("Size multiplier on the whole preset, so one shape can furnish boulders and pebbles alike. 1 = the preset's own size.")]
+        public float scale = 1f;
+
+        [Tooltip("Fit the creepy guy's climbing rings to this rock at spawn, making it one he can surface on, climb and leap from. Off = scenery he ignores.")]
+        public bool climbable = false;
+
+        /// <summary>The shape this rock wears, falling back to the defaults when no preset is set.</summary>
+        public SpikeShapeConfig Config => preset != null ? preset.config : DefaultShape;
+
+        static readonly SpikeShapeConfig DefaultShape = new SpikeShapeConfig();
+
+        /// <summary>Effective scale — treats a legacy/unset 0 as 1, matching PrefabPlacement.scale.</summary>
+        public float EffectiveScale => scale > 0.0001f ? scale : 1f;
+    }
+
+    public List<ProceduralSpike> proceduralSpikes = new List<ProceduralSpike>();
 }

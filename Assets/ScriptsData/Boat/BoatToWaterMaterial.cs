@@ -65,14 +65,11 @@ public Camera mainCamera;
     public float fallbackFadeStart = 10f;
     public float fallbackFadeEnd   = 18f;
 
-    [Header("Boat Wake")]
-    public float wakeRadius      = 1.5f;
-    public float wakeLength      = 1.0f;
-    public float ringFrequency   = 8f;
-    public float ringScrollSpeed = 3f;
-    public float ringFalloff     = 1.5f;
-    public float ringAmplitude   = 0.05f;
-    public float idleAmplitude   = 0.01f;
+    [Header("Boat Hull Clearance Pocket")]
+    [Tooltip("Size of the pocket pushed into the water around the boat")]
+    public float wakeRadius = 0.3f;
+    [Tooltip("How far the water drops under the hull, so the surface never covers the boat mesh")]
+    public float wakeDrop   = 0.1f;
 
     [Header("Deprecated Axis (No longer used for strength)")]
     public Vector3 maskAxis = Vector3.forward;
@@ -138,12 +135,7 @@ public Camera mainCamera;
         }
         waterMaterial.SetFloat("_BoatSpeed01",      speed01);
         waterMaterial.SetFloat("_WakeRadius",       wakeRadius);
-        waterMaterial.SetFloat("_WakeLength",       wakeLength);
-        waterMaterial.SetFloat("_RingFrequency",    ringFrequency);
-        waterMaterial.SetFloat("_RingScrollSpeed",  ringScrollSpeed);
-        waterMaterial.SetFloat("_RingFalloff",      ringFalloff);
-        waterMaterial.SetFloat("_RingAmplitude",    ringAmplitude);
-        waterMaterial.SetFloat("_IdleAmplitude",    idleAmplitude);
+        waterMaterial.SetFloat("_WakeDrop",         wakeDrop);
 
         bool boosting = Input.GetKey(KeyCode.Space);
 

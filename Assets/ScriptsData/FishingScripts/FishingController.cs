@@ -237,6 +237,30 @@ public class FishingController : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Turns off one soul visual on the boat — the counterpart to ActivateNextSoulVisual, for a
+    /// soul spent into a slot, pipe or street light rather than lost in a crash (BoatCollisionHandler
+    /// deactivates its own visual because it needs that visual's world position for the projectile).
+    /// Takes the last active one so the active visuals stay a contiguous block.
+    /// </summary>
+    public void ConsumeSoulVisual()
+    {
+        if (soulsParent == null) return;
+
+        for (int i = soulsParent.childCount - 1; i >= 0; i--)
+        {
+            Transform child = soulsParent.GetChild(i);
+            if (child.gameObject.activeSelf)
+            {
+                child.gameObject.SetActive(false);
+                Debug.Log($"[FishingController] Consumed soul visual '{child.name}' from the boat.");
+                return;
+            }
+        }
+
+        Debug.LogWarning("[FishingController] ConsumeSoulVisual — no active soul visual on the boat to remove.");
+    }
+
     public void RestoreSoulVisuals(int count)
     {
         if (soulsParent == null) return;

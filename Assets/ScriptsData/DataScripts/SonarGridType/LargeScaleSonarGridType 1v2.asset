@@ -12,11 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 27f8b39b0cbc4784a93d189b05a0ddd9, type: 3}
   m_Name: LargeScaleSonarGridType 1v2
   m_EditorClassIdentifier: Assembly-CSharp::SonarGridType
-  columns: 10
-  rows: 10
+  columns: 20
+  rows: 20
   levels: 4
-  linesPerCell: 78
-  subdivisions: 100
+  linesPerCell: 22
+  subdivisions: 50
   surfaceDepthOffset: -0.5
   spawnVertical: 1
   spawnCrossVertical: 1

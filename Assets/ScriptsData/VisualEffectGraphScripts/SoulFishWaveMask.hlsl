@@ -26,6 +26,13 @@ float _SoulFishEdgeNoiseScale;    // world-space frequency of the large octave (
 float _SoulFishEdgeNoiseScale2;   // world-space frequency of the fine octave (used at the outer edge)
 float _SoulFishEdgeNoiseSpeed;    // scroll speed for the animated fringe
 
+// Width taper along the path. Purely artistic and NOT animated: the band narrows and opens back up
+// over the course of the river, so a zone reads as a hand-drawn channel rather than a constant-width
+// tube. Driven by the same arc length that powers PathUV, so the shape is stable frame to frame and
+// travels with the path rather than with world space.
+float _SoulFishTaperStrength;     // 0 = constant width; 0.5 = pinches to half at its narrowest
+float _SoulFishTaperScale;        // pinches per world unit along the path (low = long lazy tapers)
+
 // --- Procedural value noise (self-contained; no texture bindings) ---
 float hash_SoulFish(float2 p)
 {
@@ -44,6 +51,16 @@ float valueNoise_SoulFish(float2 p)
     float c = hash_SoulFish(i + float2(0.0, 1.0));
     float d = hash_SoulFish(i + float2(1.0, 1.0));
     return lerp(lerp(a, b, u.x), lerp(c, d, u.x), u.y);
+}
+
+// Width multiplier at arc-length `s` along the path. Only ever narrows (never exceeds the authored
+// radius), so a tapered zone still sits inside the footprint drawn in the Grid Designer. Clamped so
+// full strength pinches rather than closes the channel entirely.
+float taperAt_SoulFish(float s)
+{
+    if (_SoulFishTaperStrength <= 0.0001) return 1.0;
+    float nz = valueNoise_SoulFish(float2(s * _SoulFishTaperScale, 3.7));   // static along the path
+    return max(1.0 - saturate(_SoulFishTaperStrength) * (1.0 - nz), 0.08);
 }
 
 // Core evaluation shared by both graph entry points.
@@ -90,11 +107,19 @@ void SoulFishWaveMaskCore(
         float r = P.y > 0.0001 ? P.y : _SoulFishRadius;
         r = max(r, 0.0001);
 
-        bool  connects = (P.w > 0.0) && (i < count - 1);
-        float cumLen   = abs(P.w) - 1.0;
+        bool  connects    = (P.w > 0.0) && (i < count - 1);
+        bool  chainedInto = (i > 0) && (_SoulFishWavePositions[i - 1].w > 0.0);
+        float cumLen      = abs(P.w) - 1.0;
+
+        // Street-light pools, fish-bowl sources, single-node zones and loose fish all register as
+        // LONE points (nothing chains in or out of them). Those are authored circles — the pool
+        // radius the designer set — so the path taper must leave them exactly as they are. Only
+        // points belonging to a chain (the river corridor) get tapered.
+        bool  lonePoint = !connects && !chainedInto;
+        float taperHere = lonePoint ? 1.0 : taperAt_SoulFish(cumLen);
 
         // Nearest normalized distance to this point (and its outgoing segment): 0 = centre, 1 = edge.
-        float t = length(WorldPos.xz - p) / r;
+        float t = length(WorldPos.xz - p) / (r * taperHere);
 
         if (connects)
         {
@@ -106,7 +131,10 @@ void SoulFishWaveMaskCore(
                 float segLen = sqrt(segLen2);
                 float h      = clamp(dot(pa, ba) / segLen2, 0.0, 1.0);
                 float ds     = length(pa - ba * h);
-                t = min(t, ds / r);
+                // Taper sampled at this pixel's own position along the path, so the width varies
+                // smoothly within a segment instead of stepping at each node.
+                float rSeg   = r * taperAt_SoulFish(cumLen + h * segLen);
+                t = min(t, ds / rSeg);
 
                 // Accumulate the segment tangent, weighted by proximity, so Flow blends smoothly
                 // between segments instead of snapping at the node joints.
@@ -128,13 +156,18 @@ void SoulFishWaveMaskCore(
         }
         else
         {
-            // Lone point: not chaining out, and nothing chains into it (chain interiors and
-            // endpoints are already covered by their segment's clamped projection above).
-            bool chainedInto = (i > 0) && (_SoulFishWavePositions[i - 1].w > 0.0);
-            if (!chainedInto && t < bestT)
+            // Lone point: a street-light pool, fish-bowl source, single-node zone or loose fish.
+            // These get POLAR path-space instead of the corridor's along/across:
+            //   x = arc length around the ring, y = distance out from the centre.
+            // Both are world units, so the corridor and the pool share one tiling scale — and
+            // scrolling x (the same Time x ZoneScrollSpeed that flows the river) SWIRLS the pool
+            // around the lamp rather than sliding it sideways. Scrolling y would pull inward/outward.
+            if (lonePoint && t < bestT)
             {
-                bestT  = t;
-                bestUV = WorldPos.xz - p; // static local offset — circular zones don't scroll
+                bestT = t;
+                float2 d   = WorldPos.xz - p;
+                float  ang = atan2(d.y, d.x);   // -PI..PI around the light
+                bestUV = float2(ang * r, length(d));
             }
         }
 

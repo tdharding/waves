@@ -52,10 +52,23 @@ public class SoulZoneTributaryLink : MonoBehaviour
     List<Vector3> _pool;
     bool _poolRegistered, _poolFullyOpen, _revealing, _joined;
     int   _routeFrontier = -1;       // frontier index the current route was built for
+    float _builtRadiusFactor = -1f;  // SwimRadiusFactor the current route was built with
     float _circleStart, _circleEnd;  // normalized window of the frontier circle
     bool  _routeBuilt;
 
     public bool IsJoined => _joined;
+
+    // ── Debug surface (SoulFishDebugTracer) ──────────────
+    public bool PoolRegistered => _poolRegistered;
+    public bool PoolFullyOpen  => _poolFullyOpen;
+    public bool BowlLanded     => _shoal == null || _shoal.IsBowlLanded;
+    public bool RiverPassed    => RiverHasPassedJunction;
+    public int  JunctionDense  => _junctionDense;
+    public int  RouteFrontier  => _routeFrontier;
+    public int  MainFrontierDense => _mainChain != null ? _mainChain.FrontierDense : -1;
+    public bool RouteBuilt     => _routeBuilt;
+    public IReadOnlyList<SplineAnimate> DebugFish => _fish;
+    public void DebugWindow(out float start, out float end) { start = _circleStart; end = _circleEnd; }
 
     public void Init(List<Vector3> regPath, float sourceRadius, float corridorRadius,
                      SoulShoalController shoal, SplineContainer spline, int knotCount)
@@ -125,8 +138,10 @@ public class SoulZoneTributaryLink : MonoBehaviour
             return;
         }
 
-        // Joined: keep the shoal's route in step with how far the river has opened.
-        if (_mainChain != null && _mainChain.FrontierIndex != _routeFrontier)
+        // Joined: keep the shoal's route in step with how far the river has opened, and rebuild
+        // on a live change to the shared orbit fraction.
+        if (_mainChain != null && (_mainChain.FrontierIndex != _routeFrontier
+                                   || !Mathf.Approximately(_builtRadiusFactor, SoulFishController.SwimRadiusFactor)))
             BuildRoute();
     }
 
@@ -192,17 +207,34 @@ public class SoulZoneTributaryLink : MonoBehaviour
         // World-space route, then one conversion to container-local at the end.
         var route = new List<Vector3>(_regPath);          // bowl → junction
 
+        // River corridor toward the frontier, stopping one node SHORT of the light so the fish meet
+        // the orbit where the path crosses it rather than diving through the centre first.
         int step = frontier >= junction ? 1 : -1;         // the river may open either way from here
-        for (int i = junction + step; i != frontier + step; i += step)
+        for (int i = junction + step; i != frontier; i += step)
             route.Add(main[i]);
 
         // Circle at the frontier light so they gather there rather than stopping dead.
+        // Same orbit fraction the river's own shoal uses (SoulFishController.SwimRadiusFactor),
+        // so a joined tributary gathers at the light exactly like the fish already there.
         Vector3 centre = main[frontier];
-        float   r      = Mathf.Max(_mainChain.FrontierRadius, 0.05f);
-        int     circleStartIdx = route.Count;
-        for (int i = 0; i < _knotCount; i++)
+        float   r      = Mathf.Max(_mainChain.FrontierRadius * SoulFishController.SwimRadiusFactor, 0.05f);
+        _builtRadiusFactor = SoulFishController.SwimRadiusFactor;
+
+        // Enter the ring on the side the fish arrive from, then sweep a full turn back to that same
+        // point — start and end coincide, so the wrap that holds them here is seamless.
+        Vector3 inDir = route.Count > 0 ? centre - route[route.Count - 1] : Vector3.forward;
+        inDir.y = 0f;
+        if (inDir.sqrMagnitude < 1e-8f) inDir = Vector3.forward;
+        inDir.Normalize();
+
+        Vector3 entryOff = -inDir * r;
+        float   entryAng = Mathf.Atan2(entryOff.z, entryOff.x);
+
+        int circleStartIdx = route.Count;
+        route.Add(centre + entryOff);
+        for (int i = 1; i <= _knotCount; i++)
         {
-            float ang = (i / (float)_knotCount) * Mathf.PI * 2f;
+            float ang = entryAng + (i / (float)_knotCount) * Mathf.PI * 2f;
             route.Add(centre + new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang)) * r);
         }
 
@@ -238,11 +270,18 @@ public class SoulZoneTributaryLink : MonoBehaviour
             }
         }
 
+        // Linear along the corridor so the swim path matches the straight bands the mask paints
+        // (see the same reasoning in SoulZoneStreetLightChain.BuildSwimSpline); AutoSmooth only on
+        // the frontier circle so the ring stays round.
         var spline = _spline.Spline;
         spline.Clear();
-        foreach (var p in route)
-            spline.Add(new BezierKnot((float3)_spline.transform.InverseTransformPoint(p)), TangentMode.AutoSmooth);
+        for (int i = 0; i < route.Count; i++)
+            spline.Add(new BezierKnot((float3)_spline.transform.InverseTransformPoint(route[i])),
+                       i >= circleStartIdx ? TangentMode.AutoSmooth : TangentMode.Linear);
         spline.Closed = false;
+
+        // Route changed shape, so who is "in the circle" must be re-decided.
+        _arrived.Clear();
 
         _circleStart   = newStart;
         _circleEnd     = newEnd;
@@ -268,18 +307,34 @@ public class SoulZoneTributaryLink : MonoBehaviour
     {
         if (!_routeBuilt || _circleEnd <= _circleStart) return;
 
+        // This route's circle is always the LAST thing on the spline, so _circleEnd is exactly 1.0.
+        // SplineAnimate's own Loop wraps 1.0 -> 0 inside its update, which would send the fish all
+        // the way back to the bowl; wrapping fractionally early keeps ownership here.
+        float cs   = _circleStart;
+        float ce   = Mathf.Min(_circleEnd, 0.999f);
+        float span = Mathf.Max(ce - cs, 1e-4f);
+
         foreach (var sa in _fish)
         {
             if (sa == null) continue;
             float t = sa.NormalizedTime;
-            if (t >= _circleEnd)
+
+            if (!_arrived.Contains(sa))
             {
-                float nt = _circleStart + (t - _circleEnd);
-                if (nt < _circleStart || nt >= _circleEnd) nt = _circleStart;
-                sa.NormalizedTime = nt;
+                if (t >= cs) _arrived.Add(sa);   // reached the frontier circle
+                else continue;                    // still swimming up the river — leave it alone
             }
+
+            if (t >= ce)         sa.NormalizedTime = cs + Mathf.Repeat(t - ce, span);
+            else if (t < cs)     sa.NormalizedTime = cs;   // looped past the end — pull it back
         }
+
+        // Same spread as the river's own shoal, so a joined tributary blends in rather than
+        // arriving as a rigid line.
+        SoulFishController.ApplyLateralSpread(_fish, _corridorRadius);
     }
+
+    readonly HashSet<SplineAnimate> _arrived = new HashSet<SplineAnimate>();
 
     // Same list instance every rebuild — the linkers hold that reference.
     void Rebuild(float arc)

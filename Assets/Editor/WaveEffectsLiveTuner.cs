@@ -56,10 +56,27 @@ public class WaveEffectsLiveTuner : EditorWindow
     [SerializeField] float     soulFishEdgeNoiseScale    = 1f;
     [SerializeField] float     soulFishEdgeNoiseScale2   = 4f;
     [SerializeField] float     soulFishEdgeNoiseSpeed    = 0.2f;
+    [SerializeField] float     soulFishTaperStrength     = 0f;
+    [SerializeField] float     soulFishTaperScale        = 0.15f;
     [SerializeField] Vector2   zoneTiling           = new Vector2(0.5f, 0.5f);
     [SerializeField] float     zoneScrollSpeed      = 0.05f;
     [SerializeField] float     zoneNoiseStrength    = 0.3f;
     [SerializeField] Texture2D zoneTexture          = null;
+
+    // Rock Rings
+    [SerializeField] float rockRingStrength     = 0.25f;
+    [SerializeField] float rockRingFrequency    = 3f;
+    [SerializeField] float rockRingSpeed        = 1.5f;
+    [SerializeField] float rockRingSpread       = 3f;
+    [SerializeField] float rockRingFalloffPower = 1.5f;
+    [SerializeField] float rockRingLobeStrength = 1f;
+    [SerializeField] float rockRingRectify         = 1f;
+    [SerializeField] float rockRingDistortStrength = 0.08f;
+    [SerializeField] float rockRingDistortScale    = 0.35f;
+    [SerializeField] float rockRingWidthMultiplier = 1f;
+    [SerializeField] float rockRingLodRadius    = 18f;
+    [SerializeField] float rockRingLodFeather   = 0.75f;
+    float tunerRockRingPhase = 0f;
 
     // Twirl
     [SerializeField] float twirlBaseStrength = 0.5f;
@@ -136,6 +153,7 @@ public class WaveEffectsLiveTuner : EditorWindow
     [SerializeField] bool foldWaveMotion    = true;
     [SerializeField] bool foldSurface       = true;
     [SerializeField] bool foldPeaksTroughs  = true;
+    [SerializeField] bool foldRockRings     = false;
     [SerializeField] bool foldTwirl         = false;
     [SerializeField] bool foldWhirlpoolFX   = false;
     [SerializeField] bool foldFoam          = false;
@@ -285,6 +303,12 @@ public class WaveEffectsLiveTuner : EditorWindow
             if (tunerPhase > 6.283185f) tunerPhase -= 6.283185f;
             Shader.SetGlobalFloat("_WavePhase", tunerPhase);
 
+            // The rock rings run on their own phase, accumulated the same way. In play mode the
+            // controller owns this; out of play mode nothing else is turning it.
+            tunerRockRingPhase += rockRingSpeed * deltaTime;
+            if (tunerRockRingPhase > 6.283185f) tunerRockRingPhase -= 6.283185f;
+            Shader.SetGlobalFloat("_RockRingPhase", tunerRockRingPhase);
+
             SceneView.RepaintAll();
         }
     }
@@ -309,6 +333,7 @@ public class WaveEffectsLiveTuner : EditorWindow
         DrawSection("Wave Motion",      ref foldWaveMotion,   DrawWaveMotion);
         DrawSection("Surface",          ref foldSurface,      DrawSurface);
         DrawSection("Peaks & Troughs",  ref foldPeaksTroughs, DrawPeaksTroughs);
+        DrawSection("Rock Rings",       ref foldRockRings,    DrawRockRings);
         DrawSection("Twirl",            ref foldTwirl,        DrawTwirl);
         DrawSection("Whirlpool FX",    ref foldWhirlpoolFX,  DrawWhirlpoolFX);
         DrawSection("Foam",             ref foldFoam,         DrawFoam);
@@ -496,6 +521,9 @@ public class WaveEffectsLiveTuner : EditorWindow
         soulFishEdgeNoiseScale    = EditorGUILayout.FloatField("Edge Noise Scale (base)", soulFishEdgeNoiseScale);
         soulFishEdgeNoiseScale2   = EditorGUILayout.FloatField("Edge Noise Scale (fine)", soulFishEdgeNoiseScale2);
         soulFishEdgeNoiseSpeed    = EditorGUILayout.FloatField("Edge Noise Speed",     soulFishEdgeNoiseSpeed);
+        EditorGUILayout.LabelField("Width Taper (static, along the path)", EditorStyles.miniBoldLabel);
+        soulFishTaperStrength     = EditorGUILayout.Slider(    "Taper Strength",       soulFishTaperStrength, 0f, 1f);
+        soulFishTaperScale        = EditorGUILayout.FloatField("Taper Scale",          soulFishTaperScale);
         zoneTiling           = EditorGUILayout.Vector2Field("Zone Tiling",            zoneTiling);
         zoneScrollSpeed      = EditorGUILayout.FloatField("Scroll Speed",            zoneScrollSpeed);
         zoneNoiseStrength    = EditorGUILayout.Slider(    "Noise Strength",          zoneNoiseStrength, 0f, 1f);
@@ -518,6 +546,33 @@ public class WaveEffectsLiveTuner : EditorWindow
             }
         }
         EditorGUILayout.EndHorizontal();
+    }
+
+    void DrawRockRings()
+    {
+        EditorGUILayout.HelpBox(
+            "Bands travelling outward from every rock near the boat. Only procedural spikes throw " +
+            "them, and only in play mode — rocks are built when the level spawns.",
+            MessageType.None);
+
+        rockRingStrength     = EditorGUILayout.Slider("Strength",      rockRingStrength,     0f, 2f);
+        rockRingFrequency    = EditorGUILayout.Slider("Bands",         rockRingFrequency,    0.5f, 12f);
+        rockRingSpeed        = EditorGUILayout.Slider("Speed",         rockRingSpeed,        0f, 8f);
+        rockRingSpread       = EditorGUILayout.Slider("Spread",        rockRingSpread,       0.5f, 10f);
+        rockRingFalloffPower = EditorGUILayout.Slider("Falloff Power", rockRingFalloffPower, 0.1f, 4f);
+        rockRingLobeStrength = EditorGUILayout.Slider("Lobe Strength", rockRingLobeStrength, 0f, 4f);
+        rockRingRectify      = EditorGUILayout.Slider("Rectify",      rockRingRectify,     -1f, 1f);
+        rockRingWidthMultiplier = EditorGUILayout.Slider("Width Multiplier", rockRingWidthMultiplier, 1f, 8f);
+
+        EditorGUILayout.Space(4);
+        EditorGUILayout.LabelField("Distortion", EditorStyles.miniBoldLabel);
+        rockRingDistortStrength = EditorGUILayout.Slider(    "Strength", rockRingDistortStrength, 0f, 0.5f);
+        rockRingDistortScale    = EditorGUILayout.FloatField("Scale",    rockRingDistortScale);
+
+        EditorGUILayout.Space(4);
+        EditorGUILayout.LabelField("LOD", EditorStyles.miniBoldLabel);
+        rockRingLodRadius  = EditorGUILayout.Slider("Radius",  rockRingLodRadius,  0f, 60f);
+        rockRingLodFeather = EditorGUILayout.Slider("Feather", rockRingLodFeather, 0f, 1f);
     }
 
     void DrawTwirl()
@@ -753,6 +808,12 @@ public class WaveEffectsLiveTuner : EditorWindow
     // APPLY
     // ─────────────────────────────────────────────────────────────────────────
 
+    void SetBoth(string name, float value)
+    {
+        waveMaterial.SetFloat(name, value);
+        Shader.SetGlobalFloat(name, value);
+    }
+
     void ApplyToMaterial()
     {
         waveMaterial.SetFloat("_Frequency",    frequency);
@@ -775,10 +836,30 @@ public class WaveEffectsLiveTuner : EditorWindow
         waveMaterial.SetFloat("_SoulFishEdgeNoiseScale",    soulFishEdgeNoiseScale);
         waveMaterial.SetFloat("_SoulFishEdgeNoiseScale2",   soulFishEdgeNoiseScale2);
         waveMaterial.SetFloat("_SoulFishEdgeNoiseSpeed",    soulFishEdgeNoiseSpeed);
+        // Bare $Globals like the rest of the soul-fish set: the material write alone isn't
+        // dependable, the global write is what survives a material rebuild.
+        waveMaterial.SetFloat("_SoulFishTaperStrength",     soulFishTaperStrength);
+        waveMaterial.SetFloat("_SoulFishTaperScale",        soulFishTaperScale);
+        Shader.SetGlobalFloat("_SoulFishTaperStrength",     soulFishTaperStrength);
+        Shader.SetGlobalFloat("_SoulFishTaperScale",        soulFishTaperScale);
         waveMaterial.SetVector("_ZoneTiling",              zoneTiling);
         waveMaterial.SetFloat("_ZoneScrollSpeed",          zoneScrollSpeed);
         waveMaterial.SetFloat("_ZoneNoiseStrength",        zoneNoiseStrength);
         if (zoneTexture != null) waveMaterial.SetTexture("_ZoneTexture", zoneTexture);
+
+        // Rock rings are bare $Globals in RockRings.hlsl — the global write is the one that counts,
+        // the material write covers the non-batched path.
+        SetBoth("_RockRingStrength",     rockRingStrength);
+        SetBoth("_RockRingFrequency",    rockRingFrequency);
+        SetBoth("_RockRingSpread",       rockRingSpread);
+        SetBoth("_RockRingFalloffPower", rockRingFalloffPower);
+        SetBoth("_RockRingLobeStrength", rockRingLobeStrength);
+        SetBoth("_RockRingRectify",         rockRingRectify);
+        SetBoth("_RockRingDistortStrength", rockRingDistortStrength);
+        SetBoth("_RockRingDistortScale",    rockRingDistortScale);
+        SetBoth("_RockRingWidthMultiplier", rockRingWidthMultiplier);
+        // The LOD range is a CPU decision, not a shader one.
+        RockRingManager.SetLod(rockRingLodRadius, rockRingLodFeather);
 
         waveMaterial.SetFloat("_TwirlBaseStrength", twirlBaseStrength);
         waveMaterial.SetFloat("_TwirlSlopeBoost",  twirlSlopeBoost);
@@ -864,6 +945,36 @@ public class WaveEffectsLiveTuner : EditorWindow
             soulFishEdgeNoiseScale    = s.SoulFishEdgeNoiseScale;
             soulFishEdgeNoiseScale2   = s.SoulFishEdgeNoiseScale2;
             soulFishEdgeNoiseSpeed    = s.SoulFishEdgeNoiseSpeed;
+        }
+        // Rock rings, with the same "0 means the preset predates this" fallback: a preset saved
+        // before the rings existed carries zero bands, which would read as the effect being
+        // deliberately switched off. Keep the tuner's own values instead.
+        if (s.RockRingFrequency > 0f)
+        {
+            rockRingStrength     = s.RockRingStrength;
+            rockRingFrequency    = s.RockRingFrequency;
+            rockRingSpeed        = s.RockRingSpeed;
+            rockRingSpread       = s.RockRingSpread;
+            rockRingFalloffPower = s.RockRingFalloffPower;
+            rockRingLobeStrength = s.RockRingLobeStrength;
+            rockRingRectify      = s.RockRingRectify;
+            rockRingLodRadius    = s.RockRingLodRadius;
+            rockRingLodFeather   = s.RockRingLodFeather;
+        }
+        // The distortion landed after the rings, so a preset saved in between has a live band count
+        // but a zero noise scale. Same "0 scale means unset" fallback used everywhere else here.
+        if (s.RockRingDistortScale > 0f)
+        {
+            rockRingDistortStrength = s.RockRingDistortStrength;
+            rockRingDistortScale    = s.RockRingDistortScale;
+            rockRingWidthMultiplier = s.RockRingWidthMultiplier;
+        }
+        // Same "0 scale means the preset predates this" fallback as the edge noise above, so
+        // loading an older preset keeps the tuner's own taper rather than flattening it.
+        if (s.SoulFishTaperScale > 0f)
+        {
+            soulFishTaperStrength = s.SoulFishTaperStrength;
+            soulFishTaperScale    = s.SoulFishTaperScale;
         }
         zoneTiling              = s.ZoneTiling;
         zoneScrollSpeed         = s.ZoneScrollSpeed;
@@ -1041,10 +1152,24 @@ public class WaveEffectsLiveTuner : EditorWindow
         SoulFishEdgeNoiseScale    = soulFishEdgeNoiseScale,
         SoulFishEdgeNoiseScale2   = soulFishEdgeNoiseScale2,
         SoulFishEdgeNoiseSpeed    = soulFishEdgeNoiseSpeed,
+        SoulFishTaperStrength     = soulFishTaperStrength,
+        SoulFishTaperScale        = soulFishTaperScale,
         ZoneTiling                = zoneTiling,
         ZoneScrollSpeed           = zoneScrollSpeed,
         ZoneNoiseStrength         = zoneNoiseStrength,
         ZoneTexture               = zoneTexture,
+        RockRingStrength     = rockRingStrength,
+        RockRingFrequency    = rockRingFrequency,
+        RockRingSpeed        = rockRingSpeed,
+        RockRingSpread       = rockRingSpread,
+        RockRingFalloffPower = rockRingFalloffPower,
+        RockRingLobeStrength = rockRingLobeStrength,
+        RockRingRectify         = rockRingRectify,
+        RockRingDistortStrength = rockRingDistortStrength,
+        RockRingDistortScale    = rockRingDistortScale,
+        RockRingWidthMultiplier = rockRingWidthMultiplier,
+        RockRingLodRadius    = rockRingLodRadius,
+        RockRingLodFeather   = rockRingLodFeather,
         TwirlBaseStrength = twirlBaseStrength,
         TwirlSlopeBoost   = twirlSlopeBoost,
         TwirlScale        = twirlScale,

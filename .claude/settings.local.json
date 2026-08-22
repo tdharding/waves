@@ -42,7 +42,17 @@
       "Bash(git -C /c/Users/tomdh/Desktop/FILES/ART/2026_ART/tomhardingillustration push origin main)",
       "Bash(git -C /c/Users/tomdh/Desktop/FILES/ART/2026_ART/tomhardingillustration rm --cached -q experimentallogov1.png)",
       "Bash(git -C /c/Users/tomdh/Desktop/FILES/ART/2026_ART/tomhardingillustration add experimentallogov2.png index.html .gitignore)",
-      "Bash(git -C /c/Users/tomdh/Desktop/FILES/ART/2026_ART/tomhardingillustration status -s)"
+      "Bash(git -C /c/Users/tomdh/Desktop/FILES/ART/2026_ART/tomhardingillustration status -s)",
+      "Bash(python -)",
+      "Bash(python preview_render2.py)",
+      "Bash(python cap_check.py)",
+      "Bash(python gen_displace.py)",
+      "Bash(python -m py_compile \"tablet_draw_v1.pyw.py\")",
+      "Bash(QT_QPA_PLATFORM=offscreen python -c ' *)",
+      "Bash(git diff *)",
+      "Bash(git checkout *)",
+      "Bash(python \"C:/Users/tomdh/AppData/Local/Temp/claude/C--Users-tomdh-Waves/39b7d861-cec0-4f37-b363-d3298772546a/scratchpad/gen_subgraph.py\")",
+      "PowerShell(git fetch origin)"
     ]
   }
 }

@@ -40,7 +40,8 @@
 //                                     z lit threshold, w threshold jitter (0..1)
 //   FlickerParams     Vector4       — _WindowFlickerParams: x flicker amount, y flicker speed,
 //                                     z BASELINE lightness with no fish nearby, w baseline variation
-//   StyleParams       Vector4       — _WindowStyleParams: x unlit darken, y (unused),
+//   StyleParams       Vector4       — _WindowStyleParams: x unlit darken, y EDGE MARGIN (world
+//                                     units kept window-free around each face's border),
 //                                     z debug mode (0 off / 1 mask / 2 id), w PANE BORDER (0..~0.4)
 //   Spacing           Vector2       — _WindowSpacing: UNUSED now (gaps are baked into the field).
 //                                     Kept only so the node interface is unchanged.
@@ -90,12 +91,20 @@ void WindowTiling_float(
     // Top/bottom faces (zeroed UV2) and anything below the waterline: no windows.
     if (UV2.w <= 0.0001 || UV2.y < 0.0) return;
 
+    // Edge margin (StyleParams.y, world units): keep windows off a border around each face
+    // so they don't run into the block's corners/top/waterline. UV2.xy is face-local; zw is
+    // (face width, height above water).
+    float margin = StyleParams.y;
+    if (margin > 0.0 &&
+        (UV2.x < margin || UV2.x > UV2.z - margin ||
+         UV2.y < margin || UV2.y > UV2.w - margin)) return;
+
     // ── Field lookup ─────────────────────────────────────────────────────────
     // Map face-local world coords to field cells: x from the left edge, y from the
     // waterline. The field repeats (frac) so buildings taller/wider than the field
     // keep getting windows. Point sampling at the cell centre keeps mask/id crisp —
     // linear filtering would bleed neighbouring window ids across boundaries.
-    float  cell   = max(CellSize, 0.05);
+    float  cell   = max(CellSize, 0.001);
     float2 field  = max(AtlasGrid, 1.0);
     float2 f      = float2(UV2.x, UV2.y) / cell;   // continuous cell coords
     float2 cellId = floor(f);

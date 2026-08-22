@@ -38,11 +38,46 @@ public class ProceduralCubeBuilding : MonoBehaviour
         ApplyMesh(ResolveChild(warningLinesChild, warningLinesChildName), mesh, assignCollider: false);
     }
 
+    // Same as Build, but generates a stepped-rooftop mesh from a preset config + seed
+    // (SteppedBuildingMesh). Used by LevelSpawner when a block has its Stepped Top flag set.
+    public void BuildStepped(float width, float length, float heightAboveWater, float depthBelowWater,
+                             SteppedBuildingConfig cfg, int seed)
+    {
+        Mesh mesh = SteppedBuildingMesh.Build(width, length, heightAboveWater, depthBelowWater, cfg, seed);
+        mesh.name = "ProceduralSteppedBuilding";
+
+        ApplyMesh(ResolveChild(visibleChild, visibleChildName), mesh, assignCollider: true);
+        ApplyMesh(ResolveChild(warningLinesChild, warningLinesChildName), mesh, assignCollider: false);
+    }
+
 #if UNITY_EDITOR
     // Lets the prefab be previewed with a mesh in the editor without entering play mode.
     [ContextMenu("Rebuild Preview")]
     void RebuildPreview() => Build(previewWidth, previewLength, previewHeight, previewDepth);
 #endif
+
+    static readonly int WindowAtlasID     = Shader.PropertyToID("_WindowAtlas");
+    static readonly int WindowCellSizeID  = Shader.PropertyToID("_WindowCellSize");
+    static readonly int WindowAtlasGridID = Shader.PropertyToID("_WindowAtlasGrid");
+
+    // Overrides this building's window sheet / cell size / grid on the visible renderer via a
+    // MaterialPropertyBlock, so different buildings show different windows off one shared
+    // material. Leaves every other property to the material. Called by LevelSpawner with a
+    // random WindowFieldPreset from the pool.
+    public void ApplyWindowField(Texture fieldTexture, float cellSize, Vector2 gridDims)
+    {
+        var go = ResolveChild(visibleChild, visibleChildName);
+        if (go == null) return;
+        var r = go.GetComponent<MeshRenderer>();
+        if (r == null) return;
+
+        var mpb = new MaterialPropertyBlock();
+        r.GetPropertyBlock(mpb);
+        if (fieldTexture != null) mpb.SetTexture(WindowAtlasID, fieldTexture);
+        mpb.SetFloat(WindowCellSizeID, cellSize);
+        mpb.SetVector(WindowAtlasGridID, new Vector4(gridDims.x, gridDims.y, 0f, 0f));
+        r.SetPropertyBlock(mpb);
+    }
 
     GameObject ResolveChild(GameObject explicitRef, string childName)
     {

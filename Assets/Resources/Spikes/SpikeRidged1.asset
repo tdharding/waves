@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b4b84c036de74d240ad890a573ecae01, type: 3}
+  m_Name: SpikeRidged1
+  m_EditorClassIdentifier: Assembly-CSharp::SpikeShapePreset
+  config:
+    radiusBelowSurface: 0.6
+    radiusWaterline: 0.44
+    radiusMid: 0.27
+    radiusTop: 0.1
+    heightAboveWater: 1.41
+    depthBelowWater: 5
+    midHeightFraction: 0.687
+    topRoundness: 1
+    twistTurns: 1.36
+    carveSpiralRidge: 1
+    ridgeSpacing: 0.4
+    ridgeDepth: 0.02
+    ridgeSoftness: 1
+    pushSpiralToMaterial: 1
+    sidesAround: 12
+    heightSubdivisions: 2

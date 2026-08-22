@@ -23,6 +23,10 @@ public class StreetLightController : MonoBehaviour, IInstancedLight
     [Tooltip("Enabled while this light is lit. Light #1 starts lit with an empty bowl.")]
     [SerializeField] private GameObject litVisual;
 
+    [Tooltip("Optional cloud of floating quads that drifts around the lamp while it is lit. " +
+             "Assign the child holding the ParticleSystem + StreetLightParticles.")]
+    [SerializeField] private StreetLightParticles litParticles;
+
     [Header("Instanced Light")]
     [Tooltip("Illumination radius this lamp casts onto objects (world units). Separate from the fish pool radius.")]
     [SerializeField] private float lightRadius = 6f;
@@ -45,6 +49,12 @@ public class StreetLightController : MonoBehaviour, IInstancedLight
 
     public bool IsLit { get; private set; }
     public int  OccupantSoulIdentity { get; private set; } = -1;
+
+    // Debug read-only: what the prefab actually has in its visual slots, so StreetLightDebugTracer
+    // can report an unassigned one rather than leaving it to guesswork.
+    public GameObject          DebugBowlFishVisual => bowlFishVisual;
+    public GameObject          DebugLitVisual      => litVisual;
+    public StreetLightParticles DebugLitParticles  => litParticles;
 
     // The transform the offset is measured from — the bulb if one is assigned, else this object.
     private Transform LightAnchorTransform => lightAnchor != null ? lightAnchor : transform;
@@ -144,6 +154,7 @@ public class StreetLightController : MonoBehaviour, IInstancedLight
     {
         if (bowlFishVisual != null) bowlFishVisual.SetActive(OccupantSoulIdentity >= 0);
         if (litVisual      != null) litVisual.SetActive(IsLit);
+        if (litParticles   != null) litParticles.SetShowing(IsLit);
     }
 
 #if UNITY_EDITOR

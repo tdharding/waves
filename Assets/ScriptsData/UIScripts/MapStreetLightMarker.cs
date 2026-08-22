@@ -25,6 +25,36 @@ public class MapStreetLightMarker : MonoBehaviour
         _lit       = null;
     }
 
+    /// <summary>
+    /// Debug read-only: what this icon currently shows. Null means SetLit has never run on it, so
+    /// the icon is still in whatever state it was built in.
+    /// </summary>
+    public bool? DebugLitState => _lit;
+
+    /// <summary>
+    /// Debug read-only: the colours SetLit writes and the colours actually sitting on the mesh.
+    /// If these two agree and the icon still looks unlit, the write landed and the material is
+    /// ignoring vertex colours; if the vertex ranges are empty, SetLit had nothing to write to.
+    /// </summary>
+    public string DebugMeshState()
+    {
+        if (_mesh == null || _colors == null) return "Init never ran — no mesh or colour array";
+
+        Color[] onMesh = _mesh.colors;
+        return $"lit={(_lit.HasValue ? _lit.Value.ToString() : "never set")} " +
+               $"verts={_colors.Length} (mesh holds {onMesh.Length}) " +
+               $"bulb[{_bulbStart}+{_bulbCount}] wants={Fmt(Sample(_colors, _bulbStart, _bulbCount))} " +
+               $"onMesh={Fmt(Sample(onMesh, _bulbStart, _bulbCount))} " +
+               $"halo[{_haloStart}+{_haloCount}] wants={Fmt(Sample(_colors, _haloStart, _haloCount))} " +
+               $"onMesh={Fmt(Sample(onMesh, _haloStart, _haloCount))} haloAlpha={_haloAlpha:F2}";
+    }
+
+    static Color? Sample(Color[] cols, int start, int count) =>
+        cols != null && count > 0 && start >= 0 && start < cols.Length ? cols[start] : (Color?)null;
+
+    static string Fmt(Color? c) =>
+        c.HasValue ? $"({c.Value.r:F2},{c.Value.g:F2},{c.Value.b:F2},a{c.Value.a:F2})" : "EMPTY RANGE";
+
     public void SetLit(bool lit)
     {
         if (_mesh == null || _colors == null || _lit == lit) return;
