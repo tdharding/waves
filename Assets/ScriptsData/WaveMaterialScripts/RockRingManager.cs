@@ -34,10 +34,23 @@ public interface IRockRing
 [ExecuteAlways]
 public class RockRingManager : MonoBehaviour
 {
-    // Must equal MAX_ROCK_RINGS in RockRings.hlsl. Raising it costs a per-pixel loop iteration
-    // on the whole water surface, so keep it tight — the LOD is what should give you headroom,
-    // not this number.
-    public const int MAX = 12;
+    // Must equal MAX_ROCK_RINGS in RockRings.hlsl — the two are a matched pair and changing one
+    // without the other silently drops rocks or reads past the array.
+    //
+    // This is a CEILING, not a running cost. The shader loop breaks on the pushed count, so a
+    // level with three rocks near the boat pays for three however high this sits; what it really
+    // buys is uniform space (two float4 per slot) and shader code size. Use `activeBudget` below
+    // to trim the working number at runtime — that is the one worth tuning.
+    //
+    // Raising it is a recompile. If you raise it and nothing changes, restart the editor: a global
+    // array locks its size the first time Shader.SetGlobalVectorArray writes it.
+    public const int MAX = 48;
+
+    [Header("Budget")]
+    [Tooltip("How many rocks may throw bands at once, up to the shader's ceiling. Lower it to buy " +
+             "back fill rate on a crowded level without pulling the LOD radius in — the nearest " +
+             "rocks keep their rings and the far ones simply go quiet.")]
+    [Range(1, MAX)] [SerializeField] int activeBudget = MAX;
 
     [Header("LOD")]
     [Tooltip("Rocks further than this from the boat throw no bands at all. Driven by the wave " +
@@ -79,6 +92,18 @@ public class RockRingManager : MonoBehaviour
     /// <summary>Did this rock's data reach the shader on the last push?</summary>
     public static bool IsContributing(IRockRing rock) => _pushed.Contains(rock);
 
+    // Live counts for the inspector readout. Three separate numbers because they answer three
+    // different questions: how many rocks exist at all, how many the LOD let through, and how many
+    // actually reached the shader. When the middle one exceeds the last, the budget is biting.
+    /// <summary>Every rock registered on the level, in range or not.</summary>
+    public static int RegisteredCount => _rocks.Count;
+    /// <summary>Rocks inside the LOD radius on the last push, before the budget was applied.</summary>
+    public static int InRangeCount { get; private set; }
+    /// <summary>Rocks whose data actually reached the shader on the last push.</summary>
+    public static int RenderingCount => _pushed.Count;
+    /// <summary>The budget the last push ran under, after clamping to MAX.</summary>
+    public static int LastBudget { get; private set; }
+
     // Domain-reload-safe: clear statics at play start regardless of the "Reload Domain" setting.
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics()
@@ -88,6 +113,8 @@ public class RockRingManager : MonoBehaviour
         _near.Clear();
         _instance = null;
         _budgetWarned = false;
+        InRangeCount = 0;
+        LastBudget = 0;
     }
 
     public static void Register(IRockRing rock)
@@ -160,11 +187,15 @@ public class RockRingManager : MonoBehaviour
         // Nearest first, so when more rocks are in range than there are slots the ones that get
         // dropped are the faint far ones already fading out.
         if (_near.Count > 1) _near.Sort(ByDistance);
-        if (_near.Count > MAX) WarnBudget();
+
+        int budget = Mathf.Clamp(activeBudget, 1, MAX);
+        InRangeCount = _near.Count;
+        LastBudget   = budget;
+        if (_near.Count > budget) WarnBudget(budget);
 
         // ── Pack ─────────────────────────────────────────────────────────────
         _pushed.Clear();
-        int count = Mathf.Min(_near.Count, MAX);
+        int count = Mathf.Min(_near.Count, budget);
         for (int i = 0; i < count; i++)
         {
             var     rock = _near[i].Rock;
@@ -172,9 +203,14 @@ public class RockRingManager : MonoBehaviour
 
             // 1 well inside the range, easing to 0 at its edge. Same shape as the boat light's
             // falloff, so a rock fades out the way everything else around the boat does.
-            float fade = lodRadius > 0.0001f
-                       ? 1f - Mathf.SmoothStep(full, lodRadius, _near[i].Distance)
-                       : 1f;
+            //
+            // The distance is normalised FIRST, then smoothed. Mathf.SmoothStep is not HLSL's
+            // smoothstep: it interpolates between its first two arguments by the third, clamped to
+            // 0..1 — so handing it a raw world distance returns the endpoint, not a 0..1 blend.
+            // Done that way every rock got the same fade regardless of where it stood, and that
+            // fade was a large negative number, which inverted the bands and multiplied them.
+            float k    = Mathf.InverseLerp(full, lodRadius, _near[i].Distance);
+            float fade = 1f - Mathf.SmoothStep(0f, 1f, k);
 
             // .y carries the fade because the water is a horizontal plane — the shader only ever
             // reads .xz, so world height is free.
@@ -247,13 +283,16 @@ public class RockRingManager : MonoBehaviour
         return waveController != null ? waveController.waveMaterial : null;
     }
 
-    static void WarnBudget()
+    static void WarnBudget(int budget)
     {
         if (_budgetWarned) return;
         _budgetWarned = true;
-        Debug.LogWarning($"[RockRingManager] More than {MAX} rocks are inside the ring LOD range — the " +
-                         $"furthest are dropped. Pull the LOD radius in, or raise MAX here and " +
-                         $"MAX_ROCK_RINGS in RockRings.hlsl together (costs a per-pixel loop iteration).");
+        string how = budget < MAX
+            ? $"Active Budget is set to {budget} of a possible {MAX} — raise it on the manager."
+            : $"That is the ceiling: raise MAX here and MAX_ROCK_RINGS in RockRings.hlsl together, " +
+              $"then restart the editor so the global array resizes.";
+        Debug.LogWarning($"[RockRingManager] More than {budget} rocks are inside the ring LOD range — the " +
+                         $"furthest are dropped. Pull the LOD radius in, or: {how}");
     }
 
 #if UNITY_EDITOR

@@ -121,9 +121,28 @@ public class CameraController : MonoBehaviour
 [Tooltip("How fast the boat must be moving (world units per second) for the drift to engage. " +
          "A stationary boat never pulls the camera round.")]
 [SerializeField] private float autoFollowMinBoatSpeed = 0.5f;
+[Tooltip("How far off from directly behind the boat the camera must be before the drift starts, in " +
+         "degrees. Stops it constantly nudging at small offsets — raise it to let the player hold a " +
+         "slightly off-centre view without being pulled straight.")]
+[SerializeField] private float autoFollowMinAngle = 10f;
+[Tooltip("Seconds spent easing up to full Auto Follow Speed after the drift engages. The turn starts " +
+         "slow and builds, so it never begins with a lurch. 0 = start at full speed immediately.")]
+[SerializeField] private float autoFollowEaseInTime = 1f;
+[Tooltip("Degrees out from directly behind the boat at which the camera starts slowing down, so it " +
+         "settles instead of stopping dead. 0 = no ease out. Keep this below Auto Follow Min Angle or " +
+         "small corrections will spend their whole turn easing.")]
+[SerializeField] private float autoFollowEaseOutAngle = 8f;
 [Tooltip("Transform whose forward is the boat's heading. Leave blank to use BoatMovement's transform — " +
          "the follow target itself is usually a child that never rotates, so its forward is useless here.")]
 [SerializeField] private Transform boatHeadingSource;
+
+[Header("Height Floor")]
+[Tooltip("Hard backstop so the camera can never drop below the boat, whatever combination of pitch " +
+         "and zoom distance it ends up at. The low-angle zoom softens the approach; this guarantees it.")]
+[SerializeField] private bool limitCameraHeight = true;
+[Tooltip("Minimum height the camera must stay above the follow point, in world units. The pitch is " +
+         "raised as far as needed to hold this — and the closer the camera is, the steeper that has to be.")]
+[SerializeField] private float minHeightAboveBoat = 0.5f;
 
 [Header("Sonar View")]
 [Tooltip("While sonar is active the pitch is held at Sonar Pitch and the mouse only turns horizontally.")]
@@ -169,6 +188,17 @@ private float   _lastRotateInputTime = -999f;
 private Vector3 _lastBoatPosition;
 private bool    _hasLastBoatPosition = false;
 private BoatMovement _boatMovement;
+
+// Auto-follow stays engaged once it starts, so it can finish the turn instead of switching off the
+// moment the offset drops back under the minimum angle. The ramp is the ease-in.
+private bool  _autoFollowEngaged = false;
+private float _autoFollowRamp = 0f;
+
+// Close enough to be done — small enough that the last degree isn't visible as a crawl.
+private const float AutoFollowStopAngle = 0.5f;
+
+// Floor on the ease-out, so the tail of the turn still closes at a visible rate.
+private const float AutoFollowMinEaseOut = 0.08f;
 
 // Pitch is driven by sonar rather than the mouse.
 private bool PitchLocked => lockPitchInSonar && _sonarView;
@@ -250,7 +280,10 @@ private void Update()
 
         // Any deliberate turn hands control back to the player and restarts the auto-follow delay
         if (Mathf.Abs(yawInput) > 0.001f || Mathf.Abs(pitchInput) > 0.001f)
+        {
             _lastRotateInputTime = Time.time;
+            CancelAutoFollow();
+        }
     }
 
     UpdateAutoFollow();
@@ -261,6 +294,9 @@ private void Update()
     _currentDistance = lowAngleZoomSmoothing > 0f
         ? Mathf.Lerp(_currentDistance, target, 1f - Mathf.Exp(-lowAngleZoomSmoothing * Time.deltaTime))
         : target;
+
+    // Last word on pitch — depends on the distance just settled above
+    ClampCameraHeight();
 
     ApplyZoomDepthOfField();
 }
@@ -383,20 +419,85 @@ private void UpdateAutoFollow()
         _hasLastBoatPosition = true;
     }
 
-    if (!autoFollowBehindBoat) return;
-    if (boatSpeed < autoFollowMinBoatSpeed) return;
-    if (Time.time - _lastRotateInputTime < autoFollowDelay) return;
+    if (!autoFollowBehindBoat || boatSpeed < autoFollowMinBoatSpeed ||
+        Time.time - _lastRotateInputTime < autoFollowDelay)
+    {
+        CancelAutoFollow();
+        return;
+    }
 
     Transform heading = HeadingSource;
-    if (heading == null) return;
+    if (heading == null) { CancelAutoFollow(); return; }
 
     // Behind the boat = looking the way the boat faces
     Vector3 forward = heading.forward;
     forward.y = 0f;
-    if (forward.sqrMagnitude < 1e-6f) return;
+    if (forward.sqrMagnitude < 1e-6f) { CancelAutoFollow(); return; }
 
     float targetYaw = Mathf.Atan2(forward.x, forward.z) * Mathf.Rad2Deg;
-    _manualYaw = Mathf.MoveTowardsAngle(_manualYaw, targetYaw, autoFollowSpeed * Time.deltaTime);
+    float offset    = Mathf.Abs(Mathf.DeltaAngle(_manualYaw, targetYaw));
+
+    if (_autoFollowEngaged)
+    {
+        // Keep going until the turn is actually finished, not until it dips back under the minimum
+        if (offset <= AutoFollowStopAngle)
+        {
+            _manualYaw = targetYaw;
+            CancelAutoFollow();
+            return;
+        }
+    }
+    else
+    {
+        if (offset < autoFollowMinAngle) return;
+        _autoFollowEngaged = true;
+        _autoFollowRamp    = 0f;
+    }
+
+    // Ease in — SmoothStep starts near zero, so the turn creeps into motion rather than lurching
+    _autoFollowRamp = autoFollowEaseInTime > 0f
+        ? Mathf.Min(1f, _autoFollowRamp + Time.deltaTime / autoFollowEaseInTime)
+        : 1f;
+
+    float easeIn  = Mathf.SmoothStep(0f, 1f, _autoFollowRamp);
+    float easeOut = EaseOutFactor(offset);
+
+    float speed = autoFollowSpeed * easeIn * easeOut;
+    _manualYaw  = Mathf.MoveTowardsAngle(_manualYaw, targetYaw, speed * Time.deltaTime);
+}
+
+// Slows the turn down over the last few degrees so it settles rather than stopping dead.
+// Floored well above zero — a pure ease would go asymptotic and leave the final degree crawling for
+// seconds, which reads as the camera sticking rather than arriving.
+private float EaseOutFactor(float offset)
+{
+    if (autoFollowEaseOutAngle <= 0f) return 1f;
+
+    float t = Mathf.Clamp01(offset / autoFollowEaseOutAngle);
+    return Mathf.Max(Mathf.SmoothStep(0f, 1f, t), AutoFollowMinEaseOut);
+}
+
+private void CancelAutoFollow()
+{
+    _autoFollowEngaged = false;
+    _autoFollowRamp    = 0f;
+}
+
+// Hard floor on how low the camera can sit. The rig puts the camera at a height of
+// distance × sin(pitch) above the follow point, so holding a minimum height means a minimum pitch of
+// asin(minHeight / distance) — which automatically steepens as the zoom pulls the camera in.
+private void ClampCameraHeight()
+{
+    if (!limitCameraHeight || minHeightAboveBoat <= 0f) return;
+
+    float distance = Mathf.Max(_currentDistance, 0.001f);
+
+    // Closer than the minimum height, no pitch can satisfy it — go fully overhead.
+    float ratio     = Mathf.Clamp(minHeightAboveBoat / distance, -1f, 1f);
+    float floorPitch = Mathf.Asin(ratio) * Mathf.Rad2Deg;
+
+    if (_manualPitch < floorPitch)
+        _manualPitch = Mathf.Min(floorPitch, manualPitchMax);
 }
 
 // =====================================================

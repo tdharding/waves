@@ -33,6 +33,11 @@ float _SoulFishEdgeNoiseSpeed;    // scroll speed for the animated fringe
 float _SoulFishTaperStrength;     // 0 = constant width; 0.5 = pinches to half at its narrowest
 float _SoulFishTaperScale;        // pinches per world unit along the path (low = long lazy tapers)
 
+// Hollow centre for the circular pools (street lights, fish-bowl sources, single-node zones), as a
+// fraction of that pool's radius. 0 = solid disc. Turns a pool into a ring with clear water at the
+// lamp, which the shoal then orbits inside. Corridors are unaffected — a river has no middle to cut.
+float _SoulFishPoolHole;
+
 // --- Procedural value noise (self-contained; no texture bindings) ---
 float hash_SoulFish(float2 p)
 {
@@ -51,6 +56,24 @@ float valueNoise_SoulFish(float2 p)
     float c = hash_SoulFish(i + float2(0.0, 1.0));
     float d = hash_SoulFish(i + float2(1.0, 1.0));
     return lerp(lerp(a, b, u.x), lerp(c, d, u.x), u.y);
+}
+
+// Smooth union of two mask contributions. A hard max() is a boolean union: where the narrow
+// corridor band crosses a wider street-light pool it leaves concave corners, so the path appears
+// to cut a notch into the circle. Blending the two instead fillets the join, and the same fillet
+// softens the corners between consecutive path segments. k is in mask units (0..1) — larger gives
+// a wider, softer flare.
+#define SOULFISH_JOIN_BLEND 0.2
+
+float smoothUnion_SoulFish(float a, float b, float k)
+{
+    // The fillet term k*h*(1-h) peaks when a and b are EQUAL — including when both are zero. Run
+    // naively over every packed point that contributes nothing, it lifts the mask a little on each
+    // iteration and the whole water surface creeps brighter. So the blend only engages where the
+    // two contributions genuinely overlap; with either at zero this collapses to a plain max().
+    k *= saturate(min(a, b) * 4.0);
+    float h = saturate(0.5 + 0.5 * (b - a) / max(k, 1e-4));
+    return lerp(a, b, h) + k * h * (1.0 - h);
 }
 
 // Width multiplier at arc-length `s` along the path. Only ever narrows (never exceeds the authored
@@ -79,6 +102,9 @@ void SoulFishWaveMaskCore(
     out float2 PathUV)
 {
     float maskAccum = 0.0;
+    // Pool centres are punched out of EVERYTHING at the end, not just out of the pool's own
+    // contribution — otherwise the corridor running through a light fills its hole straight back in.
+    float holeMask  = 1.0;
     int count = min((int)_SoulFishCount, SOULFISH_MAX_POINTS);
 
     // Two animated world-space noise octaves, evaluated once (they depend only on the pixel).
@@ -180,8 +206,26 @@ void SoulFishWaveMaskCore(
         float tN    = saturate(t + noise * _SoulFishEdgeNoiseStrength * edgeW);
         float contribution = 1.0 - smoothstep(fadeStart, 1.0, tN);
 
-        maskAccum = max(maskAccum, contribution);
+        // Record this pool's hollow centre. Collected across every pool and applied to the whole
+        // mask after the loop, so the corridor that passes through a light is cut out too and the
+        // clear water at the lamp stays clear. Only lone points carrying their own radius punch a
+        // hole — never the corridor, and never loose fish (they pack y = 0 and would each ring).
+        // Uses the clean t, not the noise-perturbed tN, so the inner rim stays crisp while the
+        // outer edge keeps its fringe.
+        if (lonePoint && P.y > 0.0001 && _SoulFishPoolHole > 0.0001)
+        {
+            float hole = saturate(_SoulFishPoolHole);
+            float soft = max(hole * 0.35, 0.02);
+            holeMask = min(holeMask, smoothstep(hole - soft, hole + soft, t));
+        }
+
+        // Smooth union rather than max(), so a corridor meeting a pool flares into it instead of
+        // notching its outline. Saturated because the blend can overshoot slightly above 1.
+        maskAccum = saturate(smoothUnion_SoulFish(maskAccum, contribution, SOULFISH_JOIN_BLEND));
     }
+
+    // Punch the pool centres out of the finished mask — corridor included.
+    maskAccum *= holeMask;
 
     // Per-point distance-based zone falloff
     float distMask = maskAccum * _SoulFishStrength;

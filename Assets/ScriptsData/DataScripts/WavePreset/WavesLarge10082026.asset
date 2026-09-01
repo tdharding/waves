@@ -22,7 +22,7 @@ MonoBehaviour:
     TroughRingWave1Brightness: 1.88
     PeakRingWave2Brightness: 8.91
     TwirlBaseStrength: -1.01
-    TwirlSlopeBoost: -0.22
+    TwirlSlopeBoost: -0
     TwirlScale: 0.48
     DepthTwirlStrength: 4.17
     DepthFadeStrength: 1.99
@@ -30,17 +30,18 @@ MonoBehaviour:
     WhirlpoolTwirlStrength: 11.52
     WhirlpoolAreaTwirlStrength: 14.55
     SoulFishTwirlStrength: 0.78
-    SoulFishMaskStrength: 0.036
+    SoulFishMaskStrength: 0.028
     SoulFishRadius: 1.49
-    SoulFishBrightness1: 1.66
-    SoulFishFadeStart: 0.3
+    SoulFishBrightness1: 2.78
+    SoulFishFadeStart: 0.073
     SoulFishEdgeNoiseStrength: -0.06
     SoulFishEdgeNoiseScale: 6.19
     SoulFishEdgeNoiseScale2: 160.3
     SoulFishEdgeNoiseSpeed: 0.25
-    SoulFishTaperStrength: 0.925
-    SoulFishTaperScale: 1.48
-    ZoneTiling: {x: -0.1, y: 3.3}
+    SoulFishTaperStrength: 0.544
+    SoulFishTaperScale: 5.37
+    SoulFishPoolHole: 0.312
+    ZoneTiling: {x: -0.1, y: 0.29}
     ZoneScrollSpeed: 0.015
     ZoneNoiseStrength: 0.16
     ZoneTexture: {fileID: 2800000, guid: 4379fff8590b78646a3dd7b4b565120e, type: 3}
@@ -48,25 +49,45 @@ MonoBehaviour:
     WhirlpoolDarkRadiusMult: 2.25
     WhirlpoolDarkStrength: 1
     WhirlpoolFalloffPower: 0.23
-    RockRingStrength: 0.049
-    RockRingFrequency: 5.95
+    RockRingStrength: 0.425
+    RockRingFrequency: 3.01
     RockRingSpeed: 0.85
-    RockRingSpread: 1.87
-    RockRingFalloffPower: 3.139
+    RockRingSpread: 1.35
+    RockRingFalloffPower: 3.085
     RockRingLobeStrength: 0
-    RockRingRectify: -1
-    RockRingDistortStrength: 0.121
+    RockRingRectify: 1
+    RockRingDistortStrength: 0.185
     RockRingDistortScale: 8.11
-    RockRingWidthMultiplier: 1.69
-    RockRingLodRadius: 14.7
-    RockRingLodFeather: 0
+    RockRingWidth: 0.4
+    RockRingWidthMultiplier: 7.4
+    RockRingSoftness: 1
+    RockRingLodRadius: 5.3
+    RockRingLodFeather: 0.208
+    WaveBandAngle: 44.5
+    WaveBandFrequency: 3.42
+    WaveBandSpeed: 1.174
+    WaveBandStrength: 0.058
+    WaveBandWidth: 0.89
+    WaveBandSoftness: 1
+    WaveBandWaviness: 2.57
+    WaveBandWavinessScale: 0.12
+    WaveBandMeanderStrength: 4
+    WaveBandMeanderScale: 0.4
+    WaveBandRockDistort: 9.04
+    WaveBandRockReach: 5.74
+    WaveBandRockBevel: 1
+    WaveBandGrainStrength: 0.1
+    WaveBandGrainSize: 0.004
+    WaterlineGradientHeight: 0.07
+    WaterlineGradientStrength: 1
+    WaterlineGradientFalloff: 0.79
     WaveStepRate: 4000
     BaseColor: {r: 1, g: 1, b: 1, a: 1}
     LightDirection: {x: 1.85, y: -50.8, z: 54.72}
     FoamDitherSize: 3.89
-    FoamDistanceDepth: -0.48
+    FoamDistanceDepth: -0.001
     FoamDepthFade: -0.08
-    FoamColor: {r: 0, g: 0, b: 0, a: 1}
+    FoamColor: {r: 0.12578613, g: 0.12578613, b: 0.12578613, a: 1}
     FoamLine: 0.005
     DepthFade: -1.14
     DepthColour: {r: 1, g: 1, b: 1, a: 0}

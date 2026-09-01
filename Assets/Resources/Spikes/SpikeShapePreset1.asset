@@ -22,7 +22,7 @@ MonoBehaviour:
     midHeightFraction: 0.326
     topRoundness: 1
     twistTurns: 0.62
-    carveSpiralRidge: 0
+    carveSpiralRidge: 1
     ridgeSpacing: 0.35
     ridgeDepth: 0.02
     ridgeSoftness: 0.5

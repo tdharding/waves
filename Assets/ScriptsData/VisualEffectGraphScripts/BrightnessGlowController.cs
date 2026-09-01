@@ -132,6 +132,11 @@ public class BrightnessGlowController : MonoBehaviour
 
     readonly Vector4[] pointBuffer = new Vector4[MAX_POINTS];   // xy = uv, z = radius, w = softness
     readonly Vector4[] paramBuffer = new Vector4[MAX_POINTS];   // x  = per-point opacity
+
+    // The arena baseline is the authority on waterline height. LevelSpawner hands out the marker the
+    // active ArenaProfile supplied, the same route BoatToWaterMaterial takes.
+    BaselineMarker baseline;
+    float nextBaselineProbe;
     int lastBuiltFrame = -1;
 
     // Blockers considered in one cast, matching CameraOccluderFader's cap. More than this stacked in
@@ -394,30 +399,63 @@ public class BrightnessGlowController : MonoBehaviour
         TryAddWorld(cam, p.target.position, r, p.softness, p.opacity, p.target.name, ref count);
     }
 
-    // Both of a lamp's points — the tight core and the soft halo — sit on InstLightPosition, so they
-    // share one occlusion ray rather than casting the same ray twice. The core is added first, so a
-    // lamp that runs into the point budget loses its halo and keeps its light.
+    // A lamp's tight core and its soft halo. The halo sits wherever the lamp's halo anchor is; with
+    // no anchor the two share a point, and then they share one occlusion ray too rather than casting
+    // the same ray twice. The core is added first, so a lamp that runs into the point budget loses
+    // its halo and keeps its light.
     void AddLamp(Camera cam, StreetLightController lamp, ref int count)
     {
-        Vector3 p = lamp.InstLightPosition;
-
         float coreR = streetLights.opacity    > 0f ? streetLights.radius    * streetLights.weight    : 0f;
         float haloR = streetLightHalo.opacity > 0f ? streetLightHalo.radius * streetLightHalo.weight : 0f;
         if (coreR <= 0f && haloR <= 0f) return;
 
-        Vector2 coreUV  = default, haloUV = default;
-        bool    coreOn  = coreR > 0f && TryProject(cam, p, coreR, out coreUV);
-        bool    haloOn  = haloR > 0f && TryProject(cam, p, haloR, out haloUV);
-        string  blocker = null;
-        bool    blocked = (coreOn || haloOn) && IsOccluded(cam, p, out blocker);
+        Vector3 corePos = lamp.InstLightPosition;
+        Vector3 haloPos = lamp.HaloGlowPosition;
+
+        float haloCullR = haloR;
+
+        Vector2 coreUV = default, haloUV = default;
+        bool    coreOn = coreR     > 0f && TryProject(cam, corePos, coreR, out coreUV);
+        bool    haloOn = haloCullR > 0f && TryProject(cam, haloPos, haloCullR, out haloUV);
+
+        string coreBlocker = null, haloBlocker = null;
+        bool   coreBlocked, haloBlocked;
+
+        if (lamp.HasOwnHaloPoint)
+        {
+            // Separate points need separate rays — the halo can clear a wall the core sits behind.
+            coreBlocked = coreOn && IsOccluded(cam, corePos, out coreBlocker);
+            haloBlocked = haloOn && IsOccluded(cam, haloPos, out haloBlocker);
+        }
+        else
+        {
+            bool shared = (coreOn || haloOn) && IsOccluded(cam, corePos, out coreBlocker);
+            coreBlocked = haloBlocked = shared;
+            haloBlocker = coreBlocker;
+        }
 
         if (coreR > 0f)
-            AddResolved(coreUV, coreOn, blocked, blocker, coreR, streetLights.softness,
+            AddResolved(coreUV, coreOn, coreBlocked, coreBlocker, coreR, streetLights.softness,
                         streetLights.opacity, lamp.name, ref count);
 
         if (haloR > 0f && count < MAX_POINTS)
-            AddResolved(haloUV, haloOn, blocked, blocker, haloR, streetLightHalo.softness,
+            AddResolved(haloUV, haloOn, haloBlocked, haloBlocker, haloCullR, streetLightHalo.softness,
                         streetLightHalo.opacity, lamp.name + " halo", ref count);
+    }
+
+    // The arena baseline owns waterline height. Probed rather than cached for good so a level rebuild
+    // is picked up, and throttled because the lookup is a scene search.
+    bool TryGetWaterY(out float y)
+    {
+        if (baseline == null && Time.unscaledTime >= nextBaselineProbe)
+        {
+            nextBaselineProbe = Time.unscaledTime + 2f;
+            var spawner = FindFirstObjectByType<LevelSpawner>();
+            baseline = spawner != null ? spawner.GetBaselineMarker() : null;
+        }
+
+        y = baseline != null ? baseline.height : 0f;
+        return baseline != null;
     }
 
     void TryAddWorld(Camera cam, Vector3 worldPos, float radius, float softness, float pointOpacity,

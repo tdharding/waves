@@ -22,16 +22,23 @@
 // them, and re-pushing is what makes that self-heal on the next frame. Names are deliberately
 // distinct from anything the water graph declares, so this include can never collide with a
 // property the graph already owns (which is why the boat centre is not read here at all).
-#define MAX_ROCK_RINGS 12
+// Guarded, because WaveBands.hlsl reads the same rocks rather than standing up a second manager,
+// and both includes land in this shader. Only what is genuinely shared sits behind the guard —
+// same reasoning as WHIRLPOOL_POSITIONS_DECLARED across the three whirlpool files.
+#ifndef ROCK_RING_POSITIONS_DECLARED
+#define ROCK_RING_POSITIONS_DECLARED
+#define MAX_ROCK_RINGS 48
 
 // .x/.z = world position   .y = LOD fade 0..1 (CPU, per rock)   .w = radius at the waterline
 float4 _RockRingPositions[MAX_ROCK_RINGS];
+float  _RockRingCount;
+#endif
 
 // The rock's own silhouette, so the ring belongs to it rather than being a circle drawn nearby:
 // .x = lobe count (its carved flutes)   .y = lobe amplitude   .z = twist   .w = phase offset
+// Unguarded — nothing else reads it.
 float4 _RockRingShape[MAX_ROCK_RINGS];
 
-float _RockRingCount;
 float _RockRingPhase;         // CPU-accumulated, exactly like _WavePhase — see below
 float _RockRingStrength;      // how far the bands push brightness either side of neutral
 float _RockRingFrequency;     // bands between the rock's edge and the outer limit
@@ -55,11 +62,14 @@ float _RockRingRectify;
 float _RockRingDistortStrength; // in band-space: 0.1 shifts a band by a tenth of the spread
 float _RockRingDistortScale;    // world-space frequency of that field
 
-// How much wider a band has become by the end of its life. For a ring moving outward, how long it
-// has been going and how far it has got are the same number, so its life runs 0 at the rock to 1 at
-// the outer limit — and this is the multiplier on its width across that span. 1 = no growth, every
-// band the same width all the way out; 3 = roughly three times the width by the time it fades.
-float _RockRingWidthMultiplier;
+// Band shape. A band is a WINDOW cut out of its cycle, not a sine — which is what makes width a
+// control in its own right. Shaping a sine could only ever widen a crest by about half again, and
+// it brightened the band as it did so, because lifting the shoulders of a curve and raising its
+// average are the same act. A window separates the two: the top is flat at full height whatever
+// the width, so widening changes only how much of the cycle is lit.
+float _RockRingWidth;           // fraction of its cycle a band fills at the rock, before any growth
+float _RockRingWidthMultiplier; // what that width has been multiplied by at the end of its life
+float _RockRingSoftness;        // 0 = a hard-edged ring; 1 = falls away from the centre, sine-like
 
 #define ROCK_RINGS_TWO_PI 6.28318530718
 
@@ -116,8 +126,9 @@ void RockRings_float(
     bool  lobed   = _RockRingLobeStrength > 0.0001;
     float rectify = clamp(_RockRingRectify, -1.0, 1.0);
     // Below 1 would narrow the band instead, which is not what the control means; clamp it off.
-    float widthMul   = max(_RockRingWidthMultiplier, 1.0);
-    bool  widthGrows = widthMul > 1.0001;
+    float widthMul  = max(_RockRingWidthMultiplier, 1.0);
+    float widthBase = clamp(_RockRingWidth, 0.01, 1.0);
+    float soft      = saturate(_RockRingSoftness);
 
     // Sampled ONCE, before the loop. The field is world space, so the answer does not depend on
     // which rock is being drawn — every rock reads the same value at this pixel, and the noise
@@ -157,32 +168,38 @@ void RockRings_float(
         // is hidden under the rock mesh anyway.
         float t = saturate((d - r) / spread);
 
+        // Position within this band's cycle, counted in whole cycles rather than radians so the
+        // window below can be measured as a plain fraction.
+        //
         // SUBTRACTING the accumulating phase is what sends the bands outward. The phase is
         // accumulated on the CPU (WaveMaterialController) rather than derived from Time * Speed,
         // so changing the speed mid-level slides the bands instead of teleporting them — the same
         // reasoning behind _WavePhase.
         // The distortion is added to the band position only, not to t itself — the envelope stays
         // clean, so the rings wander inside an outer edge that keeps its shape.
-        float band = sin((t + distort) * _RockRingFrequency * ROCK_RINGS_TWO_PI - _RockRingPhase - s.w);
+        float cyc     = (t + distort) * _RockRingFrequency
+                      - (_RockRingPhase + s.w) * (1.0 / ROCK_RINGS_TWO_PI);
+        float centred = abs(frac(cyc) - 0.5) * 2.0;   // 0 at the band's centre, 1 at the cycle edge
 
-        // Flatten one half of the wave toward neutral. Which half is the sign of rectify; how far
-        // it goes is the magnitude, so the slider walks smoothly from single rings one way, through
-        // the full paired wave at 0, to single rings the other.
-        float kept = rectify >= 0.0 ? max(band, 0.0) : min(band, 0.0);
-        band = lerp(band, kept, abs(rectify));
+        // The window. t is the band's life — 0 as it leaves the rock, 1 as it fades — so its width
+        // runs from the authored width to that times the multiplier across its journey. Held just
+        // under 1 so neighbouring bands always keep a seam between them rather than merging into a
+        // flat wash.
+        float w = min(widthBase * lerp(1.0, widthMul, t), 0.98);
 
-        // Reshape the crest without moving it. An exponent below 1 fattens a 0..1 curve toward its
-        // top, so the band covers more of its cycle the further out it is — it broadens rather than
-        // drifting, which is what keeps the ring count the same while the rings thicken.
-        //
-        // t is the band's life: 0 as it leaves the rock, 1 as it fades at the limit. The width runs
-        // from 1x to the multiplier across that, so a multiplier of 1 leaves the exponent at 1 and
-        // the sine exactly as it was.
-        if (widthGrows)
-        {
-            float k = 1.0 / lerp(1.0, widthMul, t);
-            band = sign(band) * pow(abs(band), k);   // signed, so an unrectified far half widens too
-        }
+        // Soft edges. Softness slides the inner edge of the falloff in toward the band's centre:
+        // at 0 the two edges nearly coincide and the ring has a hard rim, at 1 it falls away from
+        // the centre point and reads much like the sine this replaced. The epsilon keeps the two
+        // edges apart, since smoothstep divides by their difference.
+        float inner = w * (1.0 - soft);
+        float outer = max(w, inner + 1e-4);
+        float pulse = 1.0 - smoothstep(inner, outer, centred);   // 1 in the band, 0 outside it
+
+        // A window is already single-sided, so rectify now chooses what NEUTRAL means rather than
+        // clipping a half away. At 0 the band is centred on zero and swings both ways, giving the
+        // paired light/dark rings; at +/-1 it sits wholly to one side of neutral, so the water
+        // between rings is left alone. The sign picks which side, exactly as before.
+        float band = lerp(pulse * 2.0 - 1.0, pulse * sign(rectify), abs(rectify));
 
         float env = pow(RockRingsSmootherStep(1.0 - t), max(_RockRingFalloffPower, 0.01)) * p.y;
 

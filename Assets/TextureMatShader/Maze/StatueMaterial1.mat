@@ -138,6 +138,8 @@ Material:
     - _SmoothnessTextureChannel: 0
     - _SonarRadius: 1.11
     - _SpecularHighlights: 0
+    - _SpikeGrainScale: 0
+    - _SpikeGrainStrength: 0
     - _SpiralDarkness: 0
     - _SpiralDentDepth: 0
     - _SpiralPitch: 0.45

@@ -1,0 +1,78 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 62a877791e9312444a218bdc460321c9, type: 3}
+  m_Name: Default1FogArenaMap
+  m_EditorClassIdentifier: Assembly-CSharp::FogMap
+  properties:
+    spineBend1: 0.295
+    spineBend2: 0.388
+    spineStiffness: 0
+    limbification: 1
+    limbCount: 16
+    limbLength: 2
+    limbLengthSpread: 0
+    limbAngle: -17.2
+    limbDroop: 1
+    sideBias: 0.5
+    spineThicknessRoot: 0.062
+    spineThicknessTip: 0.1
+    limbThicknessRoot: 0.055
+    limbThicknessTip: 0.05
+    squashRoot: 0.496
+    squashTip: 0.466
+    ellipseStretch: 2.84
+    radiusVariation: 0.22
+    heightUndulation: 0.25
+    heightUndulationScale: 2
+  blobCount: 23
+  spacing: 1.32
+  blobScaleMin: 1
+  blobScaleMax: 1
+  fogOpacity: 1
+  maskRadius: 4.08
+  maskFeather: 1
+  windAngle: 221
+  windSpeed: 0.05
+  unitsPerTexel: 0.016
+  maxGridResolution: 1024
+  heaviness: 0.98
+  blurRadius: 0.002
+  heightBlurRadius: 0.2
+  spawnRadius: 4.61
+  cullRadius: 5.14
+  repelStrength: 1
+  rockClearRadius: 0.06
+  rockStrength: 1
+  rockRescanInterval: 0.2
+  lampClearFraction: 0.8
+  lampClearRadius: -1.4
+  lampStrength: 1
+  fogMaterial: {fileID: 2100000, guid: 46e2e25193da1f44e8078d278e21e7f9, type: 2}
+  overrideLook: 1
+  threshold: 0.165
+  edgeSoftness: 0.1685
+  undulationAmount: 0
+  undulationScale: 3.84
+  lipWidth: 0.071
+  lipLighting: 4
+  lipCurvature: 0.39
+  heightScale: 2.68
+  fogColour: {r: 0.11320752, g: 0.11320752, b: 0.11320752, a: 1}
+  litColour: {r: 1, g: 1, b: 1, a: 1}
+  ambient: 0.073
+  interiorFill: 0.245
+  transparencyFalloff: 0.268
+  grainAmount: 0.335
+  grainScale: 69
+  boatRepelRadius: 0.23
+  boatRepelClearRadius: -0.02
+  boatRepelStrength: 1

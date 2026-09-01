@@ -18,6 +18,7 @@ public class WavePreset : ScriptableObject
     [Header("Lights")]
     public WaveLightEntry[] lights;
 
+
     [System.Serializable]
     public class WaveLightEntry
     {

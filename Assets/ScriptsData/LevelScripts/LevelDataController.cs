@@ -81,10 +81,9 @@ public class LevelDataController : MonoBehaviour
     {
         if (!showArenaBoundsDebug) return;
 
-        ArenaProfile profile = GetArenaProfile();
-        if (profile == null) return;
+        float radius = GetArenaRadius();
+        if (radius <= 0f) return;
 
-        float radius = profile.WorldArenaRadius;
 Vector3 centre = GetArenaCentre();
         const int segments = 64;
         float angleStep = 360f / segments * Mathf.Deg2Rad;
@@ -182,6 +181,35 @@ Vector3 centre = GetArenaCentre();
     // PREPARE
     // =====================================================
 
+    /// <summary>
+    /// Hand this level's fog to the field: the arena map when fog is on, null when it is not.
+    ///
+    /// There is deliberately no fallback anywhere in the fog system — an arena map is the only
+    /// thing that decides where fog sits — so "fog on with no map" is a level that gets no fog,
+    /// and it says so rather than quietly scattering something.
+    /// </summary>
+    void ApplyLevelFog(GridData data)
+    {
+        if (data == null) { FogFieldManager.ApplyArenaMap(null); return; }
+
+        bool on = data.fogEnabled && data.fogMap != null;
+
+        if (data.fogEnabled && data.fogMap == null)
+            Debug.LogWarning($"[Fog] {data.levelID} has fog enabled but no Fog Arena Map assigned, " +
+                             $"so it gets no fog. Assign one in the Grid Designer's Fog section.", data);
+
+        // The painted field covers the arena, so it needs the arena's real width. Without this it
+        // runs on a fallback that is only right for one level's size.
+        if (data.WorldArenaWidth > 0f)
+            FogFieldManager.SetArenaWidth(data.WorldArenaWidth);
+
+        FogFieldManager.SetEnabled(on);
+
+        // ApplyArenaMap seeds blob density from the map's own Starting Density, so the order
+        // matters: enabling first, then handing over the map, means the density arrives with it.
+        FogFieldManager.ApplyArenaMap(on ? data.fogMap : null);
+    }
+
     private void PrepareLevel()
     {
         LevelSoulTracker.Instance?.InitialiseForLevel(activeGridData?.levelID);
@@ -196,22 +224,22 @@ Vector3 centre = GetArenaCentre();
         InitialiseMapProjection();
         ApplyMapRefPlaneOffset();
 
-        ArenaProfile arenaProfile = levelSpawner.GetArenaProfile();
+        Vector2 arenaCentreOffset = activeGridData != null ? activeGridData.arenaCentreOffset : Vector2.zero;
         float baselineWaterY = levelSpawner.GetBaselineWaterY();
 
-        if (arenaProfile != null && wavePlaneObject != null)
+        if (activeGridData != null && wavePlaneObject != null)
         {
             Renderer waveRend = wavePlaneObject.GetComponent<Renderer>();
             if (waveRend != null)
             {
-                float waveRadius = arenaProfile.arenaRadius1;
+                float waveRadius = levelSpawner.GetArenaMaskRadius();
                 waveRend.sharedMaterial.SetFloat("_ArenaRadius1", waveRadius);
 
                 // Update ArenaMask with center and water height
                 waveRend.sharedMaterial.SetVector("_ArenaMask", new Vector4(
-                    arenaProfile.arenaCentreOffset.x, 
+                    arenaCentreOffset.x, 
                     baselineWaterY, 
-                    arenaProfile.arenaCentreOffset.y, 
+                    arenaCentreOffset.y, 
                     0f));
             }
 
@@ -223,7 +251,7 @@ Vector3 centre = GetArenaCentre();
             var meshGen = wavePlaneObject.GetComponent<WaveMeshGenerator>();
             if (meshGen != null)
             {
-                meshGen.UpdateMeshSize(arenaProfile.WorldArenaWidth * arenaProfile.wavePlaneCoverageMultiplier);
+                meshGen.UpdateMeshSize(activeGridData.WorldArenaWidth * activeGridData.wavePlaneCoverageMultiplier);
             }
         }
 
@@ -233,14 +261,10 @@ Vector3 centre = GetArenaCentre();
             // shader masks against (_ArenaMask below) rather than wherever the scene left it.
             Vector3 sp = sonarGridParent.position;
             sp.y = baselineWaterY;
-            if (arenaProfile != null)
-            {
-                sp.x = arenaProfile.arenaCentreOffset.x;
-                sp.z = arenaProfile.arenaCentreOffset.y;
-            }
+            sp.x = arenaCentreOffset.x;
+            sp.z = arenaCentreOffset.y;
             sonarGridParent.position = sp;
 
-            if (arenaProfile != null)
             {
                 // Include inactive — the grid parent is switched off while sonar is idle
                 var sonarGen = sonarGridParent.GetComponentInChildren<SonarPlaneGenerator>(true);
@@ -250,29 +274,38 @@ Vector3 centre = GetArenaCentre();
                 if (sonarGen != null && activeGridData != null && activeGridData.sonarGridType != null)
                     sonarGen.SetGridType(activeGridData.sonarGridType);
 
+                // Fog is loaded the same way and from the same place — an arena map is level
+                // geography, so it arrives with the level rather than with the weather.
+                //
+                // Handed over unconditionally, INCLUDING when the level has no map or fog is off.
+                // Passing null is what clears the previous level's fog: skipping the call would
+                // leave the last level's banks sitting on this one, which is the sort of thing that
+                // only shows up two levels later and looks like the map is haunted.
+                ApplyLevelFog(activeGridData);
+
                 // Lattice size is not pushed from here — SonarController derives the arena square
                 // from the BaselineMarker handed to it by LevelSpawner (BaselineMarker.discRadius x 2).
 
                 Material sonarMat = sonarGen?.GridType?.planeMaterial;
                 if (sonarMat != null)
                 {
-                    float sonarRadius = arenaProfile.arenaRadius1;
+                    float sonarRadius = levelSpawner.GetArenaMaskRadius();
                     sonarMat.SetFloat("_ArenaRadius", sonarRadius);
                     
                     sonarMat.SetVector("_ArenaMask", new Vector4(
-                        arenaProfile.arenaCentreOffset.x, 
+                        arenaCentreOffset.x, 
                         baselineWaterY, 
-                        arenaProfile.arenaCentreOffset.y, 
+                        arenaCentreOffset.y, 
                         0f));
                 }
 }
         }
 
-        if (arenaProfile != null && mapPointer.MapSurface != null)
+        if (activeGridData != null && mapPointer.MapSurface != null)
         {
             Renderer mapRend = mapPointer.MapSurface.GetComponent<Renderer>();
             if (mapRend != null)
-                mapRend.material.SetVector("_MapGridTiling", arenaProfile.mapGridTiling);
+                mapRend.material.SetVector("_MapGridTiling", activeGridData.mapGridTiling);
         }
 
         ConfigureGongTower();
@@ -321,9 +354,8 @@ Vector3 centre = GetArenaCentre();
     private void InitialiseMapProjection()
     {
         if (activeGridData == null) return;
-        Bounds arenaBounds   = levelSpawner.GetArenaBounds();
-        ArenaProfile arenaProfile = levelSpawner.GetArenaProfile();
-        mapPointer.InitialiseMapProjection(arenaBounds, activeGridData, arenaProfile);
+        Bounds arenaBounds = levelSpawner.GetArenaBounds();
+        mapPointer.InitialiseMapProjection(arenaBounds, activeGridData);
     }
 
     private void ApplyMapRefPlaneOffset()
@@ -335,12 +367,11 @@ Vector3 centre = GetArenaCentre();
     {
         if (wavePlaneObject == null) return;
 
-        ArenaProfile profile = levelSpawner.GetArenaProfile();
-        if (profile == null) return;
+        if (activeGridData == null) return;
 
         Vector3 pos = wavePlaneObject.transform.position;
-        pos.x = profile.arenaCentreOffset.x;
-        pos.z = profile.arenaCentreOffset.y;
+        pos.x = activeGridData.arenaCentreOffset.x;
+        pos.z = activeGridData.arenaCentreOffset.y;
         wavePlaneObject.transform.position = pos;
     }
 
@@ -566,17 +597,13 @@ Vector3 centre = GetArenaCentre();
 
     public BoatMovement GetBoatMovement() => boatMovement;
 
-    /// <summary>
-    /// Returns the ArenaProfile for the current level.
-    /// Used by DroppedSoul to read bounds radius.
-    /// </summary>
-    public ArenaProfile GetArenaProfile() => levelSpawner != null ? levelSpawner.GetArenaProfile() : null;
+    // The level's arena radius — the radius the walls were generated to.
+    public float GetArenaRadius() => levelSpawner != null ? levelSpawner.GetArenaRadius() : 0f;
 
     public Vector3 GetArenaCentre()
     {
-        ArenaProfile profile = GetArenaProfile();
-        if (profile == null) return Vector3.zero;
-        return new Vector3(profile.arenaCentreOffset.x, 0f, profile.arenaCentreOffset.y);
+        if (activeGridData == null) return Vector3.zero;
+        return new Vector3(activeGridData.arenaCentreOffset.x, 0f, activeGridData.arenaCentreOffset.y);
     }
 
     private WavePreset _activePresetOverride;

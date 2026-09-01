@@ -24,6 +24,25 @@ public class GizmoManagerWindow : EditorWindow
     bool             annotationsAvailable;
     bool             showColliders        = true;
 
+    // Filter and opacity. Both exist for the same reason: when a dozen scripts draw into the same
+    // patch of scene, the listing is too long to find the one you care about and the drawing is
+    // too crowded to read. Narrowing the list and thinning everything else is how you get one
+    // system visible on its own without turning the others off and losing the comparison.
+    string           filter               = "";
+    bool             onlyActive           = false;
+    bool             onlyInScene          = false;
+    float            gizmoOpacity         = 1f;
+
+    const string OpacityKey = "FogTools.GizmoManager.Opacity";
+
+    /// <summary>
+    /// Read by gizmo drawing code that opts in, so a system can thin itself without every script
+    /// needing its own slider. Stored in EditorPrefs so it survives a domain reload, which happens
+    /// on every recompile and would otherwise reset it mid-session.
+    /// </summary>
+    public static float GizmoOpacity =>
+        Mathf.Clamp01(EditorPrefs.GetFloat(OpacityKey, 1f));
+
     // AnnotationUtility reflection handles
     MethodInfo mGetAnnotations;
     MethodInfo mSetGizmoEnabled;
@@ -35,6 +54,12 @@ public class GizmoManagerWindow : EditorWindow
     static void Open() => GetWindow<GizmoManagerWindow>("Gizmo Manager");
 
     void OnEnable()
+    {
+        gizmoOpacity = EditorPrefs.GetFloat(OpacityKey, 1f);
+        OnEnableInner();
+    }
+
+    void OnEnableInner()
     {
         InitAnnotations();
         Refresh();
@@ -176,6 +201,35 @@ public class GizmoManagerWindow : EditorWindow
         if (GUILayout.Button("Refresh", EditorStyles.toolbarButton, GUILayout.Width(55))) Refresh();
         EditorGUILayout.EndHorizontal();
 
+        // ── Filter ───────────────────────────────────────────────────────────
+        EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
+        GUILayout.Label("Find", EditorStyles.miniLabel, GUILayout.Width(30));
+        string newFilter = GUILayout.TextField(filter, EditorStyles.toolbarSearchField,
+                                               GUILayout.MinWidth(120));
+        if (newFilter != filter) filter = newFilter;
+        if (GUILayout.Button("×", EditorStyles.toolbarButton, GUILayout.Width(20))) filter = "";
+
+        GUILayout.Space(6);
+        onlyActive  = GUILayout.Toggle(onlyActive,  "Active",   EditorStyles.toolbarButton,
+                                       GUILayout.Width(52));
+        onlyInScene = GUILayout.Toggle(onlyInScene, "In Scene", EditorStyles.toolbarButton,
+                                       GUILayout.Width(62));
+        EditorGUILayout.EndHorizontal();
+
+        // ── Opacity ──────────────────────────────────────────────────────────
+        EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
+        GUILayout.Label("Opacity", EditorStyles.miniLabel, GUILayout.Width(48));
+        float newOpacity = GUILayout.HorizontalSlider(gizmoOpacity, 0.05f, 1f,
+                                                      GUILayout.MinWidth(100));
+        GUILayout.Label($"{newOpacity:0.00}", EditorStyles.miniLabel, GUILayout.Width(34));
+        if (!Mathf.Approximately(newOpacity, gizmoOpacity))
+        {
+            gizmoOpacity = newOpacity;
+            EditorPrefs.SetFloat(OpacityKey, gizmoOpacity);
+            SceneView.RepaintAll();
+        }
+        EditorGUILayout.EndHorizontal();
+
         if (!annotationsAvailable)
             EditorGUILayout.HelpBox("AnnotationUtility unavailable — toggles disabled.", MessageType.Warning);
 
@@ -196,10 +250,18 @@ public class GizmoManagerWindow : EditorWindow
 
         scroll = EditorGUILayout.BeginScrollView(scroll);
 
+        int shown = 0;
         for (int i = 0; i < entries.Count; i++)
         {
             var  entry   = entries[i];
             bool inScene = entry.instanceCount > 0;
+
+            if (filter.Length > 0 &&
+                entry.type.Name.IndexOf(filter, System.StringComparison.OrdinalIgnoreCase) < 0)
+                continue;
+            if (onlyActive  && !entry.gizmoEnabled) continue;
+            if (onlyInScene && !inScene)            continue;
+            shown++;
 
             EditorGUILayout.BeginHorizontal();
 
@@ -238,7 +300,10 @@ public class GizmoManagerWindow : EditorWindow
         EditorGUILayout.EndScrollView();
 
         GUILayout.Space(2);
-        EditorGUILayout.LabelField($"{entries.Count} script(s)", EditorStyles.centeredGreyMiniLabel);
+        bool filtering = filter.Length > 0 || onlyActive || onlyInScene;
+        EditorGUILayout.LabelField(
+            filtering ? $"{shown} of {entries.Count} script(s)" : $"{entries.Count} script(s)",
+            EditorStyles.centeredGreyMiniLabel);
     }
 
     void SetAll(bool enabled)

@@ -64,6 +64,16 @@ public class LevelSpawner : MonoBehaviour
     [Header("Procedural Spikes")]
     [SerializeField] GameObject proceduralSpikePrefab;
 
+    [Header("Arena Walls")]
+    [Tooltip("The arena boundary prefab, built to each level's Arena Radius. Needs an " +
+             "ArenaWallsGenerator on it and a BaselineMarker child. One prefab serves every " +
+             "arena size — the generator handles the size.")]
+    [SerializeField] GameObject arenaWallsPrefab;
+
+    [Header("Angel")]
+    [Tooltip("Spawned on levels whose Grid Data has Angel present ticked. Needs an AngelCompanion on it.")]
+    [SerializeField] GameObject angelPrefab;
+
     [Header("Fishing")]
     [SerializeField] FishingController fishingController;
 
@@ -83,8 +93,10 @@ public class LevelSpawner : MonoBehaviour
     public Matrix4x4 SpawnFinalizeMatrix { get; private set; } = Matrix4x4.identity;
 
     private GridData activeGridData;
-    private ArenaProfile activeArenaProfile;
-    public ArenaProfile GetArenaProfile() => activeArenaProfile;
+    // The level's arena radius — the radius the walls were actually generated to.
+    public float GetArenaRadius() => activeGridData != null ? activeGridData.WorldArenaRadius : 0f;
+    // Radius the wave and sonar arena masks are drawn at, now exactly the wall surface.
+    public float GetArenaMaskRadius() => activeGridData != null ? activeGridData.ArenaMaskRadius : 0f;
     private Bounds cachedArenaBounds;
     public Bounds GetArenaBounds() => cachedArenaBounds;
     private float spawnedBaselineWaterY;
@@ -118,11 +130,10 @@ public class LevelSpawner : MonoBehaviour
             return;
         }
 
-        activeGridData     = data;
-        activeArenaProfile = data.arenaProfile;
+        activeGridData = data;
 
-        if (activeArenaProfile == null)
-            Debug.LogWarning($"[LevelSpawner] No ArenaProfile on GridData '{data.name}'. Assign one in the Grid Designer.");
+        if (data.arenaRadius <= 0f)
+            Debug.LogWarning($"[LevelSpawner] GridData '{data.name}' has no Arena Radius. Set one in the Grid Designer.");
 
     }
 
@@ -236,7 +247,23 @@ public class LevelSpawner : MonoBehaviour
         if (activeGridData.orbCellIndices == null)
             activeGridData.orbCellIndices = new List<int>();
 
-        float r = activeArenaProfile != null ? activeArenaProfile.WorldArenaRadius : 20f;
+        float r = activeGridData.WorldArenaRadius > 0f ? activeGridData.WorldArenaRadius : 20f;
+
+        // ── Arena walls — generated to this level's radius before anything else is placed. ──
+        // The walls used to be instantiated last, from one of a few fixed-size modelled
+        // prefabs, and the arena size was read off the PREFAB ASSET's hand-typed discRadius.
+        // Now the generator builds the wall's inner face exactly on r and writes that radius
+        // back onto the spawned instance's marker, so the mask, fades, doors and grid frame
+        // below all key off the true wall surface rather than an approximation of it.
+        BaselineMarker baselineMarker = null;
+        if (arenaWallsPrefab != null)
+        {
+            var walls = Instantiate(arenaWallsPrefab, Vector3.zero, Quaternion.identity);
+            walls.GetComponentInChildren<ArenaWallsGenerator>()?.Build(r, activeGridData.waterlineY);
+            baselineMarker = walls.GetComponentInChildren<BaselineMarker>(true);
+        }
+        else Debug.LogWarning("[LevelSpawner] No Arena Walls Prefab assigned — the level has no boundary.");
+
         Bounds b = new Bounds(Vector3.zero, new Vector3(r * 2, 0, r * 2));
         
         cachedArenaBounds = b;
@@ -245,9 +272,10 @@ float   tileZ  = b.size.z / GridData.GridSize;
         Vector3 origin = b.min;
 
         // ── Baseline water Y — single source of truth for all tier/water positioning ──
-        var baselineMarker = activeArenaProfile?.outerWallsPrefab?.GetComponentInChildren<BaselineMarker>();
+        // Authored per level and written onto the spawned marker by the generator above, so the
+        // marker and the level agree by construction.
         activeBaselineMarker = baselineMarker;
-        spawnedBaselineWaterY = baselineMarker?.height ?? spawnParent.position.y;
+        spawnedBaselineWaterY = activeGridData.waterlineY;
         Quaternion baselineRot = baselineMarker != null
             ? Quaternion.LookRotation(baselineMarker.transform.forward, Vector3.up)
             : Quaternion.identity;
@@ -269,6 +297,21 @@ float   tileZ  = b.size.z / GridData.GridSize;
         bool waveModHasAlign = waveModAlign != null;
         float waveModContactY = waveModAlign != null ? waveModAlign.transform.position.y : 0f;
 
+        // Orbs are free-positioned (no longer clamped to a cell). Fold any legacy cell-indexed orbs
+        // into free positions, then spawn each at its exact world position.
+        activeGridData.MigrateOrbPositions();
+        if (orbPrefab != null && activeGridData.orbPositions != null)
+        {
+            Quaternion orbRot = spawnParent.rotation;
+            if (applyMinus90XRotation) orbRot *= Quaternion.Euler(-90f, 0f, 0f);
+            foreach (var op in activeGridData.orbPositions)
+            {
+                Vector3 owp = NormalizedToWorldPos(op, origin, tileX, tileZ);
+                owp.y = spawnedBaselineWaterY;
+                Instantiate(orbPrefab, owp, orbRot, spawnParent);
+            }
+        }
+
         for (int y = 0; y < GridData.GridSize; y++)
         {
             int flippedY = GridData.GridSize - 1 - y;
@@ -283,11 +326,7 @@ float   tileZ  = b.size.z / GridData.GridSize;
                     origin.z + y * tileZ + tileZ * 0.5f
                 );
 
-                Quaternion rot = spawnParent.rotation;
-                if (applyMinus90XRotation) rot *= Quaternion.Euler(-90f, 0f, 0f);
-
-                if (activeGridData.orbCellIndices.Contains(index) && orbPrefab)
-                    Instantiate(orbPrefab, pos, rot, spawnParent);
+                // (Orbs spawned above from free positions — no longer per-cell.)
 
                 if (activeGridData.waterLevelModifierCellIndices != null &&
                     activeGridData.waterLevelModifierCellIndices.Contains(index) && waterLevelModifierPrefab)
@@ -346,6 +385,7 @@ float   tileZ  = b.size.z / GridData.GridSize;
                 Vector3 pos = NormalizedToWorldPos(pp.position, origin, tileX, tileZ);
                 pos.y = spawnY;
                 Quaternion rot = hasBaselineAlign ? baselineRot : par.rotation;
+                if (pp.rotationOffset != 0f) rot = Quaternion.AngleAxis(pp.rotationOffset, Vector3.up) * rot;
                 var instance = Instantiate(pp.prefab, pos, rot, par);
                 ApplyPlacementScale(instance, pp);
                 BuildPlacementSpike(instance, pp);
@@ -431,6 +471,7 @@ float   tileZ  = b.size.z / GridData.GridSize;
                         pos2.y = spawnedBaselineWaterY + yOff - tierContactY;
                         Quaternion rot2 = spawnParent.rotation;
                         if (applyMinus90XRotation) rot2 *= Quaternion.Euler(-90f, 0f, 0f);
+                        if (pp.rotationOffset != 0f) rot2 = Quaternion.AngleAxis(pp.rotationOffset, Vector3.up) * rot2;
                         var instance = Instantiate(pp.prefab, pos2, rot2, spawnParent);
                         ApplyPlacementScale(instance, pp);
                         BuildPlacementSpike(instance, pp);
@@ -455,6 +496,9 @@ float   tileZ  = b.size.z / GridData.GridSize;
 
         // ── Procedural Spikes — before Y180 rotation so they move with spawnParent ──
         SpawnProceduralSpikes();
+
+        // ── Angel — after the spikes, so the perches she can land on already exist ──
+        SpawnAngel();
 
         if (!mazeRotated)
         {
@@ -519,8 +563,8 @@ float   tileZ  = b.size.z / GridData.GridSize;
         if (activeGridData.sculptureSetPiecePrefab)
             Instantiate(activeGridData.sculptureSetPiecePrefab, Vector3.zero, Quaternion.identity);
 
-        if (activeArenaProfile?.outerWallsPrefab != null)
-            Instantiate(activeArenaProfile.outerWallsPrefab, Vector3.zero, Quaternion.identity);
+        // Arena walls are spawned at the top of SpawnMaze now, so their generated radius is
+        // available to everything placed against the perimeter.
 
         ProcessLinkedPairs(spawnedByCell, tileX, tileZ);
 
@@ -541,7 +585,7 @@ float   tileZ  = b.size.z / GridData.GridSize;
         float defaultContactY = baselineAlign != null ? baselineAlign.transform.localPosition.y : 0f;
 
         // Nodes are stored in normalised grid space (-0.5..0.5). Scale by arena width for world positions.
-        float arenaWidth = activeArenaProfile != null ? activeArenaProfile.WorldArenaWidth : 12f;
+        float arenaWidth = activeGridData.WorldArenaWidth > 0f ? activeGridData.WorldArenaWidth : 12f;
 
         foreach (var path in activeGridData.splineWallPaths)
         {
@@ -560,6 +604,13 @@ float   tileZ  = b.size.z / GridData.GridSize;
 
             // tileSpacing is world units; convert to normalised space for WalkSpline
             float normStep = Mathf.Max(0.001f, path.tileSpacing / arenaWidth);
+
+            // Railings space their posts evenly per segment (so posts land on nodes) — precompute each
+            // segment's start distance and arc length in the same coordinate WalkSpline reports.
+            bool    isRailingPath = prefab.GetComponent<ProceduralSplineRailing>() != null;
+            float[] segStartN = null, segLenN = null;
+            if (isRailingPath)
+                ComputeSplineSegmentArcLengths(path.nodes, path.isClosed, path.IsSegmentCurved, path.IsSegmentGap, out segStartN, out segLenN);
 
             WalkSpline(path.nodes, path.isClosed, path.IsSegmentCurved, path.IsSegmentGap, normStep, (pos2d, tangent, seg, segT, spawnDist) =>
             {
@@ -581,10 +632,38 @@ float   tileZ  = b.size.z / GridData.GridSize;
                     float distAlongPath = spawnDist * arenaWidth;
                     proc.Build(path.tileSpacing * SplineTileOverlap, height, path.depthBelowWater, distAlongPath, path.wallThickness);
                 }
+
+                // Railing tiles build a round rail + sparse posts instead of a solid box. Rail/post
+                // thickness is the path's Thick value; Height and Drop come from the path too.
+                var railing = instance.GetComponent<ProceduralSplineRailing>();
+                if (railing != null)
+                {
+                    float height = path.HeightAt(seg, segT);
+                    float distAlongPath = spawnDist * arenaWidth;
+                    float segStartW = (segStartN != null && seg < segStartN.Length) ? segStartN[seg] * arenaWidth : 0f;
+                    float segLenW   = (segLenN   != null && seg < segLenN.Length)   ? segLenN[seg]   * arenaWidth : 0f;
+                    railing.Build(path.tileSpacing * SplineTileOverlap, path.tileSpacing, height, path.depthBelowWater, distAlongPath, path.wallThickness, segStartW, segLenW);
+                }
             });
 
-            // Spawn node point markers at each control node
-            if (splineNodePointPrefab != null)
+            // Spawn node point markers at each control node. Railing paths render their own nodes
+            // (a round post + sphere, same prefab & material) via the ProceduralSplineRailing
+            // component; other paths use the shared splineNodePointPrefab.
+            var railingPrefabComp = prefab.GetComponent<ProceduralSplineRailing>();
+            if (railingPrefabComp != null)
+            {
+                for (int i = 0; i < path.nodes.Count; i++)
+                {
+                    var     node    = path.nodes[i];
+                    Vector3 nodePos = new Vector3(node.x * arenaWidth, spawnY, node.y * arenaWidth);
+                    var     nodeInstance = Instantiate(prefab, nodePos, Quaternion.identity, spawnParent);
+
+                    var procNode = nodeInstance.GetComponent<ProceduralSplineRailing>();
+                    if (procNode != null)
+                        procNode.BuildNode(path.NodeHeight(i), path.depthBelowWater, path.wallThickness);
+                }
+            }
+            else if (splineNodePointPrefab != null)
             {
                 var nodeAlign      = splineNodePointPrefab.GetComponentInChildren<PrefabBaselineAlignment>();
                 float nodeContactY = nodeAlign != null ? nodeAlign.transform.localPosition.y : 0f;
@@ -621,7 +700,7 @@ float   tileZ  = b.size.z / GridData.GridSize;
         }
 
         // Footprint is normalized (-0.5..0.5); scale by arena width for world size, matching spline walls.
-        float arenaWidth = activeArenaProfile != null ? activeArenaProfile.WorldArenaWidth : 12f;
+        float arenaWidth = activeGridData.WorldArenaWidth > 0f ? activeGridData.WorldArenaWidth : 12f;
 
         // Offset the prefab so its PrefabBaselineAlignment disc (origin) meets the baseline water plane.
         var   align    = cubeBuildingPrefab.GetComponentInChildren<PrefabBaselineAlignment>();
@@ -703,7 +782,7 @@ float   tileZ  = b.size.z / GridData.GridSize;
 
         // Positions are normalized (fraction of the arena); the SHAPE is already in world units,
         // authored in the Spike Studio, so only the centre needs scaling by the arena.
-        float arenaWidth = activeArenaProfile != null ? activeArenaProfile.WorldArenaWidth : 12f;
+        float arenaWidth = activeGridData.WorldArenaWidth > 0f ? activeGridData.WorldArenaWidth : 12f;
 
         // Offset the prefab so its PrefabBaselineAlignment disc (origin) meets the baseline water
         // plane — the spike mesh puts its waterline ring at the origin, so the rock then meets the
@@ -726,8 +805,39 @@ float   tileZ  = b.size.z / GridData.GridSize;
                 continue;
             }
 
-            builder.Build(s.Config, s.EffectiveScale, s.climbable);
+            builder.Build(s.Config, s.EffectiveScale, s.climbable,
+                          s.angelPerchPoint, s.angelPerchRadius, s.angelTalkRadius, s.angelPriorityPerch,
+                          s.angelTalkEnabled, s.angelTalkText, s.angelLandingCurveSize);
         }
+    }
+
+    // =====================================================
+    // ANGEL
+    // =====================================================
+
+    // Levels say whether she is here; she works out where to be herself. No spawn position is
+    // computed for her — AngelCompanion snaps to its flight point above the boat on its first
+    // frame, so wherever she is put she is over the boat before anything renders. That also makes
+    // her immune to the post-spawn Y180 below, which would otherwise swing a placed position.
+    private void SpawnAngel()
+    {
+        if (activeGridData == null || !activeGridData.angelPresent) return;
+
+        if (angelPrefab == null)
+        {
+            Debug.LogWarning("[LevelSpawner] Grid Data has Angel present ticked but angelPrefab is not assigned — no angel spawned.");
+            return;
+        }
+
+        // A scene that already holds one keeps it, rather than ending up with two angels flying
+        // the same line — she is a single companion, not scenery.
+        if (FindFirstObjectByType<AngelCompanion>() != null) return;
+
+        var instance = Instantiate(angelPrefab, spawnParent.position, spawnParent.rotation, spawnParent);
+
+        if (instance.GetComponentInChildren<AngelCompanion>(true) == null)
+            Debug.LogWarning($"[LevelSpawner] angelPrefab '{angelPrefab.name}' has no AngelCompanion component — " +
+                             "she will not fly or land.", instance);
     }
 
     static float SplineWallSpawnY(GameObject prefab, float baselineWaterY, float defaultContactY)
@@ -789,6 +899,45 @@ float   tileZ  = b.size.z / GridData.GridSize;
                 }
                 prev = curr;
             }
+        }
+    }
+
+    // Per-segment start distance and arc length, in the SAME coordinate WalkSpline's spawnDist uses
+    // (normalised units; gap segments contribute 0 and don't advance the accumulator). Mirrors
+    // WalkSpline's sampling so railing posts divide each segment evenly and line up with the nodes.
+    static void ComputeSplineSegmentArcLengths(List<Vector2> pts, bool closed, System.Func<int,bool> isCurvedSeg, System.Func<int,bool> isGapSeg, out float[] segStart, out float[] segLen)
+    {
+        int       n        = pts.Count;
+        int       segCount = closed ? n : n - 1;
+        const int steps    = 30;
+
+        segStart = new float[Mathf.Max(0, segCount)];
+        segLen   = new float[Mathf.Max(0, segCount)];
+
+        float   accumulated = 0f;
+        bool    firstCurved = isCurvedSeg(0);
+        Vector2 prev        = firstCurved ? SplineSample(pts, 0, 0f, closed) : pts[0];
+
+        for (int seg = 0; seg < segCount; seg++)
+        {
+            segStart[seg] = accumulated;
+            int i2End = closed ? (seg + 1) % n : Mathf.Min(seg + 1, n - 1);
+
+            if (isGapSeg != null && isGapSeg(seg)) { prev = pts[i2End]; segLen[seg] = 0f; continue; }
+
+            bool curved       = isCurvedSeg(seg);
+            int  stepsThisSeg = curved ? steps : 1;
+            float len = 0f;
+            for (int s = 1; s <= stepsThisSeg; s++)
+            {
+                float   lt   = (float)s / stepsThisSeg;
+                int     i2   = closed ? (seg + 1) % n : Mathf.Min(seg + 1, n - 1);
+                Vector2 curr = curved ? SplineSample(pts, seg, lt, closed) : Vector2.Lerp(pts[seg], pts[i2], lt);
+                len  += Vector2.Distance(prev, curr);
+                prev  = curr;
+            }
+            segLen[seg]  = len;
+            accumulated += len;
         }
     }
 
@@ -1019,7 +1168,7 @@ else if (controller != null)
         );
 
         // Grid-to-world conversion values (mirrors SpawnMaze computation)
-        float r      = activeArenaProfile != null ? activeArenaProfile.WorldArenaRadius : 20f;
+        float r      = activeGridData.WorldArenaRadius > 0f ? activeGridData.WorldArenaRadius : 20f;
         float tileX  = (r * 2f) / GridData.GridSize;
         float tileZ  = (r * 2f) / GridData.GridSize;
         Vector3 gridOrigin = new Vector3(-r, 0f, -r);
@@ -1034,7 +1183,7 @@ else if (controller != null)
             {
                 var entrance = activeGridData.entrances[i];
                 GameObject instance = SpawnPortalPrefab(
-                    prefab:      activeArenaProfile?.entrancePrefabOverride ?? entrance.prefab,
+                    prefab:      activeGridData.entrancePrefabOverride ?? entrance.prefab,
                     angle:       entrance.perimeterAngle,
                     tierSlot:    entrance.tierSlot,
                     spawnRadius: entrance.spawnRadius,
@@ -1227,9 +1376,9 @@ else if (controller != null)
         }
 
         Vector3 pos;
-        if (activeArenaProfile != null)
+        if (activeGridData.WorldArenaRadius > 0f)
         {
-            float r = activeArenaProfile.WorldArenaRadius;
+            float r = activeGridData.WorldArenaRadius;
             Vector3 dir = Quaternion.Euler(0f, angle, 0f) * Vector3.forward;
             // spawnRadius is "Inward" offset from the discRadius perimeter
             pos = new Vector3(centre.x + dir.x * (r - spawnRadius), y, centre.z + dir.z * (r - spawnRadius));
@@ -1271,7 +1420,7 @@ else if (controller != null)
         // ── TEMP door/portal spawn debug — remove once orientation is confirmed ──
         if (align != null && (align.UseForwardOverride || align.UseWallDepth))
         {
-            float   rr        = activeArenaProfile != null ? activeArenaProfile.WorldArenaRadius : -1f;
+            float   rr        = activeGridData != null ? activeGridData.WorldArenaRadius : -1f;
             Vector3 radialOut = (Quaternion.Euler(0f, angle, 0f) * Vector3.forward).normalized; // centre -> perimeter
             float   posRadial = Vector3.Dot(pos - centre, radialOut);   // >rr = outside arena, <rr = inside
             // Which way does each of the instance's axes point relative to the arena?

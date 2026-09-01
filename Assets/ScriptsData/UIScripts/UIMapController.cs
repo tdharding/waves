@@ -159,7 +159,6 @@ public class UIMapController : MonoBehaviour
     private float markerScale = 1f;
 
     // Runtime
-    private ArenaProfile _activeArenaProfile;
     private readonly List<GameObject> _exitMarkerInstances     = new List<GameObject>();
     private readonly List<GameObject> _entranceMarkerInstances = new List<GameObject>();
     private GameObject snakeMarkerInstance;
@@ -198,7 +197,7 @@ public class UIMapController : MonoBehaviour
     // INITIALISE
     // ─────────────────────────────────────────
 
-public void InitialiseMapProjection(Bounds arenaBounds, GridData gridData, ArenaProfile profile = null)
+public void InitialiseMapProjection(Bounds arenaBounds, GridData gridData)
 {
     if (cornerReference == null)
     {
@@ -207,9 +206,8 @@ public void InitialiseMapProjection(Bounds arenaBounds, GridData gridData, Arena
     }
 
     activeGridData        = gridData;
-    _activeArenaProfile   = profile;
-    markerScale = profile != null ? profile.mazeWallMarkerScale : 1f;
-      Debug.Log($"[UIMapController] InitialiseMapProjection — profile: {(profile != null ? profile.name : "NULL")}, markerScale: {markerScale}");
+    markerScale = gridData != null ? gridData.mazeWallMarkerScale : 1f;
+      Debug.Log($"[UIMapController] InitialiseMapProjection — markerScale: {markerScale}");
     MapProjection.Initialise(cornerReference, arenaBounds);
 }
 
@@ -285,7 +283,7 @@ void UpdateBoatPointer(Transform boat)
 
         if (!MapProjection.IsReady || activeGridData == null) return;
 
-        float   arenaWidth = _activeArenaProfile != null ? _activeArenaProfile.WorldArenaWidth : 12f;
+        float   arenaWidth = activeGridData != null && activeGridData.WorldArenaWidth > 0f ? activeGridData.WorldArenaWidth : 12f;
         Vector3 normal     = MapPlaneNormal();
 
         DrawPlacements(activeGridData.prefabPlacements, arenaWidth, normal);
@@ -404,7 +402,7 @@ void UpdateBoatPointer(Transform boat)
             return;
         }
 
-        float     arenaWidth = _activeArenaProfile != null ? _activeArenaProfile.WorldArenaWidth : 12f;
+        float     arenaWidth = activeGridData != null && activeGridData.WorldArenaWidth > 0f ? activeGridData.WorldArenaWidth : 12f;
         Vector3   normal     = MapPlaneNormal();
         Transform parent     = ContentParent(splineWallMapParent != null ? splineWallMapParent : mazeWallMarkerParent);
 
@@ -487,7 +485,7 @@ void UpdateBoatPointer(Transform boat)
             return;
         }
 
-        float     arenaWidth = _activeArenaProfile != null ? _activeArenaProfile.WorldArenaWidth : 12f;
+        float     arenaWidth = activeGridData != null && activeGridData.WorldArenaWidth > 0f ? activeGridData.WorldArenaWidth : 12f;
         Vector3   normal     = MapPlaneNormal();
         Transform parent     = ContentParent(cubeBuildingMapParent != null ? cubeBuildingMapParent : mazeWallMarkerParent);
 
@@ -529,7 +527,7 @@ void UpdateBoatPointer(Transform boat)
             return;
         }
 
-        float     arenaWidth = _activeArenaProfile != null ? _activeArenaProfile.WorldArenaWidth : 12f;
+        float     arenaWidth = activeGridData != null && activeGridData.WorldArenaWidth > 0f ? activeGridData.WorldArenaWidth : 12f;
         Vector3   normal     = MapPlaneNormal();
         Transform parent     = ContentParent(proceduralSpikeMapParent != null ? proceduralSpikeMapParent : mazeWallMarkerParent);
 
@@ -1305,10 +1303,10 @@ void UpdateBoatPointer(Transform boat)
         _entranceMarkerInstances.Clear();
 
         if (!MapProjection.IsReady || !entranceMarkerPrefab || !entranceMarkerParent ||
-            activeGridData?.entrances == null || _activeArenaProfile == null) return;
+            activeGridData?.entrances == null) return;
 
-        float cx     = _activeArenaProfile.arenaCentreOffset.x;
-        float cz     = _activeArenaProfile.arenaCentreOffset.y;
+        float cx     = activeGridData.arenaCentreOffset.x;
+        float cz     = activeGridData.arenaCentreOffset.y;
         float radius = Mathf.Min(MapProjection.ArenaWidth, MapProjection.ArenaHeight) * 0.5f;
 
         foreach (var entrance in activeGridData.entrances)
@@ -1363,15 +1361,15 @@ void UpdateBoatPointer(Transform boat)
 
 public void UpdateWaveCenter()
 {
-    if (!MapProjection.IsReady || _activeArenaProfile == null) return;
+    if (!MapProjection.IsReady || activeGridData == null) return;
 
     Renderer mapRenderer = mapSurface?.GetComponent<Renderer>();
     if (!mapRenderer) return;
 
     Vector3 worldCentre = new Vector3(
-        _activeArenaProfile.arenaCentreOffset.x,
+        activeGridData.arenaCentreOffset.x,
         0f,
-        _activeArenaProfile.arenaCentreOffset.y);
+        activeGridData.arenaCentreOffset.y);
 
     Vector3 mapPos = MapProjection.WorldToMap(worldCentre);
     Vector3 local  = mapSurface.InverseTransformPoint(mapPos);

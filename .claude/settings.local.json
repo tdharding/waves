@@ -52,7 +52,10 @@
       "Bash(git diff *)",
       "Bash(git checkout *)",
       "Bash(python \"C:/Users/tomdh/AppData/Local/Temp/claude/C--Users-tomdh-Waves/39b7d861-cec0-4f37-b363-d3298772546a/scratchpad/gen_subgraph.py\")",
-      "PowerShell(git fetch origin)"
+      "PowerShell(git fetch origin)",
+      "Bash(cd C:/Users/tomdh/Waves *)",
+      "Bash(python __TRACKED_VAR__/gen_bands.py)",
+      "Bash(python fog_3d.py)"
     ]
   }
 }

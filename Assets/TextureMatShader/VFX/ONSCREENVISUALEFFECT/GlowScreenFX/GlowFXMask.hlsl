@@ -14,27 +14,29 @@ float  _GlowPointCount;
 // Pushed in the same call as _GlowPoints, so the two arrays can never disagree on a frame.
 float4 _GlowPointParams[GLOW_FX_MAX];
 
-// Master fade for the whole mask, 0 = fully off. Pushed every frame alongside the points, so with
-// no controller in the scene it reads 0 and the effect is silent (as it already was with count 0).
 float  _GlowOpacity;
+
+// Round point: plain radial falloff, in aspect-corrected UV so it stays circular on screen.
+float GlowFX_Disc(float2 p, float2 centre, float radius, float softness)
+{
+    float dist = length(p - centre);
+    return 1.0 - smoothstep(radius - softness, radius, dist);
+}
 
 void GlowFXMask_float(float2 UV, float2 ScreenSize, out float Mask)
 {
     Mask = 0.0;
     float aspect = ScreenSize.x / ScreenSize.y;
+    float2 p = float2(UV.x * aspect, UV.y);
     int count = (int)_GlowPointCount;
 
     for (int i = 0; i < count; i++)
     {
-        float2 center   = _GlowPoints[i].xy;
-        float  radius   = _GlowPoints[i].z;
-        float  softness = _GlowPoints[i].w;
+        float4 pt = _GlowPoints[i];
+        float2 c  = float2(pt.x * aspect, pt.y);
 
-        float2 d = UV - center;
-        d.x *= aspect;
-        float dist = length(d);
+        float m = GlowFX_Disc(p, c, pt.z, pt.w);
 
-        float m = 1.0 - smoothstep(radius - softness, radius, dist);
         m *= _GlowPointParams[i].x;   // this point's own opacity
 
         // max, not add: overlapping points stay at the brightness of the strongest one rather than

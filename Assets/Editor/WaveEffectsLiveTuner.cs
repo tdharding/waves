@@ -58,6 +58,7 @@ public class WaveEffectsLiveTuner : EditorWindow
     [SerializeField] float     soulFishEdgeNoiseSpeed    = 0.2f;
     [SerializeField] float     soulFishTaperStrength     = 0f;
     [SerializeField] float     soulFishTaperScale        = 0.15f;
+    [SerializeField] float     soulFishPoolHole          = 0.27f;
     [SerializeField] Vector2   zoneTiling           = new Vector2(0.5f, 0.5f);
     [SerializeField] float     zoneScrollSpeed      = 0.05f;
     [SerializeField] float     zoneNoiseStrength    = 0.3f;
@@ -73,10 +74,37 @@ public class WaveEffectsLiveTuner : EditorWindow
     [SerializeField] float rockRingRectify         = 1f;
     [SerializeField] float rockRingDistortStrength = 0.08f;
     [SerializeField] float rockRingDistortScale    = 0.35f;
+    [SerializeField] float rockRingWidth           = 0.4f;
     [SerializeField] float rockRingWidthMultiplier = 1f;
+    [SerializeField] float rockRingSoftness        = 1f;
     [SerializeField] float rockRingLodRadius    = 18f;
     [SerializeField] float rockRingLodFeather   = 0.75f;
     float tunerRockRingPhase = 0f;
+
+    // Wave Bands
+    [SerializeField] float waveBandAngle           = 30f;
+    [SerializeField] float waveBandFrequency       = 0.08f;
+    [SerializeField] float waveBandSpeed           = 0.15f;
+    [SerializeField] float waveBandStrength        = 0.35f;
+    [SerializeField] float waveBandWidth           = 0.12f;
+    [SerializeField] float waveBandSoftness        = 0.6f;
+    [SerializeField] float waveBandWaviness        = 0.5f;
+    [SerializeField] float waveBandWavinessScale   = 0.12f;
+    [SerializeField] float waveBandMeanderStrength = 0.25f;
+    [SerializeField] float waveBandMeanderScale    = 0.05f;
+    [SerializeField] float waveBandRockDistort     = 0.9f;
+    [SerializeField] float waveBandRockReach       = 3f;
+    [SerializeField] float waveBandRockBevel       = 0.35f;
+    [SerializeField] float waveBandGrainStrength   = 0.15f;
+    [SerializeField] float waveBandGrainSize       = 0.25f;
+    float tunerWaveBandPhase = 0f;
+
+    // Waterline Black Gradient — the one effect in this window that is not drawn on the water.
+    // It rides on the spikes, blocks and spline walls, so its values reach the scene through the
+    // global write alone; the material write beside it is only there for consistency.
+    [SerializeField] float waterlineGradientHeight   = 0.07f;
+    [SerializeField] float waterlineGradientStrength = 0.8f;
+    [SerializeField] float waterlineGradientFalloff  = 1.5f;
 
     // Twirl
     [SerializeField] float twirlBaseStrength = 0.5f;
@@ -154,6 +182,8 @@ public class WaveEffectsLiveTuner : EditorWindow
     [SerializeField] bool foldSurface       = true;
     [SerializeField] bool foldPeaksTroughs  = true;
     [SerializeField] bool foldRockRings     = false;
+    [SerializeField] bool foldWaveBands     = false;
+    [SerializeField] bool foldWaterlineGrad = false;
     [SerializeField] bool foldTwirl         = false;
     [SerializeField] bool foldWhirlpoolFX   = false;
     [SerializeField] bool foldFoam          = false;
@@ -309,6 +339,11 @@ public class WaveEffectsLiveTuner : EditorWindow
             if (tunerRockRingPhase > 6.283185f) tunerRockRingPhase -= 6.283185f;
             Shader.SetGlobalFloat("_RockRingPhase", tunerRockRingPhase);
 
+            // Same again for the bands across the water.
+            tunerWaveBandPhase += waveBandSpeed * deltaTime;
+            if (tunerWaveBandPhase > 6.283185f) tunerWaveBandPhase -= 6.283185f;
+            Shader.SetGlobalFloat("_WaveBandPhase", tunerWaveBandPhase);
+
             SceneView.RepaintAll();
         }
     }
@@ -334,6 +369,8 @@ public class WaveEffectsLiveTuner : EditorWindow
         DrawSection("Surface",          ref foldSurface,      DrawSurface);
         DrawSection("Peaks & Troughs",  ref foldPeaksTroughs, DrawPeaksTroughs);
         DrawSection("Rock Rings",       ref foldRockRings,    DrawRockRings);
+        DrawSection("Wave Bands",       ref foldWaveBands,    DrawWaveBands);
+        DrawSection("Waterline Black Gradient", ref foldWaterlineGrad, DrawWaterlineGradient);
         DrawSection("Twirl",            ref foldTwirl,        DrawTwirl);
         DrawSection("Whirlpool FX",    ref foldWhirlpoolFX,  DrawWhirlpoolFX);
         DrawSection("Foam",             ref foldFoam,         DrawFoam);
@@ -524,6 +561,7 @@ public class WaveEffectsLiveTuner : EditorWindow
         EditorGUILayout.LabelField("Width Taper (static, along the path)", EditorStyles.miniBoldLabel);
         soulFishTaperStrength     = EditorGUILayout.Slider(    "Taper Strength",       soulFishTaperStrength, 0f, 1f);
         soulFishTaperScale        = EditorGUILayout.FloatField("Taper Scale",          soulFishTaperScale);
+        soulFishPoolHole          = EditorGUILayout.Slider(    "Pool Hole",            soulFishPoolHole, 0f, 0.9f);
         zoneTiling           = EditorGUILayout.Vector2Field("Zone Tiling",            zoneTiling);
         zoneScrollSpeed      = EditorGUILayout.FloatField("Scroll Speed",            zoneScrollSpeed);
         zoneNoiseStrength    = EditorGUILayout.Slider(    "Noise Strength",          zoneNoiseStrength, 0f, 1f);
@@ -562,7 +600,12 @@ public class WaveEffectsLiveTuner : EditorWindow
         rockRingFalloffPower = EditorGUILayout.Slider("Falloff Power", rockRingFalloffPower, 0.1f, 4f);
         rockRingLobeStrength = EditorGUILayout.Slider("Lobe Strength", rockRingLobeStrength, 0f, 4f);
         rockRingRectify      = EditorGUILayout.Slider("Rectify",      rockRingRectify,     -1f, 1f);
-        rockRingWidthMultiplier = EditorGUILayout.Slider("Width Multiplier", rockRingWidthMultiplier, 1f, 8f);
+
+        EditorGUILayout.Space(4);
+        EditorGUILayout.LabelField("Band Shape", EditorStyles.miniBoldLabel);
+        rockRingWidth           = EditorGUILayout.Slider("Width",            rockRingWidth,           0.02f, 1f);
+        rockRingWidthMultiplier = EditorGUILayout.Slider("Width Multiplier", rockRingWidthMultiplier, 1f, 50f);
+        rockRingSoftness        = EditorGUILayout.Slider("Softness",         rockRingSoftness,        0f, 1f);
 
         EditorGUILayout.Space(4);
         EditorGUILayout.LabelField("Distortion", EditorStyles.miniBoldLabel);
@@ -573,6 +616,98 @@ public class WaveEffectsLiveTuner : EditorWindow
         EditorGUILayout.LabelField("LOD", EditorStyles.miniBoldLabel);
         rockRingLodRadius  = EditorGUILayout.Slider("Radius",  rockRingLodRadius,  0f, 60f);
         rockRingLodFeather = EditorGUILayout.Slider("Feather", rockRingLodFeather, 0f, 1f);
+    }
+
+    void DrawWaveBands()
+    {
+        EditorGUILayout.HelpBox(
+            "One family of white lines running right across the map in a single direction, snaking " +
+            "as they go. Rocks make them wobble harder as they cross — they never part around one. " +
+            "White only: at Strength 0 the water is exactly what it was.",
+            MessageType.None);
+
+        waveBandAngle     = EditorGUILayout.Slider("Angle",     waveBandAngle,     0f, 360f);
+        // Ceiling raised well past where the lines stop resolving on screen, so the slider is not
+        // the thing standing between a level and a fine grain. Past roughly 2 the spacing drops
+        // under half a world unit and the family starts to moire against the water it sits on.
+        waveBandFrequency = EditorGUILayout.Slider("Bands",     waveBandFrequency, 0.005f, 8f);
+        waveBandSpeed     = EditorGUILayout.Slider("Speed",     waveBandSpeed,     0f, 4f);
+        waveBandStrength  = EditorGUILayout.Slider("Strength",  waveBandStrength,  0f, 2f);
+
+        EditorGUILayout.Space(4);
+        EditorGUILayout.LabelField("Line Shape", EditorStyles.miniBoldLabel);
+        waveBandWidth    = EditorGUILayout.Slider("Width",    waveBandWidth,    0.02f, 0.98f);
+        waveBandSoftness = EditorGUILayout.Slider("Softness", waveBandSoftness, 0f, 1f);
+
+        EditorGUILayout.Space(4);
+        EditorGUILayout.LabelField("Waviness", EditorStyles.miniBoldLabel);
+        waveBandWaviness        = EditorGUILayout.Slider(    "Swing",       waveBandWaviness,      0f, 4f);
+        waveBandWavinessScale   = EditorGUILayout.FloatField("Swing Scale", waveBandWavinessScale);
+        waveBandMeanderStrength = EditorGUILayout.Slider(    "Drift",       waveBandMeanderStrength, 0f, 4f);
+        waveBandMeanderScale    = EditorGUILayout.FloatField("Drift Scale", waveBandMeanderScale);
+
+        EditorGUILayout.Space(4);
+        EditorGUILayout.LabelField("Rock Disturbance", EditorStyles.miniBoldLabel);
+        // Counted in band-widths, so 1 shifts the lines a whole cycle where the rock is strongest.
+        // The old ceiling of 4 was already a heavy scramble; this leaves room to go properly wild.
+        // Past roughly 12 the lines are moving so far between neighbouring pixels that they stop
+        // resolving as lines at all and read as noise — that is a sampling limit, not a shader one.
+        waveBandRockDistort = EditorGUILayout.Slider("Distort", waveBandRockDistort, 0f, 20f);
+        waveBandRockReach   = EditorGUILayout.Slider("Reach",   waveBandRockReach,   0.5f, 12f);
+        waveBandRockBevel   = EditorGUILayout.Slider("Bevel",   waveBandRockBevel,   0f, 1f);
+
+        EditorGUILayout.Space(4);
+        EditorGUILayout.LabelField("Fine Grain", EditorStyles.miniBoldLabel);
+        EditorGUILayout.HelpBox(
+            "Inverted through the lines: speckles white INTO the gaps and eats white OUT of the " +
+            "bands. Size is the world size of one speck, so small is fine grain and large is a " +
+            "coarse mottle.",
+            MessageType.None);
+        waveBandGrainStrength = EditorGUILayout.Slider(    "Strength", waveBandGrainStrength, 0f, 2f);
+        waveBandGrainSize     = EditorGUILayout.FloatField("Size",     waveBandGrainSize);
+    }
+
+    void DrawWaterlineGradient()
+    {
+        EditorGUILayout.HelpBox(
+            "Black gathered where an object meets the water, gone again a short way up. Not drawn " +
+            "on the water — it rides on the spikes, the blocks and the spline walls, so it needs " +
+            "the sub graph wired into their shaders to show up. Height is global: every object " +
+            "using it moves together.",
+            MessageType.None);
+
+        // The heights that actually read as contact are tiny — around 0.07 — while the ceiling has
+        // to stay high enough for a level that wants its objects sunk in shadow rather than merely
+        // grounded. A straight slider spends 98% of its travel on values nobody uses, so this one
+        // is curved: the bar moves as the cube of its travel, which puts 0.07 a quarter of the way
+        // along and 0.5 at the halfway point, with the whole range still reachable at the far end.
+        waterlineGradientHeight   = CurvedSlider("Height", waterlineGradientHeight, 0.001f, 4f, 3f);
+        waterlineGradientStrength = EditorGUILayout.Slider("Strength", waterlineGradientStrength, 0f, 1f);
+        waterlineGradientFalloff  = EditorGUILayout.Slider("Falloff",  waterlineGradientFalloff,  0.25f, 6f);
+    }
+
+    // A slider whose travel is bunched toward the low end, for values that live in the first
+    // fraction of their range. The bar carries t; the value is min + t^power * span, so raising
+    // the power buys more precision down low without moving the ends. The field beside it is the
+    // real value either way, so an exact number can always be typed in rather than hunted for.
+    float CurvedSlider(string label, float value, float min, float max, float power)
+    {
+        float span = Mathf.Max(max - min, 1e-6f);
+
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            EditorGUILayout.PrefixLabel(label);
+
+            float t    = Mathf.Pow(Mathf.Clamp01((value - min) / span), 1f / power);
+            float newT = GUILayout.HorizontalSlider(t, 0f, 1f);
+            // Only the dragged bar writes back. Rebuilding the value from t every frame would
+            // quantise a typed number to whatever the bar could express and walk it off.
+            if (!Mathf.Approximately(newT, t)) value = min + Mathf.Pow(newT, power) * span;
+
+            value = EditorGUILayout.FloatField(value, GUILayout.Width(60));
+        }
+
+        return Mathf.Clamp(value, min, max);
     }
 
     void DrawTwirl()
@@ -842,6 +977,8 @@ public class WaveEffectsLiveTuner : EditorWindow
         waveMaterial.SetFloat("_SoulFishTaperScale",        soulFishTaperScale);
         Shader.SetGlobalFloat("_SoulFishTaperStrength",     soulFishTaperStrength);
         Shader.SetGlobalFloat("_SoulFishTaperScale",        soulFishTaperScale);
+        waveMaterial.SetFloat("_SoulFishPoolHole",          soulFishPoolHole);
+        Shader.SetGlobalFloat("_SoulFishPoolHole",          soulFishPoolHole);
         waveMaterial.SetVector("_ZoneTiling",              zoneTiling);
         waveMaterial.SetFloat("_ZoneScrollSpeed",          zoneScrollSpeed);
         waveMaterial.SetFloat("_ZoneNoiseStrength",        zoneNoiseStrength);
@@ -857,9 +994,36 @@ public class WaveEffectsLiveTuner : EditorWindow
         SetBoth("_RockRingRectify",         rockRingRectify);
         SetBoth("_RockRingDistortStrength", rockRingDistortStrength);
         SetBoth("_RockRingDistortScale",    rockRingDistortScale);
+        SetBoth("_RockRingWidth",           rockRingWidth);
         SetBoth("_RockRingWidthMultiplier", rockRingWidthMultiplier);
+        SetBoth("_RockRingSoftness",        rockRingSoftness);
         // The LOD range is a CPU decision, not a shader one.
         RockRingManager.SetLod(rockRingLodRadius, rockRingLodFeather);
+
+        // Wave bands are bare $Globals in WaveBands.hlsl too. No LOD line — they read the rocks
+        // the manager already pushed rather than keeping a set of their own.
+        SetBoth("_WaveBandAngle",           waveBandAngle);
+        SetBoth("_WaveBandFrequency",       waveBandFrequency);
+        SetBoth("_WaveBandStrength",        waveBandStrength);
+        SetBoth("_WaveBandWidth",           waveBandWidth);
+        SetBoth("_WaveBandSoftness",        waveBandSoftness);
+        SetBoth("_WaveBandWaviness",        waveBandWaviness);
+        SetBoth("_WaveBandWavinessScale",   waveBandWavinessScale);
+        SetBoth("_WaveBandMeanderStrength", waveBandMeanderStrength);
+        SetBoth("_WaveBandMeanderScale",    waveBandMeanderScale);
+        SetBoth("_WaveBandRockDistort",     waveBandRockDistort);
+        SetBoth("_WaveBandRockReach",       waveBandRockReach);
+        SetBoth("_WaveBandRockBevel",       waveBandRockBevel);
+        SetBoth("_WaveBandGrainStrength",   waveBandGrainStrength);
+        SetBoth("_WaveBandGrainSize",       waveBandGrainSize);
+
+        // The waterline gradient is bare $Globals too, but unlike everything above it the material
+        // write is not the fallback path — it is dead weight. The effect is on the spikes, blocks
+        // and walls, and the global write is the only thing any of them reads. It goes through
+        // SetBoth anyway so this block reads the same as its neighbours.
+        SetBoth("_WaterlineGradientHeight",   waterlineGradientHeight);
+        SetBoth("_WaterlineGradientStrength", waterlineGradientStrength);
+        SetBoth("_WaterlineGradientFalloff",  waterlineGradientFalloff);
 
         waveMaterial.SetFloat("_TwirlBaseStrength", twirlBaseStrength);
         waveMaterial.SetFloat("_TwirlSlopeBoost",  twirlSlopeBoost);
@@ -967,7 +1131,49 @@ public class WaveEffectsLiveTuner : EditorWindow
         {
             rockRingDistortStrength = s.RockRingDistortStrength;
             rockRingDistortScale    = s.RockRingDistortScale;
+        }
+        // Its own guard, for the same reason as in NormalizeRockRings: a preset saved between the
+        // distortion and the band shape has a live distort scale but no width, and a zero width is
+        // not something anyone set on purpose.
+        if (s.RockRingWidth > 0.0001f)
+        {
+            rockRingWidth           = s.RockRingWidth;
             rockRingWidthMultiplier = s.RockRingWidthMultiplier;
+            rockRingSoftness        = s.RockRingSoftness;
+        }
+        // Wave bands, same fallback again: every preset in the project predates them, so a zero
+        // band spacing means unset rather than deliberately switched off. Keep the tuner's values.
+        if (s.WaveBandFrequency > 0f)
+        {
+            waveBandAngle           = s.WaveBandAngle;
+            waveBandFrequency       = s.WaveBandFrequency;
+            waveBandSpeed           = s.WaveBandSpeed;
+            waveBandStrength        = s.WaveBandStrength;
+            waveBandWidth           = s.WaveBandWidth;
+            waveBandSoftness        = s.WaveBandSoftness;
+            waveBandWaviness        = s.WaveBandWaviness;
+            waveBandWavinessScale   = s.WaveBandWavinessScale;
+            waveBandMeanderStrength = s.WaveBandMeanderStrength;
+            waveBandMeanderScale    = s.WaveBandMeanderScale;
+            waveBandRockDistort     = s.WaveBandRockDistort;
+            waveBandRockReach       = s.WaveBandRockReach;
+            waveBandRockBevel       = s.WaveBandRockBevel;
+        }
+        // The grain landed after the bands, so a preset saved in between has a live band spacing
+        // but a zero speck size. Same "0 scale means unset" fallback used everywhere else here.
+        if (s.WaveBandGrainSize > 0f)
+        {
+            waveBandGrainStrength = s.WaveBandGrainStrength;
+            waveBandGrainSize     = s.WaveBandGrainSize;
+        }
+        // The waterline gradient, same fallback again: every preset in the project predates it, and
+        // a zero height means unset rather than deliberately switched off — switching it off is
+        // what Strength 0 is for, which is why the guard cannot sit on that.
+        if (s.WaterlineGradientHeight > 0f)
+        {
+            waterlineGradientHeight   = s.WaterlineGradientHeight;
+            waterlineGradientStrength = s.WaterlineGradientStrength;
+            waterlineGradientFalloff  = s.WaterlineGradientFalloff;
         }
         // Same "0 scale means the preset predates this" fallback as the edge noise above, so
         // loading an older preset keeps the tuner's own taper rather than flattening it.
@@ -975,6 +1181,7 @@ public class WaveEffectsLiveTuner : EditorWindow
         {
             soulFishTaperStrength = s.SoulFishTaperStrength;
             soulFishTaperScale    = s.SoulFishTaperScale;
+            soulFishPoolHole      = s.SoulFishPoolHole;   // 0 is valid, so it rides the taper's guard
         }
         zoneTiling              = s.ZoneTiling;
         zoneScrollSpeed         = s.ZoneScrollSpeed;
@@ -1154,6 +1361,7 @@ public class WaveEffectsLiveTuner : EditorWindow
         SoulFishEdgeNoiseSpeed    = soulFishEdgeNoiseSpeed,
         SoulFishTaperStrength     = soulFishTaperStrength,
         SoulFishTaperScale        = soulFishTaperScale,
+        SoulFishPoolHole          = soulFishPoolHole,
         ZoneTiling                = zoneTiling,
         ZoneScrollSpeed           = zoneScrollSpeed,
         ZoneNoiseStrength         = zoneNoiseStrength,
@@ -1167,9 +1375,29 @@ public class WaveEffectsLiveTuner : EditorWindow
         RockRingRectify         = rockRingRectify,
         RockRingDistortStrength = rockRingDistortStrength,
         RockRingDistortScale    = rockRingDistortScale,
+        RockRingWidth           = rockRingWidth,
         RockRingWidthMultiplier = rockRingWidthMultiplier,
+        RockRingSoftness        = rockRingSoftness,
         RockRingLodRadius    = rockRingLodRadius,
         RockRingLodFeather   = rockRingLodFeather,
+        WaveBandAngle           = waveBandAngle,
+        WaveBandFrequency       = waveBandFrequency,
+        WaveBandSpeed           = waveBandSpeed,
+        WaveBandStrength        = waveBandStrength,
+        WaveBandWidth           = waveBandWidth,
+        WaveBandSoftness        = waveBandSoftness,
+        WaveBandWaviness        = waveBandWaviness,
+        WaveBandWavinessScale   = waveBandWavinessScale,
+        WaveBandMeanderStrength = waveBandMeanderStrength,
+        WaveBandMeanderScale    = waveBandMeanderScale,
+        WaveBandRockDistort     = waveBandRockDistort,
+        WaveBandRockReach       = waveBandRockReach,
+        WaveBandRockBevel       = waveBandRockBevel,
+        WaveBandGrainStrength   = waveBandGrainStrength,
+        WaveBandGrainSize       = waveBandGrainSize,
+        WaterlineGradientHeight   = waterlineGradientHeight,
+        WaterlineGradientStrength = waterlineGradientStrength,
+        WaterlineGradientFalloff  = waterlineGradientFalloff,
         TwirlBaseStrength = twirlBaseStrength,
         TwirlSlopeBoost   = twirlSlopeBoost,
         TwirlScale        = twirlScale,

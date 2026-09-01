@@ -14,7 +14,7 @@ using System.Collections.Generic;
 ///  - bowlFishVisual: shown once a soul is deposited. litVisual: shown while lit
 ///    (light #1 starts lit without an occupant, so the two can differ).
 /// </summary>
-public class StreetLightController : MonoBehaviour, IInstancedLight
+public class StreetLightController : MonoBehaviour, IInstancedLight, IFogRepeller
 {
     [Header("Visuals")]
     [Tooltip("Enabled when a soul has been deposited — the fish living in the bowl.")]
@@ -26,6 +26,10 @@ public class StreetLightController : MonoBehaviour, IInstancedLight
     [Tooltip("Optional cloud of floating quads that drifts around the lamp while it is lit. " +
              "Assign the child holding the ParticleSystem + StreetLightParticles.")]
     [SerializeField] private StreetLightParticles litParticles;
+
+    [Tooltip("Optional shaft of light under the lamp. Assign the child holding the StreetLightCone " +
+             "and its base is sat on the waterline at spawn, so one prefab works at any water height.")]
+    [SerializeField] private StreetLightCone lightCone;
 
     [Header("Instanced Light")]
     [Tooltip("Illumination radius this lamp casts onto objects (world units). Separate from the fish pool radius.")]
@@ -43,15 +47,30 @@ public class StreetLightController : MonoBehaviour, IInstancedLight
              "Off = world space, so the offset always points the same way regardless of lamp rotation.")]
     [SerializeField] private bool offsetInLocalSpace = true;
 
+    [Header("Screen Glow")]
+    [Tooltip("TOP of the cone of light — its tip. Leave blank and it sits on the default lit-from " +
+             "point, same as the core glow. Shape is tuned on BrightnessGlowController under Street " +
+             "Lights; these two anchors only say WHERE the cone runs.")]
+    [SerializeField] private Transform haloGlowAnchor;
+
+    [Tooltip("BOTTOM of the cone — where its base circle is centred. Drop the empty child you made " +
+             "for it here; move it sideways to lean the cone. Only its X/Z are used: the height comes " +
+             "from the arena baseline, which is the authority on the waterline. Blank = straight down " +
+             "from the top point.")]
+    [SerializeField] private Transform coneBaseAnchor;
+
     // Screen glow: while lit, BrightnessGlowController reads LitLights and puts a persistent glow
-    // point on InstLightPosition. Shape is tuned there under "Street Lights" — one set of knobs for
-    // every lamp — so there is nothing per-prefab to author here.
+    // point on InstLightPosition, plus a second one on HaloGlowPosition. Shape is tuned there —
+    // one set of knobs for every lamp — so the only per-prefab thing is the anchor above.
 
     public bool IsLit { get; private set; }
     public int  OccupantSoulIdentity { get; private set; } = -1;
 
     // Debug read-only: what the prefab actually has in its visual slots, so StreetLightDebugTracer
     // can report an unassigned one rather than leaving it to guesswork.
+    /// <summary>The lamp's shaft of light, so the particle cloud can find it without being wired twice.</summary>
+    public StreetLightCone LightCone => lightCone;
+
     public GameObject          DebugBowlFishVisual => bowlFishVisual;
     public GameObject          DebugLitVisual      => litVisual;
     public StreetLightParticles DebugLitParticles  => litParticles;
@@ -73,6 +92,53 @@ public class StreetLightController : MonoBehaviour, IInstancedLight
     public float   InstLightRadius   => lightRadius;
     public bool    InstLightActive   => IsLit;
 
+    /// <summary>True when the cone's tip has been given its own anchor rather than riding on the core point.</summary>
+    public bool HasOwnHaloPoint => haloGlowAnchor != null;
+
+    /// <summary>Tip of the cone — the top anchor if one is assigned, else the lit-from point.</summary>
+    public Vector3 HaloGlowPosition => haloGlowAnchor != null ? haloGlowAnchor.position : InstLightPosition;
+
+    // ── Fog ──────────────────────────────────────────────────────────────────
+    // A lit lamp PUSHES fog out of its pool. It never gathers fog to itself — where fog sits is
+    // the arena map's decision alone.
+    //
+    // The repel radius sits well inside lightRadius on purpose: push fog out as far as the light
+    // reaches and it never enters the region where it would have been lit, leaving a clean dark
+    // hole ringed by unlit fog. The intended shot is fog banked up glowing at the edge of the
+    // lamp's reach, so the clear pool has to be smaller than the lit one.
+    //
+    // Lamps push harder than rocks. A rock is an obstacle fog wraps close around; a lit lamp is
+    // burning it off, and should hold a space that reads as deliberate.
+    //
+    // It goes quiet when the lamp is unlit, which is the whole "clear the fog" mechanic: light a
+    // stretch of lamps and the fog is physically squeezed out; kill one and fog creeps back over
+    // the next few seconds on its own, with nothing tracking it.
+
+    // ── Fog ──────────────────────────────────────────────────────────────────
+    // A lit lamp PUSHES fog out of its pool. It never gathers fog to itself — where fog sits is
+    // the fog map's decision alone.
+    //
+    // The numbers live on FogFieldManager, not here. How fog behaves around a lamp is a property
+    // of the fog, and per-lamp fields meant one level could hold twenty different answers to the
+    // same question. All this contributes is where the lamp is, how far it reaches, and whether
+    // it is lit.
+    //
+    // Going quiet when unlit is the whole "clear the fog" mechanic: light a stretch of lamps and
+    // fog is physically squeezed out; kill one and fog creeps back over the next few seconds, with
+    // nothing tracking it.
+
+    public Vector3 RepelCentre   => InstLightPosition;
+    public float   RepelRadius   => lightRadius * FogFieldManager.LampClearFraction;
+    public float   RepelClearRadius => FogFieldManager.LampClearRadius;
+    public float   RepelStrength => FogFieldManager.LampStrength;
+    public bool    RepelActive   => IsLit;
+
+    /// <summary>True when the cone's base has been steered off the vertical by its own anchor.</summary>
+    public bool HasConeBaseAnchor => coneBaseAnchor != null;
+
+    /// <summary>Where the cone's base circle is centred. Only X/Z matter — the caller drops it onto the baseline.</summary>
+    public Vector3 ConeBasePosition => coneBaseAnchor != null ? coneBaseAnchor.position : HaloGlowPosition;
+
     // Wired by LevelSpawner when the chain is assembled.
     [HideInInspector] public SoulZoneStreetLightChain chain;
     [HideInInspector] public int orderIndex;   // 0-based position in path order (0 = starts lit)
@@ -92,6 +158,45 @@ public class StreetLightController : MonoBehaviour, IInstancedLight
     {
         LitLights.Clear();
         All.Clear();
+        waterBaseline = null;
+    }
+
+    void Start()
+    {
+        // Left to Start rather than Awake: the lamp is instantiated and then placed, and the level's
+        // baseline has to exist before its height can be asked for.
+        AlignConeToWater();
+    }
+
+    /// <summary>
+    /// Sits the shaft of light's base on the waterline. Called at spawn; public so a level that
+    /// moves its rig afterwards can ask for it again.
+    /// </summary>
+    public void AlignConeToWater()
+    {
+        if (lightCone == null) return;
+        if (!TryGetWaterHeight(out float waterY)) return;
+        lightCone.SetBaseAtHeight(waterY);
+
+        // The cloud sized itself to the shaft at Awake, before this moved the base onto the water,
+        // so it has to be told the shape has changed under it.
+        if (litParticles != null) litParticles.Reapply();
+    }
+
+    // The arena baseline owns waterline height, the same authority BoatToWaterMaterial uses. Cached
+    // across lamps so a level full of them costs one scene search rather than one each.
+    static BaselineMarker waterBaseline;
+
+    static bool TryGetWaterHeight(out float y)
+    {
+        if (waterBaseline == null)
+        {
+            var spawner = FindFirstObjectByType<LevelSpawner>();
+            waterBaseline = spawner != null ? spawner.GetBaselineMarker() : null;
+        }
+
+        y = waterBaseline != null ? waterBaseline.height : 0f;
+        return waterBaseline != null;
     }
 
     void Awake()
@@ -100,6 +205,8 @@ public class StreetLightController : MonoBehaviour, IInstancedLight
         RefreshVisuals();
         // Register always; InstLightActive (= IsLit) gates whether it actually contributes light.
         InstancedLightManager.Register(this);
+        // Same deal for fog: registered from the start, with RepelActive gating on IsLit.
+        FogFieldManager.Register(this);
     }
 
     void OnDestroy()
@@ -107,6 +214,7 @@ public class StreetLightController : MonoBehaviour, IInstancedLight
         All.Remove(this);
         LitLights.Remove(this);
         InstancedLightManager.Unregister(this);
+        FogFieldManager.Unregister(this);
     }
 
     /// <summary>Called by LevelSpawner for light #1's initial state, and internally on feed.</summary>
@@ -155,6 +263,7 @@ public class StreetLightController : MonoBehaviour, IInstancedLight
         if (bowlFishVisual != null) bowlFishVisual.SetActive(OccupantSoulIdentity >= 0);
         if (litVisual      != null) litVisual.SetActive(IsLit);
         if (litParticles   != null) litParticles.SetShowing(IsLit);
+        if (lightCone      != null) lightCone.SetShowing(IsLit);
     }
 
 #if UNITY_EDITOR
@@ -213,6 +322,25 @@ public class StreetLightController : MonoBehaviour, IInstancedLight
 
         Gizmos.color = new Color(c.r, c.g, c.b, 0.35f);
         Gizmos.DrawWireSphere(p, r * InstancedLightManager.CurrentInnerFalloff);
+
+        // Where the screen-space halo is centred. No sphere for it — its radius is in viewport units,
+        // not world units, so there is no world size to draw.
+        Vector3 top = HaloGlowPosition;
+        Gizmos.color = new Color(0.6f, 0.8f, 1f, 0.9f);
+        if (HasOwnHaloPoint)
+        {
+            Gizmos.DrawSphere(top, 0.1f);
+            Gizmos.DrawLine(p, top);
+            UnityEditor.Handles.Label(top + Vector3.up * 0.2f, "cone top");
+        }
+
+        if (HasConeBaseAnchor)
+        {
+            Vector3 b = ConeBasePosition;
+            Gizmos.DrawSphere(b, 0.1f);
+            Gizmos.DrawLine(top, b);
+            UnityEditor.Handles.Label(b + Vector3.up * 0.2f, "cone base (X/Z)");
+        }
 
         string state = !InstLightActive                        ? "not lit — contributes nothing"
                      : InstancedLightManager.IsContributing(this) ? "contributing"

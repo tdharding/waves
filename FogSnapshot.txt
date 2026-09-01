@@ -1,0 +1,57 @@
+FOG SNAPSHOT
+map            Default1FogArenaMap
+fogEnabled     True
+playing        True
+
+-- extent and detail ------------------------------------------
+simulationRadius  1.85   (masses live inside this)
+maskRadius        3.09   (fog DRAWS inside this)
+maskFeather       0.56   -> fade runs 1.36 to 3.09
+skipRadius        3.09   (beyond this a mass is not simulated)
+coverage          5.365  world units of painted texture
+gridResolution    64 px    -> 0.08383 u/texel
+unitsPerTexel     0.112  asked for
+heightResolution  128 px
+blur              1.01 texels = 0.085 world units
+heaviness         0.814
+
+-- population -------------------------------------------------
+blobCount 14  blobBudget 17  -> target 14
+spacing   0.67 world units between masses
+blobScale 1.19 to 2.33 world units (spine length)
+wind      221deg at 0.17 u/s
+entries   1
+  entry 0: scale x1  limbification 1 limbCount 6 -> 6 effective  limbLength 0.22  spine 0.1/0.1  limb 0.09/0.05  stretch 3
+
+repellers near 86   rocks adopted 84
+
+=== FRAME 1 ============================================
+boat -7.72,13.26   masses 4   dots 70   born 346  died 345  throwFailures 0
+  [ 0] d=  1.09  scale= 2.25  dots= 22  mask=-2.09  
+  [ 1] d=   1.5  scale= 2.25  dots= 23  mask=-2.09  
+  [ 2] d=  2.41  scale= 1.35  dots=  0  mask=-2.09  NOT SIMULATED
+  [ 3] d=  2.92  scale=  2.1  dots= 25  mask=-2.09  
+  fully drawn 0   partly faded 0   invisible 4
+  dot radius 0.0949 to 0.2691 world units = 1.13 to 3.21 TEXELS
+  dots under one texel: 0 of 70
+
+=== FRAME 2 ============================================
+boat -7.72,13.26   masses 4   dots 68   born 1  died 1  throwFailures 0
+  [ 0] d=  1.09  scale= 2.25  dots= 24  mask=-2.09  
+  [ 1] d=  1.49  scale= 2.25  dots= 23  mask=-2.09  
+  [ 2] d=  2.92  scale=  2.1  dots=  0  mask=-2.09  NOT SIMULATED
+  [ 3] d=  2.48  scale= 1.82  dots= 21  mask=-2.09  
+  fully drawn 0   partly faded 0   invisible 4
+  dot radius 0.0803 to 0.2669 world units = 0.96 to 3.18 TEXELS
+  dots under one texel: 2 of 68   <-- these paint NOTHING
+
+=== FRAME 3 ============================================
+boat -7.72,13.26   masses 4   dots 65   born 1  died 1  throwFailures 0
+  [ 0] d=  1.08  scale= 2.25  dots= 25  mask=-2.09  
+  [ 1] d=  1.48  scale= 2.25  dots= 21  mask=-2.09  
+  [ 2] d=  2.48  scale= 1.82  dots=  0  mask=-2.09  NOT SIMULATED
+  [ 3] d=  2.51  scale= 2.28  dots= 19  mask=-2.09  
+  fully drawn 0   partly faded 0   invisible 4
+  dot radius 0.0969 to 0.2669 world units = 1.16 to 3.18 TEXELS
+  dots under one texel: 0 of 65
+

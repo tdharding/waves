@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -16,6 +17,7 @@ using UnityEngine;
 ///
 /// StreetLightController turns this on and off with SetShowing as the lamp lights.
 /// </summary>
+[ExecuteAlways]   // so an edit in the inspector lands on the particle system without being asked
 [RequireComponent(typeof(ParticleSystem))]
 public class StreetLightParticles : MonoBehaviour
 {
@@ -38,6 +40,17 @@ public class StreetLightParticles : MonoBehaviour
 
     [Tooltip("Optional centre for the cloud (the bulb, usually). Falls back to this object.")]
     [SerializeField] private Transform centre;
+
+    [Tooltip("The shaft of light to fill: the quads are born inside it and fade at its walls, reading " +
+             "the shape straight off the cone so the two can never disagree. Left empty, the lamp's " +
+             "own Light Cone is used, and failing that the cloud falls back to a ball around the " +
+             "centre below.")]
+    [SerializeField] private StreetLightCone lightCone;
+
+    [Tooltip("How far in from the cone's wall the quads start fading, as a fraction of the shaft's " +
+             "width at that height. 0 cuts them off hard at the surface.")]
+    [Range(0f, 1f)]
+    [SerializeField] private float coneEdgeSoftness = 0.35f;
 
     [Header("Particles")]
     [Tooltip("Material for the quads. Assigned to the ParticleSystem's Renderer, and handed the " +
@@ -70,15 +83,56 @@ public class StreetLightParticles : MonoBehaviour
 
     private ParticleSystem ps;
     private bool isShowing;
+    private float _coneLength;   // 0 when the cloud fell back to a sphere
+
+    static readonly List<ParticleSystemVertexStream> streamBuffer = new List<ParticleSystemVertexStream>();
 
     private Transform CentreTransform => centre != null ? centre : transform;
 
-    // Born inside the inner sphere, dead at the outer one: crossing that gap at driftSpeed is what
-    // makes a particle's age stand for how far out it has got.
-    private float Lifetime =>
-        Mathf.Max(particleRadius * (1f - fadeStart) / Mathf.Max(driftSpeed, 0.0001f), 0.05f);
+    // In cone mode the cloud reaches all the way to the water, so the fade has to span that instead
+    // of the sphere's radius, or the shader would dim the quads out halfway down the beam.
+    private float FadeRadius => _coneLength > 0f ? _coneLength : particleRadius;
 
-    private void Awake() => EnsureInitialised();
+    // Born at one end, dead at the other: crossing that distance at driftSpeed is what makes a
+    // particle's age stand for how far it has got.
+    private float Lifetime =>
+        Mathf.Max(FadeRadius * (1f - fadeStart) / Mathf.Max(driftSpeed, 0.0001f), 0.05f);
+
+    // Falls back to the lamp's own cone, so filling in one slot or the other is enough — wiring both
+    // and having them disagree was a trap worth removing.
+    private StreetLightCone Cone
+    {
+        get
+        {
+            if (lightCone != null) return lightCone;
+            var lamp = GetComponentInParent<StreetLightController>();
+            return lamp != null ? lamp.LightCone : null;
+        }
+    }
+
+    private bool HasCone => Cone != null;
+
+    /// <summary>
+    /// Writes every setting again. Called when the shaft changes shape underneath the cloud — the
+    /// lamp sits its cone on the water after this has already sized itself to it.
+    /// </summary>
+    public void Reapply()
+    {
+        ApplySettings();
+        if (isShowing)
+        {
+            // Restart, or the quads still in the air keep the old shape for a full lifetime.
+            ps.Clear();
+            ps.Play();
+        }
+    }
+
+    private void Awake()
+    {
+        // In edit mode nothing is written until a field actually changes, so simply opening a scene
+        // never marks it dirty. At runtime the settings have to be on the system before it plays.
+        if (Application.isPlaying) EnsureInitialised();
+    }
 
     // Awake order between components is undefined and StreetLightController pushes its lit state
     // from its own Awake, so setup runs on first use rather than relying on ours running first.
@@ -91,6 +145,12 @@ public class StreetLightParticles : MonoBehaviour
     private void ApplySettings()
     {
         ps = GetComponent<ParticleSystem>();
+
+        // Read first: the lifetime and the fade both measure themselves against the shaft when
+        // there is one, so its size has to be known before anything else is written.
+        bool    hasCone = HasCone;
+        Vector3 apex    = hasCone ? Cone.Apex : CentreTransform.position;
+        _coneLength     = hasCone ? Cone.Height : 0f;
 
         var main = ps.main;
         main.loop            = true;
@@ -111,18 +171,43 @@ public class StreetLightParticles : MonoBehaviour
         emission.enabled     = true;
         emission.rateOverTime = particleCount / Mathf.Max(Lifetime, 0.0001f);
 
-        // Born anywhere inside the inner sphere, so the cloud is a volume from the outset rather
-        // than a spray coming off a point. The outward drift then carries them to the edge.
-        var shape = ps.shape;
-        shape.enabled        = true;
-        shape.shapeType      = ParticleSystemShapeType.Sphere;
-        shape.radius         = Mathf.Max(particleRadius * fadeStart, 0.01f);
-        shape.radiusThickness = 1f;   // fill the volume, not just the shell
-
         // Where the cloud sits relative to this object, shared by the shape and the orbit below so
         // the quads circle the lamp rather than the object the component happens to be on.
         Vector3 centreOffset = centre != null ? transform.InverseTransformPoint(centre.position) : Vector3.zero;
-        shape.position       = centreOffset;
+
+        var shape = ps.shape;
+        shape.enabled = true;
+
+        if (hasCone)
+        {
+            // Fill the shaft itself. The quads have to be born in here for the cloud to read as
+            // motes in a beam of light — a mask could only ever cut a ball down to the outline.
+            shape.shapeType = ParticleSystemShapeType.ConeVolume;
+            shape.angle     = Cone.HalfAngleDegrees;
+            shape.radius    = Mathf.Max(Cone.ApexRadius, 0.01f);
+            shape.length    = _coneLength;
+            shape.position  = transform.InverseTransformPoint(apex);
+            // The emitter fires along its own forward, so aim that down the shaft. Measured against
+            // this object's rotation, so a rotated prefab still points where the cone does.
+            //
+            // A beam pointing straight down is the normal case and also the degenerate one for
+            // LookRotation, whose up vector would be parallel to it — so the reference flips to
+            // forward whenever the two are close to lined up.
+            Vector3 dir = Cone.Axis;
+            Vector3 up  = Mathf.Abs(Vector3.Dot(dir, Vector3.up)) > 0.99f ? Vector3.forward : Vector3.up;
+            shape.rotation  = (Quaternion.Inverse(transform.rotation) *
+                               Quaternion.LookRotation(dir, up)).eulerAngles;
+        }
+        else
+        {
+            // No cone dropped in. Born anywhere inside the inner sphere instead, so the cloud is
+            // still a volume rather than a spray coming off a point.
+            shape.shapeType       = ParticleSystemShapeType.Sphere;
+            shape.radius          = Mathf.Max(particleRadius * fadeStart, 0.01f);
+            shape.radiusThickness = 1f;   // fill the volume, not just the shell
+            shape.position        = centreOffset;
+            shape.rotation        = Vector3.zero;
+        }
 
         // A wander vector of its own per particle, drawn once at birth and held for its life. This
         // is what stops the cloud reading as one body of particles all going the same way.
@@ -137,9 +222,10 @@ public class StreetLightParticles : MonoBehaviour
         // The slow turn around the lamp. Negated because a positive spin about Y reads clockwise
         // from above, and the offset moves the axis it turns about onto the lamp itself.
         velocity.orbitalY       = -orbitSpeed * Mathf.Deg2Rad;
-        velocity.orbitalOffsetX = centreOffset.x;
-        velocity.orbitalOffsetY = centreOffset.y;
-        velocity.orbitalOffsetZ = centreOffset.z;
+        Vector3 orbitCentre = hasCone ? transform.InverseTransformPoint(apex) : centreOffset;
+        velocity.orbitalOffsetX = orbitCentre.x;
+        velocity.orbitalOffsetY = orbitCentre.y;
+        velocity.orbitalOffsetZ = orbitCentre.z;
 
         // The floaty part: noise curls them about on the way out.
         //
@@ -184,6 +270,16 @@ public class StreetLightParticles : MonoBehaviour
             psRenderer.renderMode = ParticleSystemRenderMode.Billboard;
             psRenderer.alignment  = ParticleSystemRenderSpace.Facing;
             if (particleMaterial != null) psRenderer.sharedMaterial = particleMaterial;
+
+            // Back to the plain billboard stream set. Custom streams repack the channels, so a
+            // stray one left on the renderer moves the particle's colour off the channel the
+            // shader reads it from and quietly kills the lifetime ramps with it.
+            streamBuffer.Clear();
+            streamBuffer.Add(ParticleSystemVertexStream.Position);
+            streamBuffer.Add(ParticleSystemVertexStream.Normal);
+            streamBuffer.Add(ParticleSystemVertexStream.Color);
+            streamBuffer.Add(ParticleSystemVertexStream.UV);
+            psRenderer.SetActiveVertexStreams(streamBuffer);
         }
 
         PushMaterialValues();
@@ -199,12 +295,21 @@ public class StreetLightParticles : MonoBehaviour
         var psRenderer = GetComponent<ParticleSystemRenderer>();
         if (psRenderer == null) return;
 
-        _pushedCentre = CentreTransform.position;
+        // In cone mode this is the bulb, and the radius below is the drop to the water, so the
+        // shader's falloff runs down the beam instead of around a ball at the top of it.
+        _pushedCentre = HasCone ? Cone.Apex : CentreTransform.position;
 
         block ??= new MaterialPropertyBlock();
         psRenderer.GetPropertyBlock(block);
-        block.SetVector(CloudCentreId,    _pushedCentre);
-        block.SetFloat (CloudRadiusId,    particleRadius);
+
+        // The shaft, as the shader needs it: where it starts, which way it goes, how far it
+        // reaches, and how wide it ends up. With no cone dropped in these describe a ball around
+        // the centre instead — a zero-length shaft the shader reads as the plain radius fade.
+        block.SetVector(ConeApexId,     _pushedCentre);
+        block.SetVector(ConeAxisId,     HasCone ? Cone.Axis : Vector3.down);
+        block.SetFloat (ConeHeightId,   HasCone ? Cone.Height : 0f);
+        block.SetFloat (ConeRadiusId,   HasCone ? Cone.BaseRadius : particleRadius);
+        block.SetFloat (ConeSoftnessId, coneEdgeSoftness);
         block.SetFloat (CloudFadeStartId, fadeStart);
         psRenderer.SetPropertyBlock(block);
     }
@@ -215,15 +320,19 @@ public class StreetLightParticles : MonoBehaviour
     private void LateUpdate()
     {
         if (!isShowing) return;
-        if (CentreTransform.position != _pushedCentre) PushMaterialValues();
+        Vector3 want = HasCone ? Cone.Apex : CentreTransform.position;
+        if (want != _pushedCentre) PushMaterialValues();
     }
 
     // Deliberately not a valid position, so the first push always happens.
     private Vector3 _pushedCentre = new Vector3(float.NaN, float.NaN, float.NaN);
 
     // Shader property names — these are the reference names the shader graph has to expose.
-    static readonly int CloudCentreId    = Shader.PropertyToID("_CloudCentre");
-    static readonly int CloudRadiusId    = Shader.PropertyToID("_CloudRadius");
+    static readonly int ConeApexId       = Shader.PropertyToID("_ConeApex");
+    static readonly int ConeAxisId       = Shader.PropertyToID("_ConeAxis");
+    static readonly int ConeHeightId     = Shader.PropertyToID("_ConeHeight");
+    static readonly int ConeRadiusId     = Shader.PropertyToID("_ConeBaseRadius");
+    static readonly int ConeSoftnessId   = Shader.PropertyToID("_ConeEdgeSoftness");
     static readonly int CloudFadeStartId = Shader.PropertyToID("_CloudFadeStart");
 
     static MaterialPropertyBlock block;
@@ -274,7 +383,12 @@ public class StreetLightParticles : MonoBehaviour
                           $"@1={col.color.gradient.Evaluate(1f).a:F2} " +
                           $"startAlpha={ps.main.startColor.color.a:F2}";
 
-        return $"showing={isShowing} playing={ps.isPlaying} emitting={ps.isEmitting} " +
+        string volume = _coneLength > 0f
+                      ? $"volume=cone length={_coneLength:F2} angle={ps.shape.angle:F1}deg"
+                      : $"volume=sphere r={particleRadius * fadeStart:F2} " +
+                        $"(no StreetLightCone dropped into Light Cone)";
+
+        return $"showing={isShowing} playing={ps.isPlaying} emitting={ps.isEmitting} {volume} " +
                $"alive={ps.particleCount}/{particleCount} lifetime={Lifetime:F2}s " +
                $"radius={particleRadius:F2} {ramp} {centres} material={material} " +
                $"rendererEnabled={(psRenderer != null && psRenderer.enabled)} " +
@@ -293,8 +407,7 @@ public class StreetLightParticles : MonoBehaviour
     [ContextMenu("Apply Settings To Particle System")]
     private void ApplySettingsToParticleSystem()
     {
-        ps = null;                 // force the one-time setup to run again with the current fields
-        EnsureInitialised();
+        Reapply();
         UnityEditor.EditorUtility.SetDirty(ps);
         Debug.Log($"[StreetLightParticles] '{name}' pushed its settings to the ParticleSystem " +
                   $"(count {particleCount}, radius {particleRadius}, lifetime {Lifetime:0.##}s, " +
@@ -311,6 +424,19 @@ public class StreetLightParticles : MonoBehaviour
         particleRadius  = Mathf.Max(0.0001f, particleRadius);
         driftSpeed      = Mathf.Max(0.0001f, driftSpeed);
         floatFrequency  = Mathf.Max(0.0001f, floatFrequency);
+
+        // Applied on the next tick rather than here: writing to the particle system from inside
+        // OnValidate is not allowed. This is what makes the Apply menu item unnecessary.
+        applyQueued = true;
+    }
+
+    private bool applyQueued;
+
+    private void Update()
+    {
+        if (!applyQueued) return;
+        applyQueued = false;
+        Reapply();
     }
 
     // ---- Radius gizmo -------------------------------------------------------------------------

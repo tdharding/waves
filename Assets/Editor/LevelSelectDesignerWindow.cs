@@ -278,8 +278,8 @@ public class LevelSelectDesignerWindow : EditorWindow
 
     private string GetArenaPresetName(LevelSelectDesignerData.DesignerArena arena)
     {
-        var profile = arena.gridData?.arenaProfile;
-        return profile != null ? profile.name : "None";
+        float r = arena.gridData != null ? arena.gridData.arenaRadius : 0f;
+        return r > 0f ? $"r {r:0.##}" : "None";
     }
 
     private GridData DrawGridDataPopup(string label, GridData current)

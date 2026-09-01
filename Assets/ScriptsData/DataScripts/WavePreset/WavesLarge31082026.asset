@@ -1,0 +1,100 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3e8c5527e5cf59d468851ded0a7e0ff3, type: 3}
+  m_Name: WavesLarge31082026
+  m_EditorClassIdentifier: Assembly-CSharp::WavePreset
+  state:
+    Frequency: 0.57
+    Speed: 0.13
+    RippleDepth: 0.04
+    Smoothness: 0
+    Transparency: 1
+    Strength: 0.01
+    TroughRingWave1Brightness: 1.88
+    PeakRingWave2Brightness: 8.91
+    TwirlBaseStrength: -1.01
+    TwirlSlopeBoost: -0
+    TwirlScale: 0.48
+    DepthTwirlStrength: 4.17
+    DepthFadeStrength: 1.99
+    DepthFadeLine: 1.74
+    WhirlpoolTwirlStrength: 11.52
+    WhirlpoolAreaTwirlStrength: 14.55
+    SoulFishTwirlStrength: 0.78
+    SoulFishMaskStrength: 0.028
+    SoulFishRadius: 1.49
+    SoulFishBrightness1: 2.78
+    SoulFishFadeStart: 0.073
+    SoulFishEdgeNoiseStrength: -0.06
+    SoulFishEdgeNoiseScale: 6.19
+    SoulFishEdgeNoiseScale2: 160.3
+    SoulFishEdgeNoiseSpeed: 0.25
+    SoulFishTaperStrength: 0.544
+    SoulFishTaperScale: 5.37
+    SoulFishPoolHole: 0.312
+    ZoneTiling: {x: -0.1, y: 0.29}
+    ZoneScrollSpeed: 0.015
+    ZoneNoiseStrength: 0.16
+    ZoneTexture: {fileID: 2800000, guid: 4379fff8590b78646a3dd7b4b565120e, type: 3}
+    WhirlpoolTaper: 1.49
+    WhirlpoolDarkRadiusMult: 2.25
+    WhirlpoolDarkStrength: 1
+    WhirlpoolFalloffPower: 0.23
+    RockRingStrength: 0.425
+    RockRingFrequency: 3.01
+    RockRingSpeed: 0.85
+    RockRingSpread: 1.35
+    RockRingFalloffPower: 3.085
+    RockRingLobeStrength: 0
+    RockRingRectify: 1
+    RockRingDistortStrength: 0.185
+    RockRingDistortScale: 8.11
+    RockRingWidth: 0.4
+    RockRingWidthMultiplier: 7.4
+    RockRingSoftness: 1
+    RockRingLodRadius: 5.3
+    RockRingLodFeather: 0.208
+    WaveBandAngle: 70.9
+    WaveBandFrequency: 3.4
+    WaveBandSpeed: 0.208
+    WaveBandStrength: 0.128
+    WaveBandWidth: 0.791
+    WaveBandSoftness: 1
+    WaveBandWaviness: 2.57
+    WaveBandWavinessScale: 0.12
+    WaveBandMeanderStrength: 4
+    WaveBandMeanderScale: 0.4
+    WaveBandRockDistort: 9.04
+    WaveBandRockReach: 5.74
+    WaveBandRockBevel: 1
+    WaveBandGrainStrength: 0.1
+    WaveBandGrainSize: 0.25
+    WaterlineGradientHeight: 0.3541107
+    WaterlineGradientStrength: 1
+    WaterlineGradientFalloff: 1.027
+    WaveStepRate: 4000
+    BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    LightDirection: {x: 1.85, y: -50.8, z: 54.72}
+    FoamDitherSize: 3.89
+    FoamDistanceDepth: -0.001
+    FoamDepthFade: -0.08
+    FoamColor: {r: 0.12578613, g: 0.12578613, b: 0.12578613, a: 1}
+    FoamLine: 0.005
+    DepthFade: -1.14
+    DepthColour: {r: 1, g: 1, b: 1, a: 0}
+    DistanceDepth: 0.78
+    NormalTexture: {fileID: 2800000, guid: aeb74d7691c0cd64ea8d5b9b54a45338, type: 3}
+    WaveCenter: {x: 0, y: 0, z: 0, w: 0}
+  sonarEnabled: 1
+  musicIntro: {fileID: 8300000, guid: 081a1e16b36f40b429370dd58d482701, type: 3}
+  musicLoop: {fileID: 8300000, guid: 081a1e16b36f40b429370dd58d482701, type: 3}
+  lights: []

@@ -74,11 +74,9 @@ public class GridSpawnerWindow : EditorWindow
 
         Vector3 origin = b.min;
 
-        var baselineMarker = grid.arenaProfile?.outerWallsPrefab?.GetComponentInChildren<BaselineMarker>();
-        float baselineY    = baselineMarker?.height ?? plane.position.y;
-        Quaternion baselineRot = baselineMarker != null
-            ? Quaternion.LookRotation(baselineMarker.transform.forward, Vector3.up)
-            : Quaternion.identity;
+        // Waterline is authored on the level itself now (Grid Designer > Arena).
+        float baselineY = grid != null ? grid.waterlineY : plane.position.y;
+        Quaternion baselineRot = Quaternion.identity;
 
         Transform parent = null;
 

@@ -19,7 +19,10 @@ MonoBehaviour:
   gongWavePreset: {fileID: 0}
   runtimeWavePresetOverride: {fileID: 0}
   sonarGridType: {fileID: 11400000, guid: 3be5995da1a80714985097d390d15042, type: 2}
+  fogEnabled: 1
+  fogMap: {fileID: 11400000, guid: 82606031d18b7e64e8606ecca6d9b99a, type: 2}
   enemyProfile: {fileID: 0}
+  angelPresent: 1
   isTimeTrial: 0
   timeLimitSeconds: 60
   prefabs: []
@@ -41,7 +44,9 @@ MonoBehaviour:
     nodes: 
     nodePositions:
     - {x: 0.25075546, y: -0.43257567}
-    - {x: 0.171875, y: -0.296875}
+    - {x: 0.22432025, y: -0.39082688}
+    - {x: 0.19970897, y: -0.34823045}
+    - {x: 0.17320451, y: -0.29397058}
     - {x: 0.19395483, y: -0.22065908}
     - {x: 0.21018752, y: -0.18421832}
     - {x: 0.21250646, y: -0.13088234}
@@ -57,9 +62,9 @@ MonoBehaviour:
     - {x: -0.078125, y: 0.234375}
     - {x: 0.015625, y: 0.296875}
     - {x: 0.015625, y: 0.421875}
-    - {x: -0.06595519, y: 0.49563083}
+    - {x: 0.002617982, y: 0.49999315}
     closedLoop: 0
-    segmentCurved: 010101010101010101010101010101010101
+    segmentCurved: 0101010101010101010101010101010101010101
     nodeTension:
     - 0.5
     - 0.5
@@ -79,7 +84,9 @@ MonoBehaviour:
     - 0.5
     - 0.5
     - 0.5
-    radius: 0.5
+    - 0.5
+    - 0.5
+    radius: 0.3
     pathWidth: 0.15
     knotCount: 8
     curveResolution: 6
@@ -96,11 +103,11 @@ MonoBehaviour:
     ringRadius: 0.08
     towerGuarded: 0
     streetLights:
-    - nodeIndex: 1
+    - nodeIndex: 3
       poolRadius: 1.28
-    - nodeIndex: 6
+    - nodeIndex: 8
       poolRadius: 1.96
-    - nodeIndex: 12
+    - nodeIndex: 14
       poolRadius: 1.61
   entrances:
   - id: entrance_0
@@ -121,7 +128,7 @@ MonoBehaviour:
   - id: entrance_1
     prefab: {fileID: 0}
     soulPrefab: {fileID: 0}
-    perimeterAngle: -7.58
+    perimeterAngle: 0.3
     tierSlot: -1
     spawnRadius: 0
     isLocked: 0
@@ -134,7 +141,9 @@ MonoBehaviour:
     targetIsLeftPath: 0
     targetIsRightPath: 0
   arenaWaterModifiers: []
-  orbCellIndices: 93020000
+  orbCellIndices: 
+  orbPositions:
+  - {x: 0.109375, y: -0.140625}
   waterLevelModifierCellIndices: 
   waveModifierCellIndices: 
   prefabPlacements:
@@ -147,6 +156,7 @@ MonoBehaviour:
     statueId: 0
     spikePreset: {fileID: 0}
     scale: 1
+    rotationOffset: 0
     overrideModifierSettings: 0
     speedBoost: 0
     frequencyBoost: 0
@@ -160,6 +170,49 @@ MonoBehaviour:
     statueId: 0
     spikePreset: {fileID: 0}
     scale: 1
+    rotationOffset: 0
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
+  - cellIndex: 757
+    prefab: {fileID: 1418273511501514492, guid: 6b7de786e7884364ca21be82a9629016, type: 3}
+    isCircle: 0
+    isWorldSpaceProp: 0
+    position: {x: 0.16554673, y: -0.23706774}
+    freePlaced: 1
+    statueId: 0
+    spikePreset: {fileID: 0}
+    scale: 0.09356101
+    rotationOffset: 109.5
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
+  - cellIndex: 725
+    prefab: {fileID: 1418273511501514492, guid: 6b7de786e7884364ca21be82a9629016, type: 3}
+    isCircle: 0
+    isWorldSpaceProp: 0
+    position: {x: 0.18376015, y: -0.20415431}
+    freePlaced: 1
+    statueId: 0
+    spikePreset: {fileID: 0}
+    scale: 0.09356101
+    rotationOffset: 109.5
+    overrideModifierSettings: 0
+    speedBoost: 0
+    frequencyBoost: 0
+    rippleDepthBoost: 0
+  - cellIndex: 694
+    prefab: {fileID: 1418273511501514492, guid: 6b7de786e7884364ca21be82a9629016, type: 3}
+    isCircle: 0
+    isWorldSpaceProp: 0
+    position: {x: 0.19573088, y: -0.16107537}
+    freePlaced: 1
+    statueId: 0
+    spikePreset: {fileID: 0}
+    scale: 0.09356101
+    rotationOffset: 84
     overrideModifierSettings: 0
     speedBoost: 0
     frequencyBoost: 0
@@ -172,21 +225,44 @@ MonoBehaviour:
   slotNotes:
   - 
   slotColors: []
-  arenaProfile: {fileID: 11400000, guid: 590ba1b3bf09c884c99e7e16b8011417, type: 2}
+  arenaRadius: 13.02
+  waterlineY: 0
+  arenaCentreOffset: {x: 0, y: 0}
+  mapGridTiling: {x: 1, y: 1}
+  mazeWallMarkerScale: 0.4
+  wavePlaneCoverageMultiplier: 0
+  entrancePrefabOverride: {fileID: 0}
   splineWallPaths:
-  - nodes: []
+  - nodes:
+    - {x: 0.25825688, y: -0.42840472}
+    - {x: 0.19730383, y: -0.32840985}
+    - {x: 0.19212481, y: -0.31725505}
+    - {x: 0.19929576, y: -0.30370992}
+    - {x: 0.19960156, y: -0.2892118}
+    - {x: 0.1944209, y: -0.27717933}
+    - {x: 0.18130094, y: -0.26704425}
+    - {x: 0.17011112, y: -0.2660153}
+    - {x: 0.16116442, y: -0.26815495}
+    - {x: 0.15188783, y: -0.2762213}
+    - {x: 0.1461238, y: -0.28653792}
+    - {x: 0.14595668, y: -0.30191278}
+    - {x: 0.15314275, y: -0.31361103}
+    - {x: 0.16450678, y: -0.32146558}
+    - {x: 0.17754199, y: -0.3236381}
+    - {x: 0.18296194, y: -0.33358887}
+    - {x: 0.24271983, y: -0.43836436}
     isClosed: 0
-    segmentCurved: 
-    segmentGap: 
-    segmentDestructible: 
+    segmentCurved: 00000101010101010101010101010000
+    segmentGap: 00000000000001000000000000000000
+    segmentDestructible: 00000000000000000000000000000000
     tileSpacing: 0.09
-    prefabOverride: {fileID: 7000000000000000001, guid: d287e903f8a075c418e3d937873ec0c7, type: 3}
+    prefabOverride: {fileID: 7000000000000000001, guid: 164b6801924a828438c1acca1bdfc9c8, type: 3}
     destructiblePrefabOverride: {fileID: 0}
-    wallHeight: 1
-    depthBelowWater: 7
-    wallThickness: 0.09
+    wallHeight: 0.08
+    depthBelowWater: 5
+    wallThickness: 0.02
     nodeHeights: []
-    nodeSizeScale: 1.1
+    nodeSizeScale: 1
     pathScale: 1
   cubeBuildings:
   - center: {x: 0.07539402, y: 0.24565451}
@@ -224,335 +300,928 @@ MonoBehaviour:
     preset: {fileID: 11400000, guid: e79746f2b2614a84e9e0f0d8feffa9c9, type: 2}
     scale: 1
     climbable: 0
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.024873002, y: -0.23578458}
     preset: {fileID: 11400000, guid: e79746f2b2614a84e9e0f0d8feffa9c9, type: 2}
     scale: 1.54
     climbable: 0
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: -0.024027215, y: -0.2691256}
     preset: {fileID: 11400000, guid: e79746f2b2614a84e9e0f0d8feffa9c9, type: 2}
     scale: 1.76
     climbable: 0
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: -0.07626153, y: -0.31858146}
     preset: {fileID: 11400000, guid: e79746f2b2614a84e9e0f0d8feffa9c9, type: 2}
     scale: 2.42
     climbable: 0
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.17131169, y: -0.17246638}
     preset: {fileID: 11400000, guid: c4dde6651aebdcc4380fadf9cef6cc26, type: 2}
     scale: 0.39
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.22704336, y: -0.2321686}
     preset: {fileID: 11400000, guid: c4dde6651aebdcc4380fadf9cef6cc26, type: 2}
-    scale: 0.3
+    scale: 0.51985633
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 2
+    angelLandingCurveSize: 2
+    angelTalkRadius: 2
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.20851524, y: -0.23643593}
     preset: {fileID: 11400000, guid: c4dde6651aebdcc4380fadf9cef6cc26, type: 2}
     scale: 0.3
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.22417131, y: -0.19703433}
     preset: {fileID: 11400000, guid: e79746f2b2614a84e9e0f0d8feffa9c9, type: 2}
     scale: 0.3
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.24303918, y: -0.260819}
     preset: {fileID: 11400000, guid: ef6fdf4bc4a763747b36b220c50b799f, type: 2}
     scale: 0.48
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.24161647, y: -0.13861534}
     preset: {fileID: 11400000, guid: 86d2170eb3978f64db497b2627bf11d3, type: 2}
     scale: 0.48
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.1617481, y: -0.26127353}
     preset: {fileID: 11400000, guid: 6e3f066695e6223489ce9659aaca4ed1, type: 2}
     scale: 0.3
     climbable: 0
-  - center: {x: 0.14825118, y: -0.2699654}
-    preset: {fileID: 11400000, guid: a78af7ea9ee87114f9b41cffa929ca39, type: 2}
-    scale: 0.3
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
+  - center: {x: 0.14555144, y: -0.2673733}
+    preset: {fileID: 11400000, guid: 86d2170eb3978f64db497b2627bf11d3, type: 2}
+    scale: 0.39910823
     climbable: 0
-  - center: {x: 0.1382973, y: -0.28806573}
+    angelPerchPoint: 1
+    angelPerchRadius: 2.14
+    angelLandingCurveSize: 1.27
+    angelTalkRadius: 1
+    angelPriorityPerch: 1
+    angelTalkEnabled: 1
+    angelTalkText: 'Flibberty Balderdash Scrumptious Squire, /
+
+      I see the SoulFish
+      are safe for now, /
+
+      Good luck on your quest.'
+  - center: {x: 0.13514201, y: -0.2842794}
     preset: {fileID: 11400000, guid: 6e3f066695e6223489ce9659aaca4ed1, type: 2}
-    scale: 0.3
+    scale: 0.38976145
     climbable: 0
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.18839474, y: -0.2645701}
     preset: {fileID: 11400000, guid: c4dde6651aebdcc4380fadf9cef6cc26, type: 2}
     scale: 0.2
     climbable: 0
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.22042933, y: -0.26784685}
     preset: {fileID: 11400000, guid: a78af7ea9ee87114f9b41cffa929ca39, type: 2}
     scale: 0.2
     climbable: 0
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.11363237, y: -0.2195815}
     preset: {fileID: 11400000, guid: 6e3f066695e6223489ce9659aaca4ed1, type: 2}
     scale: 0.76
     climbable: 0
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.20408295, y: -0.27979118}
     preset: {fileID: 11400000, guid: c4dde6651aebdcc4380fadf9cef6cc26, type: 2}
     scale: 0.2
     climbable: 0
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.22469988, y: -0.29021296}
     preset: {fileID: 11400000, guid: 46649b775a5024b449990d984d88d03b, type: 2}
     scale: 0.3257218
     climbable: 0
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.20775573, y: -0.29332656}
     preset: {fileID: 11400000, guid: e79746f2b2614a84e9e0f0d8feffa9c9, type: 2}
     scale: 0.24913508
     climbable: 0
-  - center: {x: 0.20136534, y: -0.31588843}
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
+  - center: {x: 0.2064138, y: -0.31494185}
     preset: {fileID: 11400000, guid: c4dde6651aebdcc4380fadf9cef6cc26, type: 2}
-    scale: 0.2
+    scale: 0.27884686
     climbable: 0
-  - center: {x: 0.174975, y: -0.33416483}
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
+  - center: {x: 0.17408955, y: -0.33623084}
     preset: {fileID: 11400000, guid: c4dde6651aebdcc4380fadf9cef6cc26, type: 2}
-    scale: 0.2
+    scale: 0.22548251
     climbable: 0
-  - center: {x: 0.16009867, y: -0.3316375}
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
+  - center: {x: 0.15694338, y: -0.3338462}
     preset: {fileID: 11400000, guid: a78af7ea9ee87114f9b41cffa929ca39, type: 2}
-    scale: 0.2
+    scale: 0.47576225
     climbable: 0
-  - center: {x: 0.14683099, y: -0.32311884}
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
+  - center: {x: 0.1462407, y: -0.32267612}
     preset: {fileID: 11400000, guid: 6e3f066695e6223489ce9659aaca4ed1, type: 2}
-    scale: 0.3
+    scale: 0.38430396
     climbable: 0
-  - center: {x: 0.13774718, y: -0.30747443}
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
+  - center: {x: 0.13730447, y: -0.305556}
     preset: {fileID: 11400000, guid: 86d2170eb3978f64db497b2627bf11d3, type: 2}
-    scale: 0.3
+    scale: 0.38430396
     climbable: 0
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.16027586, y: -0.3706964}
     preset: {fileID: 11400000, guid: a78af7ea9ee87114f9b41cffa929ca39, type: 2}
     scale: 0.2
     climbable: 0
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.20252122, y: -0.38863623}
     preset: {fileID: 11400000, guid: a78af7ea9ee87114f9b41cffa929ca39, type: 2}
     scale: 0.2
     climbable: 0
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.21062309, y: -0.4265413}
     preset: {fileID: 11400000, guid: a78af7ea9ee87114f9b41cffa929ca39, type: 2}
     scale: 0.2
     climbable: 0
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.23608606, y: -0.322664}
     preset: {fileID: 11400000, guid: a78af7ea9ee87114f9b41cffa929ca39, type: 2}
     scale: 0.2
     climbable: 0
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.30292633, y: -0.3756154}
     preset: {fileID: 11400000, guid: a78af7ea9ee87114f9b41cffa929ca39, type: 2}
     scale: 0.2
     climbable: 0
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.24708141, y: -0.3602797}
     preset: {fileID: 11400000, guid: a78af7ea9ee87114f9b41cffa929ca39, type: 2}
     scale: 0.2
     climbable: 0
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.10414161, y: -0.29835844}
     preset: {fileID: 11400000, guid: a78af7ea9ee87114f9b41cffa929ca39, type: 2}
     scale: 0.2
     climbable: 0
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.11282216, y: -0.25379825}
     preset: {fileID: 11400000, guid: 6e3f066695e6223489ce9659aaca4ed1, type: 2}
     scale: 0.3
     climbable: 0
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.076942526, y: -0.2630575}
     preset: {fileID: 11400000, guid: 6e3f066695e6223489ce9659aaca4ed1, type: 2}
     scale: 0.3
     climbable: 0
-  - center: {x: 0.16294184, y: -0.24187927}
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
+  - center: {x: 0.15542258, y: -0.22312208}
     preset: {fileID: 11400000, guid: c4dde6651aebdcc4380fadf9cef6cc26, type: 2}
     scale: 0.2
     climbable: 1
-  - center: {x: 0.1720219, y: -0.21953}
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
+  - center: {x: 0.17162554, y: -0.21279186}
     preset: {fileID: 11400000, guid: 46649b775a5024b449990d984d88d03b, type: 2}
     scale: 0.36
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.1853202, y: -0.19316198}
     preset: {fileID: 11400000, guid: 46649b775a5024b449990d984d88d03b, type: 2}
     scale: 0.4388615
     climbable: 1
-  - center: {x: 0.19420944, y: -0.16521373}
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
+  - center: {x: 0.15915798, y: -0.12603855}
     preset: {fileID: 11400000, guid: 46649b775a5024b449990d984d88d03b, type: 2}
     scale: 0.36
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.19297513, y: -0.13972875}
     preset: {fileID: 11400000, guid: 46649b775a5024b449990d984d88d03b, type: 2}
     scale: 0.36
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.23956205, y: -0.18098225}
     preset: {fileID: 11400000, guid: 46649b775a5024b449990d984d88d03b, type: 2}
     scale: 0.36
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.23011748, y: -0.12225114}
     preset: {fileID: 11400000, guid: 46649b775a5024b449990d984d88d03b, type: 2}
     scale: 0.36
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.22837308, y: -0.15895337}
     preset: {fileID: 11400000, guid: 46649b775a5024b449990d984d88d03b, type: 2}
     scale: 0.36
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.21707173, y: -0.21661927}
     preset: {fileID: 11400000, guid: 46649b775a5024b449990d984d88d03b, type: 2}
     scale: 0.36
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.22143833, y: -0.10748716}
     preset: {fileID: 11400000, guid: a78af7ea9ee87114f9b41cffa929ca39, type: 2}
     scale: 0.48379
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.18687986, y: -0.11704281}
     preset: {fileID: 11400000, guid: e79746f2b2614a84e9e0f0d8feffa9c9, type: 2}
     scale: 0.3
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.1772818, y: -0.09662186}
     preset: {fileID: 11400000, guid: e79746f2b2614a84e9e0f0d8feffa9c9, type: 2}
     scale: 0.3
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.15428458, y: -0.08553032}
     preset: {fileID: 11400000, guid: e79746f2b2614a84e9e0f0d8feffa9c9, type: 2}
     scale: 0.3
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.21232657, y: -0.09228209}
     preset: {fileID: 11400000, guid: e79746f2b2614a84e9e0f0d8feffa9c9, type: 2}
     scale: 0.3
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.20102496, y: -0.073782496}
     preset: {fileID: 11400000, guid: e79746f2b2614a84e9e0f0d8feffa9c9, type: 2}
     scale: 0.3
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.19466546, y: -0.05530584}
     preset: {fileID: 11400000, guid: e79746f2b2614a84e9e0f0d8feffa9c9, type: 2}
     scale: 0.3
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.16182011, y: -0.06784266}
     preset: {fileID: 11400000, guid: e79746f2b2614a84e9e0f0d8feffa9c9, type: 2}
     scale: 0.3
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.13854748, y: -0.05429865}
     preset: {fileID: 11400000, guid: e79746f2b2614a84e9e0f0d8feffa9c9, type: 2}
     scale: 0.3
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.12465547, y: -0.03392336}
     preset: {fileID: 11400000, guid: e79746f2b2614a84e9e0f0d8feffa9c9, type: 2}
     scale: 0.39191893
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.121201426, y: -0.01459564}
     preset: {fileID: 11400000, guid: e79746f2b2614a84e9e0f0d8feffa9c9, type: 2}
     scale: 0.3
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.13026616, y: 0.00921775}
     preset: {fileID: 11400000, guid: e79746f2b2614a84e9e0f0d8feffa9c9, type: 2}
     scale: 0.3
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.14187697, y: 0.026219582}
     preset: {fileID: 11400000, guid: e79746f2b2614a84e9e0f0d8feffa9c9, type: 2}
     scale: 0.3
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.16729973, y: 0.03318894}
     preset: {fileID: 11400000, guid: e79746f2b2614a84e9e0f0d8feffa9c9, type: 2}
     scale: 0.3
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.19018692, y: 0.028790526}
     preset: {fileID: 11400000, guid: e79746f2b2614a84e9e0f0d8feffa9c9, type: 2}
     scale: 0.3
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.21102026, y: 0.017071776}
     preset: {fileID: 11400000, guid: e79746f2b2614a84e9e0f0d8feffa9c9, type: 2}
     scale: 0.3
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.22009332, y: 0.0019970788}
     preset: {fileID: 11400000, guid: e79746f2b2614a84e9e0f0d8feffa9c9, type: 2}
     scale: 0.3
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.22080989, y: -0.017077696}
     preset: {fileID: 11400000, guid: e79746f2b2614a84e9e0f0d8feffa9c9, type: 2}
     scale: 0.41862372
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.21374436, y: -0.03920993}
     preset: {fileID: 11400000, guid: e79746f2b2614a84e9e0f0d8feffa9c9, type: 2}
     scale: 0.3
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.15213963, y: -0.14336488}
     preset: {fileID: 11400000, guid: c4dde6651aebdcc4380fadf9cef6cc26, type: 2}
     scale: 0.39
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.1738288, y: -0.12683073}
     preset: {fileID: 11400000, guid: e79746f2b2614a84e9e0f0d8feffa9c9, type: 2}
     scale: 0.3
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.15894413, y: -0.19293493}
     preset: {fileID: 11400000, guid: c4dde6651aebdcc4380fadf9cef6cc26, type: 2}
     scale: 0.3
     climbable: 1
-  - center: {x: 0.1432684, y: -0.21209414}
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
+  - center: {x: 0.14723201, y: -0.20892325}
     preset: {fileID: 11400000, guid: c4dde6651aebdcc4380fadf9cef6cc26, type: 2}
     scale: 0.3
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.14370385, y: -0.17029223}
     preset: {fileID: 11400000, guid: c4dde6651aebdcc4380fadf9cef6cc26, type: 2}
     scale: 0.3
     climbable: 1
-  - center: {x: 0.12933443, y: -0.18596795}
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
+  - center: {x: 0.12990014, y: -0.15419635}
     preset: {fileID: 11400000, guid: c4dde6651aebdcc4380fadf9cef6cc26, type: 2}
-    scale: 0.3
-    climbable: 1
+    scale: 0.78061724
+    climbable: 0
+    angelPerchPoint: 1
+    angelPerchRadius: 2
+    angelLandingCurveSize: 2
+    angelTalkRadius: 2
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.13938232, y: -0.09858472}
     preset: {fileID: 11400000, guid: e79746f2b2614a84e9e0f0d8feffa9c9, type: 2}
     scale: 0.41658917
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.12396556, y: -0.07537336}
     preset: {fileID: 11400000, guid: c4dde6651aebdcc4380fadf9cef6cc26, type: 2}
     scale: 0.48379
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.21045035, y: -0.25528675}
     preset: {fileID: 11400000, guid: c4dde6651aebdcc4380fadf9cef6cc26, type: 2}
     scale: 0.3
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.10394931, y: -0.2742171}
     preset: {fileID: 11400000, guid: ef6fdf4bc4a763747b36b220c50b799f, type: 2}
-    scale: 0.48
+    scale: 0.47999993
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 2
+    angelLandingCurveSize: 2
+    angelTalkRadius: 1
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.0695927, y: -0.3152108}
     preset: {fileID: 11400000, guid: ef6fdf4bc4a763747b36b220c50b799f, type: 2}
     scale: 0.48
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.11917554, y: -0.34058782}
     preset: {fileID: 11400000, guid: ef6fdf4bc4a763747b36b220c50b799f, type: 2}
     scale: 0.5849182
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.051334243, y: -0.36789733}
     preset: {fileID: 11400000, guid: ef6fdf4bc4a763747b36b220c50b799f, type: 2}
     scale: 0.5849182
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.01579111, y: -0.31174946}
     preset: {fileID: 11400000, guid: ef6fdf4bc4a763747b36b220c50b799f, type: 2}
     scale: 0.5849182
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.15487294, y: -0.10776279}
     preset: {fileID: 11400000, guid: ef6fdf4bc4a763747b36b220c50b799f, type: 2}
     scale: 0.5849182
     climbable: 0
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.105421625, y: -0.18606071}
     preset: {fileID: 11400000, guid: ef6fdf4bc4a763747b36b220c50b799f, type: 2}
     scale: 0.5849182
     climbable: 0
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.22108532, y: -0.06287846}
     preset: {fileID: 11400000, guid: a78af7ea9ee87114f9b41cffa929ca39, type: 2}
     scale: 0.48379
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.136606, y: -0.1216019}
     preset: {fileID: 11400000, guid: a78af7ea9ee87114f9b41cffa929ca39, type: 2}
     scale: 0.48379
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.23705399, y: -0.07627153}
     preset: {fileID: 11400000, guid: 86d2170eb3978f64db497b2627bf11d3, type: 2}
     scale: 0.48
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.26435524, y: -0.105118126}
     preset: {fileID: 11400000, guid: 86d2170eb3978f64db497b2627bf11d3, type: 2}
     scale: 0.48
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.23962958, y: -0.09687624}
     preset: {fileID: 11400000, guid: 86d2170eb3978f64db497b2627bf11d3, type: 2}
     scale: 0.48
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.22978503, y: -0.24813208}
     preset: {fileID: 11400000, guid: 46649b775a5024b449990d984d88d03b, type: 2}
     scale: 0.36
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 
   - center: {x: 0.13786225, y: -0.24381801}
     preset: {fileID: 11400000, guid: 46649b775a5024b449990d984d88d03b, type: 2}
     scale: 0.7024124
     climbable: 1
+    angelPerchPoint: 0
+    angelPerchRadius: 12
+    angelLandingCurveSize: 2
+    angelTalkRadius: 4
+    angelPriorityPerch: 0
+    angelTalkEnabled: 0
+    angelTalkText: 

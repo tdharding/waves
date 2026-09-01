@@ -288,11 +288,13 @@ MonoBehaviour:
     - nodeId: ed6a26f4-1b0d-40a4-ac17-43bc986d2827
       entranceIndex: 3
   - nodeId: edfdd305-ee3a-4542-ba2e-05f1dc9a9fb9
-    gridData: {fileID: 11400000, guid: 7f67e16e8af8b6b4cbaf779cab9aa6bd, type: 2}
+    gridData: {fileID: 11400000, guid: eb75fb83b696e994fb99a1eeac0fa753, type: 2}
     entranceIndex: 0
     arenaPrefabOverride: {fileID: 0}
     arenaRadius: 6.38
-    secondaryEntrances: []
+    secondaryEntrances:
+    - nodeId: 8af9fd2a-f92f-42b9-8620-c22ee58bce6e
+      entranceIndex: 1
   junctionScriptObject: {fileID: 3543737601092306643, guid: cdc03d5a67a4c8a4ca447c17a1a65a6b, type: 3}
   junctionPrefab: {fileID: 3543737601092306643, guid: cdc03d5a67a4c8a4ca447c17a1a65a6b, type: 3}
   junctionRightFacingPrefab: {fileID: 1054175076011857233, guid: 08a0e3b54a9037545a500567ad11a7af, type: 3}

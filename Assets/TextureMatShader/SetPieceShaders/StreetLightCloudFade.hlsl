@@ -1,41 +1,75 @@
 #ifndef STREETLIGHT_CLOUD_FADE_INCLUDED
 #define STREETLIGHT_CLOUD_FADE_INCLUDED
 
-// Everything a street light's particle cloud needs from its material: the quads fade out at the
-// edge of the lamp's radius, keep the particle system's own colour and lifetime ramps, and come out
-// dithered so they can be drawn with alpha clipping rather than blended transparency.
+// Everything a street light's particle cloud needs from its material: the quads sit inside the
+// lamp's shaft of light, fade out at its walls and towards its far end, keep the particle system's
+// own colour and lifetime ramps, and come out dithered so they can be drawn with alpha clipping
+// rather than blended transparency.
 //
-// StreetLightParticles pushes CloudCentre, CloudRadius and CloudFadeStart onto the renderer through
-// a MaterialPropertyBlock, so every lamp shares one material and still fades around its own centre.
-// The particle's own colour arrives as vertex colour and is read inside the subgraph, so nothing
-// using this has to know that.
+// StreetLightParticles reads the shaft off the StreetLightCone dropped into it and pushes it here
+// through a MaterialPropertyBlock, so every lamp shares one material and still fades around its own
+// cone. Both the emitter and this fade take their numbers from that one component, so the quads
+// cannot drift out of the shape you can see in the scene.
 //
-//   Colour — the particle's tint. Straight into Base Color.
-//   Alpha  — the dithered value. Into the Alpha block, with Alpha Clip Threshold at 0: the
-//            threshold is already subtracted here, so anything below zero is meant to clip.
-//   Fade   — the raw 0..1 falloff, undithered, for a transparent material instead.
+// With no cone dropped in, ConeHeight arrives as 0 and this falls back to a plain radial fade
+// around the apex, ConeBaseRadius standing in as the cloud's radius.
+//
+//   Colour   - the particle's tint. Straight into Base Color.
+//   Alpha    - the dithered value. Into the Alpha block, with Alpha Clip Threshold at 0: the
+//              threshold is already subtracted here, so anything below zero is meant to clip.
+//   Fade     - the same falloff undithered, for a transparent material instead.
 void StreetLightCloudFade_float(
     float3 WorldPosition,
-    float3 CloudCentre,
-    float  CloudRadius,
-    float  CloudFadeStart,
+    float3 ConeApex,
+    float3 ConeAxis,
+    float  ConeHeight,
+    float  ConeBaseRadius,
+    float  ConeEdgeSoftness,
+    float  FadeStart,
     float4 VertexColour,
     float4 ScreenPosition,
     out float3 Colour,
     out float  Alpha,
     out float  Fade)
 {
-    // Distance out from the lamp, against the two radii the fade runs between. The inner edge is
-    // held just below the outer one so a fade start of 1 cannot collapse the smoothstep.
-    float dist  = distance(WorldPosition, CloudCentre);
-    float outer = max(CloudRadius, 1e-4);
-    float inner = min(outer * saturate(CloudFadeStart), outer - 1e-4);
+    float3 fromApex = WorldPosition - ConeApex;
 
-    // 1 through the middle of the cloud, easing to 0 exactly at the radius.
-    Fade = 1.0 - smoothstep(inner, outer, dist);
+    if (ConeHeight > 1e-4)
+    {
+        float3 axis = normalize(ConeAxis);
+
+        // Split the offset into how far down the shaft the quad is and how far off its centre line.
+        float  along  = dot(fromApex, axis);
+        float  radial = length(fromApex - axis * along);
+
+        float  t      = saturate(along / ConeHeight);
+        float  wall   = max(ConeBaseRadius * t, 1e-4);   // the shaft's width at this height
+
+        // Across the shaft: full strength down the middle, easing off before the wall so the cloud
+        // has no hard rim. Softness is a fraction of the width here, so the feather narrows towards
+        // the tip along with the cone itself.
+        float  inner  = wall * (1.0 - saturate(ConeEdgeSoftness));
+        float  across = 1.0 - smoothstep(inner, wall, radial);
+
+        // Along the shaft: held bright near the lamp, thinning towards where it lands, and cut off
+        // behind the bulb so nothing shows above the lamp.
+        float  hold   = saturate(FadeStart);
+        float  down   = 1.0 - smoothstep(hold, 1.0, t);
+        float  infront = step(0.0, along);
+
+        Fade = across * down * infront;
+    }
+    else
+    {
+        // No shaft: fade out at ConeBaseRadius from the apex, holding full strength to FadeStart.
+        float dist  = length(fromApex);
+        float outer = max(ConeBaseRadius, 1e-4);
+        float inner = min(outer * saturate(FadeStart), outer - 1e-4);
+        Fade = 1.0 - smoothstep(inner, outer, dist);
+    }
 
     // Vertex colour is the particle system's own: start colour x colour over lifetime, which is
-    // where the fade in and the birth and death ramps live. Its alpha multiplies the radius fade.
+    // where the fade in and the birth and death ramps live.
     Colour = VertexColour.rgb;
     float a = saturate(Fade * VertexColour.a);
 

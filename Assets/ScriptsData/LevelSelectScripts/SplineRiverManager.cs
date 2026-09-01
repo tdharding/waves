@@ -723,6 +723,15 @@ private IEnumerator AnimateMainExtrude(float target)
         return Mathf.Clamp01(t);
     }
 
+    public void ForceJumpExtrudeToT(float t)
+    {
+        _mainCurrentT = Mathf.Clamp01(t);
+        ApplyMainExtrude(_mainCurrentT);
+        RestoreExitUnlocked();
+        UpdateBranchStates(true);
+        UpdateBarriers();
+    }
+
 #if UNITY_EDITOR
     // ─────────────────────────────────────────────────────────────
     // Editor simulation API
@@ -741,14 +750,6 @@ private IEnumerator AnimateMainExtrude(float target)
         public SplineContainer Container;
     }
 
-    public void ForceJumpExtrudeToT(float t)
-    {
-        _mainCurrentT = Mathf.Clamp01(t);
-        ApplyMainExtrude(_mainCurrentT);
-        RestoreExitUnlocked();
-        UpdateBranchStates(true);
-        UpdateBarriers();
-    }
 
     public void Editor_SetMainExtrudeT(float t)
     {

@@ -25,6 +25,7 @@ class GridSnapshot
     public List<GridData.SplineWallPath> splineWallPaths;
     public List<GridData.CubeBuilding>   cubeBuildings;
     public List<GridData.ProceduralSpike> proceduralSpikes;
+    public List<UnityEngine.Vector2>     orbPositions;   // free-positioned orbs (set after construction)
 
     public GridSnapshot(int[] square, int[] circle,
                         List<GridData.ArenaEntrance> ents,
@@ -121,6 +122,7 @@ class GridSnapshot
                 isCircle                 = p.isCircle,
                 isWorldSpaceProp         = p.isWorldSpaceProp,
                 scale                    = p.scale,
+                rotationOffset           = p.rotationOffset,
                 spikePreset              = p.spikePreset,
                 statueId                 = p.statueId,
                 overrideModifierSettings = p.overrideModifierSettings,
@@ -235,10 +237,17 @@ class GridSnapshot
         foreach (var s in src)
             copy.Add(s == null ? null : new GridData.ProceduralSpike
             {
-                center    = s.center,
-                preset    = s.preset,
-                scale     = s.scale,
-                climbable = s.climbable,
+                center          = s.center,
+                preset          = s.preset,
+                scale           = s.scale,
+                climbable       = s.climbable,
+                angelPerchPoint = s.angelPerchPoint,
+                angelPerchRadius   = s.angelPerchRadius,
+                angelLandingCurveSize = s.angelLandingCurveSize,
+                angelTalkRadius    = s.angelTalkRadius,
+                angelPriorityPerch = s.angelPriorityPerch,
+                angelTalkEnabled   = s.angelTalkEnabled,
+                angelTalkText      = s.angelTalkText,
             });
         return copy;
     }
@@ -361,6 +370,11 @@ public class GridDesignerWindow : EditorWindow
     string                        prefabFolderPath    = "Assets/Prefab/MazePieces";
     string                        iconsFolderPath     = "";
     List<GameObject>              scannedPrefabs      = new List<GameObject>();
+    // Prefab library for the spline-wall Type dropdown — every prefab in this folder is an option.
+    const string                  SplineWallPrefabFolder = "Assets/Prefab/SplineWallPrefabs";
+    // NonSerialized so it resets to null across domain reloads — an EditorWindow deserializes a
+    // plain List field as an empty (non-null) list, which would defeat a null-guarded cache.
+    [System.NonSerialized] List<GameObject> _splineWallPrefabOptions;
     Dictionary<string, Texture2D> prefabIcons         = new Dictionary<string, Texture2D>();
     // Caches the PrefabBaselineAlignment component per prefab asset so the scale-radius
     // overlay does not run GetComponentInChildren every repaint.
@@ -394,6 +408,7 @@ public class GridDesignerWindow : EditorWindow
 
     bool showEnemies       = true;
     bool showCreeperRoutes = true;
+    bool showPerchPoints   = false;   // show every angel perch's ranges, any tool
 
     Dictionary<GameObject, bool>      _climbingRockCache = new Dictionary<GameObject, bool>();
     Dictionary<GameObject, bool>      _badGuyPrefabCache = new Dictionary<GameObject, bool>();
@@ -438,6 +453,8 @@ public class GridDesignerWindow : EditorWindow
     bool    _drawSpike           = false;
     bool    _showSpikes          = false;  // foldout collapsed by default
     int     _activeSpikeIndex    = -1;   // selected/active spike, edited in the panel
+    int     _activeOrbIndex      = -1;   // selected/active free orb (Select tool)
+    int     _dragOrbIndex        = -1;   // orb being dragged
     bool    _isDraggingSpike     = false; // click-drag from centre outward, sizing a new spike
     Vector2 _spikeDragStartNorm  = Vector2.zero;
     Vector2 _spikeDragCurrentNorm = Vector2.zero;
@@ -480,10 +497,10 @@ public class GridDesignerWindow : EditorWindow
     int   _spikeDisplayResolution = 8;
     // Radius of the orb cell marker, as a fraction of a grid cell.
     float _orbCircleFactor = 0.35f;
-    // When true (default), a newly drawn object snaps to the centre of the cell under the pointer;
-    // when false it drops at the exact pointer position (free placement). Applies to every drawn
-    // instance, not just prefabs.
-    bool  _clampToCellWhenDrawing = true;
+    // When true, a newly drawn object snaps to the centre of the cell under the pointer; when false
+    // (default) it drops at the exact pointer position (free placement). Applies to every drawn
+    // instance — prefab-library drops, soul-zone nodes, etc.
+    bool  _clampToCellWhenDrawing = false;
     // The pointer position (normalised grid space) captured on the click/drag that placed a prefab,
     // used as the drop point when cell clamping is off.
     Vector2 _drawPointerNorm;
@@ -505,7 +522,9 @@ public class GridDesignerWindow : EditorWindow
     bool _showCamera         = true;
     bool _showWavePresets    = true;
     bool _showSonarGrid      = true;
+    bool _showFog = true;
     bool _showEnemy          = true;
+    bool _showAngel          = true;
     bool _showTimeTrial      = false;
     bool _showPrefabs        = false;
     bool _showStartRitual    = false;
@@ -552,7 +571,7 @@ public class GridDesignerWindow : EditorWindow
         _selectionCircleFactor  = EditorPrefs.GetFloat(PrefKeySelectionCircle, 0.32f);
         _spikeDisplayResolution = EditorPrefs.GetInt(PrefKeySpikeResolution,   8);
         _orbCircleFactor        = EditorPrefs.GetFloat(PrefKeyOrbSize,         0.35f);
-        _clampToCellWhenDrawing = EditorPrefs.GetBool(PrefKeyClampToCell,      true);
+        _clampToCellWhenDrawing = EditorPrefs.GetBool(PrefKeyClampToCell,      false);
         string styleJson = EditorPrefs.GetString(PrefKeyStyle, "");
         if (!string.IsNullOrEmpty(styleJson))
             try { JsonUtility.FromJsonOverwrite(styleJson, _style); } catch { /* keep defaults on bad data */ }
@@ -584,6 +603,8 @@ public class GridDesignerWindow : EditorWindow
         snap.splineWallPaths     = GridSnapshot.CopySplineWalls(loadedData?.splineWallPaths);
         snap.cubeBuildings       = GridSnapshot.CopyCubeBuildings(loadedData?.cubeBuildings);
         snap.proceduralSpikes    = GridSnapshot.CopySpikes(loadedData?.proceduralSpikes);
+        snap.orbPositions        = loadedData?.orbPositions != null
+                                   ? new List<Vector2>(loadedData.orbPositions) : new List<Vector2>();
         undoStack.Push(snap);
         if (undoStack.Count > MaxUndoSteps) undoStack.TrimExcess();
     }
@@ -599,6 +620,8 @@ public class GridDesignerWindow : EditorWindow
             loadedData.entrances      = snapshot.entrances ?? new List<GridData.ArenaEntrance>();
             loadedData.arenaWaterModifiers = GridSnapshot.CopyWaterMods(snapshot.arenaWaterModifiers);
             loadedData.orbCellIndices = new List<int>(snapshot.orbIndices);
+            loadedData.orbPositions   = snapshot.orbPositions != null
+                                        ? new List<Vector2>(snapshot.orbPositions) : new List<Vector2>();
             loadedData.waterLevelModifierCellIndices = new List<int>(snapshot.waterLevelModifierIndices);
             loadedData.waveModifierCellIndices       = new List<int>(snapshot.waveModifierIndices);
             
@@ -830,6 +853,18 @@ public class GridDesignerWindow : EditorWindow
                 e.Use(); Repaint(); return;
             }
 
+            // A free orb picked with the Select tool is tracked by _activeOrbIndex — same rule.
+            if (delete && _currentSelection.type == SelectionType.None
+                && _activeOrbIndex >= 0 && loadedData.orbPositions != null
+                && _activeOrbIndex < loadedData.orbPositions.Count)
+            {
+                Undo.RecordObject(loadedData, "Delete Orb");
+                loadedData.orbPositions.RemoveAt(_activeOrbIndex);
+                _activeOrbIndex = -1;
+                EditorUtility.SetDirty(loadedData);
+                e.Use(); Repaint(); return;
+            }
+
             if (delete && _currentSelection.type != SelectionType.None)
             {
                 Undo.RecordObject(loadedData, "Delete Selection");
@@ -940,8 +975,8 @@ public class GridDesignerWindow : EditorWindow
 
         SetToolbarButton("⊕ Select",  drawSelect,    new Color(0.4f,0.8f,1f),  () => { activeSlot = -1; _drawSplineWall = false; _drawCubeBuilding = false; _drawSpike = false; drawSelect = true; drawSoulArea = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false; });
         SetToolbarButton("★ Soul",    drawSoulArea,  Color.yellow,             () => { activeSlot = -1; _drawSplineWall = false; _drawCubeBuilding = false; _drawSpike = false; drawSoulArea = true; drawSelect = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = false; ClearSelectState(); LogSelection(_currentSelection); });
-        SetToolbarButton("◎ Orb",     drawOrb,       Color.white,              () => { activeSlot = -1; _drawSplineWall = false; _drawCubeBuilding = false; _drawSpike = false; drawOrb = true; drawCircle = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = false; });
-        SetToolbarButton("〇 Whirl",  drawWhirlpool, new Color(0.7f,0.4f,1f), () => { activeSlot = -1; _drawSplineWall = false; _drawCubeBuilding = false; _drawSpike = false; drawWhirlpool = true; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = false; });
+        SetToolbarButton("◎ Orb",     drawOrb,       Color.white,              () => { activeSlot = -1; _drawSplineWall = false; _drawCubeBuilding = false; _drawSpike = false; drawOrb = true; drawCircle = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = false; ClearSelectState(); });
+        SetToolbarButton("〇 Whirl",  drawWhirlpool, new Color(0.7f,0.4f,1f), () => { activeSlot = -1; _drawSplineWall = false; _drawCubeBuilding = false; _drawSpike = false; drawWhirlpool = true; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = false; ClearSelectState(); });
         SetToolbarButton("✕ Eraser", activeSlot == 0, new Color(1f,0.5f,0.5f), () => { activeSlot = 0; _drawSplineWall = false; _drawCubeBuilding = false; _drawSpike = false; drawCircle = drawOrb = drawSoul = drawSoulArea = drawWaterLevelModifier = drawWaveModifier = drawWhirlpool = drawDirectPrefab = drawSelect = false; ClearSelectState(); LogSelection(_currentSelection); _isWaitingForTubePlacement = false; });
         SetToolbarButton("≋ Walls",  _drawSplineWall, new Color(1f,0.7f,0.2f), () => { activeSlot = -1; _drawSplineWall = true; _drawCubeBuilding = false; _drawSpike = false; drawSelect = drawSoulArea = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = drawDirectPrefab = false; ClearSelectState(); _isWaitingForTubePlacement = false; });
         SetToolbarButton("▦ Blocks", _drawCubeBuilding, new Color(0.55f,0.55f,0.6f), () => { activeSlot = -1; _drawCubeBuilding = true; _drawSpike = false; _drawSplineWall = false; drawSelect = drawSoulArea = drawSoul = drawCircle = drawOrb = drawWhirlpool = drawWaterLevelModifier = drawWaveModifier = drawDirectPrefab = false; ClearSelectState(); _isWaitingForTubePlacement = false; });
@@ -1119,11 +1154,9 @@ public class GridDesignerWindow : EditorWindow
     void DrawLeftPanel()
     {
         EditorGUILayout.BeginVertical(GUILayout.Width(_leftPanelWidth));
-        _leftPanelScroll = EditorGUILayout.BeginScrollView(_leftPanelScroll,
-            GUILayout.Width(_leftPanelWidth), GUILayout.ExpandHeight(true));
         EnsureSlotCapacity(GetMaxSlotUsed());
 
-        // ── Level file operations (top of panel) ────────────────────────────
+        // ── Level file operations — FIXED header, pinned above the scroll so it never scrolls away ──
         EditorGUILayout.LabelField("Existing Levels", EditorStyles.boldLabel);
         if (discoveredGrids.Count > 0)
         {
@@ -1140,6 +1173,10 @@ public class GridDesignerWindow : EditorWindow
         EditorGUILayout.Space();
         DrawButtons();
         EditorGUILayout.Space();
+
+        // ── Everything below scrolls ──
+        _leftPanelScroll = EditorGUILayout.BeginScrollView(_leftPanelScroll,
+            GUILayout.Width(_leftPanelWidth), GUILayout.ExpandHeight(true));
 
         if (loadedData != null) DrawLevelIdentitySection();
 
@@ -1233,43 +1270,75 @@ public class GridDesignerWindow : EditorWindow
 
         if (loadedData != null)
         {
+            // The arena is authored here now. ArenaProfile is gone: it only ever existed to
+            // pick between a few fixed sizes and the wall prefab, tiling and marker scales each
+            // size needed. ArenaWallsGenerator builds any size, so the level owns these directly
+            // and the walls prefab is a single slot on LevelSpawner.
             EditorGUI.BeginChangeCheck();
-            ArenaProfile newProfile = (ArenaProfile)EditorGUILayout.ObjectField(
-                "Arena Profile", loadedData.arenaProfile, typeof(ArenaProfile), false);
+
+            float newRadius = EditorGUILayout.FloatField(
+                new GUIContent("Arena Radius", "World-units from the arena centre to the inside face of the wall. " +
+                                               "The arena walls generator builds the boundary to this, and the wave " +
+                                               "and sonar masks cover the water inside it."),
+                loadedData.arenaRadius);
+
+            float newWaterY = EditorGUILayout.FloatField(
+                new GUIContent("Waterline Y", "Absolute world Y of the waterline the walls rise from. " +
+                                              "Also the base height every tier-aligned prefab is placed against."),
+                loadedData.waterlineY);
+
+            Vector2 newCentre = EditorGUILayout.Vector2Field(
+                new GUIContent("Centre Offset", "XZ offset of the arena centre from world origin. X = world X, Y = world Z."),
+                loadedData.arenaCentreOffset);
+
+            Vector2 newTiling = EditorGUILayout.Vector2Field(
+                new GUIContent("Map Grid Tiling", "Tiling of the map grid material. Match to the arena size."),
+                loadedData.mapGridTiling);
+
+            float newMarkerScale = EditorGUILayout.FloatField(
+                new GUIContent("Map Marker Scale", "Scale applied to all maze wall map markers on this level."),
+                loadedData.mazeWallMarkerScale);
+
+            float newCoverage = EditorGUILayout.FloatField(
+                new GUIContent("Wave Plane Coverage", "How much larger the wave plane is than the arena diameter (e.g. 1.5)."),
+                loadedData.wavePlaneCoverageMultiplier);
+
+            GameObject newEntrance = (GameObject)EditorGUILayout.ObjectField(
+                new GUIContent("Entrance Override", "When set, overrides the prefab on every arena entrance in this level."),
+                loadedData.entrancePrefabOverride, typeof(GameObject), false);
+
             if (EditorGUI.EndChangeCheck())
             {
-                Undo.RecordObject(loadedData, "Change Arena Profile");
-                loadedData.arenaProfile = newProfile;
+                Undo.RecordObject(loadedData, "Edit Arena");
+                loadedData.arenaRadius                = Mathf.Max(0f, newRadius);
+                loadedData.waterlineY                 = newWaterY;
+                loadedData.arenaCentreOffset          = newCentre;
+                loadedData.mapGridTiling              = newTiling;
+                loadedData.mazeWallMarkerScale        = newMarkerScale;
+                loadedData.wavePlaneCoverageMultiplier = newCoverage;
+                loadedData.entrancePrefabOverride     = newEntrance;
                 EditorUtility.SetDirty(loadedData);
             }
 
-            // Wall prefab associated with the arena profile — read-only display; the
-            // ⊙ button pings it so it can be located in the Project window.
-            if (loadedData.arenaProfile != null)
+            // World size. Everything else in this tool is normalised to the grid, which is fine
+            // until a system that works in absolute units — fog, spike sizes, block depths —
+            // needs measuring against the level, and there is nothing on screen to measure with.
+            if (loadedData.WorldArenaWidth > 0f)
             {
-                GameObject wallPrefab = loadedData.arenaProfile.outerWallsPrefab;
-                EditorGUILayout.BeginHorizontal();
-                EditorGUI.BeginDisabledGroup(true);
-                EditorGUILayout.ObjectField("Wall Prefab", wallPrefab, typeof(GameObject), false);
-                EditorGUI.EndDisabledGroup();
-                EditorGUI.BeginDisabledGroup(wallPrefab == null);
-                if (GUILayout.Button("⊙", GUILayout.Width(22)))
-                    EditorGUIUtility.PingObject(wallPrefab);
-                EditorGUI.EndDisabledGroup();
-                EditorGUILayout.EndHorizontal();
-
-                // Wall Top Height — read-only info pulled from the wall prefab's BaselineMarker,
-                // shown only when it has been set on the baseline gizmo in the inspector.
-                if (wallPrefab != null)
-                {
-                    var marker = wallPrefab.GetComponentInChildren<BaselineMarker>(true);
-                    if (marker != null && marker.useWallTopHeight)
-                    {
-                        var wtStyle = new GUIStyle(EditorStyles.miniLabel)
-                            { normal = { textColor = new Color(1f, 0.55f, 0.1f) } };
-                        EditorGUILayout.LabelField("Wall Top Height", $"{marker.WallTopDistanceAboveBaseline:0.##} above baseline (y = {marker.wallTopHeight:0.##})", wtStyle);
-                    }
-                }
+                float aWidth = loadedData.WorldArenaWidth;
+                float aCell  = aWidth / GridData.GridSize;
+                EditorGUILayout.LabelField(
+                    $"{aWidth:0.##} u across   ·   radius {aWidth * 0.5f:0.##} u" +
+                    $"   ·   1 cell = {aCell:0.###} u",
+                    EditorStyles.miniLabel);
+            }
+            else
+            {
+                // Worth saying: several tools silently fall back to 12 units at radius 0,
+                // so a level without one is not neutral, it is quietly wrong.
+                EditorGUILayout.HelpBox(
+                    "Arena Radius is 0, so world sizes fall back to 12 units and the level spawns " +
+                    "no boundary. Anything measured in world units here will be wrong.", MessageType.Warning);
             }
 
             EditorGUILayout.Space();
@@ -1341,7 +1410,9 @@ public class GridDesignerWindow : EditorWindow
             DrawCameraSection();
             DrawWavePresetsSection();
             DrawSonarGridSection();
-            DrawEnemySection();
+            DrawFogSection();
+            // Enemy section removed here — it was inert and now lives on the right panel.
+            // Angel section moved to the right panel (above Enemies).
             DrawTimeTrialSection();
             DrawPrefabsSection();
             DrawStartRitualSection();
@@ -1361,6 +1432,7 @@ public class GridDesignerWindow : EditorWindow
             if (loadedData != null)
             {
                 loadedData.orbCellIndices?.Remove(index);
+                loadedData.orbPositions?.RemoveAll(p => GridData.NormalizedToCell(p) == index); // free orbs in this cell
                 loadedData.waterLevelModifierCellIndices?.Remove(index);
                 loadedData.waveModifierCellIndices?.Remove(index);
                 loadedData.whirlpools?.RemoveAll(w => w.cellIndex == index);
@@ -1418,8 +1490,16 @@ public class GridDesignerWindow : EditorWindow
 
         if (drawOrb && loadedData != null)
         {
-            if (loadedData.orbCellIndices == null) loadedData.orbCellIndices = new List<int>();
-            if (!loadedData.orbCellIndices.Contains(index)) loadedData.orbCellIndices.Add(index);
+            // Orbs are always free-positioned — dropped at the exact pointer, never snapped to the
+            // cell centre (they ignore the Clamp-to-cell toggle). A small min-gap stops a drag from
+            // spraying a dense stream of orbs.
+            if (loadedData.orbPositions == null) loadedData.orbPositions = new List<Vector2>();
+            Vector2 op = _drawPointerNorm;
+            float minGap = 0.5f / GridData.GridSize;
+            bool near = false;
+            foreach (var e in loadedData.orbPositions)
+                if (Vector2.Distance(e, op) < minGap) { near = true; break; }
+            if (!near) loadedData.orbPositions.Add(op);
             return;
         }
 
@@ -1661,6 +1741,58 @@ public class GridDesignerWindow : EditorWindow
         int idx = scannedPrefabs.IndexOf(prefab);
         if (idx < 0) return Color.gray;
         return Color.HSVToRGB((idx * 0.618f) % 1f, 0.75f, 0.95f);
+    }
+
+    // Every prefab across the library tabs with the icon it draws on the grid (texture, or null → the
+    // fallback round swatch). Used by the settings window's icon reference/colour list.
+    public List<(string name, Texture2D icon)> GetPrefabLibraryIcons()
+    {
+        var result = new List<(string, Texture2D)>();
+        var seen   = new HashSet<string>();
+        void AddAll(List<GameObject> list)
+        {
+            if (list == null) return;
+            foreach (var go in list)
+            {
+                if (go == null || !seen.Add(go.name)) continue;
+                prefabIcons.TryGetValue(go.name, out var icon);
+                result.Add((go.name, icon));
+            }
+        }
+        AddAll(scannedPrefabs);
+        AddAll(scannedSetPiecesLib);
+        AddAll(scannedStatuesLib);
+        AddAll(scannedModifiersLib);
+        AddAll(scannedBadGuysLib);
+        return result;
+    }
+
+    // The override for a prefab's fallback icon, or null. create=true adds one seeded from the default.
+    public PrefabIconOverride GetIconOverride(string prefabName, bool create)
+    {
+        if (_style.iconOverrides == null) _style.iconOverrides = new List<PrefabIconOverride>();
+        foreach (var o in _style.iconOverrides)
+            if (o != null && o.prefabName == prefabName) return o;
+        if (!create) return null;
+        var n = new PrefabIconOverride { prefabName = prefabName, color = _style.defaultIconColor };
+        _style.iconOverrides.Add(n);
+        return n;
+    }
+
+    // Effective fallback-icon colour: the prefab's colour override if set, else the global default.
+    public Color IconColorFor(GameObject prefab)
+    {
+        var o = prefab != null ? GetIconOverride(prefab.name, false) : null;
+        return (o != null && o.overrideColor) ? o.color : _style.defaultIconColor;
+    }
+
+    // Effective overlay label: the prefab's text override if set, else its auto 2-letter abbreviation.
+    string IconLabelFor(GameObject prefab)
+    {
+        if (prefab == null) return "";
+        var o = GetIconOverride(prefab.name, false);
+        if (o != null && !string.IsNullOrEmpty(o.label)) return o.label;
+        return prefab.name.Substring(0, Mathf.Min(2, prefab.name.Length));
     }
 
     void RefreshCachedTierOffsets()
@@ -1935,7 +2067,7 @@ public class GridDesignerWindow : EditorWindow
         float rad = ent.perimeterAngle * Mathf.Deg2Rad;
         Vector2 dir = new Vector2(Mathf.Sin(rad), Mathf.Cos(rad));
 
-        float rWorld = loadedData?.arenaProfile != null ? loadedData.arenaProfile.WorldArenaRadius : 0f;
+        float rWorld = loadedData != null ? loadedData.WorldArenaRadius : 0f;
         float frac = rWorld > 0.0001f ? (rWorld - ent.spawnRadius) / (2f * rWorld) : 0.5f;
         return dir * frac;
     }
@@ -2222,6 +2354,60 @@ public class GridDesignerWindow : EditorWindow
             SonarGridEditorWindow.OpenWith(loadedData.sonarGridType);
     }
 
+    void DrawFogSection()
+    {
+        _showFog = EditorGUILayout.Foldout(_showFog, "Fog", true, EditorStyles.foldoutHeader);
+        if (!_showFog) return;
+
+        // Arena size itself is shown up in the Arena section, where the profile that produces it
+        // lives. Here it is only needed as the thing fog is compared against.
+        float arenaW = SpikeArenaWidth();
+        float cellW  = arenaW / GridData.GridSize;
+
+        EditorGUI.BeginChangeCheck();
+        bool on = EditorGUILayout.Toggle("Fog Enabled", loadedData.fogEnabled);
+        var newMap = (FogMap)EditorGUILayout.ObjectField(
+            "Fog Map", loadedData.fogMap, typeof(FogMap), false);
+        if (EditorGUI.EndChangeCheck())
+        {
+            Undo.RecordObject(loadedData, "Set Fog");
+            loadedData.fogEnabled = on;
+            loadedData.fogMap = newMap;
+            EditorUtility.SetDirty(loadedData);
+        }
+
+        if (loadedData.fogEnabled && loadedData.fogMap == null)
+        {
+            // Deliberately an error rather than a quiet fallback. Fog appearing where nobody put it
+            // is worse than no fog, because it looks like the map is working when it is not.
+            EditorGUILayout.HelpBox(
+                "Fog is on but no fog map is assigned, so this level gets no fog. There is no " +
+                "fallback — the map is the only thing that decides where fog sits.",
+                MessageType.Warning);
+        }
+        else if (loadedData.fogMap != null)
+        {
+            var m = loadedData.fogMap;
+            EditorGUILayout.LabelField(
+                $"{m.blobCount} masses   {m.properties.EffectiveLimbCount} limbs" +
+                (loadedData.fogEnabled ? "" : "   (fog off — map ignored)"),
+                EditorStyles.miniLabel);
+
+            // Mass size against the grid, so the two can be reconciled by eye.
+            var ws = m.WorldBlobScale;
+            EditorGUILayout.LabelField(
+                $"Masses {ws.x:0.##}–{ws.y:0.##} u   ·   mask {m.maskRadius:0.##} u" +
+                $"  =  {m.maskRadius / Mathf.Max(cellW, 0.001f):0.#} cells",
+                EditorStyles.miniLabel);
+        }
+
+        if (GUILayout.Button(loadedData.fogMap != null ? "Edit in Fog Map" : "Open Fog Map…"))
+        {
+            var w = EditorWindow.GetWindow<FogMapWindow>("Fog Map");
+            w.Show();
+        }
+    }
+
     void DrawEnemySection()
     {
         _showEnemy = EditorGUILayout.Foldout(_showEnemy, "Enemy", true, EditorStyles.foldoutHeader);
@@ -2245,6 +2431,132 @@ public class GridDesignerWindow : EditorWindow
                 EditorStyles.miniLabel);
             EditorGUI.indentLevel--;
         }
+    }
+
+    // Whether the angel flies this level. Where she LANDS is authored per rock in the ▲ Spikes
+    // tool, so this section also counts those up — a level that has her but nowhere to perch is a
+    // level where she never comes down, and that is worth saying at the point you tick the box.
+    void DrawAngelSection()
+    {
+        _showAngel = EditorGUILayout.Foldout(_showAngel, "Angel", true, EditorStyles.foldoutHeader);
+        if (!_showAngel) return;
+
+        EditorGUI.BeginChangeCheck();
+        bool present = EditorGUILayout.Toggle(
+            new GUIContent("Angel present", "Spawn the angel on this level, to fly above the boat and " +
+                                            "land on the rocks marked as angel perch points."),
+            loadedData.angelPresent);
+        if (EditorGUI.EndChangeCheck())
+        {
+            Undo.RecordObject(loadedData, "Set Angel Present");
+            loadedData.angelPresent = present;
+            EditorUtility.SetDirty(loadedData);
+        }
+
+        if (!loadedData.angelPresent) return;
+
+        showPerchPoints = EditorGUILayout.ToggleLeft(
+            new GUIContent("Show perch points",
+                           "Draw the perch range (and the talk range, where Talk is on) on every marked rock, " +
+                           "in any tool — so you can read her landing spots at a glance."),
+            showPerchPoints);
+
+        int perches = 0;
+        int talk    = 0;
+        if (loadedData.proceduralSpikes != null)
+            foreach (var s in loadedData.proceduralSpikes)
+                if (s != null && s.angelPerchPoint)
+                {
+                    perches++;
+                    if (s.angelTalkEnabled) talk++;
+                }
+
+        if (perches == 0)
+        {
+            EditorGUILayout.HelpBox(
+                "No rocks are marked as angel perch points, so she will fly the whole level and never " +
+                "come down. Mark one in the ▲ Spikes tool.", MessageType.Warning);
+            return;
+        }
+
+        EditorGUILayout.LabelField(
+            $"{perches} perch point{(perches == 1 ? "" : "s")} · {talk} with talk",
+            EditorStyles.miniLabel);
+
+        // Per-rock perch list — edit each perch's ranges, Talk toggle and dialogue here, without
+        // hunting for the rock in the ▲ Spikes tool. "Rock N" selects it on the grid too.
+        for (int i = 0; i < loadedData.proceduralSpikes.Count; i++)
+        {
+            var s = loadedData.proceduralSpikes[i];
+            if (s == null || !s.angelPerchPoint) continue;
+
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                bool sel = _activeSpikeIndex == i;
+                GUI.backgroundColor = sel ? new Color(0.8f, 0.72f, 1f) : Color.white;
+                if (GUILayout.Button($"Rock {i + 1}", GUILayout.Width(70)))
+                {
+                    ClearSelectState();
+                    _activeSpikeIndex = i;
+                    _drawSpike = true; _drawCubeBuilding = _drawSplineWall = false;
+                    drawSelect = drawSoulArea = drawSoul = drawCircle = drawOrb = drawWhirlpool
+                               = drawWaterLevelModifier = drawWaveModifier = drawDirectPrefab = false;
+                    Repaint();
+                }
+                GUI.backgroundColor = Color.white;
+                GUILayout.Label(s.angelTalkEnabled ? "· talk" : "· silent", EditorStyles.miniLabel);
+            }
+
+            EditorGUI.BeginChangeCheck();
+            float pr = EditorGUILayout.FloatField(
+                new GUIContent("Perch range (m)", "Sail inside this and she comes down onto this rock."),
+                s.angelPerchRadius);
+            bool tk = EditorGUILayout.Toggle(
+                new GUIContent("Talk", "Arm the talk camera + dialogue on this perch. Off = she just perches."),
+                s.angelTalkEnabled);
+            float tr = s.angelTalkRadius;
+            string tt = s.angelTalkText;
+            if (tk)
+            {
+                EditorGUI.indentLevel++;
+                tr = EditorGUILayout.FloatField(
+                    new GUIContent("Talk range (m)", "Sail inside this, with her perched, to talk. Kept inside the perch range."),
+                    tr);
+                EditorGUILayout.LabelField(new GUIContent("What she says",
+                    "Shown in the dialogue box (AngelDialogueUI). Use / to split into separate lines."));
+                tt = EditorGUILayout.TextArea(tt ?? "", GUILayout.MinHeight(40));
+                EditorGUI.indentLevel--;
+            }
+            if (EditorGUI.EndChangeCheck())
+            {
+                Undo.RecordObject(loadedData, "Edit Perch");
+                s.angelPerchRadius = Mathf.Max(0f, pr);
+                s.angelTalkEnabled = tk;
+                s.angelTalkRadius  = Mathf.Clamp(tr, 0f, s.angelPerchRadius);
+                s.angelTalkText    = tt;
+                EditorUtility.SetDirty(loadedData);
+                Repaint();
+            }
+
+            EditorGUILayout.EndVertical();
+        }
+    }
+
+    // Mirrors AngelPerchPoint.SplitTalkLines so the panel previews exactly what will play. Kept in
+    // step by hand — the runtime one is in the other assembly.
+    static List<string> SplitAngelTalkLines(string say)
+    {
+        var kept = new List<string>();
+        if (string.IsNullOrWhiteSpace(say)) return kept;
+
+        foreach (var piece in say.Split('/'))
+        {
+            string line = piece.Trim();
+            if (line.Length > 0) kept.Add(line);
+        }
+        return kept;
     }
 
     void DrawTimeTrialSection()
@@ -2422,6 +2734,11 @@ public class GridDesignerWindow : EditorWindow
         _dragCurrentCell   = -1;
         _dragUndoPushed    = false;
         _currentSelection  = new SelectionInfo { type = SelectionType.None };
+        // Every selection channel clears together, so switching tools (Walls, Blocks, etc.) fully
+        // deselects whatever was picked — a spike/block/orb no longer lingers as "selected".
+        _activeOrbIndex    = -1;
+        _activeSpikeIndex  = -1;
+        _activeCubeIndex   = -1;
         CancelBridge();
     }
 
@@ -2456,7 +2773,7 @@ public class GridDesignerWindow : EditorWindow
     public float OrbCircleSize
     {
         get => _orbCircleFactor;
-        set { _orbCircleFactor = Mathf.Clamp(value, 0.1f, 1f); EditorPrefs.SetFloat(PrefKeyOrbSize, _orbCircleFactor); Repaint(); }
+        set { _orbCircleFactor = Mathf.Clamp(value, 0.05f, 1f); EditorPrefs.SetFloat(PrefKeyOrbSize, _orbCircleFactor); Repaint(); }
     }
 
     // The overlay appearance settings, edited by the settings window. Call SaveStyle() after mutating.
@@ -4111,7 +4428,9 @@ public class GridDesignerWindow : EditorWindow
 
         // ── Scale controls for a selected prefab — appears directly under the tools ──
         DrawSelectedPrefabScaleSection();
+        DrawSelectedPlacementRotationSection();
         DrawSelectedPlacementSpikeSection();
+        DrawSelectedSpikeSection();
 
         // ── Grid display controls ──
         // All display sliders now live in the dockable Grid Designer Settings window — dock it beside
@@ -4544,7 +4863,12 @@ public class GridDesignerWindow : EditorWindow
         EditorGUILayout.BeginVertical(GUILayout.Width(_rightPanelWidth), GUILayout.ExpandHeight(true));
         _rightPanelScroll = EditorGUILayout.BeginScrollView(_rightPanelScroll, GUILayout.ExpandHeight(true));
 
+        // Constrain the content to the panel width minus the vertical scrollbar, so rows (and their
+        // rightmost controls) always fit inside the visible panel instead of being clipped by the edge.
+        EditorGUILayout.BeginVertical(GUILayout.Width(Mathf.Max(60f, _rightPanelWidth - 18f)));
+
         DrawPrefabLibrarySection();
+        if (loadedData != null) DrawAngelSection();
         if (loadedData != null) DrawEnemiesSection();
         if (loadedData != null) DrawBadGuysSection();
         if (loadedData != null) DrawSplineWallsSection();
@@ -4613,6 +4937,7 @@ public class GridDesignerWindow : EditorWindow
 
         EditorGUILayout.EndScrollView();
 
+        EditorGUILayout.EndVertical();   // width-constrained content
         EditorGUILayout.EndScrollView(); // right panel scroll
         EditorGUILayout.EndVertical();
     }
@@ -4861,7 +5186,10 @@ public class GridDesignerWindow : EditorWindow
 
         float cur = pp.scale > 0f ? pp.scale : 1f;
         EditorGUI.BeginChangeCheck();
-        float ns = EditorGUILayout.Slider($"Scale ({pp.prefab.name})", cur, 0.25f, 5f);
+        float ns = LowEndSlider(
+            new GUIContent($"Scale ({pp.prefab.name})",
+                           "Weighted hard toward the low end for fine-tuning small props; type an exact value in the box."),
+            cur, 0.05f, 5f, power: 5f);
         if (EditorGUI.EndChangeCheck())
         {
             Undo.RecordObject(loadedData, "Scale Prefab Placement");
@@ -4873,6 +5201,88 @@ public class GridDesignerWindow : EditorWindow
         EditorGUILayout.LabelField($"Footprint ≈ {align.ScaleRadius * cur:0.##} world units", EditorStyles.miniLabel);
         EditorGUILayout.EndVertical();
 
+        EditorGUIUtility.labelWidth = prevLW;
+    }
+
+    // Quick Size + shape-preset controls for a selected procedural spike, shown under the tools like
+    // the prefab scale section — so a selected spike can be resized and restyled without opening the
+    // Spikes panel.
+    void DrawSelectedSpikeSection()
+    {
+        if (loadedData?.proceduralSpikes == null
+            || _activeSpikeIndex < 0 || _activeSpikeIndex >= loadedData.proceduralSpikes.Count) return;
+        var s = loadedData.proceduralSpikes[_activeSpikeIndex];
+        if (s == null) return;
+
+        RefreshSpikePresets();
+
+        float prevLW = EditorGUIUtility.labelWidth;
+        EditorGUIUtility.labelWidth = 160f;
+
+        EditorGUILayout.Space(4);
+        EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+        // Shape preset for the selected rock (authored in the Spike Studio).
+        EditorGUI.BeginChangeCheck();
+        int cur  = System.Array.IndexOf(_spikePresets, s.preset);
+        int pick = EditorGUILayout.Popup(
+            new GUIContent($"Spike {_activeSpikeIndex + 1} shape",
+                           "Which authored shape this rock wears. Editing the preset restyles every rock using it."),
+            cur + 1, _spikePresetNames);
+        if (EditorGUI.EndChangeCheck())
+        {
+            Undo.RecordObject(loadedData, "Set Spike Preset");
+            s.preset = pick <= 0 ? null : _spikePresets[pick - 1];
+            EditorUtility.SetDirty(loadedData);
+            Repaint();
+        }
+
+        EditorGUI.BeginChangeCheck();
+        float ns = LowEndSlider(
+            new GUIContent("Size",
+                           "Weighted hard toward the low end for fine-tuning small rocks; type an exact value in the box."),
+            s.EffectiveScale, 0.05f, 6f, power: 5f);
+        if (EditorGUI.EndChangeCheck())
+        {
+            Undo.RecordObject(loadedData, "Scale Spike");
+            s.scale = Mathf.Max(0.01f, ns);
+            EditorUtility.SetDirty(loadedData);
+            Repaint();
+        }
+
+        EditorGUILayout.EndVertical();
+        EditorGUIUtility.labelWidth = prevLW;
+    }
+
+    // Facing (yaw offset) for a selected placement whose prefab overrides forward. Drives both the
+    // forward arrow on the icon and the spawned instance's rotation.
+    void DrawSelectedPlacementRotationSection()
+    {
+        var pp = GetSelectedPlacement();
+        if (pp?.prefab == null) return;
+        var align = GetBaselineAlign(pp.prefab);
+        if (align == null || !align.UseForwardOverride) return;
+
+        float prevLW = EditorGUIUtility.labelWidth;
+        EditorGUIUtility.labelWidth = 160f;
+
+        EditorGUILayout.Space(4);
+        EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+        EditorGUI.BeginChangeCheck();
+        float nr = EditorGUILayout.Slider(
+            new GUIContent($"Facing ({pp.prefab.name})",
+                           "Yaw offset (degrees) applied at spawn and shown by the forward arrow on the icon."),
+            pp.rotationOffset, 0f, 360f);
+        if (EditorGUI.EndChangeCheck())
+        {
+            Undo.RecordObject(loadedData, "Rotate Prefab Placement");
+            pp.rotationOffset = Mathf.Repeat(nr, 360f);
+            EditorUtility.SetDirty(loadedData);
+            Repaint();
+        }
+
+        EditorGUILayout.EndVertical();
         EditorGUIUtility.labelWidth = prevLW;
     }
 
@@ -5165,6 +5575,10 @@ public class GridDesignerWindow : EditorWindow
         if (drawSelect && loadedData != null)
             HandleSelectSpikeInput(rect, e);
 
+        // Select tool — free orb picking + drag
+        if (drawSelect && loadedData != null)
+            HandleSelectOrbInput(rect, e);
+
         // Select tool — free prefab-placement picking + drag (placements are position-based now)
         if (drawSelect && loadedData != null)
             HandleSelectPrefabInput(rect, e);
@@ -5219,9 +5633,7 @@ public class GridDesignerWindow : EditorWindow
                     // Soul-zone node markers are free-positioned now — drawn at rect level
                     // (see the soul-zone drawing block after the cell loop), not per-cell.
 
-                    // Orb — size from the Orb size setting; colour + fill/outline from the Orb appearance.
-                    if (loadedData?.orbCellIndices != null && loadedData.orbCellIndices.Contains(index))
-                        DrawMarker(cell.center, EffCell * _orbCircleFactor, _style.orb, baseAlpha);
+                    // Orbs are free-positioned now — drawn at rect level after the cell loop, not per-cell.
 
                     // Water Level Modifier — the labelled cell disc takes its colour from the setting.
                     if (loadedData?.waterLevelModifierCellIndices != null && loadedData.waterLevelModifierCellIndices.Contains(index))
@@ -5409,6 +5821,18 @@ public class GridDesignerWindow : EditorWindow
             Handles.BeginGUI();
 
             float pxPerUnit = GetPixelsPerWorldUnit();
+
+            // Orbs — free-positioned. Size from the Orb size setting; colour/fill from the Orb appearance.
+            // The selected orb wears the shared white selection circle (when no other selection owns it).
+            float orbAlpha = (!baseLayerVisible) ? 0f : (activeTierIndex < 0) ? 1f : 0.35f;
+            if (orbAlpha > 0f && loadedData.orbPositions != null)
+                for (int oi = 0; oi < loadedData.orbPositions.Count; oi++)
+                {
+                    Vector2 opx = WorldXZToPixel(rect, loadedData.orbPositions[oi]);
+                    if (oi == _activeOrbIndex && drawSelect && _currentSelection.type == SelectionType.None)
+                        DrawMarker(opx, Mathf.Max(EffCell * _selectionCircleFactor, 3f), _style.selection);
+                    DrawMarker(opx, EffCell * _orbCircleFactor, _style.orb, orbAlpha);
+                }
 
             // Whirlpool radii
             if (pxPerUnit > 0f && loadedData.whirlpools != null)
@@ -5659,10 +6083,10 @@ public class GridDesignerWindow : EditorWindow
     // reference plane prefab (or baseline radius) as the authority on real-world arena dimensions.
     float GetPixelsPerWorldUnit()
     {
-        var profile = loadedData?.arenaProfile;
-        if (profile == null) return -1f;
+        var level = loadedData;
+        if (level == null) return -1f;
 
-        float worldWidth = profile.WorldArenaWidth;
+        float worldWidth = level.WorldArenaWidth;
 
         if (worldWidth <= 0f) return -1f;
 
@@ -5682,11 +6106,14 @@ public class GridDesignerWindow : EditorWindow
         float s    = pp.scale > 0f ? pp.scale : 1f;
         float size = EffCell * s;
 
-        var align = pp.prefab != null ? GetBaselineAlign(pp.prefab) : null;
-        if (align != null && align.UseScaleRadius && align.ScaleRadius > 0f && pxPerUnit > 0f)
+        var  align       = pp.prefab != null ? GetBaselineAlign(pp.prefab) : null;
+        bool scaleRadius = align != null && align.UseScaleRadius && align.ScaleRadius > 0f && pxPerUnit > 0f;
+        if (scaleRadius)
             size = align.ScaleRadius * s * pxPerUnit * 2f; // match footprint ring diameter
 
-        size = Mathf.Max(size, EffCell * 0.5f); // keep tiny-scale icons visible
+        // Scale-radius icons ARE the scale indicator, so let them track the true footprint down to a
+        // tiny minimum; plain marker icons keep a larger floor so they stay visible/clickable.
+        size = Mathf.Max(size, scaleRadius ? 4f : EffCell * 0.5f);
         return new Rect(centerPx.x - size * 0.5f, centerPx.y - size * 0.5f, size, size);
     }
 
@@ -5757,11 +6184,72 @@ public class GridDesignerWindow : EditorWindow
         }
         else
         {
-            Color c = GetPrefabColor(pp.prefab); c.a = alpha;
-            EditorGUI.DrawRect(ir, c);
-            Handles.color = new Color(0f, 0f, 0f, alpha);
-            string label = pp.prefab.name.Substring(0, Mathf.Min(2, pp.prefab.name.Length));
-            Handles.Label(ir.center - new Vector2(5f, 6f), label);
+            // Round swatch instead of a square. The icon rect is already sized to the prefab's scale
+            // footprint when its baseline alignment uses a scale radius (see ScaledIconRect), so the
+            // disc doubles as the scale indicator (dual purpose) with no separate ring needed. Colour
+            // is the prefab's override or the global default; the overlay label and its size come from
+            // the settings too.
+            Color c = IconColorFor(pp.prefab); c.a = alpha;
+            float radius = Mathf.Max(Mathf.Min(ir.width, ir.height) * 0.5f, 2f);
+
+            Handles.color = c;
+            Handles.DrawSolidDisc(ir.center, Vector3.forward, radius);
+
+            string label = IconLabelFor(pp.prefab);
+            if (!string.IsNullOrEmpty(label))
+            {
+                // Text scales with the on-screen circle so it fits big icons (and grows with zoom),
+                // using iconTextSize as the size at a reference radius, capped at iconTextSizeMax.
+                const float refRadiusPx = 40f;
+                int fontSize = Mathf.Clamp(
+                    Mathf.RoundToInt(_style.iconTextSize * radius / refRadiusPx),
+                    4, Mathf.Max(4, Mathf.RoundToInt(_style.iconTextSizeMax)));
+
+                var lblStyle = new GUIStyle(EditorStyles.boldLabel)
+                {
+                    alignment = TextAnchor.MiddleCenter,
+                    fontSize  = fontSize,
+                    wordWrap  = false,
+                };
+                lblStyle.normal.textColor = new Color(0f, 0f, 0f, alpha);
+                var content = new GUIContent(label);
+                Vector2 lsz = lblStyle.CalcSize(content);
+                // Rect centred exactly on the circle centre; MiddleCenter then centres the text within
+                // it, so a long label lands on the circle centre regardless of the measured width.
+                var lr = new Rect(ir.center.x - lsz.x * 0.5f, ir.center.y - lsz.y * 0.5f, lsz.x, lsz.y);
+                GUI.Label(lr, content, lblStyle);
+            }
+        }
+
+        // Forward-direction arrow on the icon's circumference, for prefabs whose baseline alignment
+        // overrides forward. Points along LocalForward projected to the grid (XZ). Size + colour global.
+        var fAlign = GetBaselineAlign(pp.prefab);
+        if (fAlign != null && fAlign.UseForwardOverride)
+        {
+            Vector3 lf  = fAlign.LocalForward;
+            Vector2 fwd = new Vector2(lf.x, lf.z);
+            if (fwd.sqrMagnitude > 1e-6f)
+            {
+                fwd.Normalize();
+                // Apply the placement's yaw offset (clockwise in grid XZ, matching the world-up yaw
+                // used at spawn) so the arrow shows the direction the prefab will actually face.
+                float rad = pp.rotationOffset * Mathf.Deg2Rad;
+                float cs = Mathf.Cos(rad), sn = Mathf.Sin(rad);
+                fwd = new Vector2(fwd.x * cs + fwd.y * sn, -fwd.x * sn + fwd.y * cs);
+                Vector2 pd    = new Vector2(fwd.x, -fwd.y);        // world XZ → pixels (y inverted)
+                Vector2 perp  = new Vector2(-pd.y, pd.x);
+                float   aSc   = Mathf.Max(0.1f, _style.forwardArrowScale);
+                float   baseR = Mathf.Max(Mathf.Min(ir.width, ir.height) * 0.5f, 6f);
+                Vector2 baseC = ir.center + pd * baseR;
+                Color   ac    = _style.forwardArrowColor; ac.a *= alpha;
+                Handles.color = ac;
+                Handles.DrawAAConvexPolygon(new Vector3[]
+                {
+                    (Vector3)(baseC + pd   * baseR * 0.55f * aSc),  // tip (outward)
+                    (Vector3)(baseC + perp * baseR * 0.40f * aSc),
+                    (Vector3)(baseC - perp * baseR * 0.40f * aSc),
+                });
+            }
         }
 
         if (isCreep)
@@ -5795,6 +6283,7 @@ public class GridDesignerWindow : EditorWindow
                     isCircle         = src.isCircle,
                     isWorldSpaceProp = src.isWorldSpaceProp,
                     scale            = src.scale,
+                    rotationOffset   = src.rotationOffset,
                     spikePreset      = src.spikePreset,
                     statueId         = 0,   // a duplicate is not the same statue/tower — no zone link
                     overrideModifierSettings = src.overrideModifierSettings,
@@ -5855,7 +6344,7 @@ public class GridDesignerWindow : EditorWindow
     }
 
     // A spike carries its whole placement across — same shape preset, same size, same climbable
-    // flag — so duplicating is how you lay out a run of matching rocks.
+    // and perch flags — so duplicating is how you lay out a run of matching rocks.
     bool TryDuplicateSpike(Event e)
     {
         if (_activeSpikeIndex < 0 || loadedData.proceduralSpikes == null ||
@@ -5865,10 +6354,17 @@ public class GridDesignerWindow : EditorWindow
         var src = loadedData.proceduralSpikes[_activeSpikeIndex];
         loadedData.proceduralSpikes.Add(new GridData.ProceduralSpike
         {
-            center    = src.center,
-            preset    = src.preset,
-            scale     = src.scale,
-            climbable = src.climbable,
+            center          = src.center,
+            preset          = src.preset,
+            scale           = src.scale,
+            climbable       = src.climbable,
+            angelPerchPoint = src.angelPerchPoint,
+            angelPerchRadius   = src.angelPerchRadius,
+            angelLandingCurveSize = src.angelLandingCurveSize,
+            angelTalkRadius    = src.angelTalkRadius,
+            angelPriorityPerch = src.angelPriorityPerch,
+            angelTalkEnabled   = src.angelTalkEnabled,
+            angelTalkText      = src.angelTalkText,
         });
         _activeSpikeIndex = loadedData.proceduralSpikes.Count - 1;
         _carryDuplicate   = true; _carryKind = CarryKind.Spike;
@@ -6137,8 +6633,9 @@ public class GridDesignerWindow : EditorWindow
         }
         if (!anySeed) return;                                // no creeper is standing on a rock
 
-        Handles.color = new Color(0.25f, 0.95f, 0.35f, 0.95f);
-
+        // Pass one: work out which rocks a creeper can get to at all, without drawing. Marking a
+        // rock as reached the moment it gets a line would draw a single chain and hide every other
+        // hop he could make from it.
         while (_rockQueue.Count > 0)
         {
             int from = _rockQueue.Dequeue();
@@ -6147,9 +6644,24 @@ public class GridDesignerWindow : EditorWindow
                 if (_rockReached[to] || to == from) continue;
                 if (Vector2.Distance(_rockPixels[from], _rockPixels[to]) > reachPx) continue;
 
-                Handles.DrawAAPolyLine(CreeperRouteWidth, _rockPixels[from], _rockPixels[to]);
                 _rockReached[to] = true;
                 _rockQueue.Enqueue(to);
+            }
+        }
+
+        // Pass two: every hop that is actually available between reachable rocks, so the picture
+        // matches what he can really choose from rather than one route through them.
+        Handles.color = new Color(0.25f, 0.95f, 0.35f, 0.95f);
+
+        for (int a = 0; a < _rockPixels.Count; a++)
+        {
+            if (!_rockReached[a]) continue;
+            for (int b = a + 1; b < _rockPixels.Count; b++)
+            {
+                if (!_rockReached[b]) continue;
+                if (Vector2.Distance(_rockPixels[a], _rockPixels[b]) > reachPx) continue;
+
+                Handles.DrawAAPolyLine(CreeperRouteWidth, _rockPixels[a], _rockPixels[b]);
             }
         }
     }
@@ -6275,6 +6787,7 @@ public class GridDesignerWindow : EditorWindow
             if (loadedData != null)
             {
                 loadedData.orbCellIndices?.Clear();
+                loadedData.orbPositions?.Clear();
                 loadedData.soulSpawnPoints?.Clear();
                 loadedData.soulZones?.Clear();
                 loadedData.waterLevelModifierCellIndices?.Clear();
@@ -6300,7 +6813,7 @@ public class GridDesignerWindow : EditorWindow
         GUI.backgroundColor = Color.white;
 
         if (GUILayout.Button("CLEAR ORBS") && loadedData != null)
-        { PushUndoSnapshot(); loadedData.orbCellIndices?.Clear(); Repaint(); }
+        { PushUndoSnapshot(); loadedData.orbCellIndices?.Clear(); loadedData.orbPositions?.Clear(); Repaint(); }
 
         if (GUILayout.Button("CLEAR SOULS") && loadedData != null)
         { PushUndoSnapshot(); loadedData.soulSpawnPoints?.Clear(); loadedData.soulZones?.Clear(); _activeSoulZoneIndex = -1; Repaint(); }
@@ -6417,6 +6930,7 @@ public class GridDesignerWindow : EditorWindow
     {
         loadedData = data;
         if (loadedData.orbCellIndices  == null) loadedData.orbCellIndices  = new List<int>();
+        if (loadedData.orbPositions    == null) loadedData.orbPositions    = new List<Vector2>();
         if (loadedData.soulSpawnPoints == null) loadedData.soulSpawnPoints = new List<GridData.SoulSpawnPoint>();
         if (loadedData.soulZones       == null) loadedData.soulZones       = new List<GridData.SoulZone>();
         _allSoulData = null; // force re-scan on next draw
@@ -6449,6 +6963,7 @@ public class GridDesignerWindow : EditorWindow
 
         // Untether legacy grid-bound placements to free positions (cell centre). Idempotent.
         loadedData.MigratePlacementPositions();
+        loadedData.MigrateOrbPositions();   // fold legacy cell-indexed orbs into free positions
 
         _baselineAlignCache.Clear();
 
@@ -6660,15 +7175,33 @@ public class GridDesignerWindow : EditorWindow
             {
                 EditorGUI.indentLevel++;
 
-                // Prefab
-                EditorGUI.BeginChangeCheck();
-                var newPrefab = (GameObject)EditorGUILayout.ObjectField(
-                    "Prefab", path.prefabOverride, typeof(GameObject), false);
-                if (EditorGUI.EndChangeCheck())
+                // Type — dropdown of every prefab in Assets/Prefab/SplineWallPrefabs
+                // (e.g. ProceduralSplineWall, ProceduralSplineRailing).
+                var splineOptions = GetSplineWallPrefabOptions();
+                if (splineOptions.Count > 0)
                 {
-                    Undo.RecordObject(loadedData, "Set Spline Wall Prefab");
-                    path.prefabOverride = newPrefab;
-                    EditorUtility.SetDirty(loadedData);
+                    int  curIdx = splineOptions.IndexOf(path.prefabOverride);
+                    var  labels = new List<string>();
+                    foreach (var p in splineOptions) labels.Add(p.name);
+                    // Keep an out-of-folder override visible so switching away isn't accidental.
+                    if (curIdx < 0)
+                    {
+                        labels.Add(path.prefabOverride != null ? path.prefabOverride.name + " (custom)" : "(none)");
+                        curIdx = labels.Count - 1;
+                    }
+
+                    EditorGUI.BeginChangeCheck();
+                    int newIdx = EditorGUILayout.Popup("Type", curIdx, labels.ToArray());
+                    if (EditorGUI.EndChangeCheck() && newIdx >= 0 && newIdx < splineOptions.Count)
+                    {
+                        Undo.RecordObject(loadedData, "Set Spline Wall Type");
+                        path.prefabOverride = splineOptions[newIdx];
+                        EditorUtility.SetDirty(loadedData);
+                    }
+                }
+                else
+                {
+                    EditorGUILayout.HelpBox("No prefabs found in " + SplineWallPrefabFolder + ".", MessageType.Warning);
                 }
 
                 // Destructible prefab — used for segments flagged destructible (the "D" toggle below)
@@ -7958,7 +8491,7 @@ public class GridDesignerWindow : EditorWindow
             var  path     = loadedData.splineWallPaths[pi];
             if (path?.nodes == null || path.nodes.Count == 0) continue;
 
-            bool  isActive = _drawSplineWall && pi == _activeSplinePathIdx;
+            bool  isActive = (_drawSplineWall || drawSelect) && pi == _activeSplinePathIdx;
             Color col      = GetSplineWallColor(pi);
             col.a = isActive ? 0.95f : 0.45f;
 
@@ -8038,7 +8571,7 @@ public class GridDesignerWindow : EditorWindow
                     Handles.DrawWireDisc(px, Vector3.forward, nodeOuter + 2.5f, 2f);
                 }
 
-                if (isActive && n <= 30)
+                if (isActive)
                 {
                     // Label in the opposite colour so it reads on both white and black paths
                     Color labelCol = (col == Color.white) ? Color.black : Color.white;
@@ -8328,14 +8861,33 @@ public class GridDesignerWindow : EditorWindow
 
     GameObject GetDefaultSplineWallPrefab()
     {
-        // Prefer the procedural wall, then the legacy mesh wall, then any name containing "SplineWall"
-        foreach (var p in scannedPrefabs)
+        // Default to the procedural wall from the spline-wall prefab folder, else the first option.
+        var opts = GetSplineWallPrefabOptions();
+        foreach (var p in opts)
             if (p != null && p.name == "ProceduralSplineWall") return p;
-        foreach (var p in scannedPrefabs)
-            if (p != null && p.name == "BasicSplineWall1") return p;
-        foreach (var p in scannedPrefabs)
-            if (p != null && p.name.Contains("SplineWall")) return p;
-        return null;
+        return opts.Count > 0 ? opts[0] : null;
+    }
+
+    // Every prefab under SplineWallPrefabFolder, cached (sorted by name) for the Type dropdown.
+    List<GameObject> GetSplineWallPrefabOptions()
+    {
+        // Rebuild when null (fresh window / after reload) or empty (folder was empty last time, or a
+        // prefab has since been added) — the scan is cheap for this small folder.
+        if (_splineWallPrefabOptions == null || _splineWallPrefabOptions.Count == 0)
+        {
+            _splineWallPrefabOptions = new List<GameObject>();
+            foreach (var guid in AssetDatabase.FindAssets("t:Prefab", new[] { SplineWallPrefabFolder }))
+            {
+                var go = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(guid));
+                if (go == null) continue;
+                // The folder also holds node-marker prefabs (ProceduralSplineNode) — those are wall
+                // node posts, not selectable wall types, so keep them out of the Type dropdown.
+                if (go.GetComponent<ProceduralSplineNode>() != null) continue;
+                _splineWallPrefabOptions.Add(go);
+            }
+            _splineWallPrefabOptions.Sort((a, b) => string.Compare(a.name, b.name, System.StringComparison.Ordinal));
+        }
+        return _splineWallPrefabOptions;
     }
 
     Color GetSplineWallColor(int pathIdx)
@@ -8475,7 +9027,8 @@ public class GridDesignerWindow : EditorWindow
 
     void BeginCubeMove(Rect rect, int index, Vector2 mouse)
     {
-        _activeSpikeIndex    = -1;   // block and spike selection are mutually exclusive
+        _activeSpikeIndex    = -1;   // block, spike and orb selection are mutually exclusive
+        _activeOrbIndex      = -1;
         _activeCubeIndex     = index;
         _dragCubeCenterIndex = index;
         _isDraggingCubeBox   = false;
@@ -8595,7 +9148,7 @@ public class GridDesignerWindow : EditorWindow
 
         EditorGUILayout.HelpBox("Pick the ▦ Blocks tool, then drag out a box on the grid. Footprint is normalized to the arena width; height/depth are world units.", MessageType.None);
 
-        float aw = loadedData.arenaProfile != null ? loadedData.arenaProfile.WorldArenaWidth : 0f;
+        float aw = loadedData.WorldArenaWidth;
 
         int toRemove = -1;
         for (int i = 0; i < loadedData.cubeBuildings.Count; i++)
@@ -8729,8 +9282,8 @@ public class GridDesignerWindow : EditorWindow
 
     // Arena width used to turn normalized grid positions into the world units the shapes live in.
     float SpikeArenaWidth() =>
-        loadedData != null && loadedData.arenaProfile != null && loadedData.arenaProfile.WorldArenaWidth > 0f
-            ? loadedData.arenaProfile.WorldArenaWidth : 12f;
+        loadedData != null && loadedData.WorldArenaWidth > 0f
+            ? loadedData.WorldArenaWidth : 12f;
 
 
     void HandleSpikeInput(Rect rect, Event e)
@@ -8840,6 +9393,51 @@ public class GridDesignerWindow : EditorWindow
         }
     }
 
+    // Free-orb selection + drag for the ⊕ Select tool.
+    void HandleSelectOrbInput(Rect rect, Event e)
+    {
+        if (loadedData?.orbPositions == null || loadedData.orbPositions.Count == 0) return;
+
+        if (e.type == EventType.MouseDown && e.button == 0 && rect.Contains(e.mousePosition))
+        {
+            int hit = PickOrb(rect, e.mousePosition);
+            if (hit >= 0)
+            {
+                ClearSelectState();                          // single-selection
+                _activeSpikeIndex = -1; _activeCubeIndex = -1;
+                _activeOrbIndex = hit; _dragOrbIndex = hit;
+                Undo.RecordObject(loadedData, "Move Orb");
+                e.Use(); Repaint();
+            }
+        }
+        else if (e.type == EventType.MouseDrag && e.button == 0 && _dragOrbIndex >= 0
+                 && _dragOrbIndex < loadedData.orbPositions.Count)
+        {
+            loadedData.orbPositions[_dragOrbIndex] = PixelToWorldXZ(rect, e.mousePosition);
+            EditorUtility.SetDirty(loadedData);
+            e.Use(); Repaint();
+        }
+        else if (e.type == EventType.MouseUp && e.button == 0 && _dragOrbIndex >= 0)
+        {
+            _dragOrbIndex = -1;
+            e.Use();
+        }
+    }
+
+    // Orb nearest the pixel within a pick radius, or -1.
+    int PickOrb(Rect rect, Vector2 mouse)
+    {
+        if (loadedData?.orbPositions == null) return -1;
+        float best = Mathf.Max(EffCell * 0.5f, 10f);
+        int hit = -1;
+        for (int i = 0; i < loadedData.orbPositions.Count; i++)
+        {
+            float d = Vector2.Distance(WorldXZToPixel(rect, loadedData.orbPositions[i]), mouse);
+            if (d < best) { best = d; hit = i; }
+        }
+        return hit;
+    }
+
     // Spike whose centre node is nearest the pixel (within SpikeNodePickRadius), or -1.
     int PickSpike(Rect rect, Vector2 mouse)
     {
@@ -8865,7 +9463,8 @@ public class GridDesignerWindow : EditorWindow
 
     void BeginSpikeMove(Rect rect, int index, Vector2 mouse)
     {
-        _activeCubeIndex      = -1;   // spike and block selection are mutually exclusive
+        _activeCubeIndex      = -1;   // spike, block and orb selection are mutually exclusive
+        _activeOrbIndex       = -1;
         _activeSpikeIndex     = index;
         _dragSpikeCenterIndex = index;
         _isDraggingSpike      = false;
@@ -8957,13 +9556,38 @@ public class GridDesignerWindow : EditorWindow
 
             // Only in the ▲ Spikes tool: mark the climbable rocks (so you can see which the creepy
             // guy can use) with a dot on centre (colour + fill/outline from the Climbable spike
-            // appearance setting), and show the spike numbers. Both are authoring aids, off otherwise.
+            // appearance setting), mark the angel's perch rocks on their tips, and show the spike
+            // numbers. All three are authoring aids, off otherwise.
             // The green climbable dot is part of the same "where can the creeper go" picture as the
             // hop routes, so the Creeper hop routes toggle hides it too.
+            // Perch ranges as translucent washes, centred on the rock's position (where the boat
+            // crosses them). Shown for EVERY perch when "Show perch points" is on, or — in the Spikes
+            // tool — for the selected perch (or all, per the appearance setting). The talk ring only
+            // shows when Talk is enabled on that perch.
+            if (s.angelPerchPoint
+                && (showPerchPoints || (_drawSpike && (active || !_style.angelRadiiOnSelectedOnly))))
+            {
+                float op = Mathf.Clamp01(_style.angelRadiiOpacity);
+                DrawMarker(c, s.angelPerchRadius * pxPerUnit, _style.angelPerchRadius, op);
+                if (s.angelTalkEnabled)
+                    DrawMarker(c, s.angelTalkRadius * pxPerUnit, _style.angelTalkRadius, op);
+            }
+
             if (_drawSpike)
             {
                 if (s.climbable && showCreeperRoutes)
                     DrawMarker(c, Mathf.Max(EffCell * 0.18f, 5f), _style.spikeClimbable);
+
+                // Perch rocks are marked on the TIP of the drawn silhouette rather than on centre,
+                // because the tip is literally where the angel puts her feet — and it keeps the mark
+                // clear of the climbable dot on a rock that is both. A talk-enabled perch gets its own
+                // colour, since a place you can meet AND talk to her is the one that matters most.
+                if (s.angelPerchPoint)
+                    DrawAngelLandingCurve(s, c, pxPerUnit);
+
+                    DrawMarker(new Vector2(c.x, c.y - above * pxPerUnit),
+                               Mathf.Max(EffCell * 0.15f, 4f),
+                               s.angelTalkEnabled ? _style.spikeAngelPriorityPerch : _style.spikeAngelPerch);
 
                 string  numLabel = (i + 1).ToString();
                 Vector2 numSize  = numStyle.CalcSize(new GUIContent(numLabel));
@@ -8978,10 +9602,54 @@ public class GridDesignerWindow : EditorWindow
         }
     }
 
+    // The path she flies in along, drawn so it can be checked against the walls and blocks around
+    // the rock before she ever flies it.
+    //
+    // She always arrives facing the boat, so the curve ROTATES to wherever you sail in from — there
+    // is no one true path to draw. It is drawn here as if she came in facing the middle of the
+    // arena, which is where the boat mostly is. Read it as the shape and the reach rather than as a
+    // fixed route: the far end swings round the rock as the approach changes.
+    void DrawAngelLandingCurve(GridData.ProceduralSpike s, Vector2 centrePx, float pxPerUnit)
+    {
+        float r = s.angelLandingCurveSize;
+        if (r <= 0.001f) return;                     // straight in — nothing to draw
+
+        // Heading at touchdown: toward the middle of the arena.
+        Vector2 h = -s.center;
+        if (h.sqrMagnitude < 1e-6f) h = Vector2.up;
+        h.Normalize();
+
+        // Same construction the angel uses: the circle sits one radius to the side of the rock,
+        // and the curve is swept back a quarter turn from the touchdown point to find its start.
+        Vector2 n         = new Vector2(h.y, -h.x);
+        Vector2 arcCentre = n * r;                   // metres, relative to the rock
+        float   endAngle  = Mathf.Atan2(-arcCentre.y, -arcCentre.x);
+        float   entry     = endAngle + 90f * Mathf.Deg2Rad;
+
+        const int steps = 24;
+        var pts = new Vector3[steps + 1];
+        for (int k = 0; k <= steps; k++)
+        {
+            float a  = Mathf.Lerp(entry, endAngle, k / (float)steps);
+            var   pm = arcCentre + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * r;   // metres from rock
+
+            // Metres to pixels. The canvas puts +Z up the screen, so the vertical flips.
+            pts[k] = new Vector3(centrePx.x + pm.x * pxPerUnit,
+                                 centrePx.y - pm.y * pxPerUnit, 0f);
+        }
+
+        var st = _style.angelLandingCurve;
+        Handles.color = st.color;
+        Handles.DrawAAPolyLine(Mathf.Max(0.5f, st.width), pts);
+
+        // A dot where the curve begins, so which end is the approach is never in doubt.
+        DrawMarker(new Vector2(pts[0].x, pts[0].y), Mathf.Max(st.width * 1.2f, 3f), st);
+    }
+
     // A slider whose travel is weighted toward the low end (power > 1), so small values are easy to
     // dial in while a wide top range stays reachable, paired with a box for typing an exact value.
     // The handle position is power-mapped but the number shown is the real value.
-    static float LowEndSlider(GUIContent label, float value, float min, float max, float power)
+    public static float LowEndSlider(GUIContent label, float value, float min, float max, float power)
     {
         value = Mathf.Clamp(value, min, max);
         using (new EditorGUILayout.HorizontalScope())
@@ -9053,9 +9721,12 @@ public class GridDesignerWindow : EditorWindow
                 var   cfg = s.Config;
                 float sc  = s.EffectiveScale;
                 string climb = s.climbable ? " · climbable" : "";
+                string perch = s.angelPerchPoint
+                    ? (s.angelPriorityPerch ? " · angel perch (priority)" : " · angel perch")
+                    : "";
                 string name  = s.preset != null ? s.preset.name : "default shape";
                 EditorGUILayout.LabelField(
-                    $"{name} · ⌀{cfg.radiusWaterline * 2f * sc:0.##} m · {cfg.heightAboveWater * sc:0.##} m tall{climb}",
+                    $"{name} · ⌀{cfg.radiusWaterline * 2f * sc:0.##} m · {cfg.heightAboveWater * sc:0.##} m tall{climb}{perch}",
                     EditorStyles.miniLabel);
             }
             else
@@ -9085,13 +9756,93 @@ public class GridDesignerWindow : EditorWindow
 
                 float scale = LowEndSlider(
                     new GUIContent("Size", "Multiplier on the whole preset, so one shape furnishes boulders and " +
-                                           "pebbles alike. 1 = the preset's own size. The slider is weighted toward " +
-                                           "the low end for fine-tuning small rocks; type an exact value in the box."),
-                    s.EffectiveScale, 0.1f, 6f, power: 3f);
+                                           "pebbles alike. 1 = the preset's own size. The slider is weighted hard " +
+                                           "toward the low end for fine-tuning small rocks; type an exact value in the box."),
+                    s.EffectiveScale, 0.05f, 6f, power: 5f);
 
                 bool climbable = EditorGUILayout.Toggle(
                     new GUIContent("Climbable", "Fit the creepy guy's rings to this rock at spawn so he can surface on it, climb it and leap from it."),
                     s.climbable);
+
+                bool angelPerch = EditorGUILayout.Toggle(
+                    new GUIContent("Angel perch point", "Mark this rock's tip as a spot the angel can swoop down from her flight and land on. Off = she flies straight over it."),
+                    s.angelPerchPoint);
+
+                // The ranges, priority flag and talk settings only mean anything on a rock she can use.
+                float  angelPerchRadius = s.angelPerchRadius;
+                float  angelCurveSize   = s.angelLandingCurveSize;
+                float  angelTalkRadius  = s.angelTalkRadius;
+                bool   angelPriority    = s.angelPriorityPerch;
+                bool   angelTalk        = s.angelTalkEnabled;
+                string angelTalkText    = s.angelTalkText;
+                if (angelPerch)
+                {
+                    EditorGUI.indentLevel++;
+
+                    angelPriority = EditorGUILayout.Toggle(
+                        new GUIContent("Priority perch", "She always comes down here the moment the boat enters the " +
+                                                         "perch range — a place you can rely on meeting her. Off makes it " +
+                                                         "a rock she is only WATCHING: she settles here now and then, when " +
+                                                         "she happens to be looking for somewhere to land."),
+                        angelPriority);
+
+                    angelPerchRadius = EditorGUILayout.FloatField(
+                        new GUIContent("Perch range (m)", "Sail inside this and she comes down onto this rock; sail back " +
+                                                          "out of it and she leaves."),
+                        angelPerchRadius);
+
+                    angelCurveSize = EditorGUILayout.FloatField(
+                        new GUIContent("Landing curve (m)", "Size of the curve she lands along, drawn on the canvas so you " +
+                                                            "can keep it off the walls and blocks around this rock. She flies " +
+                                                            "to where the curve begins, behind the rock, then rides it round " +
+                                                            "and touches down facing the boat. 0 = straight at the rock."),
+                        angelCurveSize);
+
+                    // Talk is the decisive per-perch feature: off, she just perches; on, the talk
+                    // camera + dialogue arm inside the talk range, and she says the line below.
+                    angelTalk = EditorGUILayout.Toggle(
+                        new GUIContent("Talk (AngelTalk)", "Arm the talk camera + dialogue on this perch. Off = she " +
+                                                           "just perches here and the talk key does nothing."),
+                        angelTalk);
+
+                    if (angelTalk)
+                    {
+                        EditorGUI.indentLevel++;
+                        angelTalkRadius = EditorGUILayout.FloatField(
+                            new GUIContent("Talk range (m)", "Sail inside this, with her perched here, and the talk key " +
+                                                             "starts a conversation. Kept inside the perch range."),
+                            angelTalkRadius);
+
+                        EditorGUILayout.LabelField(new GUIContent("What she says",
+                            "Shown in the level's dialogue box when you talk to her here. Separate lines with " +
+                            "a slash — she shows one at a time and the talk key steps through them, ending the " +
+                            "conversation after the last. Blank = the camera still cuts to her and she talks, " +
+                            "but no text comes up."));
+                        angelTalkText = EditorGUILayout.TextArea(angelTalkText ?? "", GUILayout.MinHeight(42));
+
+                        // What that string actually becomes, so the slashes can be checked without
+                        // entering play mode. There is no character limit in the dialogue box — a
+                        // line longer than the text object simply overflows it — so seeing the
+                        // lengths here is the only warning you get.
+                        var talkLines = SplitAngelTalkLines(angelTalkText);
+                        if (talkLines.Count == 0)
+                            EditorGUILayout.LabelField("No text — she talks, but silently.", EditorStyles.miniLabel);
+                        else
+                        {
+                            EditorGUILayout.LabelField(
+                                $"{talkLines.Count} line{(talkLines.Count == 1 ? "" : "s")}, one press each",
+                                EditorStyles.miniLabel);
+                            EditorGUI.indentLevel++;
+                            for (int li = 0; li < talkLines.Count; li++)
+                                EditorGUILayout.LabelField($"{li + 1}. {talkLines[li]}  ({talkLines[li].Length})",
+                                                           EditorStyles.miniLabel);
+                            EditorGUI.indentLevel--;
+                        }
+                        EditorGUI.indentLevel--;
+                    }
+
+                    EditorGUI.indentLevel--;
+                }
 
                 Vector2 center = EditorGUILayout.Vector2Field("Centre X/Z (norm)", s.center);
 
@@ -9101,6 +9852,15 @@ public class GridDesignerWindow : EditorWindow
                     s.preset    = preset;
                     s.scale     = Mathf.Max(0.01f, scale);
                     s.climbable = climbable;
+                    s.angelPerchPoint    = angelPerch;
+                    s.angelPriorityPerch = angelPriority;
+                    s.angelPerchRadius   = Mathf.Max(0f, angelPerchRadius);
+                    s.angelLandingCurveSize = Mathf.Max(0f, angelCurveSize);
+                    // Clamped, not just warned about: a talk range reaching past the range that
+                    // brought her here would arm the key for a boat she is already leaving.
+                    s.angelTalkRadius    = Mathf.Clamp(angelTalkRadius, 0f, s.angelPerchRadius);
+                    s.angelTalkEnabled   = angelTalk;
+                    s.angelTalkText      = angelTalkText;
                     s.center    = new Vector2(Mathf.Clamp(center.x, -0.5f, 0.5f),
                                               Mathf.Clamp(center.y, -0.5f, 0.5f));
                     EditorUtility.SetDirty(loadedData);

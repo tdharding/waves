@@ -41,6 +41,9 @@ public class WaveMaterialController : MonoBehaviour
         // Strength 0 = constant width, so legacy presets deserializing to 0 are already correct.
         public float SoulFishTaperStrength;
         public float SoulFishTaperScale;
+        // Hollow centre for circular pools, as a fraction of the pool radius. 0 = solid disc, so
+        // legacy presets deserializing to 0 already carry the old look.
+        public float SoulFishPoolHole;
         public Vector2 ZoneTiling;
         public float ZoneScrollSpeed;
         public float ZoneNoiseStrength;
@@ -71,14 +74,61 @@ public class WaveMaterialController : MonoBehaviour
         // is not — the noise would degenerate to a constant — so NormalizeRockRings guards on scale.
         public float RockRingDistortStrength;
         public float RockRingDistortScale;
-        // How much wider a band is by the end of its life. 1 = constant width; a preset predating
-        // this deserializes as 0, which would mean "narrower than nothing" — so it rides the same
-        // sentinel as the distortion it arrived beside, and the shader clamps it to 1 regardless.
+        // Band shape. Width is the fraction of its cycle a band fills at the rock; the multiplier
+        // is what that has grown to by the end of its life; softness is how hard its rim is.
+        // A zero width is never a real setting (there would be no band), so it marks a preset that
+        // predates these and back-fills all three. A zero softness IS real — a hard-edged ring —
+        // so it rides the width guard rather than its own.
+        public float RockRingWidth;
         public float RockRingWidthMultiplier;
+        public float RockRingSoftness;
         // The LOD range is applied on the CPU by RockRingManager, not by the shader — the fade is
         // the same for every pixel of a rock, so working it out per pixel would be waste.
         public float RockRingLodRadius;
         public float RockRingLodFeather;
+
+        // Bands across the water. One family of white lines running right across the map in a
+        // single direction, snaking as they go and wobbling harder wherever they pass a rock.
+        // Unlike the two ring fields above, nothing here radiates from a point — the direction is
+        // authored, which is why the angle rides through the preset like everything else.
+        // Frequency 0 marks a preset that predates them (a zero band spacing is never a real
+        // configuration), so NormalizeWaveBands back-fills.
+        public float WaveBandAngle;
+        public float WaveBandFrequency;
+        public float WaveBandSpeed;
+        public float WaveBandStrength;
+        public float WaveBandWidth;
+        public float WaveBandSoftness;
+        // Two layers of waviness because the drawing has both: a steady swing every line shares,
+        // and an irregular drift off it so the family never looks stamped. A zero on either is a
+        // real setting (ruler-straight lines, or a pure sine), so neither can guard itself — both
+        // ride the Frequency guard.
+        public float WaveBandWaviness;
+        public float WaveBandWavinessScale;
+        public float WaveBandMeanderStrength;
+        public float WaveBandMeanderScale;
+        // Rock disturbance. The lines carry straight on through as one family; a rock only makes
+        // them wobble harder. Distort 0 (the rock leaves them alone) and Bevel 0 (the wobble eases
+        // away rather than stopping on a crease) are both real settings, so they ride the guard too.
+        public float WaveBandRockDistort;
+        public float WaveBandRockReach;
+        public float WaveBandRockBevel;
+        // Fine grain, inverted through the lines: adds in the open water, subtracts on the bands.
+        // Strength 0 is a real setting (no grain at all), but a zero speck size is not — the field
+        // would divide by nothing — so NormalizeWaveBands guards on size, the same way the rock
+        // rings guard on their distortion scale rather than its strength.
+        public float WaveBandGrainStrength;
+        public float WaveBandGrainSize;
+
+        // The black gathered where an object meets the water. Unlike everything above it, this one
+        // is not drawn on the water at all — it is read by the spikes, the blocks and the spline
+        // walls, which is exactly why it belongs here: one height in the preset, and every object
+        // in the level takes the same band. Height 0 is never a real configuration (there would be
+        // no gradient to see), so it marks a preset that predates this and NormalizeWaterlineGradient
+        // back-fills all three.
+        public float WaterlineGradientHeight;
+        public float WaterlineGradientStrength;
+        public float WaterlineGradientFalloff;
 
         public float WaveStepRate;
         public Color BaseColor;
@@ -121,6 +171,11 @@ public class WaveMaterialController : MonoBehaviour
     [Tooltip("Pinches per world unit along the path. Low = long lazy tapers, high = a beaded channel.")]
     public float soulFishTaperScale = 0.15f;
 
+    [Tooltip("Hollow centre for circular pools (street lights, fish-bowl sources, single-node zones), " +
+             "as a fraction of that pool's radius. 0 = solid disc, 0.4 = a ring with clear water at the " +
+             "lamp. Corridors are unaffected.")]
+    [Range(0f, 0.9f)] public float soulFishPoolHole = 0.27f;
+
     [Header("Rock Rings")]
     [Tooltip("How far the bands push brightness either side of neutral. 0 = the effect is gone.")]
     public float rockRingStrength = 0.25f;
@@ -146,14 +201,83 @@ public class WaveMaterialController : MonoBehaviour
     public float rockRingDistortStrength = 0.08f;
     [Tooltip("World-space frequency of that field. Low = long lazy wanders, high = a ragged edge.")]
     public float rockRingDistortScale = 0.35f;
-    [Tooltip("How much wider a band has grown by the end of its life — from the rock (1x) out to " +
-             "where it fades. 1 = every band the same width all the way; 3 = roughly three times as " +
-             "wide by the time it goes, the way a ripple loses its edge as it spreads.")]
+    [Tooltip("How much of its cycle a band fills as it leaves the rock. 0.5 fills half the gap to " +
+             "the next band; low values give thin rings with wide water between them.")]
+    [Range(0.02f, 1f)] public float rockRingWidth = 0.4f;
+    [Tooltip("What that width has been multiplied by when the band fades. 1 = the same width all " +
+             "the way out; 3 = genuinely three times as wide by the end of its life.")]
     public float rockRingWidthMultiplier = 1f;
+    [Tooltip("How the band's rim falls away. 0 = a hard-edged ring; 1 = falls off from the centre, " +
+             "reading much like a wave.")]
+    [Range(0f, 1f)] public float rockRingSoftness = 1f;
     [Tooltip("Rocks further than this from the boat throw no bands at all.")]
     public float rockRingLodRadius = 18f;
     [Tooltip("Fraction of that distance a rock stays at full strength before fading out.")]
     [Range(0f, 1f)] public float rockRingLodFeather = 0.75f;
+
+    [Header("Wave Bands")]
+    [Tooltip("Which way the family of lines runs across the map, in degrees. Unlike the rings, " +
+             "these do not radiate from anywhere — the direction is authored, and it rides through " +
+             "the preset so each level can lay its water down its own way.")]
+    [Range(0f, 360f)] public float waveBandAngle = 30f;
+    [Tooltip("Lines per world unit — how tightly packed they are. Low gives the few long bands of " +
+             "the drawing; high gives a fine grain.")]
+    public float waveBandFrequency = 0.08f;
+    [Tooltip("How fast the lines drift across the water. Accumulated on the CPU, so changing this " +
+             "mid-level slides them instead of teleporting them.")]
+    public float waveBandSpeed = 0.15f;
+    [Tooltip("Peak whiteness of a line. 0 = the effect is gone, and the water returns to exactly " +
+             "what it was — this can only ever brighten, never darken.")]
+    public float waveBandStrength = 0.35f;
+    [Tooltip("How much of its cycle a line fills. Low values give thin lines with wide water " +
+             "between them, which is what the drawing has.")]
+    [Range(0.02f, 0.98f)] public float waveBandWidth = 0.12f;
+    [Tooltip("How a line's edge falls away. 0 = a hard-edged line; 1 = falls off from its centre.")]
+    [Range(0f, 1f)] public float waveBandSoftness = 0.6f;
+    [Tooltip("How far each line swings side to side, in band-widths. This is the regular S-curve — " +
+             "the whole family swings together, the way one body of water carries them all. " +
+             "0 = ruler-straight lines.")]
+    public float waveBandWaviness = 0.5f;
+    [Tooltip("How often that swing repeats along a line's length. Low = a long slow snake; " +
+             "high = a tight ripple.")]
+    public float waveBandWavinessScale = 0.12f;
+    [Tooltip("How far a noise field drifts the lines off that steady swing, in band-widths. " +
+             "0 = a pure, identical sine on every line, which reads as printed rather than drawn.")]
+    public float waveBandMeanderStrength = 0.25f;
+    [Tooltip("World-space frequency of that drift. Low = long lazy wanders; high = a ragged line.")]
+    public float waveBandMeanderScale = 0.05f;
+    [Tooltip("How much harder the lines wobble at a rock, in band-widths. They carry straight on " +
+             "through as one family — a rock disturbs them, it does not part them. 0 = the rock " +
+             "leaves them alone.")]
+    public float waveBandRockDistort = 0.9f;
+    [Tooltip("How far past a rock's waterline radius the disturbance reaches, as a multiple of " +
+             "that radius — so a big spike unsettles more water than a pebble.")]
+    public float waveBandRockReach = 3f;
+    [Tooltip("How the disturbance dies away toward that limit. 0 = it eases off in a dome and you " +
+             "cannot see where it stops; 1 = it holds its strength and then stops on a crease.")]
+    [Range(0f, 1f)] public float waveBandRockBevel = 0.35f;
+    [Tooltip("How hard a fine grain bites into the water. It is inverted through the lines: it " +
+             "speckles white into the gaps and eats white out of the bands, so the same field " +
+             "does both. 0 = no grain.")]
+    public float waveBandGrainStrength = 0.15f;
+    [Tooltip("World-space size of one speck. Small gives the fine grain; large gives a coarse " +
+             "mottle. Static in world space — it is the water's texture, not something drifting " +
+             "across it.")]
+    public float waveBandGrainSize = 0.25f;
+
+    [Header("Waterline Black Gradient")]
+    [Tooltip("How far up an object the black reaches before it is gone, in world units. Measured " +
+             "from the water it is standing in, not from the mesh, so a spike, a block and a wall " +
+             "all take the same band whatever shape they are. This is the global height — every " +
+             "object using the effect moves together.")]
+    public float waterlineGradientHeight = 0.07f;
+    [Tooltip("How black it is right at the waterline. 0 = the effect is gone and objects are left " +
+             "exactly as they were.")]
+    [Range(0f, 1f)] public float waterlineGradientStrength = 0.8f;
+    [Tooltip("How the black gives way as it climbs. 1 = an even ramp; higher gathers it in a tight " +
+             "line against the water; lower spreads it up the object. The height it finally reaches " +
+             "zero at does not move.")]
+    public float waterlineGradientFalloff = 1.5f;
 
     [Header("Wave Material (Shared Instance)")]
     public Material waveMaterial;
@@ -192,6 +316,7 @@ public class WaveMaterialController : MonoBehaviour
 
     private float _accumulatedPhase = 0f;
     private float _rockRingPhase = 0f;
+    private float _waveBandPhase = 0f;
     private const float TWO_PI = 6.283185f;
 
     private bool isModifierActive = false;
@@ -253,6 +378,12 @@ public class WaveMaterialController : MonoBehaviour
         if (_rockRingPhase > TWO_PI) _rockRingPhase -= TWO_PI;
         else if (_rockRingPhase < 0) _rockRingPhase += TWO_PI;
 
+        // And the bands across the water, for the same reason again. 2pi is exactly one band
+        // cycle in WaveBands.hlsl, so the wrap is invisible.
+        _waveBandPhase += currentGlobalState.WaveBandSpeed * Time.deltaTime;
+        if (_waveBandPhase > TWO_PI) _waveBandPhase -= TWO_PI;
+        else if (_waveBandPhase < 0) _waveBandPhase += TWO_PI;
+
         ApplyCombinedState();
     }
 
@@ -284,6 +415,7 @@ public class WaveMaterialController : MonoBehaviour
         res.SoulFishEdgeNoiseScale2 = Mathf.SmoothDamp(current.SoulFishEdgeNoiseScale2, target.SoulFishEdgeNoiseScale2, ref vel.SoulFishEdgeNoiseScale2, smoothTime);
         res.SoulFishTaperStrength = Mathf.SmoothDamp(current.SoulFishTaperStrength, target.SoulFishTaperStrength, ref vel.SoulFishTaperStrength, smoothTime);
         res.SoulFishTaperScale = Mathf.SmoothDamp(current.SoulFishTaperScale, target.SoulFishTaperScale, ref vel.SoulFishTaperScale, smoothTime);
+        res.SoulFishPoolHole = Mathf.SmoothDamp(current.SoulFishPoolHole, target.SoulFishPoolHole, ref vel.SoulFishPoolHole, smoothTime);
         res.SoulFishEdgeNoiseSpeed = Mathf.SmoothDamp(current.SoulFishEdgeNoiseSpeed, target.SoulFishEdgeNoiseSpeed, ref vel.SoulFishEdgeNoiseSpeed, smoothTime);
         res.ZoneTiling.x = Mathf.SmoothDamp(current.ZoneTiling.x, target.ZoneTiling.x, ref vel.ZoneTiling.x, smoothTime);
         res.ZoneTiling.y = Mathf.SmoothDamp(current.ZoneTiling.y, target.ZoneTiling.y, ref vel.ZoneTiling.y, smoothTime);
@@ -302,9 +434,31 @@ public class WaveMaterialController : MonoBehaviour
         res.RockRingRectify = Mathf.SmoothDamp(current.RockRingRectify, target.RockRingRectify, ref vel.RockRingRectify, smoothTime);
         res.RockRingDistortStrength = Mathf.SmoothDamp(current.RockRingDistortStrength, target.RockRingDistortStrength, ref vel.RockRingDistortStrength, smoothTime);
         res.RockRingDistortScale = Mathf.SmoothDamp(current.RockRingDistortScale, target.RockRingDistortScale, ref vel.RockRingDistortScale, smoothTime);
+        res.RockRingWidth = Mathf.SmoothDamp(current.RockRingWidth, target.RockRingWidth, ref vel.RockRingWidth, smoothTime);
         res.RockRingWidthMultiplier = Mathf.SmoothDamp(current.RockRingWidthMultiplier, target.RockRingWidthMultiplier, ref vel.RockRingWidthMultiplier, smoothTime);
+        res.RockRingSoftness = Mathf.SmoothDamp(current.RockRingSoftness, target.RockRingSoftness, ref vel.RockRingSoftness, smoothTime);
         res.RockRingLodRadius = Mathf.SmoothDamp(current.RockRingLodRadius, target.RockRingLodRadius, ref vel.RockRingLodRadius, smoothTime);
         res.RockRingLodFeather = Mathf.SmoothDamp(current.RockRingLodFeather, target.RockRingLodFeather, ref vel.RockRingLodFeather, smoothTime);
+        // The angle takes the short way round rather than unwinding the long way: a preset at 350
+        // handing over to one at 10 should swing the water 20 degrees, not 340.
+        res.WaveBandAngle = Mathf.SmoothDampAngle(current.WaveBandAngle, target.WaveBandAngle, ref vel.WaveBandAngle, smoothTime);
+        res.WaveBandFrequency = Mathf.SmoothDamp(current.WaveBandFrequency, target.WaveBandFrequency, ref vel.WaveBandFrequency, smoothTime);
+        res.WaveBandSpeed = Mathf.SmoothDamp(current.WaveBandSpeed, target.WaveBandSpeed, ref vel.WaveBandSpeed, smoothTime);
+        res.WaveBandStrength = Mathf.SmoothDamp(current.WaveBandStrength, target.WaveBandStrength, ref vel.WaveBandStrength, smoothTime);
+        res.WaveBandWidth = Mathf.SmoothDamp(current.WaveBandWidth, target.WaveBandWidth, ref vel.WaveBandWidth, smoothTime);
+        res.WaveBandSoftness = Mathf.SmoothDamp(current.WaveBandSoftness, target.WaveBandSoftness, ref vel.WaveBandSoftness, smoothTime);
+        res.WaveBandWaviness = Mathf.SmoothDamp(current.WaveBandWaviness, target.WaveBandWaviness, ref vel.WaveBandWaviness, smoothTime);
+        res.WaveBandWavinessScale = Mathf.SmoothDamp(current.WaveBandWavinessScale, target.WaveBandWavinessScale, ref vel.WaveBandWavinessScale, smoothTime);
+        res.WaveBandMeanderStrength = Mathf.SmoothDamp(current.WaveBandMeanderStrength, target.WaveBandMeanderStrength, ref vel.WaveBandMeanderStrength, smoothTime);
+        res.WaveBandMeanderScale = Mathf.SmoothDamp(current.WaveBandMeanderScale, target.WaveBandMeanderScale, ref vel.WaveBandMeanderScale, smoothTime);
+        res.WaveBandRockDistort = Mathf.SmoothDamp(current.WaveBandRockDistort, target.WaveBandRockDistort, ref vel.WaveBandRockDistort, smoothTime);
+        res.WaveBandRockReach = Mathf.SmoothDamp(current.WaveBandRockReach, target.WaveBandRockReach, ref vel.WaveBandRockReach, smoothTime);
+        res.WaveBandRockBevel = Mathf.SmoothDamp(current.WaveBandRockBevel, target.WaveBandRockBevel, ref vel.WaveBandRockBevel, smoothTime);
+        res.WaveBandGrainStrength = Mathf.SmoothDamp(current.WaveBandGrainStrength, target.WaveBandGrainStrength, ref vel.WaveBandGrainStrength, smoothTime);
+        res.WaveBandGrainSize = Mathf.SmoothDamp(current.WaveBandGrainSize, target.WaveBandGrainSize, ref vel.WaveBandGrainSize, smoothTime);
+        res.WaterlineGradientHeight = Mathf.SmoothDamp(current.WaterlineGradientHeight, target.WaterlineGradientHeight, ref vel.WaterlineGradientHeight, smoothTime);
+        res.WaterlineGradientStrength = Mathf.SmoothDamp(current.WaterlineGradientStrength, target.WaterlineGradientStrength, ref vel.WaterlineGradientStrength, smoothTime);
+        res.WaterlineGradientFalloff = Mathf.SmoothDamp(current.WaterlineGradientFalloff, target.WaterlineGradientFalloff, ref vel.WaterlineGradientFalloff, smoothTime);
         res.WaveStepRate = Mathf.SmoothDamp(current.WaveStepRate, target.WaveStepRate, ref vel.WaveStepRate, smoothTime);
         
         // Specialized LERPs for Colors/Vectors (Damping approach)
@@ -362,7 +516,19 @@ public class WaveMaterialController : MonoBehaviour
         SetGlobalsBackedFloat("_SoulFishEdgeNoiseScale2",   currentGlobalState.SoulFishEdgeNoiseScale2);
         SetGlobalsBackedFloat("_SoulFishTaperStrength",     currentGlobalState.SoulFishTaperStrength);
         SetGlobalsBackedFloat("_SoulFishTaperScale",        currentGlobalState.SoulFishTaperScale);
+        SetGlobalsBackedFloat("_SoulFishPoolHole",          currentGlobalState.SoulFishPoolHole);
         SetGlobalsBackedFloat("_SoulFishEdgeNoiseSpeed",    currentGlobalState.SoulFishEdgeNoiseSpeed);
+        // Same story, and these two matter most: _SoulFishStrength multiplies the whole mask
+        // (SoulFishWaveMask.hlsl:231), so at 0 the zone vanishes off the water entirely. Unlike
+        // _SoulFishMaskStrength above they have no serialized value on the material — the .mat
+        // only carries the legacy _SoulFishRadius1..10 / _SoulFishStrength1..10 — so a shader
+        // reimport (saving any shadergraph) rebuilds the material with them at 0 and nothing
+        // puts them back. Pushed here per frame rather than once at BeginGameplay for that reason.
+        // Source is the inspector field, not currentGlobalState.SoulFishRadius — the preset field
+        // exists and is smooth-damped but has never reached the shader, so reading it here would
+        // silently change every level's zone width. Left as-is deliberately.
+        SetGlobalsBackedFloat("_SoulFishRadius",            soulFishRadius);
+        SetGlobalsBackedFloat("_SoulFishStrength",          soulFishStrength);
         waveMaterial.SetVector("_ZoneTiling",               currentGlobalState.ZoneTiling);
         waveMaterial.SetFloat("_ZoneScrollSpeed",           currentGlobalState.ZoneScrollSpeed);
         waveMaterial.SetFloat("_ZoneNoiseStrength",         currentGlobalState.ZoneNoiseStrength);
@@ -381,11 +547,41 @@ public class WaveMaterialController : MonoBehaviour
         SetGlobalsBackedFloat("_RockRingRectify",      currentGlobalState.RockRingRectify);
         SetGlobalsBackedFloat("_RockRingDistortStrength", currentGlobalState.RockRingDistortStrength);
         SetGlobalsBackedFloat("_RockRingDistortScale",    currentGlobalState.RockRingDistortScale);
+        SetGlobalsBackedFloat("_RockRingWidth",           currentGlobalState.RockRingWidth);
         SetGlobalsBackedFloat("_RockRingWidthMultiplier", currentGlobalState.RockRingWidthMultiplier);
+        SetGlobalsBackedFloat("_RockRingSoftness",        currentGlobalState.RockRingSoftness);
         SetGlobalsBackedFloat("_RockRingPhase",        _rockRingPhase);
         // The LOD range never reaches the shader — RockRingManager applies it when it decides
         // which rocks to push at all, which is where the saving actually is.
         RockRingManager.SetLod(currentGlobalState.RockRingLodRadius, currentGlobalState.RockRingLodFeather);
+
+        // Bands across the water. Bare $Globals in WaveBands.hlsl, same as the rings above — and
+        // there is no LOD line here because the bands read the rocks the manager already pushed
+        // rather than standing up a second set.
+        SetGlobalsBackedFloat("_WaveBandAngle",           currentGlobalState.WaveBandAngle);
+        SetGlobalsBackedFloat("_WaveBandFrequency",       currentGlobalState.WaveBandFrequency);
+        SetGlobalsBackedFloat("_WaveBandStrength",        currentGlobalState.WaveBandStrength);
+        SetGlobalsBackedFloat("_WaveBandWidth",           currentGlobalState.WaveBandWidth);
+        SetGlobalsBackedFloat("_WaveBandSoftness",        currentGlobalState.WaveBandSoftness);
+        SetGlobalsBackedFloat("_WaveBandWaviness",        currentGlobalState.WaveBandWaviness);
+        SetGlobalsBackedFloat("_WaveBandWavinessScale",   currentGlobalState.WaveBandWavinessScale);
+        SetGlobalsBackedFloat("_WaveBandMeanderStrength", currentGlobalState.WaveBandMeanderStrength);
+        SetGlobalsBackedFloat("_WaveBandMeanderScale",    currentGlobalState.WaveBandMeanderScale);
+        SetGlobalsBackedFloat("_WaveBandRockDistort",     currentGlobalState.WaveBandRockDistort);
+        SetGlobalsBackedFloat("_WaveBandRockReach",       currentGlobalState.WaveBandRockReach);
+        SetGlobalsBackedFloat("_WaveBandRockBevel",       currentGlobalState.WaveBandRockBevel);
+        SetGlobalsBackedFloat("_WaveBandGrainStrength",   currentGlobalState.WaveBandGrainStrength);
+        SetGlobalsBackedFloat("_WaveBandGrainSize",       currentGlobalState.WaveBandGrainSize);
+        SetGlobalsBackedFloat("_WaveBandPhase",           _waveBandPhase);
+
+        // The black at the waterline. Bare $Globals in WaterlineBlackGradient.hlsl, same as the
+        // rings and the bands — but note the material write here is only along for the ride: the
+        // effect lives on the SPIKES, BLOCKS and WALLS, not on the water, so the global write is
+        // the only one any of them ever sees. That is also what makes the height global: one push
+        // a frame moves every object using it together.
+        SetGlobalsBackedFloat("_WaterlineGradientHeight",   currentGlobalState.WaterlineGradientHeight);
+        SetGlobalsBackedFloat("_WaterlineGradientStrength", currentGlobalState.WaterlineGradientStrength);
+        SetGlobalsBackedFloat("_WaterlineGradientFalloff",  currentGlobalState.WaterlineGradientFalloff);
 
         waveMaterial.SetFloat("_WaveStepRate", currentGlobalState.WaveStepRate);
         waveMaterial.SetColor("_BaseColor",    currentGlobalState.BaseColor);
@@ -470,6 +666,9 @@ public class WaveMaterialController : MonoBehaviour
         {
             s.SoulFishTaperStrength = soulFishTaperStrength;
             s.SoulFishTaperScale    = soulFishTaperScale;
+            // Rides the same "preset predates the taper" test — a hole of 0 is a legitimate value
+            // (solid disc), so it has no zero-check of its own to fall back on.
+            s.SoulFishPoolHole      = soulFishPoolHole;
         }
         return s;
     }
@@ -500,14 +699,78 @@ public class WaveMaterialController : MonoBehaviour
         {
             s.RockRingDistortStrength = rockRingDistortStrength;
             s.RockRingDistortScale    = rockRingDistortScale;
+        }
+        // The band shape needs its OWN guard, not the distortion's. A preset saved between the two
+        // changes carries a live distort scale — so the guard above never fires — while these
+        // deserialize as 0 and the bands vanish entirely. A zero width is never something anyone
+        // set on purpose, which makes it a reliable marker for "this preset predates the field".
+        if (s.RockRingWidth <= 0.0001f)
+        {
+            s.RockRingWidth           = rockRingWidth;
             s.RockRingWidthMultiplier = rockRingWidthMultiplier;
+            s.RockRingSoftness        = rockRingSoftness;
         }
         return s;
     }
 
+    // Every preset in the project predates the bands, so all thirteen fields deserialize as 0 —
+    // and a zero band spacing is never a real configuration, so it marks them the same way a zero
+    // band count marks the rings above. One guard covers the lot: a zero angle, a zero waviness,
+    // a zero meander, a zero rock distort and a zero bevel are all real settings someone might
+    // choose, so not one of them can be trusted to mark an unset preset on its own.
+    private WaveState NormalizeWaveBands(WaveState s)
+    {
+        if (s.WaveBandFrequency <= 0.0001f)
+        {
+            s.WaveBandAngle           = waveBandAngle;
+            s.WaveBandFrequency       = waveBandFrequency;
+            s.WaveBandSpeed           = waveBandSpeed;
+            s.WaveBandStrength        = waveBandStrength;
+            s.WaveBandWidth           = waveBandWidth;
+            s.WaveBandSoftness        = waveBandSoftness;
+            s.WaveBandWaviness        = waveBandWaviness;
+            s.WaveBandWavinessScale   = waveBandWavinessScale;
+            s.WaveBandMeanderStrength = waveBandMeanderStrength;
+            s.WaveBandMeanderScale    = waveBandMeanderScale;
+            s.WaveBandRockDistort     = waveBandRockDistort;
+            s.WaveBandRockReach       = waveBandRockReach;
+            s.WaveBandRockBevel       = waveBandRockBevel;
+        }
+        // The grain landed after the bands did, so a preset saved in between carries a live band
+        // spacing — the guard above never fires — while these two deserialize as 0 and the grain
+        // is silently absent. Guarded on size, not strength: a zero strength is a real choice
+        // (no grain), a zero speck size is not. Same split as the rock rings' distortion.
+        if (s.WaveBandGrainSize <= 0.0001f)
+        {
+            s.WaveBandGrainStrength = waveBandGrainStrength;
+            s.WaveBandGrainSize     = waveBandGrainSize;
+        }
+        return s;
+    }
+
+    // Every preset in the project predates the waterline gradient, so all three fields deserialize
+    // as 0 — and a zero height is never a real configuration, because there would be no gradient at
+    // all. One guard covers the lot: a zero strength IS a real setting (the effect switched off for
+    // a level that wants its objects clean), so it cannot be trusted to mark an unset preset, and
+    // neither can a zero falloff. Same reasoning as NormalizeWaveBands above.
+    private WaveState NormalizeWaterlineGradient(WaveState s)
+    {
+        if (s.WaterlineGradientHeight <= 0.0001f)
+        {
+            s.WaterlineGradientHeight   = waterlineGradientHeight;
+            s.WaterlineGradientStrength = waterlineGradientStrength;
+            s.WaterlineGradientFalloff  = waterlineGradientFalloff;
+        }
+        return s;
+    }
+
+    // One place the four normalizers are applied, so a new preset route cannot quietly skip one.
+    private WaveState NormalizeState(WaveState s) =>
+        NormalizeWaterlineGradient(NormalizeWaveBands(NormalizeRockRings(NormalizeSoulFishEdgeNoise(s))));
+
     public void ApplyStateInstant(WaveState state)
     {
-        state = NormalizeRockRings(NormalizeSoulFishEdgeNoise(state));
+        state = NormalizeState(state);
         targetGlobalState = state;
         _baselineState = state;
         currentGlobalState = state;
@@ -548,14 +811,14 @@ public class WaveMaterialController : MonoBehaviour
     {
         if (preset == null) yield break;
         LevelAudioController.Instance?.OnPresetChanged(preset);
-        targetGlobalState = NormalizeRockRings(NormalizeSoulFishEdgeNoise(preset.state));
+        targetGlobalState = NormalizeState(preset.state);
         WaveLightController.Instance?.ApplyPreset(preset);
         yield break;
     }
 
     public IEnumerator TransitionToState(WaveState targetState, float duration)
     {
-        targetGlobalState = NormalizeRockRings(NormalizeSoulFishEdgeNoise(targetState));
+        targetGlobalState = NormalizeState(targetState);
         generalSmoothTime = duration;
         yield break;
     }
@@ -563,8 +826,8 @@ public class WaveMaterialController : MonoBehaviour
     public void ApplySoulFishMaskSettings()
     {
         if (!waveMaterial) return;
-        waveMaterial.SetFloat("_SoulFishRadius",   soulFishRadius);
-        waveMaterial.SetFloat("_SoulFishStrength", soulFishStrength);
+        SetGlobalsBackedFloat("_SoulFishRadius",   soulFishRadius);
+        SetGlobalsBackedFloat("_SoulFishStrength", soulFishStrength);
         waveMaterial.SetFloat("_SoulFishFadeStart",         soulFishFadeStart);
         waveMaterial.SetFloat("_SoulFishEdgeNoiseStrength", soulFishEdgeNoiseStrength);
         waveMaterial.SetFloat("_SoulFishEdgeNoiseScale",    soulFishEdgeNoiseScale);
@@ -572,6 +835,7 @@ public class WaveMaterialController : MonoBehaviour
         waveMaterial.SetFloat("_SoulFishEdgeNoiseSpeed",    soulFishEdgeNoiseSpeed);
         waveMaterial.SetFloat("_SoulFishTaperStrength",     soulFishTaperStrength);
         waveMaterial.SetFloat("_SoulFishTaperScale",        soulFishTaperScale);
+        waveMaterial.SetFloat("_SoulFishPoolHole",          soulFishPoolHole);
     }
 
     private WaveState GetCurrentStateFromMaterial()
@@ -606,6 +870,7 @@ public class WaveMaterialController : MonoBehaviour
         s.SoulFishEdgeNoiseSpeed     = soulFishEdgeNoiseSpeed;
         s.SoulFishTaperStrength      = soulFishTaperStrength;
         s.SoulFishTaperScale         = soulFishTaperScale;
+        s.SoulFishPoolHole           = soulFishPoolHole;
         s.ZoneTiling         = waveMaterial.GetVector("_ZoneTiling");
         s.ZoneScrollSpeed    = waveMaterial.GetFloat("_ZoneScrollSpeed");
         s.ZoneNoiseStrength  = waveMaterial.GetFloat("_ZoneNoiseStrength");
@@ -624,9 +889,17 @@ public class WaveMaterialController : MonoBehaviour
         s.RockRingRectify      = rockRingRectify;
         s.RockRingDistortStrength = rockRingDistortStrength;
         s.RockRingDistortScale    = rockRingDistortScale;
+        s.RockRingWidth           = rockRingWidth;
         s.RockRingWidthMultiplier = rockRingWidthMultiplier;
+        s.RockRingSoftness        = rockRingSoftness;
         s.RockRingLodRadius    = rockRingLodRadius;
         s.RockRingLodFeather   = rockRingLodFeather;
+        // Seeded from the inspector for the same reason, and it matters more here than it does for
+        // the rings: this one is read by the spikes and walls, so a zero height on the first frames
+        // would strip the black off every object in the level until a preset arrived.
+        s.WaterlineGradientHeight   = waterlineGradientHeight;
+        s.WaterlineGradientStrength = waterlineGradientStrength;
+        s.WaterlineGradientFalloff  = waterlineGradientFalloff;
         s.WaveStepRate   = waveMaterial.GetFloat("_WaveStepRate");
         s.BaseColor      = waveMaterial.GetColor("_BaseColor");
         s.LightDirection = waveMaterial.GetVector("_LightDirection");

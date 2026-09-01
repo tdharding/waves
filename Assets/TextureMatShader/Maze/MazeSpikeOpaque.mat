@@ -106,7 +106,7 @@ Material:
     - _ClearCoatSmoothness: 0
     - _Cull: 2
     - _Cutoff: 0.5
-    - _DefaultDarkness: 0.96
+    - _DefaultDarkness: 0.975
     - _DestructableFactor: 1
     - _DetailAlbedoMapScale: 1
     - _DetailNormalMapScale: 1
@@ -139,6 +139,8 @@ Material:
     - _SmoothnessTextureChannel: 0
     - _SonarRadius: 0
     - _SpecularHighlights: 0
+    - _SpikeGrainScale: 202.2
+    - _SpikeGrainStrength: 0.78
     - _SpiralDarkness: 0.16
     - _SpiralDentDepth: 0.03
     - _SpiralPitch: 0.26
@@ -156,7 +158,7 @@ Material:
     - _ZWrite: 1
     m_Colors:
     - _BaseColor: {r: 0.57232696, g: 0.57232696, b: 0.57232696, a: 1}
-    - _BaseColour: {r: 0, g: 0, b: 0, a: 1}
+    - _BaseColour: {r: 1, g: 1, b: 1, a: 1}
     - _BoatCenter: {r: 0, g: 0, b: 0, a: 0}
     - _BoatWorldCenter: {r: 0, g: 0, b: 0, a: 0}
     - _Color: {r: 0.5723269, g: 0.5723269, b: 0.5723269, a: 1}
@@ -164,7 +166,7 @@ Material:
     - _InMinMax1: {r: -1.33, g: -1.01, b: 0, a: 0}
     - _LightAngle1: {r: -4.7, g: 35.7, b: 41.8, a: 0}
     - _LightAngle2: {r: -4.7, g: 19.62, b: 465.8, a: 0}
-    - _SonarCenter: {r: 0.5009337, g: 0.26145178, b: 0, a: 0}
+    - _SonarCenter: {r: 0.4994123, g: 0.3699346, b: 0, a: 0}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
     - _Tiling: {r: 0.64, g: 1.03, b: 0, a: 0}
     - _Tiling_1: {r: 1, g: 1, b: 0, a: 0}

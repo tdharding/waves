@@ -96,17 +96,19 @@ public class DroppedSoul : MonoBehaviour
 
         mat = waterTransform.GetComponent<MeshRenderer>().sharedMaterial;
 
-        ArenaProfile profile = LevelDataController.Instance.GetArenaProfile();
-        if (profile != null)
+        // Souls are clamped to the arena radius the walls were generated to, so the clamp
+        // circle now sits on the wall surface rather than near it.
+        float radius = LevelDataController.Instance.GetArenaRadius();
+        if (radius > 0f)
         {
-            arenaBoundsRadius = profile.WorldArenaRadius;
+            arenaBoundsRadius = radius;
 debugBoundsRadius = arenaBoundsRadius;
             arenaCentre       = LevelDataController.Instance.GetArenaCentre();
             boundsReady       = true;
         }
         else
         {
-            Debug.LogWarning("[DroppedSoul] No ArenaProfile found — bounds clamping disabled.");
+            Debug.LogWarning("[DroppedSoul] No arena radius found — bounds clamping disabled.");
         }
     }
 

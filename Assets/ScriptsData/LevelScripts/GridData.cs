@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 using System.Collections.Generic;
 
 [CreateAssetMenu(fileName = "GridData", menuName = "WaveGrid/Grid Data")]
@@ -42,6 +43,17 @@ public class GridData : ScriptableObject
     [Tooltip("Sonar grid formation loaded on level spawn. Null = keep the scene's default sonar formation.")]
     public SonarGridType sonarGridType;
 
+    [Header("Fog")]
+    [Tooltip("Fog on this level at all. On requires a Fog Arena Map — there is no fallback, so " +
+             "on with no map means no fog.")]
+    public bool fogEnabled = false;
+
+    [Tooltip("Where fog masses sit on this level, and the only thing that decides it. Authored in " +
+             "Waves > Fog Arena Map. Nothing else places fog: rocks, the boat and lit street " +
+             "lights only push it away.")]
+    [FormerlySerializedAs("fogMap")]
+    public FogMap fogMap;
+
     // ─────────────────────────────────────────────
     // ENEMY
     // ─────────────────────────────────────────────
@@ -49,6 +61,15 @@ public class GridData : ScriptableObject
     [Header("Enemy")]
     [Tooltip("Assign an EnemyProfile to spawn an enemy on this level. Null = no enemy.")]
     public EnemyProfile enemyProfile;
+
+    // ─────────────────────────────────────────────
+    // ANGEL
+    // ─────────────────────────────────────────────
+
+    [Header("Angel")]
+    [Tooltip("Spawn the angel on this level, to fly above the boat and land on the rocks marked as " +
+             "angel perch points. Off = no angel.")]
+    public bool angelPresent = false;
 
     // ─────────────────────────────────────────────
     // TIME TRIAL
@@ -461,7 +482,21 @@ public class GridData : ScriptableObject
     // ORBS
     // ─────────────────────────────────────────────
 
-    public List<int> orbCellIndices = new List<int>();
+    public List<int>     orbCellIndices = new List<int>(); // legacy cell-indexed orbs (migrated below)
+    public List<Vector2> orbPositions   = new List<Vector2>(); // free positions (normalized -0.5..0.5)
+
+    // Folds any legacy cell-indexed orbs into free positions once, so orbs are no longer clamped to
+    // the grid. Safe to call repeatedly — it clears the legacy list after moving it across.
+    public void MigrateOrbPositions()
+    {
+        if (orbPositions == null) orbPositions = new List<Vector2>();
+        if (orbCellIndices != null && orbCellIndices.Count > 0)
+        {
+            foreach (int ci in orbCellIndices)
+                orbPositions.Add(SoulZone.CellToNormalized(ci));
+            orbCellIndices.Clear();
+        }
+    }
 
     // ─────────────────────────────────────────────
     // MODIFIERS
@@ -518,6 +553,10 @@ public class GridData : ScriptableObject
         // Grid Designer when the prefab has a PrefabBaselineAlignment scale radius.
         // 1 = prefab default. 0 (legacy/unset) is treated as 1 everywhere it is read.
         public float scale = 1f;
+
+        // Yaw offset (degrees) applied to the spawned instance around world up, and shown by the
+        // forward-direction arrow in the Grid Designer. Lets each placement face a chosen direction.
+        public float rotationOffset;
 
         // Per-modifier overrides for TypeB wave modifiers. When
         // overrideModifierSettings is false the spawned prefab keeps its own
@@ -609,8 +648,42 @@ public class GridData : ScriptableObject
     // ARENA
     // ─────────────────────────────────────────────
 
-    [Tooltip("ArenaProfile asset for this level. Used directly by LevelSpawner — replaces the old arenaSize enum.")]
-    public ArenaProfile arenaProfile;
+    // Everything the old ArenaProfile designated now lives here, on the level itself. The
+    // profile only ever existed to pick between a few fixed arena sizes and the wall prefab,
+    // map tiling and marker scales that each size needed; ArenaWallsGenerator builds any size,
+    // so those are per-level values set in the Grid Designer instead.
+
+    [Tooltip("Arena radius in world units — the authoritative size of this level, set in the Grid Designer. " +
+             "ArenaWallsGenerator builds the wall's inner face exactly on it.")]
+    public float arenaRadius = 12f;
+
+    [Tooltip("Absolute world Y of the waterline the arena walls rise from. Pushed onto the walls " +
+             "prefab's BaselineMarker at spawn, and the base height for every tier-aligned prefab.")]
+    public float waterlineY = 0f;
+
+    [Tooltip("XZ offset of the arena centre from world origin. X = world X, Y = world Z.")]
+    public Vector2 arenaCentreOffset = Vector2.zero;
+
+    [Tooltip("Tiling of the map grid material for this level. Match to the arena size.")]
+    public Vector2 mapGridTiling = Vector2.one;
+
+    [Tooltip("Scale applied to all maze wall map markers for this level.")]
+    public float mazeWallMarkerScale = 0.4f;
+
+    [Tooltip("How much larger the wave plane is than the arena diameter (e.g. 1.5).")]
+    public float wavePlaneCoverageMultiplier = 1.5f;
+
+    [Tooltip("When set, overrides the prefab on every ArenaEntrance in this level.")]
+    public GameObject entrancePrefabOverride;
+
+    public float WorldArenaRadius => arenaRadius;
+
+    public float WorldArenaWidth => arenaRadius * 2f;
+
+    // Radius fed to the wave and sonar arena masks — the water area enclosed by the walls.
+    // The generator builds the wall's inner face exactly here, so the mask edge lands on the
+    // wall surface rather than near it.
+    public float ArenaMaskRadius => arenaRadius;
 
     // ─────────────────────────────────────────────
     // SPLINE WALL PATHS
@@ -733,6 +806,35 @@ public class GridData : ScriptableObject
 
         [Tooltip("Fit the creepy guy's climbing rings to this rock at spawn, making it one he can surface on, climb and leap from. Off = scenery he ignores.")]
         public bool climbable = false;
+
+        [Tooltip("Mark this rock's tip as a spot the angel can swoop down and land on. Off = she flies straight over it.")]
+        public bool angelPerchPoint = false;
+
+        [Tooltip("Sail inside this and she comes down onto this rock; sail back out of it and she leaves. " +
+                 "Measured from the rock, in world units.")]
+        public float angelPerchRadius = 12f;
+
+        [Tooltip("Size of the landing curve she rides in on — the radius of the arc. She flies to " +
+                 "where that curve begins, behind the rock, then follows it round and touches down " +
+                 "facing the boat. Bigger = a wider sweep, so give her room. 0 = straight at the rock.")]
+        public float angelLandingCurveSize = 2f;
+
+        [Tooltip("Sail inside this, once she is perched here, and you can press the talk key. " +
+                 "Sits inside the perch radius — it is the close-up range, not the landing range.")]
+        public float angelTalkRadius = 4f;
+
+        [Tooltip("A priority perch is one she always comes down to the moment you enter its radius — " +
+                 "a place you can rely on meeting her. Off makes it a perch she is only WATCHING: she " +
+                 "settles there now and then, when she happens to be looking for somewhere to land.")]
+        public bool angelPriorityPerch = false;
+
+        [Tooltip("Turn on the talk feature for this perch: sail inside the talk range while she is here " +
+                 "and the talk camera + dialogue arm. Off = she just perches, nothing else happens.")]
+        public bool angelTalkEnabled = false;
+
+        [TextArea(1, 4)]
+        [Tooltip("What she says when you talk to her here. Only used when Talk is enabled.")]
+        public string angelTalkText = "";
 
         /// <summary>The shape this rock wears, falling back to the defaults when no preset is set.</summary>
         public SpikeShapeConfig Config => preset != null ? preset.config : DefaultShape;

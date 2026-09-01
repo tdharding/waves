@@ -44,7 +44,11 @@ public class ProceduralSpike : MonoBehaviour
     /// guy to it. Not climbable strips the CreepClimbingArea off the instance entirely, so the
     /// rock never joins his route and stays scenery.
     /// </summary>
-    public void Build(SpikeShapeConfig cfg, float scale, bool climbable)
+    public void Build(SpikeShapeConfig cfg, float scale, bool climbable,
+                      bool angelPerchPoint = false, float angelPerchRadius = 12f,
+                      float angelTalkRadius = 4f, bool angelPriorityPerch = false,
+                      bool angelTalkEnabled = false, string angelTalkText = "",
+                      float angelLandingCurveSize = 2f)
     {
         if (cfg == null) cfg = new SpikeShapeConfig();
 
@@ -57,7 +61,32 @@ public class ProceduralSpike : MonoBehaviour
         ApplyMesh(ResolveChild(warningLinesChild, warningLinesChildName), mesh, assignCollider: false);
 
         FitClimbingArea(profile, climbable);
+        FitAngelPerch(profile, angelPerchPoint, angelPerchRadius, angelTalkRadius, angelPriorityPerch,
+                      angelTalkEnabled, angelTalkText, angelLandingCurveSize);
         FitRockRings(profile, cfg, scale);
+    }
+
+    // The angel lands on the point of the rock, so the perch is simply the tip the mesh was just
+    // built to — straight up this object's own axis, since the mesh is built around the origin.
+    // Added on demand rather than expected on the prefab (the same route RockRingSource takes),
+    // so marking a rock in the Grid Designer is all it takes.
+    void FitAngelPerch(SpikeProfile profile, bool angelPerchPoint,
+                       float perchRadius, float talkRadius, bool priority,
+                       bool talkEnabled, string talkText, float landingCurveSize)
+    {
+        var perch = GetComponent<AngelPerchPoint>();
+
+        if (!angelPerchPoint)
+        {
+            // Gone rather than disabled: AngelPerchPoint registers itself in OnEnable, and a
+            // disabled one left behind would still be found by anything walking children.
+            if (perch != null) Destroy(perch);
+            return;
+        }
+
+        if (perch == null) perch = gameObject.AddComponent<AngelPerchPoint>();
+        perch.Configure(new Vector3(0f, profile.topY, 0f), perchRadius, talkRadius, priority,
+                        talkEnabled, talkText, landingCurveSize);
     }
 
     // The bands the water throws around this rock are drawn from the shape just built, so the

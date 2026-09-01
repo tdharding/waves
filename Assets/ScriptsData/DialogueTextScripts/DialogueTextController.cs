@@ -105,6 +105,54 @@ public class DialogueTextController : MonoBehaviour
         currentRoutine = StartCoroutine(FadeOutRoutine(defaultFadeOut));
     }
 
+    /// <summary>
+    /// Show a line and leave it up until something takes it down, rather than for a set beat.
+    /// For dialogue whose length is the player's to decide — the angel's conversations hold until
+    /// the talk key ends them. Brings the background panel up with it.
+    /// </summary>
+    public void ShowHeld(string message)
+    {
+        if (dialogueText == null) return;
+
+        StopCurrentRoutine();
+        currentRoutine = StartCoroutine(ShowHeldRoutine(message));
+    }
+
+    /// <summary>
+    /// Take the whole thing down — text AND background panel.
+    /// Hide() fades only the text, which is right mid-sequence (the sequence lowers the panel
+    /// itself once it is done), but would leave the panel stranded on screen when dialogue is
+    /// ended early. Anything that opens with ShowHeld should close with this.
+    /// </summary>
+    public void HideAll()
+    {
+        StopCurrentRoutine();
+        currentRoutine = StartCoroutine(HideAllRoutine());
+    }
+
+    private IEnumerator ShowHeldRoutine(string message)
+    {
+        // Only raise the panel if it is not already up. FadeInBackground lerps from a hardcoded 0,
+        // so calling it on an open panel would drop it to transparent and bring it back — a flicker
+        // between every line of a conversation that steps through several.
+        if (dialogueBackground == null || dialogueBackground.alpha < 0.999f)
+            yield return FadeInBackground(backgroundFadeDuration);
+
+        yield return FadeInRoutine(message, defaultFadeIn);
+
+        // Nothing further to run: the line simply stays up until HideAll.
+        currentRoutine = null;
+    }
+
+    private IEnumerator HideAllRoutine()
+    {
+        if (dialogueText != null)
+            yield return FadeOutRoutine(defaultFadeOut);
+
+        yield return FadeOutBackground(backgroundFadeDuration);
+        currentRoutine = null;
+    }
+
     // ---------------------------------------------------------
     // SEQUENCE ROUTINES
     // ---------------------------------------------------------
