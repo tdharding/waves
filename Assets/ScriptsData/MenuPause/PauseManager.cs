@@ -83,17 +83,16 @@ public void QuitGame()
 }
 private void SaveBoatStateFromCache()
 {
-    string segmentID = LevelSelectionCache.BoatSegmentID;
-    float progress   = LevelSelectionCache.BoatProgress;
-
-    if (!string.IsNullOrEmpty(segmentID))
+    if (LevelSelectionCache.BoatHasPose)
     {
-        GameProgressData.SaveBoatState(segmentID, progress);
-        Debug.Log($"PauseManager: Saved boat state — segment: {segmentID} progress: {progress}");
+        GameProgressData.SaveBoatPose(LevelSelectionCache.BoatPosition,
+                                      LevelSelectionCache.BoatHeading);
+        Debug.Log($"PauseManager: Saved boat pose — {LevelSelectionCache.BoatPosition}, " +
+                  $"heading {LevelSelectionCache.BoatHeading:F1}");
     }
     else
     {
-        Debug.LogWarning("PauseManager: No boat segment cached — boat will return to default.");
+        Debug.LogWarning("PauseManager: No boat pose cached — boat will return to default.");
     }
 }
 }

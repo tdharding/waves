@@ -236,6 +236,11 @@ public class GridData : ScriptableObject
 
             [Tooltip("World-unit radius of the circular fish pool (mask + swim loop) around this light.")]
             public float poolRadius = 1f;
+
+            [Tooltip("This light is already lit when the level loads, so the zone starts drawn up to it. " +
+                     "Light #1 is always lit — it is the chain's source. Lights only light in order, so " +
+                     "marking one lit without the lights before it does nothing.")]
+            public bool startsLit = false;
         }
 
         public List<StreetLight> streetLights = new List<StreetLight>();
@@ -247,6 +252,34 @@ public class GridData : ScriptableObject
             var sorted = streetLights != null ? new List<StreetLight>(streetLights) : new List<StreetLight>();
             sorted.Sort((a, b) => a.nodeIndex.CompareTo(b.nodeIndex));
             return sorted;
+        }
+
+        /// <summary>
+        /// How many street lights are already lit when the level loads. Light #1 always counts —
+        /// it is the chain's source and has no lamp to feed — and each light after it counts only
+        /// while the run is unbroken, because the chain lights them strictly in path order. A light
+        /// marked lit behind an unlit one is therefore ignored; <see cref="FirstStrandedLitLight"/>
+        /// reports that so the designer can warn about it. Returns 0 when the zone has no lights.
+        /// </summary>
+        public int LitAtStartCount()
+        {
+            var ordered = StreetLightsInOrder();
+            if (ordered.Count == 0) return 0;
+            int lit = 1;
+            while (lit < ordered.Count && ordered[lit] != null && ordered[lit].startsLit) lit++;
+            return lit;
+        }
+
+        /// <summary>
+        /// Order index (0-based) of the first light marked startsLit that sits behind an unlit one,
+        /// or -1 when none do. Such a light can never be lit at load — the run stops before it.
+        /// </summary>
+        public int FirstStrandedLitLight()
+        {
+            var ordered = StreetLightsInOrder();
+            for (int i = LitAtStartCount(); i < ordered.Count; i++)
+                if (ordered[i] != null && ordered[i].startsLit) return i;
+            return -1;
         }
 
         public StreetLight StreetLightAtNode(int nodeIdx) =>
@@ -502,8 +535,30 @@ public class GridData : ScriptableObject
     // MODIFIERS
     // ─────────────────────────────────────────────
 
-    public List<int> waterLevelModifierCellIndices = new List<int>();
-    public List<int> waveModifierCellIndices       = new List<int>();
+    public List<int> waterLevelModifierCellIndices = new List<int>(); // legacy (migrated to positions)
+    public List<int> waveModifierCellIndices       = new List<int>(); // legacy (migrated to positions)
+    public List<Vector2> waterLevelModifierPositions = new List<Vector2>(); // free positions (-0.5..0.5)
+    public List<Vector2> waveModifierPositions       = new List<Vector2>();
+
+    // Folds legacy cell-indexed modifiers (base + every tier) into free positions once. Idempotent —
+    // clearing the cell list after moving it across makes a second call a no-op.
+    public void MigrateModifierPositions()
+    {
+        MigrateModList(waterLevelModifierCellIndices, ref waterLevelModifierPositions);
+        MigrateModList(waveModifierCellIndices,       ref waveModifierPositions);
+        if (tiers != null)
+            foreach (var t in tiers) t?.MigrateModifierPositions();
+    }
+
+    internal static void MigrateModList(List<int> cells, ref List<Vector2> positions)
+    {
+        if (positions == null) positions = new List<Vector2>();
+        if (cells != null && cells.Count > 0)
+        {
+            foreach (int ci in cells) positions.Add(SoulZone.CellToNormalized(ci));
+            cells.Clear();
+        }
+    }
 
     // ─────────────────────────────────────────────
     // TIERS
@@ -615,9 +670,17 @@ public class GridData : ScriptableObject
         public float     yOffset      = 5f;   // legacy fallback only
         public int       yOffsetSlot  = 0;    // index into TierConfig.offsets
         public int[]     cells        = new int[CellCount];
-        public List<int> waterLevelModifierCellIndices = new List<int>();
-        public List<int> waveModifierCellIndices       = new List<int>();
+        public List<int> waterLevelModifierCellIndices = new List<int>(); // legacy (migrated to positions)
+        public List<int> waveModifierCellIndices       = new List<int>(); // legacy (migrated to positions)
+        public List<Vector2> waterLevelModifierPositions = new List<Vector2>();
+        public List<Vector2> waveModifierPositions       = new List<Vector2>();
         public List<PrefabPlacement> prefabPlacements  = new List<PrefabPlacement>();
+
+        public void MigrateModifierPositions()
+        {
+            MigrateModList(waterLevelModifierCellIndices, ref waterLevelModifierPositions);
+            MigrateModList(waveModifierCellIndices,       ref waveModifierPositions);
+        }
     }
 
     public List<GridTier> tiers = new List<GridTier>();
@@ -629,13 +692,28 @@ public class GridData : ScriptableObject
     [System.Serializable]
     public class WhirlpoolPoint
     {
-        public int   cellIndex;
-        public float radius = 5f;
+        public int     cellIndex;            // LEGACY/derived: kept in sync with position (nearest cell)
+        public float   radius = 5f;
+        public Vector2 position;             // free position, normalized grid space (-0.5..0.5)
+        public bool    freePlaced;           // false = legacy cell-only, folded into position on load
     }
 
     public List<WhirlpoolPoint> whirlpools     = new List<WhirlpoolPoint>();
     [Range(0f, 20f)] public float whirlpoolDepth = 5f;
     [Range(0f, 10f)] public float whirlpoolSwirl = 2f;
+
+    // Folds legacy cell-indexed whirlpools into free positions once, so they're no longer clamped to
+    // the grid. cellIndex stays as a derived key (map/links) — kept in sync with position elsewhere.
+    public void MigrateWhirlpoolPositions()
+    {
+        if (whirlpools == null) return;
+        foreach (var w in whirlpools)
+        {
+            if (w == null || w.freePlaced) continue;
+            w.position   = SoulZone.CellToNormalized(w.cellIndex);
+            w.freePlaced = true;
+        }
+    }
 
     // ─────────────────────────────────────────────
     // EDITOR METADATA
@@ -661,6 +739,18 @@ public class GridData : ScriptableObject
              "prefab's BaselineMarker at spawn, and the base height for every tier-aligned prefab.")]
     public float waterlineY = 0f;
 
+    [Tooltip("World-units the top of the arena wall stands above the waterline.")]
+    public float arenaWallHeight = 4f;
+
+    [Tooltip("World-units the arena wall extends outward from the arena radius. The inner face " +
+             "stays on the radius, so thickness never moves the gameplay boundary.")]
+    public float arenaWallThickness = 1f;
+
+    [Tooltip("Absolute world Y per tier slot, ordered high to low (F2, F1, G, B-1, B-2, B-3) — the " +
+             "same order as TierConfig.offsets. Set in the Grid Designer. Leave empty and every tier " +
+             "falls back to the global TierConfig offsets.")]
+    public float[] spawnTierHeights;
+
     [Tooltip("XZ offset of the arena centre from world origin. X = world X, Y = world Z.")]
     public Vector2 arenaCentreOffset = Vector2.zero;
 
@@ -669,9 +759,6 @@ public class GridData : ScriptableObject
 
     [Tooltip("Scale applied to all maze wall map markers for this level.")]
     public float mazeWallMarkerScale = 0.4f;
-
-    [Tooltip("How much larger the wave plane is than the arena diameter (e.g. 1.5).")]
-    public float wavePlaneCoverageMultiplier = 1.5f;
 
     [Tooltip("When set, overrides the prefab on every ArenaEntrance in this level.")]
     public GameObject entrancePrefabOverride;

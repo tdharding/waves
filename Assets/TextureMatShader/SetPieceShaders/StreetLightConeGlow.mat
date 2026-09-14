@@ -44,10 +44,11 @@ Material:
     m_Floats:
     - _AlphaClip: 0
     - _AlphaToMask: 0
-    - _ApexDensity: 1
+    - _ApexDensity: 0.492
     - _ApexMaskFeather: 0.7
     - _ApexMaskRadius: 0.12
     - _BaseBrightness: 0
+    - _BaseDepth: 0.25
     - _BaseOpacity: 0.159
     - _Blend: 0
     - _CastShadows: 0
@@ -60,7 +61,7 @@ Material:
     - _DstBlend: 10
     - _DstBlendAlpha: 10
     - _EdgeSoftness: 0.772
-    - _FalloffPower: 3.51
+    - _FalloffPower: 1.55
     - _QueueControl: 0
     - _QueueOffset: 0
     - _SrcBlend: 5

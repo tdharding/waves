@@ -1,7 +1,10 @@
 fileFormatVersion: 2
 guid: 37eead51e72a2a8419074653cc987790
 TextureImporter:
-  internalIDToNameTable: []
+  internalIDToNameTable:
+  - first:
+      213: -4521560121208933780
+    second: AW_GRADIENT black linear 2_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -53,7 +56,9 @@ TextureImporter:
   spriteGenerateFallbackPhysicsShape: 1
   alphaUsage: 1
   alphaIsTransparency: 1
+  spriteTessellationMethod: 0
   spriteTessellationDetail: -1
+  spriteGeometrySubdivision: -1
   textureType: 8
   textureShape: 1
   singleChannelComponent: 0
@@ -108,7 +113,29 @@ TextureImporter:
     forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
-    sprites: []
+    sprites:
+    - serializedVersion: 2
+      name: AW_GRADIENT black linear 2_0
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 0
+        width: 600
+        height: 600
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c62f4c8a6013041c0800000000000000
+      internalID: -4521560121208933780
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
     outline: []
     customData: 
     physicsShape: []

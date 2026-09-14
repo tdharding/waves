@@ -130,6 +130,7 @@ Material:
     - _Smoothness: 0
     - _SmoothnessTextureChannel: 0
     - _SoulFishMarkerRadius: 0.5
+    - _SoulFishMaskStrength: 0
     - _SpecularHighlights: 0
     - _Speed: 0.8
     - _SrcBlend: 1

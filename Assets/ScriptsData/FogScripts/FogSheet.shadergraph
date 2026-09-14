@@ -768,7 +768,12 @@
         "preventRotation": false
     },
     "m_Path": "Shader Graphs",
+    "m_DeprecateSubgraph": false,
+    "m_DeprecateSubgraphMessage": "",
     "m_GraphPrecision": 1,
+    "m_CustomPragmas": [],
+    "m_CustomDefines": [],
+    "m_CustomIncludes": [],
     "m_PreviewMode": 2,
     "m_OutputNode": {
         "m_Id": ""
@@ -1069,7 +1074,7 @@
             "x": 346.0000305175781,
             "y": -704.0000610351563,
             "width": 209.33334350585938,
-            "height": 338.66668701171877
+            "height": 338.66668701171875
         }
     },
     "m_Slots": [
@@ -1454,7 +1459,7 @@
     "m_FloatType": 1,
     "m_LiteralFloatMode": false,
     "m_RangeValues": {
-        "x": 0.019999999552965165,
+        "x": 0.019999999552965164,
         "y": 1.5
     },
     "m_SliderType": 0,
@@ -1995,7 +2000,7 @@
     "m_Hidden": false,
     "m_PerRendererData": false,
     "m_customAttributes": [],
-    "m_Value": 0.25999999046325686,
+    "m_Value": 0.25999999046325684,
     "m_FloatType": 1,
     "m_LiteralFloatMode": false,
     "m_RangeValues": {
@@ -2076,7 +2081,7 @@
     "m_Hidden": false,
     "m_PerRendererData": false,
     "m_customAttributes": [],
-    "m_Value": 1.2000000476837159,
+    "m_Value": 1.2000000476837158,
     "m_FloatType": 1,
     "m_LiteralFloatMode": false,
     "m_RangeValues": {
@@ -2196,7 +2201,7 @@
             "x": 1041.3333740234375,
             "y": 102.00000762939453,
             "width": 209.3333740234375,
-            "height": 304.00006103515627
+            "height": 304.00006103515625
         }
     },
     "m_Slots": [
@@ -2409,7 +2414,7 @@
     "m_Hidden": false,
     "m_PerRendererData": false,
     "m_customAttributes": [],
-    "m_Value": 0.18000000715255738,
+    "m_Value": 0.18000000715255737,
     "m_FloatType": 1,
     "m_LiteralFloatMode": false,
     "m_RangeValues": {
@@ -2539,7 +2544,7 @@
             "serializedVersion": "2",
             "x": 832.0000610351563,
             "y": -22.00000762939453,
-            "width": 209.33331298828126,
+            "width": 209.33331298828125,
             "height": 304.0000305175781
         }
     },
@@ -2964,7 +2969,7 @@
     "m_PerRendererData": false,
     "m_customAttributes": [],
     "m_Value": {
-        "r": 0.41999998688697817,
+        "r": 0.41999998688697815,
         "g": 0.5,
         "b": 0.6200000047683716,
         "a": 1.0
@@ -3492,7 +3497,7 @@
     "m_ZTestMode": 4,
     "m_ZWriteControl": 2,
     "m_AlphaMode": 0,
-    "m_RenderFace": 2,
+    "m_RenderFace": 0,
     "m_AlphaClip": false,
     "m_CastShadows": false,
     "m_ReceiveShadows": false,
@@ -3863,8 +3868,8 @@
             "serializedVersion": "2",
             "x": -845.333251953125,
             "y": -1076.0,
-            "width": 218.66668701171876,
-            "height": 375.99993896484377
+            "width": 218.66668701171875,
+            "height": 375.99993896484375
         }
     },
     "m_Slots": [
@@ -4015,7 +4020,7 @@
         "m_Position": {
             "serializedVersion": "2",
             "x": -182.6666259765625,
-            "y": 132.00001525878907,
+            "y": 132.00001525878906,
             "width": 234.00003051757813,
             "height": 424.0
         }
@@ -4242,12 +4247,12 @@
     "m_Hidden": false,
     "m_PerRendererData": false,
     "m_customAttributes": [],
-    "m_Value": 0.029999999329447748,
+    "m_Value": 0.029999999329447746,
     "m_FloatType": 1,
     "m_LiteralFloatMode": false,
     "m_RangeValues": {
-        "x": 0.0020000000949949028,
-        "y": 0.20000000298023225
+        "x": 0.0020000000949949026,
+        "y": 0.20000000298023224
     },
     "m_SliderType": 0,
     "m_SliderPower": 1.0,
@@ -4346,7 +4351,7 @@
     "m_LiteralFloatMode": false,
     "m_RangeValues": {
         "x": 0.004999999888241291,
-        "y": 0.30000001192092898
+        "y": 0.30000001192092896
     },
     "m_SliderType": 0,
     "m_SliderPower": 1.0,
@@ -4646,7 +4651,7 @@
     "m_Hidden": false,
     "m_PerRendererData": false,
     "m_customAttributes": [],
-    "m_Value": 0.18000000715255738,
+    "m_Value": 0.18000000715255737,
     "m_FloatType": 1,
     "m_LiteralFloatMode": false,
     "m_RangeValues": {

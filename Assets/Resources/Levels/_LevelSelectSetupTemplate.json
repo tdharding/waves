@@ -17,28 +17,24 @@
             "value": "81f54d9e5f0cd2149a669edc76b1ab99"
         },
         {
-            "key": "riverBlockPrefab",
-            "value": "070f6a1ad10a0e34aa3247fe890bb1a4"
+            "key": "riverMaterial",
+            "value": "df48e831018dc444dbc6635b9fe63f5c"
+        },
+        {
+            "key": "waterMaterial",
+            "value": "23355fb4d7f054041b2040aaa843e46d"
         },
         {
             "key": "splineInstantiateSpacing",
-            "value": "0.15"
+            "value": "0.5"
         },
         {
-            "key": "junctionScriptObject",
-            "value": "cdc03d5a67a4c8a4ca447c17a1a65a6b"
+            "key": "waterLevel",
+            "value": "0.48"
         },
         {
-            "key": "junctionRightFacingPrefab",
-            "value": "08a0e3b54a9037545a500567ad11a7af"
-        },
-        {
-            "key": "junctionLeftFacingPrefab",
-            "value": "4112896818a87814181c705d9fb75161"
-        },
-        {
-            "key": "junctionPrefab",
-            "value": "cdc03d5a67a4c8a4ca447c17a1a65a6b"
+            "key": "generatedDrop",
+            "value": "42.5"
         },
         {
             "key": "junctionGapPadding",

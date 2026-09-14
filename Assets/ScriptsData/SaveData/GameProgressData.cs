@@ -132,7 +132,48 @@ public static class GameProgressData
         data.boatSplineProgress = progress;
         data.boatIsLeftPath      = isLeftPath;
         data.boatIsRightPath   = isRightPath;
+
+        // A river and a distance along it is a door saying where the boat comes out. That
+        // beats wherever the boat had got to before it went through, so the pose goes.
+        data.boatHasPose = false;
         SaveManager.Write();
+    }
+
+    // ──────────────────────────────
+    // WHERE THE BOAT GOT TO
+    // ──────────────────────────────
+
+    /// <summary>Writes down where the boat stood on the map and which way it faced.</summary>
+    public static void SaveBoatPose(Vector3 position, float heading)
+    {
+        var data = SaveManager.Load();
+        data.boatHasPose     = true;
+        data.boatPoseX       = position.x;
+        data.boatPoseY       = position.y;
+        data.boatPoseZ       = position.z;
+        data.boatPoseHeading = heading;
+        SaveManager.Write();
+    }
+
+    /// <summary>
+    /// Whether the boat has ever been put down on the map — either it got somewhere itself,
+    /// or a door said where it comes out. What "a returning player" means.
+    /// </summary>
+    public static bool HasBoatBeenPlaced()
+    {
+        var data = SaveManager.Load();
+        return data.boatHasPose || !string.IsNullOrEmpty(data.boatSegmentID);
+    }
+
+    /// <summary>Reads it back. False when the boat has never been anywhere, or a door has
+    /// since said where it comes out instead.</summary>
+    public static bool TryGetBoatPose(out Vector3 position, out float heading)
+    {
+        var data = SaveManager.Load();
+
+        position = new Vector3(data.boatPoseX, data.boatPoseY, data.boatPoseZ);
+        heading  = data.boatPoseHeading;
+        return data.boatHasPose;
     }
 
     public static void ClearBoatProgress()
@@ -142,6 +183,7 @@ public static class GameProgressData
         data.boatSegmentID      = string.Empty;
         data.boatIsLeftPath      = false;
         data.boatIsRightPath   = false;
+        data.boatHasPose       = false;
         SaveManager.Write();
     }
 

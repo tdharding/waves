@@ -140,6 +140,12 @@ public class FishingController : MonoBehaviour
         if (LevelSoulTracker.Instance != null)
             LevelSoulTracker.Instance.AddSoulToBoat(fishLabel.linkID, fishLabel.soulDataIdentity);
 
+        // A soul that travelled here is tracked by its journey, not by this level's caught list —
+        // without this it would still read as swimming in the level and spawn again next load.
+        if (SoulJourneyData.HasRecord(fishLabel.soulDataIdentity) &&
+            SoulJourneyData.Where(fishLabel.soulDataIdentity).place == SoulPlace.InLevel)
+            SoulJourneyData.Catch(fishLabel.soulDataIdentity);
+
         // sonar?.DeactivateSonar();
     }
 

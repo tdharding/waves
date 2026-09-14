@@ -221,6 +221,29 @@ public class StreetLightDebugTracer : MonoBehaviour
             sb.AppendLine($"     particles: {cloud.DebugSummary()}");
         }
 
+        // ── Shaft of light ──
+        var cone = lamp.LightCone;
+        if (cone == null)
+        {
+            sb.AppendLine("     cone=NONE (Light Cone slot empty)");
+        }
+        else
+        {
+            float baseY = cone.BaseCentre.y;
+            string aim  = cone.HasBaseTarget
+                        ? $"target={cone.BaseTargetY:F2} actual={baseY:F2}" +
+                          (Mathf.Abs(baseY - cone.BaseTargetY) > 0.02f ? "  OFF TARGET" : "")
+                        : "never aligned — no waterline was found";
+
+            sb.AppendLine($"     cone: apexY={cone.Apex.y:F2} baseY={baseY:F2} height={cone.Height:F2} " +
+                          $"radius={cone.BaseRadius:F2} | {aim}");
+
+            if (!cone.HasBaseTarget)
+                problems.Add($"{id} cone was never aligned — no LevelSpawner, so no authored waterline");
+            else if (Mathf.Abs(baseY - cone.BaseTargetY) > 0.02f)
+                problems.Add($"{id} cone base sits at {baseY:F2}, not the waterline {cone.BaseTargetY:F2}");
+        }
+
         // ── Instanced light ──
         sb.AppendLine($"     instLight active={lamp.InstLightActive} " +
                       $"contributing={InstancedLightManager.IsContributing(lamp)} " +

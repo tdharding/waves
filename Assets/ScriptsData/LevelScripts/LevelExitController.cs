@@ -141,13 +141,12 @@ public class LevelExitController : MonoBehaviour
         SaveBoatStateFromCache();
     }
 
+    // No door routing to follow, so the boat goes back to the spot on the map it left from.
     private void SaveBoatStateFromCache()
     {
-        string segmentID = LevelSelectionCache.BoatSegmentID;
-        float  progress  = LevelSelectionCache.BoatProgress;
-
-        if (!string.IsNullOrEmpty(segmentID))
-            GameProgressData.SaveBoatState(segmentID, progress, GameProgressData.GetBoatIsLeftPath());
+        if (LevelSelectionCache.BoatHasPose)
+            GameProgressData.SaveBoatPose(LevelSelectionCache.BoatPosition,
+                                          LevelSelectionCache.BoatHeading);
     }
 
     // ─────────────────────────────────────────────

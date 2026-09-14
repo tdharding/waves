@@ -50,6 +50,7 @@ public class SoulZoneStreetLightChain : MonoBehaviour
     SplineContainer _splineContainer;
 
     // ── state ────────────────────────────────────────────
+    float     _revealedArc;              // how far along the dense path the mask has drawn
     float[]   _cumArc;                    // cumulative arc length over the dense mask path
     Vector3[] _localPath;                 // dense path in container-local space (baked at Init)
     float[]   _circleStartNorm;           // per-light: normalized spline time at the circle's first knot
@@ -86,7 +87,7 @@ public class SoulZoneStreetLightChain : MonoBehaviour
     public void Init(
         List<Vector3> regPath, List<Vector3> worldPath, List<int> lightDenseIndices,
         List<float> poolRadii, List<StreetLightController> lightsInOrder,
-        float pathRadius, int knotCount, SplineContainer splineContainer)
+        float pathRadius, int knotCount, SplineContainer splineContainer, int litAtStart = 1)
     {
         _regPath         = regPath;
         _worldPath       = worldPath;
@@ -116,20 +117,32 @@ public class SoulZoneStreetLightChain : MonoBehaviour
             _lights[i].orderIndex = i;
         }
 
-        // Initial mask state: the authored lead-in from the START node (no light needed there)
-        // up to light #1, plus light #1's pool. Register the path entry FIRST so the later dedupe
-        // (shoal.InitZone with the same list) keeps this radius.
+        // Initial mask state: the authored lead-in from the START node (no light needed there) up
+        // to the last light that begins lit, plus a pool at each of those lights. Register the path
+        // entry FIRST so the later dedupe (shoal.InitZone with the same list) keeps this radius.
         // A null light[0] is a fish-bowl source: it's logically lit (frontier 0) with just its pool
         // and an empty lead-in, so nothing draws until the first real light is fed.
-        _litCount = 1;
-        _lights[0]?.SetLit(true);
+        //
+        // litAtStart is authored per light in the Grid Designer ("Starts Lit"), already collapsed to
+        // a count by GridData.SoulZone.LitAtStartCount — lights only ever light in order, so the
+        // starting state is a prefix of the chain, never a scatter. #1 is always lit: it is the source.
+        _litCount = Mathf.Clamp(litAtStart, 1, _lights.Count);
+        for (int i = 0; i < _litCount; i++)
+            _lights[i]?.SetLit(true);
 
-        for (int i = 0; i <= _lightDense[0]; i++)
+        int frontier = _litCount - 1;
+        for (int i = 0; i <= _lightDense[frontier]; i++)
             _revealedReg.Add(_regPath[i]);
+        _revealedArc = _cumArc[_lightDense[frontier]];
         SoulFishWaveLinker.RegisterZone(_revealedReg, false, _pathRadius);
         SoulFishMapLinker.RegisterZone(_revealedReg, false, _pathRadius);
 
-        RegisterPool(0, _poolRadii[0]);
+        for (int i = 0; i <= frontier; i++)
+            RegisterPool(i, _poolRadii[i]);
+
+        if (_litCount > 1)
+            Debug.Log($"[StreetLightChain] '{name}' starts with {_litCount}/{_lights.Count} lamp(s) already lit — " +
+                      $"drawn from the start node to light #{_litCount}.");
     }
 
     // Builds the static swim spline: lead-in + a circle at each light + corridors between them,
@@ -216,6 +229,12 @@ public class SoulZoneStreetLightChain : MonoBehaviour
             }
         }
 
+        // The stretch from the last light on to the end of the authored path — the door, for a
+        // zone pinned to the entrances. It is always built; the gate keeps the fish circling the
+        // frontier light until the door opens, and only then are they let onto it.
+        for (int i = _lightDense[_lights.Count - 1] + 1; i < _localPath.Length; i++)
+            Add(_localPath[i], false);
+
         float total = Mathf.Max(cum[cum.Count - 1], 1e-4f);
         for (int k = 0; k < _lights.Count; k++)
         {
@@ -273,7 +292,11 @@ public class SoulZoneStreetLightChain : MonoBehaviour
         var found = _splineContainer.GetComponentsInChildren<SplineAnimate>(true);
         if (found.Length == 0) return;   // not spawned yet
 
-        float cs = _circleStartNorm[0];
+        // File them along the drawn part of the path, which ends at whichever light is the frontier
+        // — a zone that starts part-lit has its fish spread over everything already open, not
+        // stacked back at the start node.
+        int   frontier = Mathf.Clamp(_litCount - 1, 0, _lights.Count - 1);
+        float cs       = _circleStartNorm[frontier];
         for (int i = 0; i < found.Length; i++)
         {
             var sa = found[i];
@@ -285,8 +308,153 @@ public class SoulZoneStreetLightChain : MonoBehaviour
             _fish.Add(sa);
         }
         _fishCached = true;
-        Debug.Log($"[StreetLightChain] Cached {_fish.Count} fish on '{name}'. Gate active — frontier light #1, " +
-                  $"circle window [{_circleStartNorm[0]:F3}..{_circleEndNorm[0]:F3}], fish filed into lead-in [0..{cs:F3}].");
+        Debug.Log($"[StreetLightChain] Cached {_fish.Count} fish on '{name}'. Gate active — frontier light " +
+                  $"#{frontier + 1}, circle window [{cs:F3}..{_circleEndNorm[frontier]:F3}], " +
+                  $"fish filed into the drawn path [0..{cs:F3}].");
+    }
+
+    // ── Departure ────────────────────────────────────────
+    // The path unlocks in order, entrance to entrance: each street light in turn, then the door.
+    // The last stretch — final light to door — needs BOTH ends done: every lamp lit AND the door
+    // unlocked. Either one alone holds the fish at the last light. Once both are true the zone
+    // draws on to the door, the fish stop looping back at their pool and swim the rest of the
+    // path, each despawning as it reaches the door and handing its soul to SoulJourneyData. From
+    // there the soul is on the river and the level-select scene picks it up.
+
+    string _departLevelID;
+    int    _departEntranceIndex = -1;
+    string _departEntranceID;
+    bool   _departNeedsUnlock;
+    bool   _departing;
+    bool   _departed;
+    bool   _departLogged;
+    LockedDoorController _departDoor;
+    bool   _departDoorSearched;
+
+    /// <summary>
+    /// Tells the chain which door its path ends at, so it knows where its souls go when the zone
+    /// is finished. Called by LevelSpawner for a zone with attachToEntrances and an exit door.
+    /// </summary>
+    public void SetDeparture(string levelID, int entranceIndex, string entranceID, bool needsUnlock)
+    {
+        _departLevelID       = levelID;
+        _departEntranceIndex = entranceIndex;
+        _departEntranceID    = entranceID;
+        _departNeedsUnlock   = needsUnlock;
+    }
+
+    /// <summary>Every lamp on the chain is lit — the chain's own half of the last stretch.</summary>
+    public bool AllLampsLit => _lights != null && _litCount >= _lights.Count;
+
+    /// <summary>
+    /// The exit door is passable. An entrance that was never locked has no controller to find,
+    /// so it counts as open; a locked one is open once its LockedDoorController says so.
+    /// </summary>
+    bool DoorIsOpen
+    {
+        get
+        {
+            if (!_departNeedsUnlock) return true;
+
+            if (!_departDoorSearched)
+            {
+                _departDoorSearched = true;
+                var allDoors = FindObjectsByType<LockedDoorController>(FindObjectsSortMode.None);
+                foreach (var door in allDoors)
+                {
+                    if (door != null && door.entranceID == _departEntranceID)
+                    {
+                        _departDoor = door;
+                        break;
+                    }
+                }
+                if (_departDoor == null)
+                {
+                    // Names every door it did see: an entranceID mismatch between the grid data and
+                    // the spawned prefab is otherwise indistinguishable from a door that is simply open.
+                    var seen = new System.Text.StringBuilder();
+                    foreach (var door in allDoors)
+                        if (door != null) seen.Append($" '{door.entranceID}'");
+                    Debug.LogWarning($"[StreetLightChain] '{name}' wants door '{_departEntranceID}' but found no " +
+                                     $"LockedDoorController with that entranceID — treating it as open. " +
+                                     $"Doors in scene ({allDoors.Length}):{seen}");
+                }
+            }
+
+            return _departDoor == null || !_departDoor.isLocked;
+        }
+    }
+
+    /// <summary>
+    /// The path runs on to the door. Needs all three: this zone ends at a door, every street light
+    /// on the way has been lit in order, and that door is unlocked. The lights and the door are
+    /// independent locks on the same final stretch — whichever is satisfied last opens it.
+    /// </summary>
+    public bool CanDepart => _departEntranceIndex >= 0 && AllLampsLit && DoorIsOpen;
+
+    /// <summary>
+    /// The door has opened, so the zone draws on from wherever it had reached to the end of the
+    /// authored path — the door itself — at the same reveal speed a street light uses. The gate
+    /// stays shut while it draws, so the fish keep circling their light until the way is painted;
+    /// then they are released onto the last stretch and RunDeparture collects them at the door.
+    /// </summary>
+    IEnumerator DepartRoutine()
+    {
+        _departing = true;
+
+        float toArc = _cumArc[_cumArc.Length - 1];
+        Debug.Log($"[StreetLightChain] '{name}' last stretch unlocked — all {_lights.Count} lamp(s) lit and " +
+                  $"door '{_departEntranceID}' open. Drawing the zone on from arc {_revealedArc:F2} " +
+                  $"to the door at {toArc:F2}.");
+
+        if (toArc - _revealedArc < 0.01f)
+            Debug.LogWarning($"[StreetLightChain] '{name}' has NOTHING to draw to the door — the mask already " +
+                             "reaches the end of the authored path. The last node and the last street light " +
+                             "are at the same place, so no extra stretch exists.");
+
+        float arc = _revealedArc;
+        while (arc < toArc)
+        {
+            arc = Mathf.Min(arc + revealSpeed * Time.deltaTime, toArc);
+            RebuildRevealedPath(arc);
+            SoulFishMapLinker.Instance?.BakePositionsOnce();
+            yield return null;
+        }
+        RebuildRevealedPath(toArc);
+        SoulFishMapLinker.Instance?.BakePositionsOnce();
+
+        _departing = false;
+        _departed  = true;
+        _arrived.Clear();
+        Debug.Log($"[StreetLightChain] '{name}' is drawn to the door — {_fish.Count} fish leaving by " +
+                  $"entrance {_departEntranceIndex} of '{_departLevelID}'.");
+    }
+
+    /// <summary>
+    /// Sends fish that have reached the end of the path out through the door, one at a time as
+    /// each arrives. Wrapping fractionally short of 1.0 because SplineAnimate's own Loop would
+    /// otherwise fling a fish back to the lead-in before this ever saw it — the same reason the
+    /// gate below clamps its window end.
+    /// </summary>
+    void RunDeparture()
+    {
+        for (int i = _fish.Count - 1; i >= 0; i--)
+        {
+            var sa = _fish[i];
+            if (sa == null) { _fish.RemoveAt(i); continue; }
+
+            if (sa.NormalizedTime < 0.995f) continue;
+
+            var label = sa.GetComponentInParent<LinkIdentityLabel>();
+            if (label != null && label.soulDataIdentity > 0)
+                SoulJourneyData.DepartLevel(label.soulDataIdentity, _departLevelID, _departEntranceIndex);
+            else
+                Debug.LogWarning($"[StreetLightChain] A fish left '{name}' with no soul identity — " +
+                                 "it is gone from the level but joins no route.");
+
+            _fish.RemoveAt(i);
+            Destroy(sa.gameObject);
+        }
     }
 
     // The gate. After SplineAnimate has advanced each fish this frame, wrap any that passed the
@@ -301,6 +469,18 @@ public class SoulZoneStreetLightChain : MonoBehaviour
             BuildSwimSpline();
 
         if (!_fishCached) { CacheFish(); return; }
+
+        // Departure takes over from the gate entirely: once the way out is open the fish are no
+        // longer held anywhere, they just swim the rest of the path and leave.
+        if (!_departed && !_departing && !_revealing && CanDepart)
+            StartCoroutine(DepartRoutine());
+
+        if (_departed)
+        {
+            RunDeparture();
+            SoulFishController.ApplyLateralSpread(_fish, _pathRadius);
+            return;
+        }
 
         int frontier = Mathf.Clamp(_litCount - 1, 0, _lights.Count - 1);
 
@@ -413,6 +593,7 @@ public class SoulZoneStreetLightChain : MonoBehaviour
     // is what the linkers (and SoulShoalController's fishing-distance check) hold.
     void RebuildRevealedPath(float arc)
     {
+        _revealedArc = arc;
         _revealedReg.Clear();
         for (int i = 0; i < _regPath.Count && _cumArc[i] <= arc; i++)
             _revealedReg.Add(_regPath[i]);

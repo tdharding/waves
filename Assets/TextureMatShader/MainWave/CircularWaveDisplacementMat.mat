@@ -128,7 +128,7 @@ Material:
     - _AlphaClip: 0
     - _AlphaToMask: 0
     - _ArenaFadeStart: 1
-    - _ArenaRadius1: 13.02
+    - _ArenaRadius1: 7.7
     - _Blend: 0
     - _BlendModePreserveSpecular: 1
     - _BoatDarknessRadius: 6.55
@@ -147,7 +147,7 @@ Material:
     - _BoatRippleSpeed: 0.2
     - _BoatRipplesFrequency: 10
     - _BoatSonarPosition: 0
-    - _BoatSpeed01: 0.33324853
+    - _BoatSpeed01: 0.41956383
     - _BoatTrailWidth: 40
     - _BowAmplitude: -2.43
     - _BowFrontWaveClamp: 1
@@ -298,12 +298,12 @@ Material:
     m_Colors:
     - _ArenaMask: {r: 0, g: 0, b: 0, a: 0}
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
-    - _BoatCenter: {r: -1.6338632, g: 0, b: 4.2009583, a: 0}
-    - _BoatForward: {r: -0.77494466, g: 0.0010872581, b: 0.6320282, a: 0}
-    - _BoatForwardLocal: {r: -0.77494466, g: 0.6320283, b: 0, a: 0}
-    - _BoatPosition: {r: -1.7113577, g: -0.0498787, b: 4.2641606, a: 0}
-    - _BoatRight: {r: 0.6320106, g: -0.0063301423, b: 0.77493393, a: 0}
-    - _BoatSonarPosition: {r: -1.6342397, g: 0, b: 4.2004967, a: 0}
+    - _BoatCenter: {r: 2.0631344, g: 0, b: 7.381077, a: 0}
+    - _BoatForward: {r: 0.9734866, g: -0.0036172667, b: -0.22871494, a: 0}
+    - _BoatForwardLocal: {r: 0.9734866, g: -0.22871497, b: 0, a: 0}
+    - _BoatPosition: {r: 2.1604831, g: -0.039811827, b: 7.3582044, a: 0}
+    - _BoatRight: {r: -0.22869094, g: 0.0060540605, b: -0.97348017, a: 0}
+    - _BoatSonarPosition: {r: 2.0632708, g: 0, b: 7.381655, a: 0}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _DeepColour: {r: 1, g: 0, b: 0, a: 1}
     - _DepthColour: {r: 1, g: 1, b: 1, a: 0}
@@ -319,16 +319,16 @@ Material:
     - _ShadowColour: {r: 0, g: 0, b: 0, a: 1}
     - _SonarRadiusDimensions: {r: 0, g: 0, b: 0, a: 0}
     - _Sonar_Effect_Color: {r: 0, g: 0, b: 0, a: 0}
-    - _SoulFishPosition1: {r: -6.5296717, g: 0.3, b: 11.264272, a: 2}
-    - _SoulFishPosition10: {r: 99999, g: 99999, b: 99999, a: 0}
-    - _SoulFishPosition2: {r: -5.841299, g: 0.3, b: 10.177133, a: 2}
-    - _SoulFishPosition3: {r: -5.200421, g: 0.3, b: 9.067922, a: 2}
-    - _SoulFishPosition4: {r: -4.5102463, g: 0.3, b: 7.6549945, a: 1}
-    - _SoulFishPosition5: {r: -4.5102463, g: 1.28, b: 7.6549945, a: 1}
-    - _SoulFishPosition6: {r: 99999, g: 99999, b: 99999, a: 0}
-    - _SoulFishPosition7: {r: 99999, g: 99999, b: 99999, a: 0}
-    - _SoulFishPosition8: {r: 99999, g: 99999, b: 99999, a: 0}
-    - _SoulFishPosition9: {r: 99999, g: 99999, b: 99999, a: 0}
+    - _SoulFishPosition1: {r: 2.1353238, g: 0.38, b: 7.398, a: 2}
+    - _SoulFishPosition10: {r: 0.70652753, g: 0.38, b: 0.7442665, a: 2}
+    - _SoulFishPosition2: {r: 1.9333088, g: 0.38, b: 6.893519, a: 2}
+    - _SoulFishPosition3: {r: 1.6378148, g: 0.38, b: 6.186334, a: 2}
+    - _SoulFishPosition4: {r: 1.3076586, g: 0.38, b: 5.3541684, a: 2}
+    - _SoulFishPosition5: {r: 1.0016581, g: 0.38, b: 4.474747, a: 2}
+    - _SoulFishPosition6: {r: 0.7786294, g: 0.38, b: 3.6257927, a: 2}
+    - _SoulFishPosition7: {r: 0.6939663, g: 0.38, b: 2.9342318, a: 2}
+    - _SoulFishPosition8: {r: 0.6817994, g: 0.38, b: 2.21468, a: 2}
+    - _SoulFishPosition9: {r: 0.7000218, g: 0.38, b: 1.480304, a: 2}
     - _SoulFishWaveColor: {r: 0, g: 0, b: 0, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
     - _SurfaceColourTest1: {r: 0, g: 0.8023877, b: 1, a: 1}

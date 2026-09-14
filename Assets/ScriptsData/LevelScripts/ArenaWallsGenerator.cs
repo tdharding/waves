@@ -22,11 +22,8 @@ public class ArenaWallsGenerator : MonoBehaviour
     [SerializeField] ProceduralArenaWallMesh.Shape shape = ProceduralArenaWallMesh.Shape.Circle;
 
     [Header("Wall")]
-    [Tooltip("World-units the top of the wall stands above the baseline waterline.")]
-    [SerializeField] float wallHeight = 4f;
-    [Tooltip("World-units the wall extends outward from the arena radius.")]
-    [SerializeField] float wallThickness = 1f;
-    [Tooltip("World-units the wall drops below the waterline so it reads as bottomless.")]
+    [Tooltip("World-units the wall drops below the waterline so it reads as bottomless. " +
+             "Height and thickness come from the level (Grid Designer > Arena); this is the default drop.")]
     [SerializeField] float wallDrop = 8f;
 
     [Header("Child object names (auto-resolved by name if unassigned)")]
@@ -39,14 +36,19 @@ public class ArenaWallsGenerator : MonoBehaviour
     [SerializeField] BaselineMarker baselineMarker;
 
     // Last values built, so an inspector tweak can rebuild without LevelSpawner re-running.
+    // The height/thickness defaults are only what a bare prefab previews at before a level
+    // has fed it anything — the level is the authority once it has.
     float _builtRadius;
     float _builtWaterY;
+    float _builtHeight    = 4f;
+    float _builtThickness = 1f;
     Mesh  _mesh;
 
-    public float WallHeight => wallHeight;
+    public float WallHeight => _builtHeight;
 
     // Called by LevelSpawner immediately after the walls prefab is instantiated.
-    public void Build(float arenaRadius, float waterY)
+    // Radius, waterline, height and thickness are all authored per level in the Grid Designer.
+    public void Build(float arenaRadius, float waterY, float wallHeight, float wallThickness)
     {
         if (arenaRadius <= 0f)
         {
@@ -54,8 +56,10 @@ public class ArenaWallsGenerator : MonoBehaviour
             return;
         }
 
-        _builtRadius = arenaRadius;
-        _builtWaterY = waterY;
+        _builtRadius    = arenaRadius;
+        _builtWaterY    = waterY;
+        _builtHeight    = wallHeight;
+        _builtThickness = wallThickness;
 
         // The wall is built exactly on the requested radius and rises from the level's own
         // waterline, so the marker states both rather than approximating a scaled mesh.
@@ -135,7 +139,8 @@ public class ArenaWallsGenerator : MonoBehaviour
     {
         var marker = ResolveMarker();
         Build(_builtRadius > 0f ? _builtRadius : (marker != null ? marker.discRadius : 0f),
-              _builtRadius > 0f ? _builtWaterY : (marker != null ? marker.height : 0f));
+              _builtRadius > 0f ? _builtWaterY : (marker != null ? marker.height : 0f),
+              _builtHeight, _builtThickness);
     }
 
     // Live-rebuild when a field is tweaked on the prefab or a spawned instance, reusing the
@@ -156,8 +161,8 @@ public class ArenaWallsGenerator : MonoBehaviour
         if (marker == null || marker.discRadius <= 0f) return;
         Gizmos.color = new Color(1f, 0.55f, 0.1f, 0.9f);
         Vector3 c = new Vector3(transform.position.x, marker.height, transform.position.z);
-        Gizmos.DrawWireCube(c + Vector3.up * (wallHeight - wallDrop) * 0.5f,
-                            new Vector3(marker.discRadius * 2f, wallHeight + wallDrop, marker.discRadius * 2f));
+        Gizmos.DrawWireCube(c + Vector3.up * (_builtHeight - wallDrop) * 0.5f,
+                            new Vector3(marker.discRadius * 2f, _builtHeight + wallDrop, marker.discRadius * 2f));
     }
 #endif
 }

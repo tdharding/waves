@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEditor;
 
 /// <summary>
@@ -514,16 +514,23 @@ public class FogMapWindow : EditorWindow
 
         EditorGUILayout.Space(8);
         EditorGUILayout.LabelField("Boat Push", EditorStyles.boldLabel);
-        Field("boatRepelRadius", "Hull Radius");
-        Field("boatRepelClearRadius", "Clear Radius");
-        Field("boatRepelStrength", "Strength");
+        Field("boatRepelRadius", "Repel Radius");
+        Field("boatRepelStrength", "Repel Strength");
+        Field("boatMaskRadius", "Mask Radius");
+        Field("boatMaskFeather", "Mask Feather");
         EditorGUILayout.LabelField(" ",
-            $"clears {_map.boatRepelRadius + _map.boatRepelClearRadius:0.##} world units",
+            $"push holds {_map.boatRepelRadius:0.##} u, mask cuts at {_map.boatMaskRadius:0.##} u",
             EditorStyles.miniLabel);
         EditorGUILayout.HelpBox(
             "How fog parts around the hull. On the arena rather than on the boat, because how " +
             "readily fog gives way is a property of the weather — thin haze barely notices a " +
             "hull, a thick bank shoulders well clear. Strength 0 lets fog close straight over you.",
+            MessageType.None);
+        EditorGUILayout.HelpBox(
+            "Two distances, on purpose. Repel Radius is how far the SKELETON is pushed, which " +
+            "shapes fog but cannot hold an exact edge. Mask Radius is where the fog is CUT, with " +
+            "its own feather, which holds the edge exactly at no cost in motion. Set the mask to " +
+            "0 to let fog close over you visually while the push still holds it off.",
             MessageType.None);
 
         EditorGUILayout.Space(8);
@@ -572,13 +579,45 @@ public class FogMapWindow : EditorWindow
 
         EditorGUILayout.Space(8);
         EditorGUILayout.LabelField("Pushing", EditorStyles.boldLabel);
-        Field("repelStrength", "Repel Strength");
-        Field("rockClearRadius", "Rock Clear Radius");
-        Field("rockStrength", "Rock Strength");
+        Field("globalRepelStrength", "Global Strength");
+        EditorGUILayout.HelpBox(
+            "Scales every repeller at once. The per-obstacle strengths below may go past 1, which " +
+            "is how one kind of obstacle reaches full push while this is held low for the rest — " +
+            "the PRODUCT is what gets clamped, never either number on its own.", MessageType.None);
+
+        EditorGUILayout.LabelField("Rocks", EditorStyles.miniBoldLabel);
+        Field("rockRepelRadius", "Repel Radius");
+        Field("rockRepelStrength", "Repel Strength");
+        Field("rockMaskRadius", "Mask Radius");
+        Field("rockMaskFeather", "Mask Feather");
         Field("rockRescanInterval", "Rock Rescan");
-        Field("lampClearFraction", "Lamp Clear Fraction");
-        Field("lampClearRadius", "Lamp Clear Radius");
-        Field("lampStrength", "Lamp Strength");
+
+        EditorGUILayout.LabelField("Street Lights", EditorStyles.miniBoldLabel);
+        Field("lampClearFraction", "Clear Fraction");
+        Field("lampRepelRadius", "Repel Radius");
+        Field("lampRepelStrength", "Repel Strength");
+        Field("lampMaskRadius", "Mask Radius");
+        Field("lampMaskFeather", "Mask Feather");
+        EditorGUILayout.HelpBox(
+            "Repel Radius shapes fog as it flows past; Mask Radius is the hard edge it is drawn " +
+            "to, with its own feather. A wide gentle push with a tight mask gives fog that leans " +
+            "away from an obstacle and is still cut cleanly at it.", MessageType.None);
+
+        EditorGUILayout.LabelField("River Runs", EditorStyles.miniBoldLabel);
+        Field("runsRepel", "Runs Repel");
+        Field("runChainSpacing", "Chain Spacing");
+        Field("runRepelRadius", "Repel Radius");
+        Field("runRepelStrength", "Repel Strength");
+        Field("runMaskRadius", "Mask Radius");
+        Field("runMaskFeather", "Mask Feather");
+        EditorGUILayout.HelpBox(
+            "The elevated runs, strung with a chain of circles so fog has to get past the " +
+            "structures instead of sliding through them. Purely a look — nothing is cleared and " +
+            "nothing is scored. " +
+            "Chain Spacing is the budget: every circle is one of the 32 obstacle slots, shared " +
+            "with the rocks, and the runs are handed out first. Select a run in the scene to " +
+            "read its chain length off the gizmo, and keep the total well under 32 or the rocks " +
+            "lose their mask.", MessageType.None);
 
         EditorGUILayout.Space(8);
         EditorGUILayout.LabelField("Look", EditorStyles.boldLabel);

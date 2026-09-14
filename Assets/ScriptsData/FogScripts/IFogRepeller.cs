@@ -33,10 +33,26 @@ public interface IFogRepeller
     float RepelClearRadius { get; }
 
     /// <summary>
-    /// How hard fog is pushed out. 1 pins the skeleton exactly on the clear radius; lower lets
-    /// it press in, which suits a moving repeller like the boat where fog should lag and recover.
+    /// How hard fog is pushed out. 1 pins the skeleton exactly on the repel radius; lower lets it
+    /// press in, which suits a moving repeller like the boat where fog should lag and recover.
+    ///
+    /// May exceed 1. The global multiplier scales every repeller at once, so a value above 1 here
+    /// is how one obstacle type reaches full push while the multiplier is held low for the rest.
+    /// The product is what gets clamped, never this on its own.
     /// </summary>
     float RepelStrength { get; }
+
+    /// <summary>
+    /// Clear water the FRAGMENT MASK cuts, beyond the radius. Separate from the repel clearance
+    /// on purpose: the push shapes fog around an obstacle and the mask decides where fog is
+    /// allowed to be drawn, and those two want different distances. A wide gentle push with a
+    /// tight mask gives fog that leans away from a rock and is cut cleanly at its edge; the
+    /// reverse gives fog that barely reacts but keeps well clear.
+    /// </summary>
+    float MaskClearRadius { get; }
+
+    /// <summary>How soft the mask's edge is, in world units. 0 is a hard cut.</summary>
+    float MaskFeather { get; }
 
     bool RepelActive { get; }
 }

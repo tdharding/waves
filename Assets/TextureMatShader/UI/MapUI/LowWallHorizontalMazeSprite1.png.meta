@@ -1,7 +1,10 @@
 fileFormatVersion: 2
 guid: e7ab5d3cc9f184f4d9bb900921f35ffb
 TextureImporter:
-  internalIDToNameTable: []
+  internalIDToNameTable:
+  - first:
+      213: -164151850169702846
+    second: LowWallHorizontalMazeSprite1_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -53,7 +56,9 @@ TextureImporter:
   spriteGenerateFallbackPhysicsShape: 1
   alphaUsage: 1
   alphaIsTransparency: 1
+  spriteTessellationMethod: 0
   spriteTessellationDetail: -1
+  spriteGeometrySubdivision: -1
   textureType: 8
   textureShape: 1
   singleChannelComponent: 0
@@ -121,7 +126,29 @@ TextureImporter:
     forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
-    sprites: []
+    sprites:
+    - serializedVersion: 2
+      name: LowWallHorizontalMazeSprite1_0
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 0
+        width: 252
+        height: 252
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 246696113c0d8bdf0800000000000000
+      internalID: -164151850169702846
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
     outline: []
     customData: 
     physicsShape: []

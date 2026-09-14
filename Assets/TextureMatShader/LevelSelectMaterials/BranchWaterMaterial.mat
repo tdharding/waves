@@ -51,6 +51,8 @@ Material:
     m_Ints: []
     m_Floats:
     - _Contrast: 0
+    - _Depth: 0.09
+    - _DepthOpacity: 0.7
     - _Gradient_Noise: 0
     - _Gradient_Noise_Blend: 0
     - _GridLinesColourOpacity: 0
@@ -60,15 +62,18 @@ Material:
     - _ShadowIntensity: 0
     - _Texture2DOpacity: 1
     - _TextureMultiply: 0
+    - _WhiteRadiusOpacity: 6.46
     m_Colors:
-    - _BaseColour: {r: 1, g: 1, b: 1, a: 1}
+    - _BaseColour: {r: 0.836478, g: 0.836478, b: 0.836478, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _DepthColour: {r: 0.7610062, g: 0.7610062, b: 0.7610062, a: 1}
     - _DitherMultiplier: {r: 0, g: 0, b: 0, a: 0}
     - _FadeEndWorld: {r: 115.272606, g: 3.1658895, b: -17.56, a: 0}
     - _FadeStartWorld: {r: 118.43261, g: -3.8941104, b: -13.3, a: 0}
     - _GridLinesColour: {r: 0, g: 0, b: 0, a: 1}
     - _Light_Angle: {r: -0.71, g: -8.55, b: 6.41, a: 0}
     - _NormalTiling: {r: 0, g: 0, b: 0, a: 0}
+    - _SoulfishColour: {r: 1, g: 1, b: 1, a: 1}
     - _Tiling: {r: 0, g: 0, b: 0, a: 0}
     - _Vector1Colour: {r: 1, g: 1, b: 1, a: 1}
     - _Vector2Colour: {r: 0, g: 0, b: 0, a: 1}

@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.Serialization;
 using UnityEngine.Rendering;
 using System.Collections.Generic;
@@ -301,15 +301,26 @@ public class FogFieldManager : MonoBehaviour
         _instance.spawnRadius = from.spawnRadius;
         _instance.cullRadius  = from.cullRadius;
 
-        _instance.settings.RepelStrength = from.repelStrength;
+        _instance.settings.RepelStrength = from.globalRepelStrength;
 
-        _instance.rockClearRadius       = from.rockClearRadius;
-        _instance.rockStrength       = from.rockStrength;
+        _instance.rockRepelRadius    = from.rockRepelRadius;
+        _instance.rockRepelStrength  = from.rockRepelStrength;
+        _instance.rockMaskRadius     = from.rockMaskRadius;
+        _instance.rockMaskFeather    = from.rockMaskFeather;
         _instance.rockRescanInterval = from.rockRescanInterval;
 
         _instance.lampClearFraction = from.lampClearFraction;
-        _instance.lampClearRadius      = from.lampClearRadius;
-        _instance.lampStrength      = from.lampStrength;
+        _instance.lampRepelRadius   = from.lampRepelRadius;
+        _instance.lampRepelStrength = from.lampRepelStrength;
+        _instance.lampMaskRadius    = from.lampMaskRadius;
+        _instance.lampMaskFeather   = from.lampMaskFeather;
+
+        _instance.runsRepel        = from.runsRepel;
+        _instance.runChainSpacing  = from.runChainSpacing;
+        _instance.runRepelRadius   = from.runRepelRadius;
+        _instance.runRepelStrength = from.runRepelStrength;
+        _instance.runMaskRadius    = from.runMaskRadius;
+        _instance.runMaskFeather   = from.runMaskFeather;
     }
 
     [Header("Weather")]
@@ -328,46 +339,76 @@ public class FogFieldManager : MonoBehaviour
     [SerializeField] Transform boat;
 
     [Header("Rocks")]
-    [Tooltip("Adopt anything already telling the water where it stands, so a level's spikes push " +
-             "fog around without being tagged, wired, or given a component. Turn off only if you " +
-             "want fog to ignore rocks entirely.")]
+    [Tooltip("Adopt anything already throwing rock rings, so a level's spikes push fog without " +
+             "being touched.")]
     [SerializeField] bool adoptRocks = true;
 
-    [Tooltip("Clear radius given to adopted rocks, since IRockRing carries no fog settings of its own.")]
-    [FormerlySerializedAs("rockStandoff")] 
-    [SerializeField] float rockClearRadius = 0.34f;
+    [Tooltip("Clear water the SKELETON is pushed out of, beyond a rock's own waterline radius.")]
+    [FormerlySerializedAs("rockClearRadius")] [SerializeField] float rockRepelRadius = 0.7f;
 
-    [Tooltip("Push strength given to adopted rocks. Rocks are firm — fog wraps close and stays out.")]
-    [Range(0f, 1f)] [SerializeField] float rockStrength = 1f;
+    [Tooltip("How hard rocks push. Above 1 makes up for a low global multiplier.")]
+    [FormerlySerializedAs("rockStrength")] [Range(0f, 4f)] [SerializeField] float rockRepelStrength = 1f;
 
-    [Tooltip("Seconds between rescans for rocks. Levels spawn their spikes, so this cannot be a " +
-             "one-off at startup, but it need not run often either.")]
+    [Tooltip("Clear water the MASK cuts, beyond a rock's own radius. The hard edge.")]
+    [SerializeField] float rockMaskRadius = 0.7f;
+
+    [Tooltip("How soft that cut is, in world units.")]
+    [SerializeField] float rockMaskFeather = 0.15f;
+
+    [Tooltip("Seconds between rescans for rocks.")]
     [SerializeField] float rockRescanInterval = 2f;
 
-    // ── Street lights ────────────────────────────────────────────────────────
-    // Here rather than on each lamp, for the same reason the rock settings are: how fog behaves
-    // is a property of the fog, not of the thing it happens to be avoiding. Tuning it per lamp
-    // meant a level could quietly hold twenty different answers to the same question.
     [Header("Street Lights")]
-    [Tooltip("Fraction of a lamp's light radius that fog is held out of. Keep it well under 1: " +
-             "push fog out as far as the light reaches and it never enters the region it would " +
-             "have been lit in, leaving a dark hole ringed by unlit fog instead of fog banked up " +
-             "glowing at the edge of the lamp's reach.")]
+    [Tooltip("Fraction of a lamp's light radius that fog is held out of.")]
     [Range(0.05f, 0.8f)] [SerializeField] float lampClearFraction = 0.35f;
 
-    [Tooltip("Clear water kept beyond that, on top of it.")]
-    [FormerlySerializedAs("lampStandoff")] 
-    [SerializeField] float lampClearRadius = 0.34f;
+    [Tooltip("Clear water the skeleton is pushed out of, on top of that fraction.")]
+    [FormerlySerializedAs("lampClearRadius")] [SerializeField] float lampRepelRadius = 0.34f;
 
-    [Tooltip("How hard a lit lamp pushes fog out. Higher than a rock's — a lamp is burning fog " +
-             "off, not just standing in its way.")]
-    [Range(0f, 1f)] [SerializeField] float lampStrength = 1f;
+    [Tooltip("How hard a lit lamp pushes. Above 1 is allowed.")]
+    [FormerlySerializedAs("lampStrength")] [Range(0f, 4f)] [SerializeField] float lampRepelStrength = 1f;
 
-    // Read by StreetLightController, which owns no fog numbers of its own. Defaults stand in when
-    // no manager exists yet, so a lamp registering before the rig is built still behaves sanely.
+    [Tooltip("Clear water the mask cuts, on top of the light fraction.")]
+    [SerializeField] float lampMaskRadius = 0.34f;
+
+    [Tooltip("How soft that cut is, in world units.")]
+    [SerializeField] float lampMaskFeather = 0.2f;
+
+    // Read by StreetLightController, which owns no fog numbers of its own.
     public static float LampClearFraction => _instance != null ? _instance.lampClearFraction : 0.35f;
-    public static float LampClearRadius      => _instance != null ? _instance.lampClearRadius      : 0.34f;
-    public static float LampStrength      => _instance != null ? _instance.lampStrength      : 1f;
+    public static float LampClearRadius   => _instance != null ? _instance.lampRepelRadius   : 0.34f;
+    public static float LampStrength      => _instance != null ? _instance.lampRepelStrength : 1f;
+    public static float LampMaskRadius    => _instance != null ? _instance.lampMaskRadius     : 0.34f;
+    public static float LampMaskFeather   => _instance != null ? _instance.lampMaskFeather    : 0.2f;
+
+    [Header("River Runs")]
+    [Tooltip("Whether the elevated river runs push fog about at all.")]
+    [SerializeField] bool runsRepel = true;
+
+    [Tooltip("How far apart the circles are strung along a run, in world units. The amount on " +
+             "a chain, and the whole budget control — every circle is one obstacle slot.")]
+    [Range(0.5f, 20f)] [SerializeField] float runChainSpacing = 2.04f;
+
+    [Tooltip("Radius of each circle on the chain.")]
+    [SerializeField] float runRepelRadius = 2.91f;
+
+    [Tooltip("How hard a run pushes. The mask holds the edge; above 1 is full push.")]
+    [Range(0f, 4f)] [SerializeField] float runRepelStrength = 4f;
+
+    [Tooltip("Clear air the mask cuts, beyond each circle.")]
+    [SerializeField] float runMaskRadius = 0.5f;
+
+    [Tooltip("How soft that cut is, in world units.")]
+    [SerializeField] float runMaskFeather = 0.6f;
+
+    // Read by RiverRunFogRepellers, which owns no fog numbers of its own — same deal as the
+    // lamps above. Spacing is read every rescan so restringing a chain is a slider drag.
+    public static bool  RunsRepel        => _instance != null && _instance.runsRepel;
+    public static float RunChainSpacing  => _instance != null ? _instance.runChainSpacing  : 2.04f;
+    public static float RunRepelRadius   => _instance != null ? _instance.runRepelRadius   : 2.91f;
+    public static float RunRepelStrength => _instance != null ? _instance.runRepelStrength : 4f;
+    public static float RunMaskRadius    => _instance != null ? _instance.runMaskRadius    : 0.5f;
+    public static float RunMaskFeather   => _instance != null ? _instance.runMaskFeather   : 0.6f;
 
     // ── Shader ids ───────────────────────────────────────────────────────────
     static readonly int FieldTexId    = Shader.PropertyToID("_FogField");
@@ -502,6 +543,21 @@ public class FogFieldManager : MonoBehaviour
     }
 
     /// <summary>
+    /// Say what the field centres on, for a scene where nothing pushes _BoatWorldCenter.
+    ///
+    /// Inside a level BoatToWaterMaterial pushes that global every frame, so the fallback in
+    /// ResolveBoat is enough and nothing has to be wired. The level select world has no such
+    /// component on its boat, so without this the field would centre on world zero and paint its
+    /// window in a corner of the map — silently, because a window with no boat in it looks
+    /// exactly like fog that is switched off.
+    /// </summary>
+    public static void SetBoat(Transform t)
+    {
+        if (_instance == null || t == null) return;
+        _instance.boat = t;
+    }
+
+    /// <summary>
     /// Turn the whole field on or off for this level. Off retires what is out there rather than
     /// deleting it, so a level transition dissolves the last level's fog instead of blinking it
     /// away mid-shot.
@@ -524,6 +580,7 @@ public class FogFieldManager : MonoBehaviour
     public static void ApplyArenaMap(FogMap map)
     {
         if (_instance == null) return;
+        _instance._mapHandedOver = true;
         _instance.fogMap = map;
         map?.ApplyLook();
 
@@ -552,6 +609,35 @@ public class FogFieldManager : MonoBehaviour
 
     void Awake() => _instance = this;
     void OnEnable() { _instance = this; }
+
+    /// <summary>
+    /// Set once something hands a map over, so the fallback below knows whether this scene has an
+    /// owner for its fog or is running on its own.
+    /// </summary>
+    bool _mapHandedOver;
+
+    /// <summary>
+    /// Start on the map the scene was deployed with, when nothing has handed one over.
+    ///
+    /// A level always has an owner for its fog — LevelDataController reads it off the GridData and
+    /// calls ApplyArenaMap on load, at execution order 0 against this manager's 50, so by the time
+    /// this runs the hand-over has happened and this does nothing. A level select world has one
+    /// too, but only while its designer data is wired; wired or not, the rig sitting in the scene
+    /// already holds a map and a switch, and pressing Deploy in the designer is what made fog
+    /// appear in editor testing. This is that same push, in the build, on load.
+    ///
+    /// Deliberately NOT a fallback that invents anything: no map or the switch off is still no
+    /// fog. It only starts what the scene was authored with.
+    /// </summary>
+    void Start()
+    {
+        if (_mapHandedOver) return;
+        if (!fogEnabled || fogMap == null) return;
+
+        fogMap.ApplyLook();
+        SyncFromMap(fogMap);
+        _primePending = true;
+    }
     void OnDisable() { ReleaseTextures(); if (_instance == this) _instance = null; }
     void OnDestroy() { ReleaseTextures(); if (_instance == this) _instance = null; }
 
@@ -1012,7 +1098,8 @@ public class FogFieldManager : MonoBehaviour
         for (int i = 0; i < all.Length; i++)
         {
             if (all[i] is IRockRing rock)
-                _rocks.Add(new FogRockRepeller(rock, rockClearRadius, rockStrength));
+                _rocks.Add(new FogRockRepeller(rock, rockRepelRadius, rockRepelStrength,
+                                               rockMaskRadius, rockMaskFeather));
         }
     }
 
@@ -1031,9 +1118,11 @@ public class FogFieldManager : MonoBehaviour
         // Refreshed from the map rather than cached, so editing the numbers moves the fog while
         // you watch it rather than on the next level load.
         _boatRepel.Centre   = new Vector3(_boatCentre.x, 0f, _boatCentre.y);
-        _boatRepel.Radius   = fogMap != null ? Mathf.Max(fogMap.boatRepelRadius, 0f)   : 0f;
-        _boatRepel.ClearRadius = fogMap != null ? Mathf.Max(fogMap.boatRepelClearRadius, 0f) : 0f;
-        _boatRepel.Strength = fogMap != null ? Mathf.Clamp01(fogMap.boatRepelStrength) : 0f;
+        _boatRepel.Radius      = 0f;   // one radius now; the clearance IS the whole distance
+        _boatRepel.ClearRadius = fogMap != null ? Mathf.Max(fogMap.boatRepelRadius, 0f) : 0f;
+        _boatRepel.Strength    = fogMap != null ? Mathf.Max(fogMap.boatRepelStrength, 0f) : 0f;
+        _boatRepel.MaskClear   = fogMap != null ? Mathf.Max(fogMap.boatMaskRadius, 0f) : 0f;
+        _boatRepel.Feather     = fogMap != null ? Mathf.Max(fogMap.boatMaskFeather, 0f) : 0.2f;
         Consider(_boatRepel, limitSq);
 
         for (int i = 0; i < _repellers.Count; i++) Consider(_repellers[i], limitSq);
@@ -1408,12 +1497,14 @@ public class FogFieldManager : MonoBehaviour
             if (r == null || !r.RepelActive) continue;
 
             Vector3 c = r.RepelCentre;
-            float keep = r.RepelRadius + r.RepelClearRadius;
+
+            // The MASK radius, not the repel one. They are separate distances on purpose — see
+            // IFogRepeller — and publishing the repel radius here would tie the hard edge back to
+            // the soft push, which is the coupling the split exists to remove.
+            float keep = r.RepelRadius + r.MaskClearRadius;
             if (keep <= 0f) continue;
 
-            // w is the softness of the cut. Scaled off the obstacle so a big rock does not get a
-            // razor edge while a small one dissolves.
-            _obstacleBuf[obstacles++] = new Vector4(c.x, c.z, keep, Mathf.Max(keep * 0.15f, 0.02f));
+            _obstacleBuf[obstacles++] = new Vector4(c.x, c.z, keep, Mathf.Max(r.MaskFeather, 0.001f));
         }
         for (int i = obstacles; i < FOG_OBSTACLE_SLOTS; i++) _obstacleBuf[i] = Vector4.zero;
 

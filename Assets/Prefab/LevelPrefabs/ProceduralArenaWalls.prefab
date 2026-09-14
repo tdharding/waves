@@ -111,8 +111,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ArenaWallsGenerator
   shape: 0
-  wallHeight: 4
-  wallThickness: 1
   wallDrop: 8
   visibleChildName: MeshVisible
   warningLinesChildName: WarningCollisionLines

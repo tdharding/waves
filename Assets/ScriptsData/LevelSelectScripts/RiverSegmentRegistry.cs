@@ -30,6 +30,10 @@ private void Awake()
         _segments.Remove(segment.SegmentID);
     }
 
+    /// <summary>Every river registered — for anything that has to search them all
+    /// rather than name one.</summary>
+    public IEnumerable<RiverSegmentID> AllSegments => _segments.Values;
+
     public RiverSegmentID GetSegment(string id)
     {
         _segments.TryGetValue(id, out var segment);

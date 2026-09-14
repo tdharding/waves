@@ -6,6 +6,7 @@ public class LevelSelectCameraControllerEditor : Editor
 {
     private bool autoPreviewStart = false;
     private bool autoPreviewTransition = false;
+    private bool autoPreviewFollow = false;
 
     public override void OnInspectorGUI()
     {
@@ -24,6 +25,18 @@ public class LevelSelectCameraControllerEditor : Editor
 
         EditorGUILayout.Space();
 
+        // 1b. Follow Pose — the shot the camera holds behind the boat under way
+        EditorGUILayout.LabelField("Follow Pose Settings", EditorStyles.boldLabel);
+        EditorGUI.BeginChangeCheck();
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("followDistance"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("followHeight"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("defaultZoom"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("followCatchUpTime"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("defaultVerticalFOV"));
+        bool followSettingsChanged = EditorGUI.EndChangeCheck();
+
+        EditorGUILayout.Space();
+
         // 2. Transition Section
         EditorGUILayout.LabelField("Transition Target Settings", EditorStyles.boldLabel);
         EditorGUI.BeginChangeCheck();
@@ -38,13 +51,14 @@ public class LevelSelectCameraControllerEditor : Editor
         // 3. Other Properties
         EditorGUILayout.LabelField("Base Settings", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(serializedObject.FindProperty("cam"));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("followDistance"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("minDistance"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("maxDistance"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("zoomSpeed"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("boatControl"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("orbitSpeed"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("pitchMin"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("pitchMax"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("lockCursorWhileOrbiting"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("previewTarget"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("previewOrigin"));
 
@@ -69,7 +83,16 @@ public class LevelSelectCameraControllerEditor : Editor
             MarkDirty(controller);
         }
         EditorGUILayout.EndHorizontal();
-        
+
+        EditorGUILayout.BeginHorizontal();
+        autoPreviewFollow = EditorGUILayout.ToggleLeft("Auto Preview Follow", autoPreviewFollow, GUILayout.Width(150));
+        if (GUILayout.Button("Preview Follow") || (autoPreviewFollow && followSettingsChanged))
+        {
+            controller.EditorPreviewFollow();
+            MarkDirty(controller);
+        }
+        EditorGUILayout.EndHorizontal();
+
         EditorGUILayout.HelpBox("Use these tools to visualize where the camera starts and where it ends up after the transition trigger.", MessageType.Info);
         
         serializedObject.ApplyModifiedProperties();

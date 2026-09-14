@@ -1,0 +1,153 @@
+// Extracted from Assets/Editor/LevelSelectDesignerWindow.cs before the rails were retired.
+// Left here verbatim so the junction spawning can be read back if it is ever wanted again.
+
+// ── Junction script object spawned at the gap midpoint (was inside BakePaths' per-split loop) ──
+
+                // Junction script object at gap midpoint
+                if (_data.junctionScriptObject != null)
+                {
+                    float   T_mid     = (r.T_endA + r.T_startB) * 0.5f;
+                    Vector3 scriptPos = go.transform.TransformPoint(fullSpline.EvaluatePosition(T_mid));
+                    float3  tl        = math.normalize(fullSpline.EvaluateTangent(T_mid));
+                    float3  tw        = math.normalize(math.mul(fl2w, new float4(tl, 0f)).xyz);
+                    Vector3 scriptTan = math.lengthsq(tw) > 0.001f
+                        ? new Vector3(tw.x, tw.y, tw.z) : r.tanWorld;
+
+                    var jGO = (GameObject)PrefabUtility.InstantiatePrefab(_data.junctionScriptObject);
+                    Undo.RegisterCreatedObjectUndo(jGO, "Generate Junction Script Object");
+                    jGO.transform.SetParent(junctionsParent.transform, true);
+                    jGO.transform.position = scriptPos;
+                    if (scriptTan != Vector3.zero)
+                        jGO.transform.rotation = Quaternion.LookRotation(scriptTan, Vector3.up);
+                    jGO.name = $"Junction_{path.segmentId}_{s}";
+
+                    FitJunctionTrigger(jGO, path, branchPath, r.junction.nodeId);
+                }
+            }
+        }
+
+// ── FitJunctionTrigger ──
+    /// <summary>
+    /// Sizes a junction's trigger from the two rivers meeting there: as wide as the branch's
+    /// channel, running the full width of the river it joins and on into the branch itself.
+    ///
+    /// The box is axis-aligned in its own space, so the junction object is turned to face
+    /// down the branch — nothing reads its rotation, only its position.
+    /// </summary>
+    private void FitJunctionTrigger(
+        GameObject junctionGO,
+        LevelSelectDesignerData.DesignerPath path,
+        LevelSelectDesignerData.DesignerPath branchPath,
+        string nodeId)
+    {
+        if (junctionGO == null) return;
+        if (!_junctionPerpDirections.TryGetValue(nodeId, out Vector3 branchDir)) return;
+
+        var mainProfile   = _data.ProfileFor(path.riverName);
+        var branchProfile = branchPath != null ? _data.ProfileFor(branchPath.riverName) : mainProfile;
+
+        junctionGO.transform.rotation = Quaternion.LookRotation(branchDir, Vector3.up);
+
+        // How far it carries on past the river, into the branch.
+        float reach = branchProfile.OuterWidth;
+
+        var box = junctionGO.GetComponent<BoxCollider>();
+        if (box == null) box = Undo.AddComponent<BoxCollider>(junctionGO);
+
+        Undo.RecordObject(box, "Fit Junction Trigger");
+        box.isTrigger = true;
+        box.size      = new Vector3(branchProfile.innerWidth,
+                                    mainProfile.OuterWidth,
+                                    mainProfile.OuterWidth + reach);
+        box.center    = new Vector3(0f, 0f, reach * 0.5f);
+        EditorUtility.SetDirty(box);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // PROCEDURAL RUN GEOMETRY
+    // ══════════════════════════════════════════════════════════════
+
+    private const string GeneratedDir = PrefabDir + "/Generated";
+
+    // How finely the sweep walks a spline before rings are placed along it by arc length.
+    private const int SplineSampleCount = 512;
+
+    /// <summary>
+    /// Walks a spline by arc length and places ring frames every <paramref name="step"/>
+    /// along it, so rings sit evenly rather than bunching where the curve is tight.
+    ///
+    /// Where a branch's mouth crosses, the rings are placed on the lines of that branch's
+    /// own section instead — the mouth ends on this run's centreline and has to land there
+    /// on the run's own vertices, or the two stop lining up.
+    /// </summary>
+    /// <summary>
+    /// How far a run has to carry on past <paramref name="nodeId"/> to reach into the arena
+    /// standing there, or 0 when that node is not an arena.
+    ///
+    /// A run stops on the entrance node it was drawn to, and the wall stands `radius` out from
+    /// the arena centre — so what has to be made up is however far that node fell from the
+    /// face. Measured rather than assumed, because the primary entrance sits `arenaHeadOffset`
+    /// back from the centre while the others are dragged wherever they are wanted.
+    ///
+    /// It goes both ways. A node short of the face carries the run on; a node already inside a
+    /// wide arena pulls it back. Either way 0 lands the run's end on the inner face, and the
+    /// entrance's own overlap pushes it in from there.
+    /// </summary>
+    private float ArenaReachAt(string nodeId)
+    {
+        if (string.IsNullOrEmpty(nodeId)) return 0f;
+
+        var arena = _data.ArenaAtEntrance(nodeId);
+        if (arena == null) return 0f;
+
+// ── WireJunctionNodes ──
+            private void WireJunctionNodes(RiverSegmentID[] bakedSegments)
+    {
+        var sceneJunctions = FindObjectsOfType<SplineRiverJunctionNodeV2>();
+
+        foreach (var designerJunc in _data.junctions)
+        {
+            if (string.IsNullOrEmpty(designerJunc.riverPathId) ||
+                string.IsNullOrEmpty(designerJunc.branchPathId)) continue;
+
+            var riverPath  = _data.paths.Find(p => p.pathId == designerJunc.riverPathId);
+            var branchPath = _data.paths.Find(p => p.pathId == designerJunc.branchPathId);
+            if (riverPath == null || branchPath == null) continue;
+
+            var juncNode = _data.nodes.Find(n => n.id == designerJunc.nodeId);
+            if (juncNode == null) continue;
+            Vector3 juncPos = juncNode.worldPosition;
+
+            // Find baked highway from river path with endpoint nearest to junction
+            string riverSegID  = FindBakedEndpointID(bakedSegments, riverPath.segmentId, juncPos);
+            string branchSegID = FindBakedEndpointID(bakedSegments, branchPath.segmentId, juncPos);
+
+            if (string.IsNullOrEmpty(riverSegID) || string.IsNullOrEmpty(branchSegID))
+            {
+                Debug.LogWarning($"[LSD] Junction '{designerJunc.junctionId}': could not find baked segments " +
+                                 $"for river='{riverPath.segmentId}' branch='{branchPath.segmentId}'");
+                continue;
+            }
+
+            // Find the scene junction node nearest to this designer junction position
+            SplineRiverJunctionNodeV2 nearest = null;
+            float nearestDist = float.MaxValue;
+            foreach (var sj in sceneJunctions)
+            {
+                float d = Vector3.Distance(sj.transform.position, juncPos);
+                if (d < nearestDist) { nearestDist = d; nearest = sj; }
+            }
+
+            if (nearest != null)
+            {
+                Undo.RecordObject(nearest, "Wire Junction Segment IDs");
+                nearest.AssignSegmentIDsFromBaked(new[] {
+                    bakedSegments.FirstOrDefault(b => b.SegmentID == riverSegID),
+                    bakedSegments.FirstOrDefault(b => b.SegmentID == branchSegID)
+                }.Where(b => b != null));
+                EditorUtility.SetDirty(nearest);
+                Debug.Log($"[LSD] Junction wired: river='{riverSegID}' branch='{branchSegID}'");
+            }
+        }
+    }
+

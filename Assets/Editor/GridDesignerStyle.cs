@@ -26,7 +26,10 @@ public class GridMarkerStyle
 public class GridDesignerStyle
 {
     // Lines / backdrop.
-    public Color gridLineColor = new Color(0f, 0f, 0f, 1f);
+    public Color gridLineColor  = new Color(0f, 0f, 0f, 1f);
+    // Arena outer wall ring. Fill = a solid band at the wall thickness; outline = just its inner/outer
+    // edges (width = edge line thickness).
+    public GridMarkerStyle arenaWall = new GridMarkerStyle(new Color(0.45f, 0.45f, 0.50f, 1f));
 
     // Interactive markers.
     public GridMarkerStyle selection      = new GridMarkerStyle(Color.white);

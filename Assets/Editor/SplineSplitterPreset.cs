@@ -12,7 +12,8 @@ public class SplineSplitterPreset : ScriptableObject
     public GameObject junctionPrefab;               // fallback visual (gap SplineInstantiate)
     public GameObject junctionRightFacingPrefab;     // visual: branch exits right of travel direction
     public GameObject junctionLeftFacingPrefab;       // visual: branch exits left  of travel direction
-    public GameObject junctionScriptObject;         // LevelSelectJunctionScriptObject — placed under RIVERJUNCTIONS
+    // Retired with the on-rails boat — kept so older presets still load.
+    public GameObject junctionScriptObject;
     public float      padding               = 0f;
     public Vector3    junctionPosOffset;
     public Vector3    junctionRotOffset;

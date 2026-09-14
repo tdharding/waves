@@ -76,7 +76,7 @@ Material:
     - _MaskDistance1: 0
     - _MaskFade1: 0
     - _MaskSubtraction: 0
-    - _NormalStrength: 1.05
+    - _NormalStrength: -0.78
     - _Normal_Strength: 1.8
     - _PointCount: 0
     - _QueueControl: 0

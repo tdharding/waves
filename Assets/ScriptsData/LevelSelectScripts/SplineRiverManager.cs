@@ -25,6 +25,12 @@ public class SplineRiverManager : MonoBehaviour
     [Tooltip("When a branch unlocks on exit, start its extrusion at this normalised T (0-1) so the mesh head is already slightly beyond where the boat spawns.")]
     [SerializeField] [Range(0f, 0.5f)] private float _exitExtrudeHeadStart = 0.1f;
 
+    [Header("Water")]
+    [Tooltip("The rivers are already full of water — generated as mesh by the Level Select " +
+             "Designer. The extruded water is hidden and no barriers are spawned, so every " +
+             "river is navigable from load.")]
+    [SerializeField] private bool _waterPrefilled = true;
+
     [Header("Barriers")]
     [SerializeField] private GameObject _barrierPrefab; // Sphere collider tagged "LevelSelectPathObstacle"
     [SerializeField] private float _barrierCompleteThreshold = 0.99f; // Disable barrier above this T
@@ -87,6 +93,7 @@ public class SplineRiverManager : MonoBehaviour
     {
         Instance = this;
         Stitch();
+        HideExtrudedWater();
         SpawnBarriers();
 
         _mainCurrentT = GameProgressData.GetRiverProgress(0f);
@@ -119,6 +126,9 @@ public class SplineRiverManager : MonoBehaviour
     // ─────────────────────────────────────────────────────────────
     private void SpawnBarriers()
     {
+        // Nothing to hold the boat back when the rivers are already full.
+        if (_waterPrefilled) return;
+
         if (_barrierPrefab == null)
         {
             Debug.LogWarning("SplineRiverManager: No barrier prefab assigned — barriers will not be created.");
@@ -137,6 +147,23 @@ public class SplineRiverManager : MonoBehaviour
             barrier.name = $"Barrier_Branch_{i}_{_branches[i].JunctionGroup}";
             _branchBarriers.Add(barrier);
         }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Water — the extruded mesh steps aside for the generated one
+    // ─────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// With the rivers pre-filled the water is generated mesh sitting in each channel, so the
+    /// extruded tube would only sit on top of it. The stitched splines stay — they still carry
+    /// the river progress the rest of the level select reads — only the renderers go dark.
+    /// </summary>
+    private void HideExtrudedWater()
+    {
+        if (!_waterPrefilled) return;
+
+        foreach (var renderer in GetComponentsInChildren<MeshRenderer>(true))
+            renderer.enabled = false;
     }
 
     // ─────────────────────────────────────────────────────────────

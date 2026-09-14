@@ -26,6 +26,8 @@ class GridSnapshot
     public List<GridData.CubeBuilding>   cubeBuildings;
     public List<GridData.ProceduralSpike> proceduralSpikes;
     public List<UnityEngine.Vector2>     orbPositions;   // free-positioned orbs (set after construction)
+    public List<UnityEngine.Vector2>     waterModPositions; // free base water modifiers (set after construction)
+    public List<UnityEngine.Vector2>     waveModPositions;  // free base wave modifiers (set after construction)
 
     public GridSnapshot(int[] square, int[] circle,
                         List<GridData.ArenaEntrance> ents,
@@ -170,7 +172,8 @@ class GridSnapshot
             if (z.streetLights != null)
                 foreach (var sl in z.streetLights)
                     c.streetLights.Add(sl == null ? null
-                        : new GridData.SoulZone.StreetLight { nodeIndex = sl.nodeIndex, poolRadius = sl.poolRadius });
+                        : new GridData.SoulZone.StreetLight { nodeIndex = sl.nodeIndex, poolRadius = sl.poolRadius,
+                                                              startsLit = sl.startsLit });
             copy.Add(c);
         }
         return copy;
@@ -181,7 +184,8 @@ class GridSnapshot
         var copy = new List<GridData.WhirlpoolPoint>();
         if (src == null) return copy;
         foreach (var w in src)
-            copy.Add(w == null ? null : new GridData.WhirlpoolPoint { cellIndex = w.cellIndex, radius = w.radius });
+            copy.Add(w == null ? null : new GridData.WhirlpoolPoint
+                { cellIndex = w.cellIndex, radius = w.radius, position = w.position, freePlaced = w.freePlaced });
         return copy;
     }
 
@@ -363,6 +367,11 @@ public class GridDesignerWindow : EditorWindow
     bool       baseLayerVisible = true;
 
     float[] cachedTierYOffsets; // pulled from LevelSpawner in scene
+    // Guards so the two asset scans below (AssetDatabase.FindAssets — expensive) run once instead of
+    // every repaint. Invalidated on window focus (OnFocus), which catches assets created/edited
+    // elsewhere (e.g. a preset saved in the Spike Studio) without scanning during interaction.
+    bool _tierOffsetsCached;
+    bool _spikePresetsCached;
 
     // ── Direct Prefab Library ──
     enum PrefabLibraryTab { MazePieces, SetPieces, Statues, Modifiers, BadGuys }
@@ -375,6 +384,9 @@ public class GridDesignerWindow : EditorWindow
     // NonSerialized so it resets to null across domain reloads — an EditorWindow deserializes a
     // plain List field as an empty (non-null) list, which would defeat a null-guarded cache.
     [System.NonSerialized] List<GameObject> _splineWallPrefabOptions;
+    // Prefab library for the per-entrance Type dropdown — every prefab in this folder is an option.
+    const string                  EntrancePrefabFolder = "Assets/Prefab/Entrances";
+    [System.NonSerialized] List<GameObject> _entrancePrefabOptions;
     Dictionary<string, Texture2D> prefabIcons         = new Dictionary<string, Texture2D>();
     // Caches the PrefabBaselineAlignment component per prefab asset so the scale-radius
     // overlay does not run GetComponentInChildren every repaint.
@@ -455,6 +467,8 @@ public class GridDesignerWindow : EditorWindow
     int     _activeSpikeIndex    = -1;   // selected/active spike, edited in the panel
     int     _activeOrbIndex      = -1;   // selected/active free orb (Select tool)
     int     _dragOrbIndex        = -1;   // orb being dragged
+    int     _activeWhirlpoolIndex = -1;  // selected/active free whirlpool (Select tool)
+    int     _dragWhirlpoolIndex   = -1;  // whirlpool being dragged
     bool    _isDraggingSpike     = false; // click-drag from centre outward, sizing a new spike
     Vector2 _spikeDragStartNorm  = Vector2.zero;
     Vector2 _spikeDragCurrentNorm = Vector2.zero;
@@ -489,6 +503,9 @@ public class GridDesignerWindow : EditorWindow
     // ── Grid display settings (persisted via EditorPrefs) ──
     float _gridLineOpacity    = 1f;
     float _backdropBrightness = 0.08f;
+    // The legacy painted-cell grid (slots + grid lines) is off by default now that placement is
+    // free-positioned. When off, the per-repaint cell loop is skipped entirely — the main perf win.
+    bool  _showGridCells      = false;
     // Radius of the white opaque selection dot, as a fraction of a grid cell. Drives the generic
     // prefab/node marker AND the procedural-spike/block selection marker, so one setting styles all.
     float _selectionCircleFactor = 0.32f;
@@ -512,6 +529,7 @@ public class GridDesignerWindow : EditorWindow
     const string PrefKeySpikeResolution = "GridDesigner_SpikeResolution";
     const string PrefKeyOrbSize         = "GridDesigner_OrbSize";
     const string PrefKeyClampToCell     = "GridDesigner_ClampToCellWhenDrawing";
+    const string PrefKeyShowGridCells   = "GridDesigner_ShowGridCells";
     const string PrefKeyStyle           = "GridDesigner_Style";
 
     Stack<GridSnapshot> undoStack = new Stack<GridSnapshot>();
@@ -555,6 +573,26 @@ public class GridDesignerWindow : EditorWindow
     string[]        discoveredGridNames = new string[0];
     int             selectedDiscoveredGridIndex;
 
+    // How the Existing Levels dropdown is ordered.
+    enum LevelSortOrder { Alphabetical, RecentlyModified }
+    LevelSortOrder   _levelSortOrder = LevelSortOrder.Alphabetical;
+    const string     PrefKeyLevelSort = "GridDesigner_LevelSortOrder";
+    static readonly string[] LevelSortLabels = { "Alphabetical", "Recently modified" };
+
+    // Sort mode for the level list, exposed for the settings window (int-indexed into LevelSortLabels).
+    public int LevelSortMode
+    {
+        get => (int)_levelSortOrder;
+        set
+        {
+            _levelSortOrder = (LevelSortOrder)Mathf.Clamp(value, 0, 1);
+            EditorPrefs.SetInt(PrefKeyLevelSort, (int)_levelSortOrder);
+            RefreshDiscoveredGrids();
+            Repaint();
+        }
+    }
+    public static string[] LevelSortOptionLabels => LevelSortLabels;
+
     [MenuItem("Tools/Waves/Grid Designer #4")]
     static void Open() => GetWindow<GridDesignerWindow>("Grid Designer");
 
@@ -563,7 +601,8 @@ public class GridDesignerWindow : EditorWindow
         wantsMouseMove = true;          // needed so a carried duplicate follows the cursor
         drawSelect = true;              // default tool on open is Select, not the eraser
         activeSlot = -1;
-        RefreshDiscoveredGrids();
+        _levelSortOrder         = (LevelSortOrder)EditorPrefs.GetInt(PrefKeyLevelSort, 0);
+        RefreshDiscoveredGrids();       // uses _levelSortOrder, so load it first
         prefabFolderPath    = EditorPrefs.GetString("GridDesigner_PrefabFolder", "Assets/Prefab/MazePieces");
         iconsFolderPath     = EditorPrefs.GetString("GridDesigner_IconsFolder",  "");
         _gridLineOpacity        = EditorPrefs.GetFloat(PrefKeyGridOpacity,     1f);
@@ -572,6 +611,7 @@ public class GridDesignerWindow : EditorWindow
         _spikeDisplayResolution = EditorPrefs.GetInt(PrefKeySpikeResolution,   8);
         _orbCircleFactor        = EditorPrefs.GetFloat(PrefKeyOrbSize,         0.35f);
         _clampToCellWhenDrawing = EditorPrefs.GetBool(PrefKeyClampToCell,      false);
+        _showGridCells          = EditorPrefs.GetBool(PrefKeyShowGridCells,    false);
         string styleJson = EditorPrefs.GetString(PrefKeyStyle, "");
         if (!string.IsNullOrEmpty(styleJson))
             try { JsonUtility.FromJsonOverwrite(styleJson, _style); } catch { /* keep defaults on bad data */ }
@@ -581,6 +621,15 @@ public class GridDesignerWindow : EditorWindow
         ScanModifiersLib();
         ScanBadGuysLib();
         LoadPanelWidth();
+    }
+
+    // Returning to the window re-scans the once-cached asset lists (tier config, spike presets), so a
+    // preset saved in the Spike Studio or an edited TierConfig shows up — without paying for the scan
+    // on every repaint while you work.
+    void OnFocus()
+    {
+        _tierOffsetsCached  = false;
+        _spikePresetsCached = false;
     }
 
     void GridLog(string msg)
@@ -605,6 +654,10 @@ public class GridDesignerWindow : EditorWindow
         snap.proceduralSpikes    = GridSnapshot.CopySpikes(loadedData?.proceduralSpikes);
         snap.orbPositions        = loadedData?.orbPositions != null
                                    ? new List<Vector2>(loadedData.orbPositions) : new List<Vector2>();
+        snap.waterModPositions   = loadedData?.waterLevelModifierPositions != null
+                                   ? new List<Vector2>(loadedData.waterLevelModifierPositions) : new List<Vector2>();
+        snap.waveModPositions    = loadedData?.waveModifierPositions != null
+                                   ? new List<Vector2>(loadedData.waveModifierPositions) : new List<Vector2>();
         undoStack.Push(snap);
         if (undoStack.Count > MaxUndoSteps) undoStack.TrimExcess();
     }
@@ -624,6 +677,10 @@ public class GridDesignerWindow : EditorWindow
                                         ? new List<Vector2>(snapshot.orbPositions) : new List<Vector2>();
             loadedData.waterLevelModifierCellIndices = new List<int>(snapshot.waterLevelModifierIndices);
             loadedData.waveModifierCellIndices       = new List<int>(snapshot.waveModifierIndices);
+            loadedData.waterLevelModifierPositions   = snapshot.waterModPositions != null
+                                                       ? new List<Vector2>(snapshot.waterModPositions) : new List<Vector2>();
+            loadedData.waveModifierPositions         = snapshot.waveModPositions != null
+                                                       ? new List<Vector2>(snapshot.waveModPositions) : new List<Vector2>();
             
             loadedData.linkedPairs = snapshot.linkedPairs != null 
                 ? new List<GridData.LinkedPrefabPair>(snapshot.linkedPairs) 
@@ -861,6 +918,18 @@ public class GridDesignerWindow : EditorWindow
                 Undo.RecordObject(loadedData, "Delete Orb");
                 loadedData.orbPositions.RemoveAt(_activeOrbIndex);
                 _activeOrbIndex = -1;
+                EditorUtility.SetDirty(loadedData);
+                e.Use(); Repaint(); return;
+            }
+
+            // A free whirlpool picked with the Select tool is tracked by _activeWhirlpoolIndex — same rule.
+            if (delete && _currentSelection.type == SelectionType.None
+                && _activeWhirlpoolIndex >= 0 && loadedData.whirlpools != null
+                && _activeWhirlpoolIndex < loadedData.whirlpools.Count)
+            {
+                Undo.RecordObject(loadedData, "Delete Whirlpool");
+                loadedData.whirlpools.RemoveAt(_activeWhirlpoolIndex);
+                _activeWhirlpoolIndex = -1;
                 EditorUtility.SetDirty(loadedData);
                 e.Use(); Repaint(); return;
             }
@@ -1160,9 +1229,13 @@ public class GridDesignerWindow : EditorWindow
         EditorGUILayout.LabelField("Existing Levels", EditorStyles.boldLabel);
         if (discoveredGrids.Count > 0)
         {
+            EditorGUI.BeginChangeCheck();
             selectedDiscoveredGridIndex = EditorGUILayout.Popup(
                 selectedDiscoveredGridIndex, discoveredGridNames);
-            if (GUILayout.Button("LOAD SELECTED"))
+            if (EditorGUI.EndChangeCheck()
+                && selectedDiscoveredGridIndex >= 0
+                && selectedDiscoveredGridIndex < discoveredGrids.Count
+                && discoveredGrids[selectedDiscoveredGridIndex] != loadedData)
                 LoadGrid(discoveredGrids[selectedDiscoveredGridIndex]);
         }
         else
@@ -1186,7 +1259,7 @@ public class GridDesignerWindow : EditorWindow
         {
             if (loadedData.tiers == null) loadedData.tiers = new List<GridData.GridTier>();
 
-            RefreshCachedTierOffsets();
+            EnsureTierOffsetsCache();
 
             EditorGUILayout.BeginHorizontal();
             baseLayerVisible = EditorGUILayout.Toggle(baseLayerVisible, GUILayout.Width(16));
@@ -1287,6 +1360,15 @@ public class GridDesignerWindow : EditorWindow
                                               "Also the base height every tier-aligned prefab is placed against."),
                 loadedData.waterlineY);
 
+            float newWallHeight = EditorGUILayout.FloatField(
+                new GUIContent("Wall Height", "World-units the top of the arena wall stands above the waterline."),
+                loadedData.arenaWallHeight);
+
+            float newWallThickness = EditorGUILayout.FloatField(
+                new GUIContent("Wall Thickness", "World-units the wall extends outward from the arena radius. " +
+                                                 "The inner face stays on the radius, so this never moves the gameplay boundary."),
+                loadedData.arenaWallThickness);
+
             Vector2 newCentre = EditorGUILayout.Vector2Field(
                 new GUIContent("Centre Offset", "XZ offset of the arena centre from world origin. X = world X, Y = world Z."),
                 loadedData.arenaCentreOffset);
@@ -1299,10 +1381,6 @@ public class GridDesignerWindow : EditorWindow
                 new GUIContent("Map Marker Scale", "Scale applied to all maze wall map markers on this level."),
                 loadedData.mazeWallMarkerScale);
 
-            float newCoverage = EditorGUILayout.FloatField(
-                new GUIContent("Wave Plane Coverage", "How much larger the wave plane is than the arena diameter (e.g. 1.5)."),
-                loadedData.wavePlaneCoverageMultiplier);
-
             GameObject newEntrance = (GameObject)EditorGUILayout.ObjectField(
                 new GUIContent("Entrance Override", "When set, overrides the prefab on every arena entrance in this level."),
                 loadedData.entrancePrefabOverride, typeof(GameObject), false);
@@ -1312,10 +1390,11 @@ public class GridDesignerWindow : EditorWindow
                 Undo.RecordObject(loadedData, "Edit Arena");
                 loadedData.arenaRadius                = Mathf.Max(0f, newRadius);
                 loadedData.waterlineY                 = newWaterY;
+                loadedData.arenaWallHeight            = Mathf.Max(0f, newWallHeight);
+                loadedData.arenaWallThickness         = Mathf.Max(0.01f, newWallThickness);
                 loadedData.arenaCentreOffset          = newCentre;
                 loadedData.mapGridTiling              = newTiling;
                 loadedData.mazeWallMarkerScale        = newMarkerScale;
-                loadedData.wavePlaneCoverageMultiplier = newCoverage;
                 loadedData.entrancePrefabOverride     = newEntrance;
                 EditorUtility.SetDirty(loadedData);
             }
@@ -1340,6 +1419,8 @@ public class GridDesignerWindow : EditorWindow
                     "Arena Radius is 0, so world sizes fall back to 12 units and the level spawns " +
                     "no boundary. Anything measured in world units here will be wrong.", MessageType.Warning);
             }
+
+            DrawArenaTierHeights();
 
             EditorGUILayout.Space();
             DrawPortalList();
@@ -1433,8 +1514,8 @@ public class GridDesignerWindow : EditorWindow
             {
                 loadedData.orbCellIndices?.Remove(index);
                 loadedData.orbPositions?.RemoveAll(p => GridData.NormalizedToCell(p) == index); // free orbs in this cell
-                loadedData.waterLevelModifierCellIndices?.Remove(index);
-                loadedData.waveModifierCellIndices?.Remove(index);
+                loadedData.waterLevelModifierPositions?.RemoveAll(p => GridData.NormalizedToCell(p) == index);
+                loadedData.waveModifierPositions?.RemoveAll(p => GridData.NormalizedToCell(p) == index);
                 loadedData.whirlpools?.RemoveAll(w => w.cellIndex == index);
                 loadedData.soulSpawnPoints?.RemoveAll(s => s.cellIndex == index);
                 RemoveGuardedZonesForCell(index);
@@ -1443,8 +1524,8 @@ public class GridDesignerWindow : EditorWindow
                     foreach (var tier in loadedData.tiers)
                     {
                         if (tier.cells != null && index < tier.cells.Length) tier.cells[index] = 0;
-                        tier.waterLevelModifierCellIndices?.Remove(index);
-                        tier.waveModifierCellIndices?.Remove(index);
+                        tier.waterLevelModifierPositions?.RemoveAll(p => GridData.NormalizedToCell(p) == index);
+                        tier.waveModifierPositions?.RemoveAll(p => GridData.NormalizedToCell(p) == index);
                         tier.prefabPlacements?.RemoveAll(p => p.cellIndex == index);
                     }
             }
@@ -1505,24 +1586,35 @@ public class GridDesignerWindow : EditorWindow
 
         if (drawWaterLevelModifier && loadedData != null)
         {
-            var wlList = GetActiveTierWaterModifiers();
-            if (wlList.Contains(index)) wlList.Remove(index); else wlList.Add(index);
+            // Free-positioned now — dropped at the exact pointer; click near an existing one toggles it off.
+            var wl = GetActiveWaterModPositions();
+            if (!ToggleOffNear(wl, _drawPointerNorm)) wl.Add(_drawPointerNorm);
             return;
         }
 
         if (drawWaveModifier && loadedData != null)
         {
-            var wvList = GetActiveTierWaveModifiers();
-            if (wvList.Contains(index)) wvList.Remove(index); else wvList.Add(index);
+            var wv = GetActiveWaveModPositions();
+            if (!ToggleOffNear(wv, _drawPointerNorm)) wv.Add(_drawPointerNorm);
             return;
         }
 
         if (drawWhirlpool && loadedData != null)
         {
+            // Whirlpools are free-positioned now — dropped at the exact pointer (never snapped). A small
+            // min-gap toggles the nearest existing one off instead of stacking. cellIndex stays synced
+            // as a derived key (map/links). The shader tracks the spawned handle's world position.
             if (loadedData.whirlpools == null) loadedData.whirlpools = new List<GridData.WhirlpoolPoint>();
-            int existing = loadedData.whirlpools.FindIndex(w => w.cellIndex == index);
+            Vector2 wpPos = _drawPointerNorm;
+            float   gap   = 0.6f / GridData.GridSize;
+            int existing = loadedData.whirlpools.FindIndex(w => w != null && Vector2.Distance(w.position, wpPos) < gap);
             if (existing >= 0) loadedData.whirlpools.RemoveAt(existing);
-            else loadedData.whirlpools.Add(new GridData.WhirlpoolPoint { cellIndex = index });
+            else loadedData.whirlpools.Add(new GridData.WhirlpoolPoint
+            {
+                position   = wpPos,
+                freePlaced = true,
+                cellIndex  = GridData.NormalizedToCell(wpPos),
+            });
             return;
         }
 
@@ -1795,6 +1887,85 @@ public class GridDesignerWindow : EditorWindow
         return prefab.name.Substring(0, Mathf.Min(2, prefab.name.Length));
     }
 
+    // Per-level tier heights — absolute world Y per slot, ordered high to low the same way
+    // TierConfig.offsets is. These used to live on the walls prefab's BaselineMarker, which
+    // meant every level sharing a prefab shared its floors. Empty means this level uses the
+    // global TierConfig offsets, which is the default and the behaviour before any of this.
+    void DrawArenaTierHeights()
+    {
+        if (loadedData == null) return;
+        EnsureTierOffsetsCache();
+
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Tier Heights", EditorStyles.boldLabel);
+
+        float[] heights = loadedData.spawnTierHeights;
+
+        if (heights == null || heights.Length == 0)
+        {
+            EditorGUILayout.HelpBox(
+                "Using the global Tier Config offsets. Give this level its own tier heights to " +
+                "place floors against its waterline.", MessageType.None);
+
+            if (GUILayout.Button("Set Tier Heights For This Level"))
+            {
+                int n = (cachedTierYOffsets != null && cachedTierYOffsets.Length > 0)
+                        ? cachedTierYOffsets.Length : 6;
+                var seeded = new float[n];
+                for (int i = 0; i < n; i++)
+                    seeded[i] = loadedData.waterlineY +
+                                (cachedTierYOffsets != null && i < cachedTierYOffsets.Length ? cachedTierYOffsets[i] : 0f);
+
+                Undo.RecordObject(loadedData, "Set Tier Heights");
+                loadedData.spawnTierHeights = seeded;
+                EditorUtility.SetDirty(loadedData);
+            }
+            return;
+        }
+
+        EditorGUI.BeginChangeCheck();
+        var edited = new float[heights.Length];
+        for (int i = 0; i < heights.Length; i++)
+        {
+            string label = (cachedTierYOffsets != null && cachedTierYOffsets.Length > 0)
+                           ? WaterLevelModifier.FloorLabel(i, cachedTierYOffsets)
+                           : $"Slot {i}";
+            edited[i] = EditorGUILayout.FloatField(
+                new GUIContent(label, $"Absolute world Y for tier slot {i}. Waterline is {loadedData.waterlineY:0.##}."),
+                heights[i]);
+        }
+        if (EditorGUI.EndChangeCheck())
+        {
+            Undo.RecordObject(loadedData, "Edit Tier Heights");
+            loadedData.spawnTierHeights = edited;
+            EditorUtility.SetDirty(loadedData);
+        }
+
+        // Every slot on the same value collapses all floors onto one height — worth saying,
+        // because it looks like tiers are simply broken rather than flat.
+        bool allSame = true;
+        for (int i = 1; i < heights.Length; i++)
+            if (!Mathf.Approximately(heights[i], heights[0])) { allSame = false; break; }
+        if (allSame)
+            EditorGUILayout.HelpBox(
+                $"Every tier is at {heights[0]:0.##}, so all floors spawn at the same height.",
+                MessageType.Warning);
+
+        if (GUILayout.Button("Clear (use Tier Config)"))
+        {
+            Undo.RecordObject(loadedData, "Clear Tier Heights");
+            loadedData.spawnTierHeights = null;
+            EditorUtility.SetDirty(loadedData);
+        }
+    }
+
+    // Scans once and caches; re-scan happens on window focus. Call this from the per-frame draw path.
+    void EnsureTierOffsetsCache()
+    {
+        if (_tierOffsetsCached) return;
+        RefreshCachedTierOffsets();
+    }
+
     void RefreshCachedTierOffsets()
     {
         string[] guids = UnityEditor.AssetDatabase.FindAssets("t:TierConfig");
@@ -1808,6 +1979,7 @@ public class GridDesignerWindow : EditorWindow
         {
             cachedTierYOffsets = null;
         }
+        _tierOffsetsCached = true;
     }
 
     List<GridData.PrefabPlacement> GetActivePrefabPlacements()
@@ -2250,6 +2422,41 @@ public class GridDesignerWindow : EditorWindow
         return loadedData.waveModifierCellIndices;
     }
 
+    // Free-position lists for the modifiers on the active layer (base or selected tier).
+    List<Vector2> GetActiveWaterModPositions()
+    {
+        if (activeTierIndex >= 0 && loadedData?.tiers != null && activeTierIndex < loadedData.tiers.Count)
+        {
+            var t = loadedData.tiers[activeTierIndex];
+            if (t.waterLevelModifierPositions == null) t.waterLevelModifierPositions = new List<Vector2>();
+            return t.waterLevelModifierPositions;
+        }
+        if (loadedData.waterLevelModifierPositions == null) loadedData.waterLevelModifierPositions = new List<Vector2>();
+        return loadedData.waterLevelModifierPositions;
+    }
+
+    List<Vector2> GetActiveWaveModPositions()
+    {
+        if (activeTierIndex >= 0 && loadedData?.tiers != null && activeTierIndex < loadedData.tiers.Count)
+        {
+            var t = loadedData.tiers[activeTierIndex];
+            if (t.waveModifierPositions == null) t.waveModifierPositions = new List<Vector2>();
+            return t.waveModifierPositions;
+        }
+        if (loadedData.waveModifierPositions == null) loadedData.waveModifierPositions = new List<Vector2>();
+        return loadedData.waveModifierPositions;
+    }
+
+    // Removes any modifier in `positions` within a small gap of `at` (normalized). Returns true if one
+    // was removed — used to toggle a modifier off when you click near an existing one.
+    static bool ToggleOffNear(List<Vector2> positions, Vector2 at)
+    {
+        float gap = 0.6f / GridData.GridSize;
+        for (int i = 0; i < positions.Count; i++)
+            if (Vector2.Distance(positions[i], at) < gap) { positions.RemoveAt(i); return true; }
+        return false;
+    }
+
     // ─────────────────────────────────────────────
     // LEVEL DATA SECTIONS
     // ─────────────────────────────────────────────
@@ -2510,11 +2717,22 @@ public class GridDesignerWindow : EditorWindow
             }
 
             EditorGUI.BeginChangeCheck();
+
+            bool priority = EditorGUILayout.Toggle(
+                new GUIContent("Priority perch", "She always comes down here the moment the boat enters the perch " +
+                                                 "range — a place you can rely on meeting her. Off = a rock she is " +
+                                                 "only WATCHING: she settles here now and then."),
+                s.angelPriorityPerch);
             float pr = EditorGUILayout.FloatField(
-                new GUIContent("Perch range (m)", "Sail inside this and she comes down onto this rock."),
+                new GUIContent("Perch range (m)", "Sail inside this and she comes down onto this rock; out of it she leaves."),
                 s.angelPerchRadius);
+            float cv = EditorGUILayout.FloatField(
+                new GUIContent("Landing curve (m)", "Size of the curve she lands along, drawn on the canvas. She flies to " +
+                                                    "where the curve begins behind the rock, rides it round and touches " +
+                                                    "down facing the boat. 0 = straight at the rock."),
+                s.angelLandingCurveSize);
             bool tk = EditorGUILayout.Toggle(
-                new GUIContent("Talk", "Arm the talk camera + dialogue on this perch. Off = she just perches."),
+                new GUIContent("Talk (AngelTalk)", "Arm the talk camera + dialogue on this perch. Off = she just perches."),
                 s.angelTalkEnabled);
             float tr = s.angelTalkRadius;
             string tt = s.angelTalkText;
@@ -2525,17 +2743,26 @@ public class GridDesignerWindow : EditorWindow
                     new GUIContent("Talk range (m)", "Sail inside this, with her perched, to talk. Kept inside the perch range."),
                     tr);
                 EditorGUILayout.LabelField(new GUIContent("What she says",
-                    "Shown in the dialogue box (AngelDialogueUI). Use / to split into separate lines."));
+                    "Shown in the level's dialogue box. Separate lines with a slash — one shows at a time and the " +
+                    "talk key steps through them. Blank = she talks, but silently."));
                 tt = EditorGUILayout.TextArea(tt ?? "", GUILayout.MinHeight(40));
+
+                var lines = SplitAngelTalkLines(tt);
+                EditorGUILayout.LabelField(
+                    lines.Count == 0 ? "No text — she talks, but silently."
+                                     : $"{lines.Count} line{(lines.Count == 1 ? "" : "s")}, one press each",
+                    EditorStyles.miniLabel);
                 EditorGUI.indentLevel--;
             }
             if (EditorGUI.EndChangeCheck())
             {
                 Undo.RecordObject(loadedData, "Edit Perch");
-                s.angelPerchRadius = Mathf.Max(0f, pr);
-                s.angelTalkEnabled = tk;
-                s.angelTalkRadius  = Mathf.Clamp(tr, 0f, s.angelPerchRadius);
-                s.angelTalkText    = tt;
+                s.angelPriorityPerch    = priority;
+                s.angelPerchRadius      = Mathf.Max(0f, pr);
+                s.angelLandingCurveSize = Mathf.Max(0f, cv);
+                s.angelTalkEnabled      = tk;
+                s.angelTalkRadius       = Mathf.Clamp(tr, 0f, s.angelPerchRadius);
+                s.angelTalkText         = tt;
                 EditorUtility.SetDirty(loadedData);
                 Repaint();
             }
@@ -2739,6 +2966,7 @@ public class GridDesignerWindow : EditorWindow
         _activeOrbIndex    = -1;
         _activeSpikeIndex  = -1;
         _activeCubeIndex   = -1;
+        _activeWhirlpoolIndex = -1;
         CancelBridge();
     }
 
@@ -2770,6 +2998,11 @@ public class GridDesignerWindow : EditorWindow
         get => _clampToCellWhenDrawing;
         set { _clampToCellWhenDrawing = value; EditorPrefs.SetBool(PrefKeyClampToCell, _clampToCellWhenDrawing); Repaint(); }
     }
+    public bool ShowGridCells
+    {
+        get => _showGridCells;
+        set { _showGridCells = value; EditorPrefs.SetBool(PrefKeyShowGridCells, _showGridCells); Repaint(); }
+    }
     public float OrbCircleSize
     {
         get => _orbCircleFactor;
@@ -2794,6 +3027,41 @@ public class GridDesignerWindow : EditorWindow
         Handles.color = col;
         if (st.outline) Handles.DrawWireDisc(center, Vector3.forward, radius, Mathf.Max(1f, st.width));
         else            Handles.DrawSolidDisc(center, Vector3.forward, radius);
+    }
+
+    // Draws one layer's free-positioned modifiers — a coloured disc + a centred label per position.
+    void DrawModifierLayer(Rect rect, List<Vector2> positions, GridMarkerStyle style, string label,
+                           Color labelCol, float alpha)
+    {
+        if (alpha <= 0f || positions == null) return;
+        foreach (var mp in positions)
+        {
+            Vector2 px = WorldXZToPixel(rect, mp);
+            DrawMarker(px, EffCell * 0.38f, style, alpha);
+            Handles.color = new Color(labelCol.r, labelCol.g, labelCol.b, alpha);
+            Handles.Label(px - new Vector2(4f, 6f), label);
+        }
+    }
+
+    // Draws an opaque filled annulus (a ring band) between innerR and outerR as a strip of quads, so
+    // only the band is painted — the arena interior underneath stays visible.
+    void DrawFilledRing(Vector2 center, float innerR, float outerR, Color color)
+    {
+        if (outerR <= innerR) return;
+        Handles.color = color;
+        const int segments = 96;
+        float step = 2f * Mathf.PI / segments;
+        for (int i = 0; i < segments; i++)
+        {
+            float a0 = i * step, a1 = (i + 1) * step;
+            Vector2 d0 = new Vector2(Mathf.Cos(a0), Mathf.Sin(a0));
+            Vector2 d1 = new Vector2(Mathf.Cos(a1), Mathf.Sin(a1));
+            Handles.DrawAAConvexPolygon(
+                (Vector3)(center + d0 * innerR),
+                (Vector3)(center + d0 * outerR),
+                (Vector3)(center + d1 * outerR),
+                (Vector3)(center + d1 * innerR));
+        }
     }
 
     void CancelBridge()
@@ -2895,29 +3163,9 @@ public class GridDesignerWindow : EditorWindow
             }
         }
 
-        // 3. Whirlpools
-        int wIdx = loadedData.whirlpools?.FindIndex(w => w.cellIndex == cellIndex) ?? -1;
-        if (wIdx >= 0)
-        {
-            info.type = SelectionType.Whirlpool;
-            info.index = wIdx;
-            return info;
-        }
+        // 3. Whirlpools are free-positioned now — selected via HandleSelectWhirlpoolInput, not per-cell.
 
-        // 4. Modifiers
-        var waterMods = GetActiveTierWaterModifiers();
-        if (waterMods.Contains(cellIndex))
-        {
-            info.type = SelectionType.WaterModifier;
-            return info;
-        }
-
-        var waveMods = GetActiveTierWaveModifiers();
-        if (waveMods.Contains(cellIndex))
-        {
-            info.type = SelectionType.WaveModifier;
-            return info;
-        }
+        // 4. Modifiers are free-positioned now — placed/erased directly, not selected per-cell.
 
         // 5. Orbs (Base layer only)
         if (activeTierIndex == -1 && loadedData.orbCellIndices != null && loadedData.orbCellIndices.Contains(cellIndex))
@@ -3746,6 +3994,36 @@ public class GridDesignerWindow : EditorWindow
                             lightHere.poolRadius = newPool;
                             EditorUtility.SetDirty(loadedData);
                         }
+
+                        // Starting state. Light #1 is the chain's source and is always lit, so its
+                        // toggle is shown ticked but disabled rather than hidden — the rule is easier
+                        // to read when the control is there and greyed than when it is missing.
+                        var  ordered   = zone.StreetLightsInOrder();
+                        int  lightOrd  = ordered.IndexOf(lightHere);
+                        bool isSource  = lightOrd == 0;
+                        using (new EditorGUI.DisabledScope(isSource))
+                        {
+                            EditorGUI.BeginChangeCheck();
+                            bool newLit = EditorGUILayout.Toggle(
+                                new GUIContent("Starts Lit",
+                                    isSource ? "Light #1 is the chain's source — it is always lit at load."
+                                             : "This light is already lit when the level loads, so the zone starts "
+                                             + "drawn up to it. Lights only light in order."),
+                                isSource || lightHere.startsLit);
+                            if (EditorGUI.EndChangeCheck() && !isSource)
+                            {
+                                Undo.RecordObject(loadedData, "Set Street Light Starts Lit");
+                                lightHere.startsLit = newLit;
+                                EditorUtility.SetDirty(loadedData);
+                            }
+                        }
+
+                        int strandedOrd = zone.FirstStrandedLitLight();
+                        if (strandedOrd >= 0 && lightOrd >= strandedOrd)
+                            EditorGUILayout.HelpBox(
+                                $"Light #{strandedOrd + 1} is marked lit but a light before it is not. Lights only " +
+                                "light in order, so it starts unlit — mark the earlier ones too.",
+                                MessageType.Warning);
                     }
                     EditorGUILayout.EndVertical();
                 }
@@ -3829,7 +4107,22 @@ public class GridDesignerWindow : EditorWindow
             var wp = loadedData.whirlpools[i];
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
             EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField($"#{i + 1}  Cell {wp.cellIndex}", GUILayout.Width(90));
+            bool sel = _activeWhirlpoolIndex == i;
+            GUI.backgroundColor = sel ? new Color(0.7f, 0.5f, 1f) : Color.white;
+            if (GUILayout.Button($"#{i + 1}", GUILayout.Width(40)))
+            {
+                // Select it on the grid (Select tool) so it can be dragged to fine-tune its position.
+                ClearSelectState();
+                _activeSpikeIndex = _activeCubeIndex = _activeOrbIndex = -1;
+                _activeWhirlpoolIndex = i;
+                activeSlot = -1; drawSelect = true;
+                _drawSplineWall = _drawCubeBuilding = _drawSpike = false;
+                drawSoulArea = drawSoul = drawCircle = drawOrb = drawWhirlpool
+                             = drawWaterLevelModifier = drawWaveModifier = drawDirectPrefab = false;
+                Repaint();
+            }
+            GUI.backgroundColor = Color.white;
+            EditorGUILayout.LabelField($"x {wp.position.x:0.00}  z {wp.position.y:0.00}", GUILayout.Width(110));
             GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
             if (GUILayout.Button("✕", GUILayout.Width(22))) toRemove = i;
             GUI.backgroundColor = Color.white;
@@ -4009,6 +4302,33 @@ public class GridDesignerWindow : EditorWindow
             GUI.backgroundColor = Color.white;
             EditorGUILayout.EndHorizontal();
 
+            // Row: Type — dropdown of every prefab in Assets/Prefab/Entrances.
+            // "(default)" = null prefab, so the spawner's Arena Entrance Prefab (or a level-wide
+            // Entrance Override) is used. Written back with the other fields in the commit block below.
+            var entranceOptions = GetEntrancePrefabOptions();
+            GameObject newEntPrefab = ent.prefab;
+            {
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.LabelField("Type", GUILayout.Width(34));
+
+                var entLabels = new List<string> { "(default)" };
+                foreach (var p in entranceOptions) entLabels.Add(p.name);
+
+                int entTypeIdx = ent.prefab == null ? 0 : entranceOptions.IndexOf(ent.prefab) + 1;
+                // Keep a prefab that isn't in the folder visible so switching away isn't accidental.
+                if (ent.prefab != null && entTypeIdx == 0)
+                {
+                    entLabels.Add(ent.prefab.name + " (custom)");
+                    entTypeIdx = entLabels.Count - 1;
+                }
+
+                int newEntTypeIdx = EditorGUILayout.Popup(entTypeIdx, entLabels.ToArray());
+                newEntPrefab = (newEntTypeIdx == 0) ? null
+                             : (newEntTypeIdx - 1 < entranceOptions.Count ? entranceOptions[newEntTypeIdx - 1]
+                                                                          : ent.prefab);
+                EditorGUILayout.EndHorizontal();
+            }
+
             // Row 2: Tier
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField("Tier", GUILayout.Width(28));
@@ -4179,6 +4499,7 @@ public class GridDesignerWindow : EditorWindow
                 ent.id             = newEntID;
                 ent.perimeterAngle = newEntAngle;
                 ent.tierSlot       = newEntTierSlot;
+                ent.prefab         = newEntPrefab;
                 ent.isLocked       = newIsLocked;
                 ent.lockHubAngle   = newHubAngle;
                 ent.lockHubPrefab  = newHubPrefab;
@@ -5123,7 +5444,7 @@ public class GridDesignerWindow : EditorWindow
         if (pp?.prefab == null) return;
         if (pp.prefab.GetComponentInChildren<ProceduralSpike>(true) == null) return;
 
-        RefreshSpikePresets();
+        EnsureSpikePresetsCache();
 
         float prevLW = EditorGUIUtility.labelWidth;
         EditorGUIUtility.labelWidth = 160f;
@@ -5214,7 +5535,7 @@ public class GridDesignerWindow : EditorWindow
         var s = loadedData.proceduralSpikes[_activeSpikeIndex];
         if (s == null) return;
 
-        RefreshSpikePresets();
+        EnsureSpikePresetsCache();
 
         float prevLW = EditorGUIUtility.labelWidth;
         EditorGUIUtility.labelWidth = 160f;
@@ -5579,6 +5900,10 @@ public class GridDesignerWindow : EditorWindow
         if (drawSelect && loadedData != null)
             HandleSelectOrbInput(rect, e);
 
+        // Select tool — free whirlpool picking + drag
+        if (drawSelect && loadedData != null)
+            HandleSelectWhirlpoolInput(rect, e);
+
         // Select tool — free prefab-placement picking + drag (placements are position-based now)
         if (drawSelect && loadedData != null)
             HandleSelectPrefabInput(rect, e);
@@ -5601,6 +5926,14 @@ public class GridDesignerWindow : EditorWindow
         if (_pipeTubeDrawIndex >= 0 && loadedData != null)
             HandlePipeTubePathInput(rect, e);
 
+        // The legacy painted-cell grid (slots + grid lines) and its click dispatch. Everything free-
+        // positioned is drawn/handled elsewhere, so this only needs to run to DRAW cells (Repaint, when
+        // Show grid cells is on) or to route a click/drag that might land on a cell. Skipping it on the
+        // common repaint / mouse-move path is the main performance win now cells are being retired.
+        bool cellLoopForDraw  = e.type == EventType.Repaint && _showGridCells;
+        bool cellLoopForInput = e.type == EventType.MouseDown || e.type == EventType.MouseDrag
+                             || e.type == EventType.MouseUp;
+        if (cellLoopForDraw || cellLoopForInput)
         for (int y = 0; y < GridSize; y++)
         {
             for (int x = 0; x < GridSize; x++)
@@ -5635,29 +5968,8 @@ public class GridDesignerWindow : EditorWindow
 
                     // Orbs are free-positioned now — drawn at rect level after the cell loop, not per-cell.
 
-                    // Water Level Modifier — the labelled cell disc takes its colour from the setting.
-                    if (loadedData?.waterLevelModifierCellIndices != null && loadedData.waterLevelModifierCellIndices.Contains(index))
-                    {
-                        DrawMarker(cell.center, EffCell * 0.38f, _style.waterModifier, baseAlpha);
-                        Handles.color = new Color(1f, 1f, 1f, baseAlpha);
-                        Handles.Label(cell.center - new Vector2(4f, 6f), "W");
-                    }
-
-                    // Wave Modifier — cell disc colour from the setting.
-                    if (loadedData?.waveModifierCellIndices != null && loadedData.waveModifierCellIndices.Contains(index))
-                    {
-                        DrawMarker(cell.center, EffCell * 0.38f, _style.waveModifier, baseAlpha);
-                        Handles.color = new Color(0f, 0f, 0f, baseAlpha);
-                        Handles.Label(cell.center - new Vector2(4f, 6f), "~");
-                    }
-
-                    // Whirlpool — cell disc colour from the setting (the radius ring uses it too).
-                    if (loadedData?.whirlpools != null && loadedData.whirlpools.Exists(w => w.cellIndex == index))
-                    {
-                        DrawMarker(cell.center, EffCell * 0.38f, _style.whirlpool, baseAlpha);
-                        Handles.color = new Color(1f, 1f, 1f, baseAlpha);
-                        Handles.Label(cell.center - new Vector2(4f, 6f), "〇");
-                    }
+                    // Modifiers (water/wave) are free-positioned now — drawn at rect level after the cell
+                    // loop, and whirlpools too.
 
                     // Direct prefab placements (base layer) are drawn in a dedicated overlay pass
                     // AFTER the soul zones (see DrawPrefabPlacementIcons), so the icons sit on top.
@@ -5693,22 +6005,7 @@ public class GridDesignerWindow : EditorWindow
                             }
                         }
 
-                        // Water Level Modifier — colour from the setting (dimmed for inactive tiers).
-                        if (tier.waterLevelModifierCellIndices != null && tier.waterLevelModifierCellIndices.Contains(index))
-                        {
-                            DrawMarker(cell.center, EffCell * 0.38f, _style.waterModifier, a);
-                            Handles.color = new Color(1f, 1f, 1f, a);
-                            Handles.Label(cell.center - new Vector2(4f, 6f), "W");
-                        }
-
-                        // Wave Modifier — colour from the setting (dimmed for inactive tiers).
-                        if (tier.waveModifierCellIndices != null && tier.waveModifierCellIndices.Contains(index))
-                        {
-                            DrawMarker(cell.center, EffCell * 0.38f, _style.waveModifier, a);
-                            Handles.color = new Color(0f, 0f, 0f, a);
-                            Handles.Label(cell.center - new Vector2(4f, 6f), "~");
-                        }
-
+                        // Tier modifiers are free-positioned now — drawn at rect level after the cell loop.
                         // Tier prefab placements are drawn in the overlay pass (on top of zones) too.
                     }
                 }
@@ -5822,6 +6119,31 @@ public class GridDesignerWindow : EditorWindow
 
             float pxPerUnit = GetPixelsPerWorldUnit();
 
+            // Arena outer wall — a ring at the wall's true thickness, extending OUTWARD from the arena
+            // radius (normalized 0.5). World thickness → pixels via the arena width. Fill = a solid band
+            // at that thickness; Outline = just the inner/outer edges. Colour/mode in Settings ▸ Appearance.
+            if (loadedData.arenaWallThickness > 0f && loadedData.WorldArenaWidth > 0.0001f)
+            {
+                float innerR  = 0.5f * ZoomedGridSize;
+                float thickPx = (loadedData.arenaWallThickness / loadedData.WorldArenaWidth) * ZoomedGridSize;
+                if (thickPx >= 1f)
+                {
+                    float outerR = innerR + thickPx;
+                    if (_style.arenaWall.outline)
+                    {
+                        float ew = Mathf.Max(1f, _style.arenaWall.width);
+                        Handles.color = _style.arenaWall.color;
+                        Handles.DrawWireDisc(rect.center, Vector3.forward, innerR, ew);
+                        Handles.DrawWireDisc(rect.center, Vector3.forward, outerR, ew);
+                    }
+                    else
+                    {
+                        // A true opaque annulus filled from the arena edge to the outer wall.
+                        DrawFilledRing(rect.center, innerR, outerR, _style.arenaWall.color);
+                    }
+                }
+            }
+
             // Orbs — free-positioned. Size from the Orb size setting; colour/fill from the Orb appearance.
             // The selected orb wears the shared white selection circle (when no other selection owns it).
             float orbAlpha = (!baseLayerVisible) ? 0f : (activeTierIndex < 0) ? 1f : 0.35f;
@@ -5834,14 +6156,36 @@ public class GridDesignerWindow : EditorWindow
                     DrawMarker(opx, EffCell * _orbCircleFactor, _style.orb, orbAlpha);
                 }
 
-            // Whirlpool radii
+            // Whirlpools — free-positioned. Radius ring + a small centre dot at the free position, and
+            // the shared white selection circle on the active one (when no other selection owns it).
             if (pxPerUnit > 0f && loadedData.whirlpools != null)
             {
-                foreach (var wp in loadedData.whirlpools)
+                for (int wi = 0; wi < loadedData.whirlpools.Count; wi++)
                 {
-                    float radiusPx = wp.radius * pxPerUnit;
-                    DrawMarker(CellCenter(rect, wp.cellIndex), radiusPx, _style.whirlpool);
+                    var wp = loadedData.whirlpools[wi];
+                    if (wp == null) continue;
+                    Vector2 wpx = WorldXZToPixel(rect, wp.position);
+                    if (wi == _activeWhirlpoolIndex && drawSelect && _currentSelection.type == SelectionType.None)
+                        DrawMarker(wpx, Mathf.Max(EffCell * _selectionCircleFactor, 3f), _style.selection);
+                    DrawMarker(wpx, wp.radius * pxPerUnit, _style.whirlpool);
+                    DrawMarker(wpx, Mathf.Max(EffCell * 0.12f, 3f), _style.whirlpool);
                 }
+            }
+
+            // Water / wave modifiers — free-positioned. Base layer + visible tiers, dimmed like the rest.
+            {
+                float baseModAlpha = (!baseLayerVisible) ? 0f : (activeTierIndex < 0) ? 1f : 0.12f;
+                DrawModifierLayer(rect, loadedData.waterLevelModifierPositions, _style.waterModifier, "W", new Color(1f, 1f, 1f, 1f), baseModAlpha);
+                DrawModifierLayer(rect, loadedData.waveModifierPositions,       _style.waveModifier,  "~", new Color(0f, 0f, 0f, 1f), baseModAlpha);
+                if (loadedData.tiers != null)
+                    for (int ti = 0; ti < loadedData.tiers.Count; ti++)
+                    {
+                        if (!(ti < tierVisible.Count && tierVisible[ti])) continue;
+                        float a = activeTierIndex == ti ? 1f : 0.12f;
+                        var tr = loadedData.tiers[ti];
+                        DrawModifierLayer(rect, tr.waterLevelModifierPositions, _style.waterModifier, "W", new Color(1f, 1f, 1f, 1f), a);
+                        DrawModifierLayer(rect, tr.waveModifierPositions,       _style.waveModifier,  "~", new Color(0f, 0f, 0f, 1f), a);
+                    }
             }
 
             // Prefab scale-radius footprint rings (base + visible tiers)
@@ -6792,6 +7136,8 @@ public class GridDesignerWindow : EditorWindow
                 loadedData.soulZones?.Clear();
                 loadedData.waterLevelModifierCellIndices?.Clear();
                 loadedData.waveModifierCellIndices?.Clear();
+                loadedData.waterLevelModifierPositions?.Clear();
+                loadedData.waveModifierPositions?.Clear();
                 loadedData.whirlpools?.Clear();
                 loadedData.prefabPlacements?.Clear();
                 if (loadedData.tiers != null)
@@ -6800,6 +7146,8 @@ public class GridDesignerWindow : EditorWindow
                         if (tier.cells != null) System.Array.Clear(tier.cells, 0, tier.cells.Length);
                         tier.waterLevelModifierCellIndices?.Clear();
                         tier.waveModifierCellIndices?.Clear();
+                        tier.waterLevelModifierPositions?.Clear();
+                        tier.waveModifierPositions?.Clear();
                         tier.prefabPlacements?.Clear();
                     }
             }
@@ -6963,7 +7311,9 @@ public class GridDesignerWindow : EditorWindow
 
         // Untether legacy grid-bound placements to free positions (cell centre). Idempotent.
         loadedData.MigratePlacementPositions();
-        loadedData.MigrateOrbPositions();   // fold legacy cell-indexed orbs into free positions
+        loadedData.MigrateOrbPositions();        // fold legacy cell-indexed orbs into free positions
+        loadedData.MigrateWhirlpoolPositions();  // fold legacy cell-indexed whirlpools into free positions
+        loadedData.MigrateModifierPositions();   // fold legacy cell-indexed water/wave modifiers (base + tiers)
 
         _baselineAlignCache.Clear();
 
@@ -6993,14 +7343,30 @@ public class GridDesignerWindow : EditorWindow
             GridData d  = AssetDatabase.LoadAssetAtPath<GridData>(path);
             if (d != null) discoveredGrids.Add(d);
         }
+
+        // Order per the setting: A→Z, or newest-modified first (by the asset file's write time).
+        if (_levelSortOrder == LevelSortOrder.RecentlyModified)
+            discoveredGrids.Sort((a, b) => LevelFileTime(b).CompareTo(LevelFileTime(a)));
+        else
+            discoveredGrids.Sort((a, b) =>
+                string.Compare(LevelDisplay(a), LevelDisplay(b), System.StringComparison.OrdinalIgnoreCase));
+
         discoveredGridNames = new string[discoveredGrids.Count];
         for (int i = 0; i < discoveredGrids.Count; i++)
-        {
-            var d = discoveredGrids[i];
-            discoveredGridNames[i] = string.IsNullOrEmpty(d.displayName) ? d.name : d.displayName;
-        }
+            discoveredGridNames[i] = LevelDisplay(discoveredGrids[i]);
+
         selectedDiscoveredGridIndex = Mathf.Clamp(selectedDiscoveredGridIndex, 0,
             Mathf.Max(0, discoveredGrids.Count - 1));
+    }
+
+    // The name shown for a level in the dropdown (display name, else the asset name).
+    static string LevelDisplay(GridData d) => string.IsNullOrEmpty(d.displayName) ? d.name : d.displayName;
+
+    // The asset file's last-write time, for "recently modified" ordering (MinValue if the path is gone).
+    static System.DateTime LevelFileTime(GridData d)
+    {
+        string p = AssetDatabase.GetAssetPath(d);
+        return string.IsNullOrEmpty(p) ? System.DateTime.MinValue : System.IO.File.GetLastWriteTimeUtc(p);
     }
 
     int GetMaxSlotUsed()
@@ -8753,10 +9119,16 @@ public class GridDesignerWindow : EditorWindow
         if (pts == null || pts.Count == 0) return;
 
         float rpx       = Mathf.Max(zone.radius * pxPerUnit, 1f);
-        var   pixelPath = BuildZonePixelPath(rect, zone);
+        var   nodeIndex = new List<int>();
+        var   pixelPath = BuildZonePixelPath(rect, zone, nodeIndex);
+
+        // Split point between what is painted at load (lc) and what is still locked (blue).
+        Color blue      = new Color(UnlitZoneColor.r, UnlitZoneColor.g, UnlitZoneColor.b, lc.a);
+        int   drawnNode = ZoneDrawnAtLoadNode(zone);
+        int   cut       = (drawnNode < 0 || drawnNode >= nodeIndex.Count)
+                          ? int.MaxValue : nodeIndex[drawnNode];
 
         // Band — filled quads along the sampled path, discs at interior joints keep it gapless.
-        Handles.color = lc;
         for (int si = 0; si < pixelPath.Count - 1; si++)
         {
             Vector2 a = pixelPath[si];
@@ -8765,40 +9137,64 @@ public class GridDesignerWindow : EditorWindow
             if (d.sqrMagnitude < 0.0001f) continue;
             d.Normalize();
             Vector2 n = new Vector2(-d.y, d.x) * rpx; // half-width = node radius
+            Handles.color = si < cut ? lc : blue;
             Handles.DrawAAConvexPolygon((Vector3)(a + n), (Vector3)(b + n), (Vector3)(b - n), (Vector3)(a - n));
             if (si > 0) Handles.DrawSolidDisc(a, Vector3.forward, rpx);
         }
 
-        // Street-light pools — part of the footprint, under the node markers.
+        // Street-light pools — part of the footprint, under the node markers. A pool is only painted
+        // at load if its own light starts lit, so it takes the same two colours as the band.
         if (zone.streetLights != null)
-            foreach (var slPool in zone.streetLights)
+        {
+            var orderedPools = zone.StreetLightsInOrder();
+            int litPools     = zone.LitAtStartCount();
+            for (int pi = 0; pi < orderedPools.Count; pi++)
             {
+                var slPool = orderedPools[pi];
                 if (slPool == null || slPool.nodeIndex < 0 || slPool.nodeIndex >= pts.Count) continue;
-                Handles.color = lc;
+                Handles.color = pi < litPools ? lc : blue;
                 Handles.DrawSolidDisc(WorldXZToPixel(rect, pts[slPool.nodeIndex]), Vector3.forward,
                                       Mathf.Max(slPool.poolRadius * pxPerUnit, 5f));
             }
+        }
 
-        // Orange circle + black dot at each node.
+        // Orange circle + black dot at each node. A path end BONDED to an entrance takes a solid
+        // white dot instead: a node sitting on top of a door looks identical to one pinned to it,
+        // so without this the bond — the thing that decides whether souls can leave by that door —
+        // is invisible while authoring.
         float dotR = Mathf.Max(rpx * 0.45f, 3f);
         for (int ni = 0; ni < pts.Count; ni++)
         {
-            Vector2 p = WorldXZToPixel(rect, pts[ni]);
-            Handles.color = lc;
+            Vector2 p      = WorldXZToPixel(rect, pts[ni]);
+            bool    bonded = ZoneEndBondedToEntrance(zone, ni);
+            Handles.color = (cut == int.MaxValue || (ni < nodeIndex.Count && nodeIndex[ni] <= cut)) ? lc : blue;
             Handles.DrawSolidDisc(p, Vector3.forward, rpx);
-            Handles.color = Color.black;
-            Handles.DrawSolidDisc(p, Vector3.forward, dotR);
+            Handles.color = bonded ? Color.white : Color.black;
+            Handles.DrawSolidDisc(p, Vector3.forward, bonded ? dotR * 1.4f : dotR);
         }
 
         if (drawArrows) DrawZoneFlowArrows(pixelPath, rpx);
     }
 
-    List<Vector2> BuildZonePixelPath(Rect rect, GridData.SoulZone zone)
+    // True when this node is a path end clamped to an entrance — the same test SyncZoneEntrances
+    // pins with and the node drag blocks on, so the marker can never disagree with the behaviour.
+    static bool ZoneEndBondedToEntrance(GridData.SoulZone zone, int nodeIndex)
+    {
+        var pts = zone.nodePositions;
+        if (!zone.attachToEntrances || pts == null) return false;
+        if (nodeIndex == 0 && zone.entryEntranceIndex >= 0) return true;
+        if (nodeIndex == pts.Count - 1 && zone.exitEntranceIndex >= 0 && pts.Count >= 2) return true;
+        return false;
+    }
+
+    List<Vector2> BuildZonePixelPath(Rect rect, GridData.SoulZone zone, List<int> nodePathIndex = null)
     {
         var pts  = zone.nodePositions;
         var path = new List<Vector2>();
         int n = pts?.Count ?? 0;
+        nodePathIndex?.Clear();
         if (n == 0) return path;
+        if (nodePathIndex != null) for (int i = 0; i < n; i++) nodePathIndex.Add(0);
 
         bool closed   = zone.closedLoop && n >= 3;
         int  segCount = zone.SegmentCount();
@@ -8821,8 +9217,42 @@ public class GridDesignerWindow : EditorWindow
             {
                 path.Add(WorldXZToPixel(rect, pts[i2]));
             }
+            // Where this authored node ended up on the sampled polyline — lets a caller cut the
+            // path at a node (the lit frontier) without re-deriving the sampling.
+            // seg+1 == n is the closing segment of a loop, whose i2 wraps back to node 0 — it must
+            // not overwrite node 0, which always sits at the start of the path.
+            if (nodePathIndex != null && seg + 1 < n) nodePathIndex[i2] = path.Count - 1;
         }
         return path;
+    }
+
+    // Blue marks the part of a soul fish zone that is NOT drawn when the level loads — the stretch
+    // beyond the last street light that starts lit, and the final run to a door that starts locked.
+    // Orange is what the player sees painted on the water the moment they arrive.
+    static readonly Color UnlitZoneColor = new Color(0.30f, 0.55f, 0.95f);
+
+    /// <summary>
+    /// Authored node the zone is drawn up to at load, or -1 when the whole path is drawn. Mirrors
+    /// the runtime: SoulZoneStreetLightChain reveals from node 0 to the frontier lit light, and only
+    /// carries on to the exit door once every lamp is lit AND that door is open.
+    /// </summary>
+    int ZoneDrawnAtLoadNode(GridData.SoulZone zone)
+    {
+        var ordered = zone.StreetLightsInOrder();
+        if (ordered.Count == 0) return -1;              // no lights gating it — painted in full
+
+        int  lit = zone.LitAtStartCount();
+        bool doorOpenAtLoad = zone.attachToEntrances
+                              && zone.exitEntranceIndex >= 0
+                              && loadedData?.entrances != null
+                              && zone.exitEntranceIndex < loadedData.entrances.Count
+                              && !loadedData.entrances[zone.exitEntranceIndex].isLocked;
+
+        // Every lamp lit and the door already open: the chain walks to the door on load.
+        if (lit >= ordered.Count && doorOpenAtLoad) return -1;
+
+        var frontier = ordered[lit - 1];
+        return frontier != null ? frontier.nodeIndex : -1;
     }
 
     // Chevrons spaced along the sampled band, pointing in node order — the flow direction the
@@ -8888,6 +9318,28 @@ public class GridDesignerWindow : EditorWindow
             _splineWallPrefabOptions.Sort((a, b) => string.Compare(a.name, b.name, System.StringComparison.Ordinal));
         }
         return _splineWallPrefabOptions;
+    }
+
+    // Every prefab under EntrancePrefabFolder, cached (sorted by name) for the entrance Type dropdown.
+    // Rebuilds when null (fresh window / after reload) or empty (folder was empty or a prefab was
+    // added since) — the scan is cheap for this small folder. IsValidFolder-guarded so a missing
+    // folder just yields no options (the entrance falls back to the spawner default) rather than a warning.
+    List<GameObject> GetEntrancePrefabOptions()
+    {
+        if (_entrancePrefabOptions == null || _entrancePrefabOptions.Count == 0)
+        {
+            _entrancePrefabOptions = new List<GameObject>();
+            if (AssetDatabase.IsValidFolder(EntrancePrefabFolder))
+            {
+                foreach (var guid in AssetDatabase.FindAssets("t:Prefab", new[] { EntrancePrefabFolder }))
+                {
+                    var go = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(guid));
+                    if (go != null) _entrancePrefabOptions.Add(go);
+                }
+                _entrancePrefabOptions.Sort((a, b) => string.Compare(a.name, b.name, System.StringComparison.Ordinal));
+            }
+        }
+        return _entrancePrefabOptions;
     }
 
     Color GetSplineWallColor(int pathIdx)
@@ -9027,8 +9479,9 @@ public class GridDesignerWindow : EditorWindow
 
     void BeginCubeMove(Rect rect, int index, Vector2 mouse)
     {
-        _activeSpikeIndex    = -1;   // block, spike and orb selection are mutually exclusive
+        _activeSpikeIndex    = -1;   // block, spike, orb and whirlpool selection are mutually exclusive
         _activeOrbIndex      = -1;
+        _activeWhirlpoolIndex = -1;
         _activeCubeIndex     = index;
         _dragCubeCenterIndex = index;
         _isDraggingCubeBox   = false;
@@ -9255,6 +9708,13 @@ public class GridDesignerWindow : EditorWindow
     SpikeShapePreset[] _spikePresets     = new SpikeShapePreset[0];
     string[]           _spikePresetNames = { "Default shape" };
 
+    // Scans once and caches; re-scan happens on window focus. Call this from the per-frame draw path.
+    void EnsureSpikePresetsCache()
+    {
+        if (_spikePresetsCached) return;
+        RefreshSpikePresets();
+    }
+
     void RefreshSpikePresets()
     {
         var guids = AssetDatabase.FindAssets("t:SpikeShapePreset", new[] { SpikeShapePreset.AssetFolder });
@@ -9270,13 +9730,14 @@ public class GridDesignerWindow : EditorWindow
         _spikePresetNames = new string[found.Count + 1];
         _spikePresetNames[0] = "Default shape";
         for (int i = 0; i < found.Count; i++) _spikePresetNames[i + 1] = found[i].name;
+        _spikePresetsCached = true;
     }
 
     // First preset in the folder, so a rock dropped on the grid wears a real shape rather than
     // the built-in default. Null when the folder is empty, which the profile handles.
     SpikeShapePreset FirstSpikePreset()
     {
-        if (_spikePresets.Length == 0) RefreshSpikePresets();
+        EnsureSpikePresetsCache();
         return _spikePresets.Length > 0 ? _spikePresets[0] : null;
     }
 
@@ -9404,7 +9865,7 @@ public class GridDesignerWindow : EditorWindow
             if (hit >= 0)
             {
                 ClearSelectState();                          // single-selection
-                _activeSpikeIndex = -1; _activeCubeIndex = -1;
+                _activeSpikeIndex = -1; _activeCubeIndex = -1; _activeWhirlpoolIndex = -1;
                 _activeOrbIndex = hit; _dragOrbIndex = hit;
                 Undo.RecordObject(loadedData, "Move Orb");
                 e.Use(); Repaint();
@@ -9438,6 +9899,56 @@ public class GridDesignerWindow : EditorWindow
         return hit;
     }
 
+    // Free-whirlpool selection + drag for the ⊕ Select tool. Drag moves the free position and keeps
+    // cellIndex synced (derived key). The shader follows the spawned handle's world position.
+    void HandleSelectWhirlpoolInput(Rect rect, Event e)
+    {
+        if (loadedData?.whirlpools == null || loadedData.whirlpools.Count == 0) return;
+
+        if (e.type == EventType.MouseDown && e.button == 0 && rect.Contains(e.mousePosition))
+        {
+            int hit = PickWhirlpool(rect, e.mousePosition);
+            if (hit >= 0)
+            {
+                ClearSelectState();                          // single-selection
+                _activeSpikeIndex = -1; _activeCubeIndex = -1; _activeOrbIndex = -1;
+                _activeWhirlpoolIndex = hit; _dragWhirlpoolIndex = hit;
+                Undo.RecordObject(loadedData, "Move Whirlpool");
+                e.Use(); Repaint();
+            }
+        }
+        else if (e.type == EventType.MouseDrag && e.button == 0 && _dragWhirlpoolIndex >= 0
+                 && _dragWhirlpoolIndex < loadedData.whirlpools.Count)
+        {
+            var wp = loadedData.whirlpools[_dragWhirlpoolIndex];
+            wp.position  = PixelToWorldXZ(rect, e.mousePosition);
+            wp.cellIndex = GridData.NormalizedToCell(wp.position);
+            EditorUtility.SetDirty(loadedData);
+            e.Use(); Repaint();
+        }
+        else if (e.type == EventType.MouseUp && e.button == 0 && _dragWhirlpoolIndex >= 0)
+        {
+            _dragWhirlpoolIndex = -1;
+            e.Use();
+        }
+    }
+
+    // Whirlpool nearest the pixel (within a pick radius), or -1.
+    int PickWhirlpool(Rect rect, Vector2 mouse)
+    {
+        if (loadedData?.whirlpools == null) return -1;
+        float best = Mathf.Max(EffCell * 0.5f, 10f);
+        int hit = -1;
+        for (int i = 0; i < loadedData.whirlpools.Count; i++)
+        {
+            var wp = loadedData.whirlpools[i];
+            if (wp == null) continue;
+            float d = Vector2.Distance(WorldXZToPixel(rect, wp.position), mouse);
+            if (d < best) { best = d; hit = i; }
+        }
+        return hit;
+    }
+
     // Spike whose centre node is nearest the pixel (within SpikeNodePickRadius), or -1.
     int PickSpike(Rect rect, Vector2 mouse)
     {
@@ -9463,8 +9974,9 @@ public class GridDesignerWindow : EditorWindow
 
     void BeginSpikeMove(Rect rect, int index, Vector2 mouse)
     {
-        _activeCubeIndex      = -1;   // spike, block and orb selection are mutually exclusive
+        _activeCubeIndex      = -1;   // spike, block, orb and whirlpool selection are mutually exclusive
         _activeOrbIndex       = -1;
+        _activeWhirlpoolIndex = -1;
         _activeSpikeIndex     = index;
         _dragSpikeCenterIndex = index;
         _isDraggingSpike      = false;
@@ -9683,7 +10195,7 @@ public class GridDesignerWindow : EditorWindow
                 EditorApplication.ExecuteMenuItem("Tools/Waves/Spike Studio");
         }
 
-        RefreshSpikePresets();
+        EnsureSpikePresetsCache();
         if (_spikePresets.Length == 0)
             EditorGUILayout.HelpBox($"No shape presets found in {SpikeShapePreset.AssetFolder}. " +
                                     "Spikes will use the default shape until you save one from the Spike Studio.",

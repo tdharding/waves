@@ -270,7 +270,10 @@ public class FogBlob
             float keep = rep.RepelRadius + rep.RepelClearRadius;
             if (keep <= 0f) continue;
 
-            float strength = Mathf.Clamp01(rep.RepelStrength) * settings.RepelStrength;
+            // The PRODUCT is clamped, not the repeller's own value. Clamping that first meant a
+            // per-obstacle strength could never make up for a low global multiplier, so raising
+            // it past 1 did nothing at all.
+            float strength = Mathf.Clamp01(rep.RepelStrength * settings.RepelStrength);
             if (strength <= 0f) continue;
 
             float keepSq = keep * keep;

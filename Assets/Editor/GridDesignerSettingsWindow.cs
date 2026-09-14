@@ -98,6 +98,26 @@ public class GridDesignerSettingsWindow : EditorWindow
         if (EditorGUI.EndChangeCheck())
             _target.ClampToCellWhenDrawing = clamp;
 
+        EditorGUI.BeginChangeCheck();
+        bool showCells = EditorGUILayout.Toggle(
+            new GUIContent("Show grid cells",
+                           "Draw the legacy painted-cell grid + grid lines. Off (default) skips the per-repaint "
+                           + "cell loop entirely — a big performance win now placement is free-positioned. "
+                           + "Turn on only if you still paint cell slots."),
+            _target.ShowGridCells);
+        if (EditorGUI.EndChangeCheck())
+            _target.ShowGridCells = showCells;
+
+        EditorGUILayout.Space(8);
+        EditorGUILayout.LabelField("Levels", EditorStyles.boldLabel);
+
+        EditorGUI.BeginChangeCheck();
+        int sort = EditorGUILayout.Popup(
+            new GUIContent("Existing levels order", "How the Existing Levels dropdown is ordered."),
+            _target.LevelSortMode, GridDesignerWindow.LevelSortOptionLabels);
+        if (EditorGUI.EndChangeCheck())
+            _target.LevelSortMode = sort;
+
         EditorGUIUtility.labelWidth = prevLW;
 
         EditorGUILayout.Space(8);
@@ -224,6 +244,9 @@ public class GridDesignerSettingsWindow : EditorWindow
         style.gridLineColor = EditorGUILayout.ColorField(
             new GUIContent("Grid lines", "Colour of the grid lines (opacity is the Grid lines slider above)."),
             style.gridLineColor);
+
+        MarkerRow("Arena wall", style.arenaWall,
+                  "The ring at the arena's outer wall thickness. Fill = solid band; Outline = its edges only.");
 
         MarkerRow("Selection",       style.selection,
                   "The white circle on the selected prefab, node, spike or block.");

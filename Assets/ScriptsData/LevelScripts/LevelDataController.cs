@@ -251,7 +251,14 @@ Vector3 centre = GetArenaCentre();
             var meshGen = wavePlaneObject.GetComponent<WaveMeshGenerator>();
             if (meshGen != null)
             {
-                meshGen.UpdateMeshSize(activeGridData.WorldArenaWidth * activeGridData.wavePlaneCoverageMultiplier);
+                // The wave plane is exactly the arena, never larger — water is not meant to be
+                // seen beyond the walls. A square of side = diameter is the tightest square that
+                // still fully contains the circular arena, so this is the minimum that leaves no
+                // gap at the wall. Sized off the arena, never off the transform scale.
+                float planeSize = activeGridData.WorldArenaWidth;
+                if (planeSize > 0f) meshGen.UpdateMeshSize(planeSize);
+                else Debug.LogWarning($"[LevelDataController] '{activeGridData.name}' has Arena Radius 0, " +
+                                      $"so the wave plane has no size. Set it in Grid Designer > Arena.", activeGridData);
             }
         }
 
@@ -265,40 +272,38 @@ Vector3 centre = GetArenaCentre();
             sp.z = arenaCentreOffset.y;
             sonarGridParent.position = sp;
 
+            // Include inactive — the grid parent is switched off while sonar is idle
+            var sonarGen = sonarGridParent.GetComponentInChildren<SonarPlaneGenerator>(true);
+
+            // Load this level's sonar grid formation (set in the Grid Designer).
+            // Null keeps whatever formation is already on the scene generator.
+            if (sonarGen != null && activeGridData != null && activeGridData.sonarGridType != null)
+                sonarGen.SetGridType(activeGridData.sonarGridType);
+
+            // Fog is loaded the same way and from the same place — an arena map is level
+            // geography, so it arrives with the level rather than with the weather.
+            //
+            // Handed over unconditionally, INCLUDING when the level has no map or fog is off.
+            // Passing null is what clears the previous level's fog: skipping the call would
+            // leave the last level's banks sitting on this one, which is the sort of thing that
+            // only shows up two levels later and looks like the map is haunted.
+            ApplyLevelFog(activeGridData);
+
+            // Lattice size is not pushed from here — SonarController derives the arena square
+            // from the BaselineMarker handed to it by LevelSpawner (BaselineMarker.discRadius x 2).
+
+            Material sonarMat = sonarGen?.GridType?.planeMaterial;
+            if (sonarMat != null)
             {
-                // Include inactive — the grid parent is switched off while sonar is idle
-                var sonarGen = sonarGridParent.GetComponentInChildren<SonarPlaneGenerator>(true);
+                float sonarRadius = levelSpawner.GetArenaMaskRadius();
+                sonarMat.SetFloat("_ArenaRadius", sonarRadius);
 
-                // Load this level's sonar grid formation (set in the Grid Designer).
-                // Null keeps whatever formation is already on the scene generator.
-                if (sonarGen != null && activeGridData != null && activeGridData.sonarGridType != null)
-                    sonarGen.SetGridType(activeGridData.sonarGridType);
-
-                // Fog is loaded the same way and from the same place — an arena map is level
-                // geography, so it arrives with the level rather than with the weather.
-                //
-                // Handed over unconditionally, INCLUDING when the level has no map or fog is off.
-                // Passing null is what clears the previous level's fog: skipping the call would
-                // leave the last level's banks sitting on this one, which is the sort of thing that
-                // only shows up two levels later and looks like the map is haunted.
-                ApplyLevelFog(activeGridData);
-
-                // Lattice size is not pushed from here — SonarController derives the arena square
-                // from the BaselineMarker handed to it by LevelSpawner (BaselineMarker.discRadius x 2).
-
-                Material sonarMat = sonarGen?.GridType?.planeMaterial;
-                if (sonarMat != null)
-                {
-                    float sonarRadius = levelSpawner.GetArenaMaskRadius();
-                    sonarMat.SetFloat("_ArenaRadius", sonarRadius);
-                    
-                    sonarMat.SetVector("_ArenaMask", new Vector4(
-                        arenaCentreOffset.x, 
-                        baselineWaterY, 
-                        arenaCentreOffset.y, 
-                        0f));
-                }
-}
+                sonarMat.SetVector("_ArenaMask", new Vector4(
+                    arenaCentreOffset.x,
+                    baselineWaterY,
+                    arenaCentreOffset.y,
+                    0f));
+            }
         }
 
         if (activeGridData != null && mapPointer.MapSurface != null)

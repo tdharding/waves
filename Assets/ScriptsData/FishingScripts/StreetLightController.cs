@@ -131,6 +131,12 @@ public class StreetLightController : MonoBehaviour, IInstancedLight, IFogRepelle
     public float   RepelRadius   => lightRadius * FogFieldManager.LampClearFraction;
     public float   RepelClearRadius => FogFieldManager.LampClearRadius;
     public float   RepelStrength => FogFieldManager.LampStrength;
+
+    // The mask's own clearance, not the push's. A lamp wants a wide gentle push with the drawn
+    // edge held somewhere else entirely, so the two distances are asked for separately.
+    public float   MaskClearRadius => FogFieldManager.LampMaskRadius;
+    public float   MaskFeather     => FogFieldManager.LampMaskFeather;
+
     public bool    RepelActive   => IsLit;
 
     /// <summary>True when the cone's base has been steered off the vertical by its own anchor.</summary>
@@ -158,7 +164,7 @@ public class StreetLightController : MonoBehaviour, IInstancedLight, IFogRepelle
     {
         LitLights.Clear();
         All.Clear();
-        waterBaseline = null;
+        levelSpawner = null;
     }
 
     void Start()
@@ -168,6 +174,16 @@ public class StreetLightController : MonoBehaviour, IInstancedLight, IFogRepelle
         AlignConeToWater();
     }
 
+    // If the level was not ready at Start — no spawner yet, or the baseline not written — keep
+    // trying rather than leaving the shaft at its authored length for the whole session.
+    void LateUpdate()
+    {
+        if (lightCone == null || _coneAligned) return;
+        AlignConeToWater();
+    }
+
+    bool _coneAligned;
+
     /// <summary>
     /// Sits the shaft of light's base on the waterline. Called at spawn; public so a level that
     /// moves its rig afterwards can ask for it again.
@@ -176,6 +192,8 @@ public class StreetLightController : MonoBehaviour, IInstancedLight, IFogRepelle
     {
         if (lightCone == null) return;
         if (!TryGetWaterHeight(out float waterY)) return;
+
+        _coneAligned = true;
         lightCone.SetBaseAtHeight(waterY);
 
         // The cloud sized itself to the shaft at Awake, before this moved the base onto the water,
@@ -183,20 +201,20 @@ public class StreetLightController : MonoBehaviour, IInstancedLight, IFogRepelle
         if (litParticles != null) litParticles.Reapply();
     }
 
-    // The arena baseline owns waterline height, the same authority BoatToWaterMaterial uses. Cached
-    // across lamps so a level full of them costs one scene search rather than one each.
-    static BaselineMarker waterBaseline;
+    // The waterline the level was authored with, straight off the Grid Designer's grid data — the
+    // same number the wave and tier spawning is built on, so the shaft lands on the surface the rest
+    // of the level was placed against. Cached across lamps so a level full of them costs one scene
+    // search rather than one each.
+    static LevelSpawner levelSpawner;
 
     static bool TryGetWaterHeight(out float y)
     {
-        if (waterBaseline == null)
-        {
-            var spawner = FindFirstObjectByType<LevelSpawner>();
-            waterBaseline = spawner != null ? spawner.GetBaselineMarker() : null;
-        }
+        y = 0f;
+        if (levelSpawner == null) levelSpawner = FindFirstObjectByType<LevelSpawner>();
+        if (levelSpawner == null) return false;
 
-        y = waterBaseline != null ? waterBaseline.height : 0f;
-        return waterBaseline != null;
+        y = levelSpawner.GetBaselineWaterY();
+        return true;
     }
 
     void Awake()

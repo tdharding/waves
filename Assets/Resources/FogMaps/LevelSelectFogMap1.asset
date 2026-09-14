@@ -1,0 +1,89 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 62a877791e9312444a218bdc460321c9, type: 3}
+  m_Name: LevelSelectFogMap1
+  m_EditorClassIdentifier: Assembly-CSharp::FogMap
+  properties:
+    spineBend1: -0.368
+    spineBend2: 0.36
+    spineStiffness: 0.302
+    limbification: 1
+    limbCount: 3
+    limbLength: 0.43
+    limbLengthSpread: 0.558
+    limbAngle: 0
+    limbDroop: 0.15
+    sideBias: 0.5
+    spineThicknessRoot: 0.137
+    spineThicknessTip: 0.259
+    limbThicknessRoot: 0.09
+    limbThicknessTip: 0.05
+    squashRoot: 0.55
+    squashTip: 0.25
+    ellipseStretch: 3
+    radiusVariation: 0.22
+    heightUndulation: 0.25
+    heightUndulationScale: 2
+  blobCount: 48
+  spacing: 1.9
+  blobScaleMin: 5.8
+  blobScaleMax: 7.2
+  fogOpacity: 1
+  maskRadius: 35.1
+  maskFeather: 0.75
+  windAngle: 20
+  windSpeed: 0.4
+  unitsPerTexel: 0.053
+  maxGridResolution: 1024
+  heaviness: 0.98
+  blurRadius: 0.213
+  heightBlurRadius: 2
+  spawnRadius: 32.8
+  cullRadius: 35.4
+  globalRepelStrength: 1
+  rockRepelRadius: 0.7
+  rockRepelStrength: 1
+  rockMaskRadius: 2.2
+  rockMaskFeather: 0.12
+  rockRescanInterval: 2
+  lampClearFraction: 0.35
+  lampRepelRadius: 0.34
+  lampRepelStrength: 1
+  lampMaskRadius: 0.34
+  lampMaskFeather: 0.2
+  runsRepel: 1
+  runChainSpacing: 2.4
+  runRepelRadius: 2.5
+  runRepelStrength: 0.5
+  runMaskRadius: 0.5
+  runMaskFeather: 0.6
+  boatRepelRadius: 0
+  boatRepelStrength: 0.6
+  boatMaskRadius: 2.14
+  boatMaskFeather: 0.4
+  fogMaterial: {fileID: 2100000, guid: 46e2e25193da1f44e8078d278e21e7f9, type: 2}
+  overrideLook: 1
+  threshold: 0.349
+  edgeSoftness: 0.1434
+  undulationAmount: 0
+  undulationScale: 0.05
+  lipWidth: 0.132
+  lipLighting: 1.92
+  lipCurvature: 0.55
+  heightScale: 1.6
+  fogColour: {r: 0.10062885, g: 0.10062885, b: 0.10062885, a: 1}
+  litColour: {r: 1, g: 1, b: 1, a: 1}
+  ambient: 0.341
+  interiorFill: 1
+  transparencyFalloff: 0.803
+  grainAmount: 0.56
+  grainScale: 83

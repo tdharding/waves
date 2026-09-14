@@ -12,14 +12,21 @@ using UnityEngine;
 // Tuning one group never changes another, so the shape can be settled before the lines are dressed.
 //
 // Deliberately NOT routed through WaveState/presets: these follow the boat, not the level.
+//
+// Runs on either boat. The arena boat is BoatMovement, the map boat LevelSelectBoatControl —
+// different scripts, and a scene only ever has one of them, so both references are here and
+// whichever is wired supplies the speed. Everything else is the same wake on the same water.
 public class BoatWakeBandsController : MonoBehaviour
 {
     [Header("References")]
     public Material waterMaterial;
     public Transform boat;
 
-    [Tooltip("Read for Speed01, which drives the min/max pairs below. Without it the wake sits at its minimum.")]
+    [Tooltip("The arena boat. Read for Speed01, which drives the min/max pairs below. Without a speed source the wake sits at its minimum.")]
     public BoatMovement boatMovement;
+
+    [Tooltip("The map boat, for the level select scene. Used only when Boat Movement is empty — the two boats are different scripts, and a scene only ever has one of them.")]
+    public LevelSelectBoatControl levelSelectBoat;
 
     // ─────────────────────────────────────────────────────────────────────────
     [Header("Mask Shape")]
@@ -127,7 +134,13 @@ public class BoatWakeBandsController : MonoBehaviour
         // Both min/max pairs are resolved here, from the boat speed the movement script already
         // works out. Lerping on the CPU keeps the shader unaware of speed entirely — it still gets
         // a single Length and a single accumulated phase.
-        float speed01 = boatMovement != null ? Mathf.Clamp01(boatMovement.Speed01) : 0f;
+        //
+        // From either boat, whichever this scene has. Both normalise against their own top speed,
+        // so the min/max pairs mean the same thing on the map as they do in an arena. With neither
+        // wired the wake still draws, but frozen at its minimum length and drift.
+        float speed01 = boatMovement    != null ? Mathf.Clamp01(boatMovement.Speed01)
+                      : levelSelectBoat != null ? Mathf.Clamp01(levelSelectBoat.Speed01)
+                      : 0f;
 
         // Accumulated on the CPU rather than derived from Time * Speed, so changing the speed
         // mid-level slides the pattern instead of teleporting it.

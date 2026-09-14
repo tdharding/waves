@@ -63,10 +63,7 @@ MonoBehaviour:
     curveResolution: 16
     souls:
     - {fileID: 11400000, guid: f461b3f2e1b14f848b8e4cd758b76ca3, type: 2}
-    - {fileID: 11400000, guid: e68191a332cca2b4d88b1900348aadfb, type: 2}
-    - {fileID: 11400000, guid: 5751c89769745b1468d9e62b2cf89ca5, type: 2}
     - {fileID: 11400000, guid: 91ca60bd9ad90a146ab5d08c9b6f0929, type: 2}
-    - {fileID: 11400000, guid: 5e214e390293fc94195c6b4c6e6161ae, type: 2}
     - {fileID: 11400000, guid: cbb48d7113346304e8b170ef32454a63, type: 2}
     statueGuarded: 0
     linkedStatueId: 0

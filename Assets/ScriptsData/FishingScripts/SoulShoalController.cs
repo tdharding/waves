@@ -109,36 +109,77 @@ public class SoulShoalController : MonoBehaviour
                 continue;
             }
 
-            // Deactivate prefab root before instantiating so Awake/OnEnable are deferred
-            // until SplineContainer and other refs are fully assigned.
-            fishMeshPrefab.SetActive(false);
-            GameObject fish = Instantiate(fishMeshPrefab, splineContainer.transform);
-            fishMeshPrefab.SetActive(true);
-
-            var splineAnimate = fish.GetComponent<SplineAnimate>();
-            if (splineAnimate != null)
-            {
-                splineAnimate.Container   = splineContainer;
-                splineAnimate.StartOffset = (float)i / zone.souls.Count;
-            }
-
-            var fishingBehaviour = fish.GetComponent<FishFishingBehaviour>();
-            if (fishingBehaviour != null)
-                fishingBehaviour.fishing = fishingController;
-
-            // Stamp per-fish identity so FishFishingBehaviour reads the correct soul
-            var label = fish.GetComponent<LinkIdentityLabel>() ?? fish.AddComponent<LinkIdentityLabel>();
-            label.SetLabel(linkID, "SoulFish");
-            label.soulDataIdentity = soulData.soulDataIdentity;
-
-            fish.SetActive(true);
-            _fishList.Add(fish.transform);
+            SpawnOneFish(soulData.soulDataIdentity, linkID, (float)i / zone.souls.Count);
         }
 
         _fishSpawned = true;
 
         // The level-wide controller owns swim speed and the fish-count readout.
         SoulFishController.RegisterShoal(this);
+    }
+
+    /// <summary>
+    /// Adds souls that swam into the level by this zone's entrance. A zone pinned to the doors
+    /// begins at one, so a soul that arrives through that door joins this shoal — the same fish,
+    /// on the same spline, as the souls authored into the zone.
+    ///
+    /// Their linkID comes from the identity, not from a spawn slot: an arrival has no authored
+    /// slot, and a slot-order id would move under it every time the level loads.
+    /// </summary>
+    public void SpawnArrivedFish(List<int> identities, string levelID)
+    {
+        if (identities == null || identities.Count == 0) return;
+        if (fishMeshPrefab == null || splineContainer == null) return;
+
+        for (int i = 0; i < identities.Count; i++)
+        {
+            int linkID = ArrivedLinkID(identities[i]);
+
+            if (GameProgressData.IsSoulCaught(levelID, linkID))
+            {
+                Debug.Log($"[SoulShoalController] Arrived soul #{identities[i]} already caught — skipping.");
+                continue;
+            }
+
+            SpawnOneFish(identities[i], linkID, (float)i / identities.Count);
+        }
+
+        _fishSpawned = true;
+        Debug.Log($"[SoulShoalController] '{gameObject.name}' took {identities.Count} arrived soul(s).");
+    }
+
+    /// <summary>
+    /// linkID for a soul that arrived rather than being authored into a zone. Sits above every
+    /// authored slot (zoneIndex * 100 + i) so the two id spaces cannot meet.
+    /// </summary>
+    public static int ArrivedLinkID(int identity) => 10000 + identity;
+
+    private void SpawnOneFish(int soulIdentity, int linkID, float startOffset)
+    {
+        // Deactivate prefab root before instantiating so Awake/OnEnable are deferred
+        // until SplineContainer and other refs are fully assigned.
+        fishMeshPrefab.SetActive(false);
+        GameObject fish = Instantiate(fishMeshPrefab, splineContainer.transform);
+        fishMeshPrefab.SetActive(true);
+
+        var splineAnimate = fish.GetComponent<SplineAnimate>();
+        if (splineAnimate != null)
+        {
+            splineAnimate.Container   = splineContainer;
+            splineAnimate.StartOffset = startOffset;
+        }
+
+        var fishingBehaviour = fish.GetComponent<FishFishingBehaviour>();
+        if (fishingBehaviour != null)
+            fishingBehaviour.fishing = fishingController;
+
+        // Stamp per-fish identity so FishFishingBehaviour reads the correct soul
+        var label = fish.GetComponent<LinkIdentityLabel>() ?? fish.AddComponent<LinkIdentityLabel>();
+        label.SetLabel(linkID, "SoulFish");
+        label.soulDataIdentity = soulIdentity;
+
+        fish.SetActive(true);
+        _fishList.Add(fish.transform);
     }
 
     // ---------------------------------------------------------

@@ -93,11 +93,16 @@ public class FogSheetMesh : MonoBehaviour
     }
 #endif
 
+    // Cached for the same reason the wave plane is: this runs every LateUpdate, and finding the
+    // manager by type is a whole-scene scan. Re-found only once it has actually gone.
+    FogFieldManager _mgr;
+
     float ResolvedSize()
     {
         if (!matchFieldCoverage) return Mathf.Max(size, 0.01f);
 
-        var mgr = FindAnyObjectByType<FogFieldManager>();
+        if (_mgr == null) _mgr = FindAnyObjectByType<FogFieldManager>();
+        var mgr = _mgr;
         if (mgr == null) return Mathf.Max(size, 0.01f);
 
         // The ARENA, not the painted window. These are deliberately different sizes: the sheet is
@@ -123,13 +128,27 @@ public class FogSheetMesh : MonoBehaviour
         mr.receiveShadows = false;
     }
 
+    // When the last search came up empty. A scene with no wave plane at all is a real case now —
+    // the level select world has none, because out there the sheet hovers over the landscape
+    // rather than lying on water — and searching for one that is never going to be there is a
+    // whole-scene type scan every single frame, forever.
+    float _wavePlaneSearchClock;
+    const float WAVE_PLANE_RESEARCH = 1f;
+
     /// <summary>
     /// The wave plane, which is where the water actually is. Cached, and re-found when it goes
     /// stale — levels rebuild their arena, so a reference caught at edit time does not survive.
+    /// Null is a legitimate answer, so a failed search is throttled rather than repeated: the
+    /// caller falls back to its own waterline Y, which is what an exterior scene wants anyway.
     /// </summary>
     Transform ResolveWavePlane()
     {
         if (wavePlane != null) return wavePlane;
+
+        _wavePlaneSearchClock -= Application.isPlaying ? Time.deltaTime : 1f / 60f;
+        if (_wavePlaneSearchClock > 0f) return null;
+        _wavePlaneSearchClock = WAVE_PLANE_RESEARCH;
+
         var gen = FindAnyObjectByType<WaveMeshGenerator>();
         if (gen != null) wavePlane = gen.transform;
         return wavePlane;

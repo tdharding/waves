@@ -21,8 +21,17 @@ public class FogRepellerSource : MonoBehaviour, IFogRepeller
     [SerializeField] float clearRadius = 0.55f;
 
     [Tooltip("1 pins fog exactly on the clear radius. Lower lets it press in and recover, which " +
-             "suits something that moves — the boat wants roughly 0.6.")]
-    [Range(0f, 1f)] [SerializeField] float strength = 1f;
+             "suits something that moves — the boat wants roughly 0.6. Above 1 is allowed and is " +
+             "how one obstacle reaches full push while the global multiplier is held low for the " +
+             "rest; the product is what gets clamped, never this on its own.")]
+    [Range(0f, 4f)] [SerializeField] float strength = 1f;
+
+    [Tooltip("Clear water the fragment mask cuts beyond the radius. The push shapes fog; this " +
+             "decides where fog may be drawn at all.")]
+    [SerializeField] float maskClearRadius = 0.55f;
+
+    [Tooltip("How soft the mask's edge is, in world units. 0 is a hard cut.")]
+    [SerializeField] float maskFeather = 0.15f;
 
     [Tooltip("Lift the measuring point off the transform, for a wall whose pivot is not at its " +
              "centre.")]
@@ -32,6 +41,8 @@ public class FogRepellerSource : MonoBehaviour, IFogRepeller
     public float   RepelRadius   => radius;
     public float   RepelClearRadius => clearRadius;
     public float   RepelStrength => strength;
+    public float   MaskClearRadius => maskClearRadius;
+    public float   MaskFeather => maskFeather;
     public bool    RepelActive   => isActiveAndEnabled && radius + clearRadius > 0.0001f;
 
     /// <summary>For anything building these at spawn rather than authoring them in a prefab.</summary>
@@ -70,14 +81,16 @@ public class FogRepellerSource : MonoBehaviour, IFogRepeller
 public class FogRockRepeller : IFogRepeller
 {
     readonly IRockRing _rock;
-    readonly float _clearRadius;
-    readonly float _strength;
+    readonly float _clearRadius, _strength, _maskClear, _maskFeather;
 
-    public FogRockRepeller(IRockRing rock, float clearRadius, float strength)
+    public FogRockRepeller(IRockRing rock, float clearRadius, float strength,
+                           float maskClear, float maskFeather)
     {
         _rock = rock;
         _clearRadius = clearRadius;
         _strength = strength;
+        _maskClear = maskClear;
+        _maskFeather = maskFeather;
     }
 
     public IRockRing Rock => _rock;
@@ -86,6 +99,8 @@ public class FogRockRepeller : IFogRepeller
     public float   RepelRadius   => _rock != null ? _rock.RingRadius : 0f;
     public float   RepelClearRadius => _clearRadius;
     public float   RepelStrength => _strength;
+    public float   MaskClearRadius => _maskClear;
+    public float   MaskFeather => _maskFeather;
 
     // A rock that has stopped throwing rings — destroyed, or disabled — has also stopped being an
     // obstacle, so the two go quiet together rather than fog piling against an invisible wall.
@@ -118,11 +133,15 @@ public class FogBoatRepeller : IFogRepeller
     public float   Radius;
     public float   ClearRadius;
     public float   Strength;
+    public float   MaskClear;
+    public float   Feather;
 
     public Vector3 RepelCentre   => Centre;
     public float   RepelRadius   => Radius;
     public float   RepelClearRadius => ClearRadius;
     public float   RepelStrength => Strength;
+    public float   MaskClearRadius => MaskClear;
+    public float   MaskFeather => Feather;
 
     // No map means no fog at all, so the boat has nothing to push and Strength sits at zero.
     public bool RepelActive => Strength > 0.0001f && Radius + ClearRadius > 0.0001f;

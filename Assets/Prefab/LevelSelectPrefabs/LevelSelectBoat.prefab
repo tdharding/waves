@@ -132,10 +132,12 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5225368971487640994}
-  - component: {fileID: 6980929049385446736}
+  - component: {fileID: 5948905900585385629}
+  - component: {fileID: 5039176491590513229}
+  - component: {fileID: 8764496665436206004}
   m_Layer: 0
   m_Name: LevelSelectBoat
-  m_TagString: Untagged
+  m_TagString: BoatPrefab
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -156,7 +158,55 @@ Transform:
   - {fileID: 5249584794582394869}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &6980929049385446736
+--- !u!54 &5948905900585385629
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3274025100092174629}
+  serializedVersion: 5
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 0
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 0
+--- !u!135 &5039176491590513229
+SphereCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3274025100092174629}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Radius: 0.5
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &8764496665436206004
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -165,20 +215,10 @@ MonoBehaviour:
   m_GameObject: {fileID: 3274025100092174629}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 29a074d529cf945029ef7cf40540c9df, type: 3}
+  m_Script: {fileID: 11500000, guid: a9be10135915ba84083617c2df0e461a, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Unity.Splines::UnityEngine.Splines.SplineAnimate
-  m_Target: {fileID: 0}
-  m_PlayOnAwake: 1
-  m_LoopMode: 1
-  m_Method: 0
-  m_Duration: 1
-  m_MaxSpeed: 10
-  m_EasingMode: 0
-  m_AlignmentMode: 1
-  m_ObjectForwardAxis: 2
-  m_ObjectUpAxis: 1
-  m_StartOffset: 0
+  m_EditorClassIdentifier: Assembly-CSharp::LevelSelectBoatToShaders
+  boatControl: {fileID: 0}
 --- !u!1 &4332667731821666365
 GameObject:
   m_ObjectHideFlags: 0
@@ -310,11 +350,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5249584794582394869}
-  - component: {fileID: 7994702914686190016}
-  - component: {fileID: 8016136921458129799}
   m_Layer: 0
   m_Name: Boat
-  m_TagString: BoatPrefab
+  m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -335,51 +373,3 @@ Transform:
   - {fileID: 7352574460150917283}
   m_Father: {fileID: 5225368971487640994}
   m_LocalEulerAnglesHint: {x: 90, y: 0, z: 0}
---- !u!135 &7994702914686190016
-SphereCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7725140413258941310}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Radius: 0.15
-  m_Center: {x: 0, y: 0, z: 0}
---- !u!54 &8016136921458129799
-Rigidbody:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7725140413258941310}
-  serializedVersion: 5
-  m_Mass: 1
-  m_LinearDamping: 0
-  m_AngularDamping: 0.05
-  m_CenterOfMass: {x: 0, y: 0, z: 0}
-  m_InertiaTensor: {x: 1, y: 1, z: 1}
-  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ImplicitCom: 1
-  m_ImplicitTensor: 1
-  m_UseGravity: 1
-  m_IsKinematic: 1
-  m_Interpolate: 0
-  m_Constraints: 0
-  m_CollisionDetection: 0

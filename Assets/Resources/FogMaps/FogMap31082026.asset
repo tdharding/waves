@@ -18,14 +18,14 @@ MonoBehaviour:
     spineStiffness: 0.7
     limbification: 1
     limbCount: 3
-    limbLength: 0.767
+    limbLength: 0.988
     limbLengthSpread: 0.25
     limbAngle: -19.1
     limbDroop: 0.686
     sideBias: 0.5
     spineThicknessRoot: 0.1
     spineThicknessTip: 0.1
-    limbThicknessRoot: 0.09
+    limbThicknessRoot: 0.06
     limbThicknessTip: 0.05
     squashRoot: 0.55
     squashTip: 0.25
@@ -49,30 +49,35 @@ MonoBehaviour:
   heightBlurRadius: 0.2
   spawnRadius: 3.95
   cullRadius: 4.7
-  repelStrength: 1
-  rockClearRadius: 0.13
-  rockStrength: 1
+  globalRepelStrength: 1
+  rockRepelRadius: 0.33
+  rockRepelStrength: 4
+  rockMaskRadius: 0.01
+  rockMaskFeather: 0.51
   rockRescanInterval: 2
-  lampClearFraction: 0.35
-  lampClearRadius: 0.34
-  lampStrength: 1
+  lampClearFraction: 0.154
+  lampRepelRadius: 0.34
+  lampRepelStrength: 1.08
+  lampMaskRadius: 0.34
+  lampMaskFeather: 0.2
+  boatRepelRadius: 0.66
+  boatRepelStrength: 4
+  boatMaskRadius: 0.05
+  boatMaskFeather: 0.4
   fogMaterial: {fileID: 2100000, guid: 46e2e25193da1f44e8078d278e21e7f9, type: 2}
   overrideLook: 1
-  threshold: 0.515
+  threshold: 0.705
   edgeSoftness: 0.1585
   undulationAmount: 0
   undulationScale: 1.51
-  lipWidth: 0.05
-  lipLighting: 3.23
-  lipCurvature: 1.28
+  lipWidth: 0.056
+  lipLighting: 4
+  lipCurvature: 0.52
   heightScale: 1
   fogColour: {r: 0, g: 0, b: 0, a: 1}
   litColour: {r: 1, g: 1, b: 1, a: 1}
   ambient: 0.273
   interiorFill: 0.75
   transparencyFalloff: 0.25
-  grainAmount: 0.841
+  grainAmount: 0.408
   grainScale: 62
-  boatRepelRadius: 0.11
-  boatRepelClearRadius: 0.33
-  boatRepelStrength: 1

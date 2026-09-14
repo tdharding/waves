@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.Serialization;
 
 /// <summary>
@@ -142,35 +142,116 @@ public class FogMap : ScriptableObject
     public float cullRadius = 4.7f;
 
     // ── Pushing ──────────────────────────────────────────────────────────────
+    // Two clearances per obstacle, deliberately independent.
+    //
+    //   Repel Radius   how far the SKELETON is pushed out. This shapes fog: it bends and flows
+    //                  around the obstacle. It cannot hold an exact edge, because a point pinned
+    //                  to a circle slides around it as a mass drifts past, which reads as the fog
+    //                  accelerating.
+    //
+    //   Mask Radius    how far the FRAGMENT MASK cuts, with its own feather. This holds the edge,
+    //                  exactly, at no cost in motion — so the push above is free to be gentle.
+    //
+    // They are separate numbers because they want different distances: a wide soft push with a
+    // tight mask gives fog that leans away from a rock and is cut cleanly at it.
     [Header("Pushing")]
-    [Tooltip("Global multiplier on every repeller's own strength. Drop it to let fog crowd in " +
-             "closer to everything at once without editing each rock.")]
-    [Range(0f, 1f)] public float repelStrength = 1f;
+    [Tooltip("Global multiplier on every repeller's strength at once. Drop it to let fog crowd in " +
+             "closer to everything without editing each obstacle. Per-obstacle strengths may " +
+             "exceed 1 to make up for a low value here — the product is what is clamped.")]
+    [FormerlySerializedAs("repelStrength")]
+    [Range(0f, 1f)] public float globalRepelStrength = 1f;
 
+    [Header("Rocks")]
+    [Tooltip("Clear water the SKELETON is pushed out of, beyond a rock's own waterline radius.")]
+    [FormerlySerializedAs("rockClearRadius")]
+    public float rockRepelRadius = 0.7f;
 
-    [Tooltip("Clear water kept beyond a rock's own waterline radius.")]
-    [FormerlySerializedAs("rockStandoff")]
-    public float rockClearRadius = 0.34f;
+    [Tooltip("How hard rocks push. Above 1 is allowed and is how a rock reaches full push while " +
+             "the global multiplier is held low. 1 pins the skeleton exactly on the repel radius.")]
+    [FormerlySerializedAs("rockStrength")]
+    [Range(0f, 4f)] public float rockRepelStrength = 1f;
 
-    [Tooltip("How hard rocks push. Rocks are firm — fog wraps close and stays out.")]
-    [Range(0f, 1f)] public float rockStrength = 1f;
+    [Tooltip("Clear water the MASK cuts, beyond a rock's own radius. This is the hard edge — fog " +
+             "is never drawn inside it however gently it is being pushed.")]
+    public float rockMaskRadius = 0.7f;
+
+    [Tooltip("How soft that cut is, in world units. 0 is a razor edge.")]
+    public float rockMaskFeather = 0.15f;
 
     [Tooltip("Seconds between rescans for rocks. Levels spawn their spikes, so this cannot be a " +
              "one-off at startup, but it need not run often either.")]
     public float rockRescanInterval = 2f;
 
+    [Header("Street Lights")]
     [Tooltip("Fraction of a lamp's light radius that fog is held out of. Keep it well under 1: " +
              "push fog out as far as the light reaches and it never enters the region it would " +
              "have been lit in, leaving a dark hole ringed by unlit fog.")]
     [Range(0.05f, 0.8f)] public float lampClearFraction = 0.35f;
 
-    [Tooltip("Clear water kept beyond that, on top of it.")]
-    [FormerlySerializedAs("lampStandoff")]
-    public float lampClearRadius = 0.34f;
+    [Tooltip("Clear water the skeleton is pushed out of, on top of that fraction.")]
+    [FormerlySerializedAs("lampClearRadius")]
+    public float lampRepelRadius = 0.34f;
 
-    [Tooltip("How hard a lit lamp pushes fog out. Higher than a rock's — a lamp is burning fog " +
-             "off, not just standing in its way.")]
-    [Range(0f, 1f)] public float lampStrength = 1f;
+    [Tooltip("How hard a lit lamp pushes. Above 1 is allowed.")]
+    [FormerlySerializedAs("lampStrength")]
+    [Range(0f, 4f)] public float lampRepelStrength = 1f;
+
+    [Tooltip("Clear water the mask cuts, on top of the light fraction.")]
+    public float lampMaskRadius = 0.34f;
+
+    [Tooltip("How soft that cut is, in world units.")]
+    public float lampMaskFeather = 0.2f;
+
+    [Header("River Runs")]
+    [Tooltip("Whether the elevated river runs push fog about at all. Purely a look: the runs are " +
+             "up above the fog like highways, and without this the fog slides straight through " +
+             "the structures holding them up.")]
+    public bool runsRepel = true;
+
+    [Tooltip("How far apart the circles are strung along a run, IN WORLD UNITS. This is the " +
+             "amount on a chain — the whole budget control. Every circle is one of the " +
+             "thirty-two obstacle slots the mask has, shared with the rocks, so a run chained " +
+             "tightly enough will crowd the rocks out of the mask entirely. Read it against Run " +
+             "Repel Radius: spacing near the radius gives a smooth corridor, spacing well past " +
+             "it gives a row of separate clearings.")]
+    [Range(0.5f, 20f)] public float runChainSpacing = 2.04f;
+
+    [Tooltip("Radius of each circle on the chain. Deliberately NOT the run's own half width — " +
+             "the runs are 1.3 to 2.7 half wide, and fog standing off further than the structure " +
+             "is wide reads better than fog hugging it. Wider circles also mean fewer of them.")]
+    public float runRepelRadius = 2.91f;
+
+    [Tooltip("How hard a run pushes. The mask holds the edge, so this only has to make fog react " +
+             "as it passes — at full push the skeleton is pinned exactly on the circle, which is " +
+             "firm but can read as a lurch on a mass drifting through. Above 1 is allowed and is " +
+             "how a run reaches full push while Global Strength is held low for the rest; with " +
+             "Global Strength at 1, anything at or above 1 here is already full push.")]
+    [Range(0f, 4f)] public float runRepelStrength = 4f;
+
+    [Tooltip("Clear air the MASK cuts, beyond each circle. This is the hard edge.")]
+    public float runMaskRadius = 0.5f;
+
+    [Tooltip("How soft that cut is, in world units. Keep it generous — it is also what hides " +
+             "the scalloping between one circle on the chain and the next.")]
+    public float runMaskFeather = 0.6f;
+
+    [Header("Boat")]
+    [Tooltip("Clear water the SKELETON is pushed out of, measured from the boat. One radius, not " +
+             "two: a hull radius and a clearance on top of it were only ever added together, so " +
+             "the pair said nothing the sum did not.")]
+    public float boatRepelRadius = 1.55f;
+
+    [Tooltip("How hard the hull pushes. Below 1 lets fog press in and recover, which is what " +
+             "suits something moving. Above 1 is allowed.")]
+    [Range(0f, 4f)] public float boatRepelStrength = 0.6f;
+
+    [Tooltip("Clear water the mask cuts around the boat. Set it to 0 to let fog close over you " +
+             "visually while the push still holds it off.")]
+    [FormerlySerializedAs("boatRepelClearRadius")]
+    public float boatMaskRadius = 1.2f;
+
+    [Tooltip("How soft that cut is, in world units.")]
+    public float boatMaskFeather = 0.4f;
 
     // ── Look ──────────────────────────────────────────────────────────────
     // Following SonarGridType, which carries its own plane material alongside its formation: the
@@ -247,30 +328,6 @@ public class FogMap : ScriptableObject
              "hundreds gives a fine tooth; under ten is broad cloudy blotching.")]
     [Range(0.5f, 400f)] public float grainScale = 12f;
 
-    // ── Boat ─────────────────────────────────────────────────────────────────
-    // Here rather than on the boat, for the same reason the rock and lamp numbers live on the fog
-    // side: how fog behaves around something is a property of the WEATHER, not of the thing it is
-    // avoiding. Per-arena rather than global because it genuinely differs by arena — thin haze
-    // barely parts for a hull, a thick bank shoulders well clear of it.
-    [Header("Boat")]
-    [Tooltip("The hull's own radius at the waterline: the circle fog does not enter at all.")]
-    public float boatRepelRadius = 1f;
-
-    [Tooltip("Clear water kept beyond that radius. Note it does not simply add a gap — the mass is " +
-             "stretched around a bigger circle and thins, so raise body thickness alongside it.")]
-    [FormerlySerializedAs("boatRepelStandoff")]
-    public float boatRepelClearRadius = 0.55f;
-
-    [Tooltip("1 pins fog exactly on the clear radius. Lower lets it press in and recover, which " +
-             "is what suits something moving — around 0.6 reads right for a boat. 0 turns the " +
-             "boat's push off entirely and fog closes straight over you.")]
-    [Range(0f, 1f)] public float boatRepelStrength = 0.6f;
-
-    /// <summary>
-    /// Push this map's look onto its material. Called at level start and by Refresh Preview, never
-    /// per frame — the material is what you tune against, and re-pushing every frame would undo
-    /// every slider you moved while looking at it.
-    /// </summary>
     /// <summary>
     /// The reverse of ApplyLook: read every Look value OFF the material and into this map.
     ///

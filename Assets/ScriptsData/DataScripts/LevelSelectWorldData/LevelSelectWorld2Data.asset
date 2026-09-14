@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   hillPoints:
   - id: 2ce12732-fe5f-4b7d-a23d-a36643212d5e
-    positionXZ: {x: 30.31618, y: -22.924978}
+    positionXZ: {x: 35.13688, y: -25.740664}
     scale: 5
     height: 1
   - id: 252d0f7c-8d27-47ba-b486-c8781a1806d0
@@ -26,9 +26,9 @@ MonoBehaviour:
     scale: 1.4
     height: 6.9
   - id: 287d9bb7-99dc-4fe7-9108-640a6742e4f3
-    positionXZ: {x: 56.668884, y: -47.024925}
-    scale: 6.9
-    height: 6.9
+    positionXZ: {x: 58.732582, y: -30.52374}
+    scale: 9.3
+    height: 50
   - id: ad947181-5f49-43ee-b116-5c64ff556f72
     positionXZ: {x: 72.6007, y: -39.059017}
     scale: 7.8
@@ -46,17 +46,17 @@ MonoBehaviour:
     scale: 19.2
     height: -15
   - id: c1d2c02f-86b8-4ed5-a166-64ad2d931b20
-    positionXZ: {x: 69.71611, y: 11.90939}
-    scale: 19.2
-    height: 15
+    positionXZ: {x: 64.5135, y: 6.907706}
+    scale: 15.3
+    height: 42.8
   - id: 65a6e1b8-fc75-4df3-be19-1455a7358016
     positionXZ: {x: 35.871002, y: 4.8546124}
     scale: 9.1
     height: 15
   - id: 69b3cec3-ee38-4a82-87bd-c0e581ea2c3f
-    positionXZ: {x: 30.873186, y: 34.745136}
-    scale: 5.43
-    height: 14.1
+    positionXZ: {x: 16.820915, y: -26.188051}
+    scale: 12.7
+    height: 50
   - id: d67f3d4b-67ac-4ddb-84e3-f0d3bf55da1c
     positionXZ: {x: 105.806564, y: 27.376728}
     scale: 19.2
@@ -110,65 +110,79 @@ MonoBehaviour:
     scale: 5.6
     height: -9.4
   - id: 1f472ed0-d5de-4028-8230-24039689db10
-    positionXZ: {x: 45.279785, y: -42.1136}
-    scale: 5.6
-    height: -9.4
+    positionXZ: {x: 57.937702, y: -51.045994}
+    scale: 11.7
+    height: 50
   nodes:
   - id: 6c2c0bb8-0ed6-4a0c-a0c7-31ed04a6984b
-    worldPosition: {x: 143.3325, y: 0, z: -12.623}
+    worldPosition: {x: 88.20113, y: 2, z: -16.329378}
     type: 0
   - id: e1f05638-ddfe-4bb2-9b7b-68de9e60a628
-    worldPosition: {x: 62.15912, y: 0, z: -15.761003}
+    worldPosition: {x: 55.48462, y: 0, z: -16.312918}
     type: 2
-  - id: 41074375-ff3e-430e-9c56-aad6f0420be6
-    worldPosition: {x: 82.67421, y: 0, z: -16.091797}
+  - id: b120236e-0200-44b0-a8dc-f6f9940c46d6
+    worldPosition: {x: 75.26848, y: 0, z: -16.307352}
     type: 0
-  - id: 269a8498-177d-4b92-ba35-2cc3153d51f4
-    worldPosition: {x: 57.107628, y: 0, z: -9.300604}
+  - id: fdd41757-67b3-4add-89dc-85b6fed6be9b
+    worldPosition: {x: 70.680374, y: 0, z: -16.395206}
+    type: 1
+  - id: db7d413b-45c1-4245-8ed4-960f13707658
+    worldPosition: {x: 73.22016, y: 0, z: -25.001484}
+    type: 0
+  - id: b2e5db0b-7bc0-4af6-ab70-c3e42776e421
+    worldPosition: {x: 84.24471, y: 0, z: -26.742876}
+    type: 0
+  - id: 7b809514-9d66-45d4-ba5d-68ef656aa1a8
+    worldPosition: {x: 70.73956, y: 0, z: -20.083752}
+    type: 0
+  - id: e179a491-5f75-445d-b2b3-b04178d9ba43
+    worldPosition: {x: 42.78159, y: 0, z: -15.959761}
+    type: 0
+  - id: aeb22f6f-e051-4245-9d02-92afcf23088a
+    worldPosition: {x: 33.043938, y: 0, z: -16.371576}
+    type: 0
+  - id: 23885b89-514e-4831-8e52-baa25f4c2085
+    worldPosition: {x: 9.79983, y: 0, z: -14.93789}
     type: 2
-  - id: 8557c6ab-fd9c-4aa7-ac6c-a0888fbca508
-    worldPosition: {x: 57.51575, y: 0, z: -22.050451}
+  - id: efd82fa0-c355-44bb-9f6d-50c203cfaa13
+    worldPosition: {x: 23.466682, y: 0, z: -16.371576}
+    type: 0
+  - id: 10aaff99-cd7f-4c2a-b7bc-4106c47e94b6
+    worldPosition: {x: -0.97027683, y: 0, z: -17.079815}
     type: 2
-  - id: ed6a26f4-1b0d-40a4-ac17-43bc986d2827
-    worldPosition: {x: 50.779938, y: 0, z: -15.633592}
-    type: 2
-  - id: 0467a321-bced-4a52-aab7-ef22b7ad0334
-    worldPosition: {x: 56.595707, y: 0, z: 7.6044455}
+  - id: 070587d1-da56-4508-8d85-b420d153e1f4
+    worldPosition: {x: -11.011416, y: 0, z: -26.331915}
     type: 0
-  - id: e219a47f-ef70-46e5-9360-f3868bdff0b9
-    worldPosition: {x: 21.18651, y: 0, z: -19.51304}
+  - id: a41925ea-6c83-4673-a2e2-d0bcfe2d40f1
+    worldPosition: {x: -10.93479, y: 0, z: -37.67138}
     type: 0
-  - id: 65c301ce-fc3f-466d-a0dd-13b9491d4147
-    worldPosition: {x: 56.97824, y: 0, z: -36.45288}
+  - id: a91f922f-1baa-4392-9d95-e2fa616534cc
+    worldPosition: {x: -4.422264, y: 0, z: -47.32525}
     type: 0
-  - id: 34cbc5f4-d23d-4f33-83d4-97982d8840cc
-    worldPosition: {x: 56.823715, y: 0, z: -2.9845917}
+  - id: 486291ce-e817-4b2b-8b3d-3d3f706f0234
+    worldPosition: {x: 14.425763, y: 0, z: -61.576195}
     type: 0
-  - id: 8d4f251f-29ac-4726-98cd-ef6ae4aa8c6a
-    worldPosition: {x: 31.344309, y: 0, z: -18.569052}
+  - id: fbe762a1-75cd-477f-96d1-9369b4fb0eab
+    worldPosition: {x: 77.43512, y: 0, z: -26.552095}
     type: 0
-  - id: 4d6a2529-a792-4249-880c-d5fa6283a736
-    worldPosition: {x: 37.1066, y: 0, z: -17.668722}
+  - id: 358ab451-e795-44c1-a972-71e8cb9442aa
+    worldPosition: {x: 83.36096, y: 2, z: -16.206888}
     type: 0
-  - id: ff57f405-19a2-42c1-8189-3b18de79e950
-    worldPosition: {x: 42.152992, y: 0, z: -17.750483}
+  - id: 0342c7d0-6045-4291-827e-982a0d16420d
+    worldPosition: {x: 79.83954, y: 2, z: -16.443815}
     type: 0
-  - id: d54580f2-5bf9-4a36-9bc0-d067959f5e0b
-    worldPosition: {x: 57.57128, y: 0, z: -27.849686}
+  - id: 5e03aaba-f7bf-4158-bb7a-7003c42a4dd4
+    worldPosition: {x: 71.3825, y: 0, z: -23.179943}
     type: 0
-  - id: 5128b34f-8956-4859-8cf0-edd390670769
-    worldPosition: {x: 79.938866, y: 0, z: -16.047691}
-    type: 0
-  - id: edfdd305-ee3a-4542-ba2e-05f1dc9a9fb9
-    worldPosition: {x: 79.82427, y: 0, z: -28.26948}
-    type: 2
   paths:
   - pathId: cb512902-99c4-4aa3-973b-d4a908cef861
     segmentId: MainRiver
     nodeIds:
     - 6c2c0bb8-0ed6-4a0c-a0c7-31ed04a6984b
-    - 41074375-ff3e-430e-9c56-aad6f0420be6
-    - 5128b34f-8956-4859-8cf0-edd390670769
+    - 358ab451-e795-44c1-a972-71e8cb9442aa
+    - 0342c7d0-6045-4291-827e-982a0d16420d
+    - b120236e-0200-44b0-a8dc-f6f9940c46d6
+    - fdd41757-67b3-4add-89dc-85b6fed6be9b
     - e1f05638-ddfe-4bb2-9b7b-68de9e60a628
     isLeftPath: 0
     isRightPath: 0
@@ -180,89 +194,76 @@ MonoBehaviour:
     tJunctionBidirectional: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.27, g: 0.45396018, b: 0.9, a: 1}
-    curveStrength: 1
-    curveSubdivisions: 2
-  - pathId: 827ac486-09e8-494a-9081-13a1bfd7e51f
+    curveStrength: 0.1
+    curveSubdivisions: 6
+  - pathId: 9d03b668-69f2-44e9-bf9d-6b5f77785098
     segmentId: Branch_01
     nodeIds:
-    - 269a8498-177d-4b92-ba35-2cc3153d51f4
-    - 34cbc5f4-d23d-4f33-83d4-97982d8840cc
-    - 0467a321-bced-4a52-aab7-ef22b7ad0334
+    - fdd41757-67b3-4add-89dc-85b6fed6be9b
+    - 7b809514-9d66-45d4-ba5d-68ef656aa1a8
+    - 5e03aaba-f7bf-4158-bb7a-7003c42a4dd4
+    - db7d413b-45c1-4245-8ed4-960f13707658
+    - fbe762a1-75cd-477f-96d1-9369b4fb0eab
+    - b2e5db0b-7bc0-4af6-ab70-c3e42776e421
     isLeftPath: 0
-    isRightPath: 0
+    isRightPath: 1
     segmentType: 1
     riverName: Branch_01
-    leadsToArena: 1
+    leadsToArena: 0
     arenaIsAtEnd: 0
-    extrudeOnExit: 1
+    extrudeOnExit: 0
     tJunctionBidirectional: 0
     arenaGridDataGuid: 
-    editorColor: {r: 0.27, g: 0.45396018, b: 0.9, a: 1}
-    curveStrength: 0.1
+    editorColor: {r: 0.27, g: 0.4539601, b: 0.9, a: 1}
+    curveStrength: 1
     curveSubdivisions: 2
-  - pathId: b00cbdf7-ae42-4a47-88d5-0a0f5a0876b8
+  - pathId: 5b0a0255-7e55-4784-b96c-248b5958e1ee
     segmentId: Branch_02
     nodeIds:
-    - ed6a26f4-1b0d-40a4-ac17-43bc986d2827
-    - ff57f405-19a2-42c1-8189-3b18de79e950
-    - 4d6a2529-a792-4249-880c-d5fa6283a736
-    - 8d4f251f-29ac-4726-98cd-ef6ae4aa8c6a
-    - e219a47f-ef70-46e5-9360-f3868bdff0b9
+    - e179a491-5f75-445d-b2b3-b04178d9ba43
+    - aeb22f6f-e051-4245-9d02-92afcf23088a
+    - efd82fa0-c355-44bb-9f6d-50c203cfaa13
+    - 23885b89-514e-4831-8e52-baa25f4c2085
     isLeftPath: 0
     isRightPath: 0
     segmentType: 1
     riverName: Branch_02
     leadsToArena: 1
     arenaIsAtEnd: 0
-    extrudeOnExit: 1
-    tJunctionBidirectional: 0
-    arenaGridDataGuid: 
-    editorColor: {r: 0.6379202, g: 0.9, b: 0.27, a: 1}
-    curveStrength: 0.1
-    curveSubdivisions: 2
-  - pathId: 99ad3eaa-1958-4066-a008-191b925168ef
-    segmentId: Branch_03
-    nodeIds:
-    - 8557c6ab-fd9c-4aa7-ac6c-a0888fbca508
-    - d54580f2-5bf9-4a36-9bc0-d067959f5e0b
-    - 65c301ce-fc3f-466d-a0dd-13b9491d4147
-    isLeftPath: 0
-    isRightPath: 0
-    segmentType: 1
-    riverName: Branch_03
-    leadsToArena: 1
-    arenaIsAtEnd: 0
-    extrudeOnExit: 1
-    tJunctionBidirectional: 0
-    arenaGridDataGuid: 
-    editorColor: {r: 0.9, g: 0.27, b: 0.8218802, a: 1}
-    curveStrength: 0.1
-    curveSubdivisions: 2
-  - pathId: a81a3bf5-f2e1-4015-b606-4880663b35dd
-    segmentId: Branch_04
-    nodeIds:
-    - 5128b34f-8956-4859-8cf0-edd390670769
-    - edfdd305-ee3a-4542-ba2e-05f1dc9a9fb9
-    isLeftPath: 0
-    isRightPath: 1
-    segmentType: 1
-    riverName: Branch_04
-    leadsToArena: 1
-    arenaIsAtEnd: 1
     extrudeOnExit: 0
     tJunctionBidirectional: 0
     arenaGridDataGuid: 
-    editorColor: {r: 0.27, g: 0.9, b: 0.79415953, a: 1}
+    editorColor: {r: 0.6379202, g: 0.9, b: 0.27, a: 1}
+    curveStrength: 1
+    curveSubdivisions: 2
+  - pathId: a98e74a7-1543-405a-b87e-925ffbd7ea7a
+    segmentId: Branch_03
+    nodeIds:
+    - 10aaff99-cd7f-4c2a-b7bc-4106c47e94b6
+    - 070587d1-da56-4508-8d85-b420d153e1f4
+    - a41925ea-6c83-4673-a2e2-d0bcfe2d40f1
+    - a91f922f-1baa-4392-9d95-e2fa616534cc
+    - 486291ce-e817-4b2b-8b3d-3d3f706f0234
+    isLeftPath: 0
+    isRightPath: 0
+    segmentType: 2
+    riverName: Branch_03
+    leadsToArena: 1
+    arenaIsAtEnd: 0
+    extrudeOnExit: 0
+    tJunctionBidirectional: 0
+    arenaGridDataGuid: 
+    editorColor: {r: 0.9, g: 0.27, b: 0.8218803, a: 1}
     curveStrength: 1
     curveSubdivisions: 2
   junctions:
-  - junctionId: 4e64911c-ccd4-45c7-a00f-aeb4c6e7eed7
-    nodeId: 5128b34f-8956-4859-8cf0-edd390670769
+  - junctionId: 2b1e6d8e-a1f0-47ec-a245-a106ee8e225a
+    nodeId: fdd41757-67b3-4add-89dc-85b6fed6be9b
     pathIds:
     - cb512902-99c4-4aa3-973b-d4a908cef861
-    - a81a3bf5-f2e1-4015-b606-4880663b35dd
+    - 9d03b668-69f2-44e9-bf9d-6b5f77785098
     riverPathId: cb512902-99c4-4aa3-973b-d4a908cef861
-    branchPathId: a81a3bf5-f2e1-4015-b606-4880663b35dd
+    branchPathId: 9d03b668-69f2-44e9-bf9d-6b5f77785098
   shops:
   - nodeId: 96534931-abe4-4d47-80b1-94b5937fbf7e
     pathId: 
@@ -275,39 +276,175 @@ MonoBehaviour:
     - {fileID: 3016354063737027754, guid: b9892903f4bfc8d4bb553edfb66480d0, type: 3}
   obstacles: []
   arenas:
-  - nodeId: e1f05638-ddfe-4bb2-9b7b-68de9e60a628
-    gridData: {fileID: 11400000, guid: 1657fa75af15e7245bc43ab1594e1859, type: 2}
-    entranceIndex: 0
-    arenaPrefabOverride: {fileID: 0}
-    arenaRadius: 6.38
-    secondaryEntrances:
-    - nodeId: 269a8498-177d-4b92-ba35-2cc3153d51f4
-      entranceIndex: 1
-    - nodeId: 8557c6ab-fd9c-4aa7-ac6c-a0888fbca508
-      entranceIndex: 2
-    - nodeId: ed6a26f4-1b0d-40a4-ac17-43bc986d2827
-      entranceIndex: 3
   - nodeId: edfdd305-ee3a-4542-ba2e-05f1dc9a9fb9
-    gridData: {fileID: 11400000, guid: eb75fb83b696e994fb99a1eeac0fa753, type: 2}
+    gridData: {fileID: 0}
+    entranceIndex: 0
+    arenaPrefabOverride: {fileID: 0}
+    arenaRadius: 10.47
+    overrideWall: 1
+    archwayOnEntrances: 0
+    overrideArchway: 0
+    archwayProfile:
+      openingWidth: 0
+      thickness: 0
+      legHeight: 0.35
+      archHeight: 0.4
+      depth: 0
+    wallProfile:
+      radius: 10.47
+      thickness: 1
+      height: 4
+      drop: 42.5
+    overrideRunOverlap: 0
+    runOverlap: 0
+    overrideEntranceAlignment: 0
+    entranceAlignment:
+      across: 0
+      up: 0
+      along: 0
+    secondaryEntrances: []
+  - nodeId: e1f05638-ddfe-4bb2-9b7b-68de9e60a628
+    gridData: {fileID: 11400000, guid: ea7758a3ab37a344380b917f95a35a13, type: 2}
+    entranceIndex: 0
+    arenaPrefabOverride: {fileID: 0}
+    arenaRadius: 7.71
+    overrideWall: 1
+    archwayOnEntrances: 1
+    overrideArchway: 0
+    archwayProfile:
+      openingWidth: 0
+      thickness: 0
+      legHeight: 0.35
+      archHeight: 0.4
+      depth: 0
+    wallProfile:
+      radius: 7.71
+      thickness: 1
+      height: 5.8
+      drop: 42.5
+    overrideRunOverlap: 1
+    runOverlap: 1.86
+    overrideEntranceAlignment: 1
+    entranceAlignment:
+      across: 0
+      up: -0.5
+      along: -3.44
+    secondaryEntrances:
+    - nodeId: e179a491-5f75-445d-b2b3-b04178d9ba43
+      entranceIndex: 1
+      overrideRunOverlap: 1
+      runOverlap: 0
+      overrideAlignment: 1
+      alignment:
+        across: 0
+        up: -0.5
+        along: -3.44
+  - nodeId: 23885b89-514e-4831-8e52-baa25f4c2085
+    gridData: {fileID: 11400000, guid: 289ead0a486e6a941a5f2c9731943c64, type: 2}
     entranceIndex: 0
     arenaPrefabOverride: {fileID: 0}
     arenaRadius: 6.38
+    overrideWall: 0
+    archwayOnEntrances: 1
+    overrideArchway: 0
+    archwayProfile:
+      openingWidth: 0
+      thickness: 0
+      legHeight: 0.35
+      archHeight: 0.4
+      depth: 0
+    wallProfile:
+      radius: 0
+      thickness: 1
+      height: 4
+      drop: 8
+    overrideRunOverlap: 1
+    runOverlap: 1
+    overrideEntranceAlignment: 1
+    entranceAlignment:
+      across: 0
+      up: -0.5
+      along: -3.44
     secondaryEntrances:
-    - nodeId: 8af9fd2a-f92f-42b9-8620-c22ee58bce6e
+    - nodeId: 10aaff99-cd7f-4c2a-b7bc-4106c47e94b6
       entranceIndex: 1
+      overrideRunOverlap: 0
+      runOverlap: 0
+      overrideAlignment: 1
+      alignment:
+        across: 0
+        up: -0.5
+        along: -3.44
+  pools:
+  - nodeId: b2e5db0b-7bc0-4af6-ab70-c3e42776e421
+    overrideShape: 1
+    poolRadius: 1.96
+    islandRadius: 0.61
+    floorDepth: 0
+    editorColor: {r: 0.35, g: 0.75, b: 1, a: 1}
+  - nodeId: 6c2c0bb8-0ed6-4a0c-a0c7-31ed04a6984b
+    overrideShape: 1
+    poolRadius: 3
+    islandRadius: 0
+    floorDepth: 0
+    editorColor: {r: 0.35, g: 0.75, b: 1, a: 1}
   junctionScriptObject: {fileID: 3543737601092306643, guid: cdc03d5a67a4c8a4ca447c17a1a65a6b, type: 3}
-  junctionPrefab: {fileID: 3543737601092306643, guid: cdc03d5a67a4c8a4ca447c17a1a65a6b, type: 3}
-  junctionRightFacingPrefab: {fileID: 1054175076011857233, guid: 08a0e3b54a9037545a500567ad11a7af, type: 3}
-  junctionLeftFacingPrefab: {fileID: 1054175076011857233, guid: 4112896818a87814181c705d9fb75161, type: 3}
   arenaPrefab: {fileID: 6685816687890925279, guid: 1f8a1bc0973719f48851a1d2efa25504, type: 3}
   arenaEntrancePrefab: {fileID: 3190444306040296516, guid: fb37ce94a14f8f24a9a64d50b2d45a57, type: 3}
   obstaclePrefab: {fileID: 5547052044951733551, guid: 343705c9ba8011941978eabad3d8f143, type: 3}
   shopPrefab: {fileID: 5139625902506829726, guid: 4cf4b2f660ffe3a47a1134471c985525, type: 3}
-  riverBlockPrefab: {fileID: 8220959671730015965, guid: 070f6a1ad10a0e34aa3247fe890bb1a4, type: 3}
+  riverMaterial: {fileID: 2100000, guid: df48e831018dc444dbc6635b9fe63f5c, type: 2}
+  waterMaterial: {fileID: 2100000, guid: 23355fb4d7f054041b2040aaa843e46d, type: 2}
+  arenaWallMaterial: {fileID: 2100000, guid: df48e831018dc444dbc6635b9fe63f5c, type: 2}
+  waterFilled: 1
+  waterLevel: 0.48
+  waterBranchOverlap: 3
+  waterPoolOverlap: 3
+  waterLapDrop: 0.01
+  generatedDrop: 42.5
+  defaultRiverProfile:
+    riverName: 
+    innerWidth: 1.69
+    rimWidth: 0.43
+    riverDepth: 0.69
+    depth: 42.98
+    jointGroove: 0
+  riverProfiles:
+  - riverName: MainRiver
+    innerWidth: 3
+    rimWidth: 1.19
+    riverDepth: 0.81
+    depth: 42.98
+    jointGroove: 0
+  - riverName: Branch_04
+    innerWidth: 1.69
+    rimWidth: 0.43
+    riverDepth: 0.69
+    depth: 10
+    jointGroove: 0
+  defaultPoolShape:
+    poolRadius: 3
+    islandRadius: 1
+    floorDepth: 0
+  defaultArenaWall:
+    radius: 0
+    thickness: 1
+    height: 4
+    drop: 42.5
+  defaultArchway:
+    openingWidth: 0
+    thickness: 0
+    legHeight: 0.97
+    archHeight: 0.97
+    depth: 3.25
+  defaultEntranceAlignment:
+    across: 0
+    up: -0.5
+    along: -3.44
+  arenaRunOverlap: 1.86
   junctionGapPadding: 0
-  splineInstantiateSpacing: 0.15
+  splineInstantiateSpacing: 0.5
   curveSubdivisions: 2
-  branchStartOffset: 0.5
   arenaHeadOffset: 5
   shopHeadOffset: 5
   landscapeTilePrefab: {fileID: 849136606222838744, guid: 78fcaaa5184a3c2448e4c351b4ed9e79, type: 3}
@@ -315,10 +452,20 @@ MonoBehaviour:
   landscapeTilesX: 5
   landscapeTilesZ: 5
   landscapeOffset: {x: -97.9, y: -130.9}
-  landscapeWorldY: -1.65
+  landscapeWorldY: 0
+  landscapeHeightOffset: -43.1
+  fogEnabled: 1
+  fogMap: {fileID: 11400000, guid: 4062942389ca8354dbda8fa65eabcd24, type: 2}
+  fogHeightOffset: 40.5
+  whiteGradientPos: -43.13
+  waterPreset: {fileID: 11400000, guid: 38955bea00a774b41909025653e8fef0, type: 2}
+  structurePreset: {fileID: 11400000, guid: 4b84725422771dc429cc34f4a98d090d, type: 2}
+  rippleDebugView: 0
+  distanceFadeRadius: 105.15
   landscapeTool: {fileID: 0}
   boatPathManager: {fileID: 0}
   dataController: {fileID: 0}
+  fogFieldManager: {fileID: 0}
   riverManager: {fileID: 0}
   segmentRegistry: {fileID: 0}
   splineManager: {fileID: 0}
@@ -352,10 +499,94 @@ MonoBehaviour:
   musicController: {fileID: 0}
   openingSequence: {fileID: 0}
   targetScenePath: Assets/Scenes/LevelSelectWorlds/LevelSelectWorld2.unity
-  useOpeningSequence: 1
+  useOpeningSequence: 0
   openingSequenceStartPos: {x: 143.3325, y: 0, z: -12.623}
   openingSequencePrefab: {fileID: 7575765240899787153, guid: ac17943291d2d9d42b50db647d5bfb47, type: 3}
   canvasOriginX: 0
   canvasOriginZ: 0
   canvasUnitsPerPixel: 0.1
   canvasWorldY: 0
+  soulRoutes:
+  - routeId: 75c845e2
+    displayName: Route 1
+    originNodeId: b2e5db0b-7bc0-4af6-ab70-c3e42776e421
+    originRadius: 2.93
+    bandWidth: 0.72
+    editorColor: {r: 0.45, g: 0.85, b: 1, a: 1}
+    souls:
+    - {fileID: 11400000, guid: 202f359e43cb10e4eb16a5d06122181b, type: 2}
+    - {fileID: 11400000, guid: cf2c832d872d5f941ad674f3c46c1a32, type: 2}
+    - {fileID: 11400000, guid: 3d643652398d0164e8856ce07c69ee04, type: 2}
+    - {fileID: 11400000, guid: bba44f351bbf599459f1493039ffc894, type: 2}
+    - {fileID: 11400000, guid: c877b027132a10d49971b2ca003cc501, type: 2}
+    - {fileID: 11400000, guid: 7e593a50b3c316340b1157f39ebc634e, type: 2}
+    - {fileID: 11400000, guid: 0174e50012100ff48b59f9dc5645320c, type: 2}
+    - {fileID: 11400000, guid: 2a6b34d20b25e9646987e1c6eb1f926e, type: 2}
+    - {fileID: 11400000, guid: ac11204bd5d7380479b5acec6ebf8d79, type: 2}
+    - {fileID: 11400000, guid: d28f26c27e043fc489d44691d4e3231d, type: 2}
+    points:
+    - kind: 0
+      nodeId: db7d413b-45c1-4245-8ed4-960f13707658
+      entranceIn: -1
+      entranceOut: -1
+      gateCondition: 
+    - kind: 0
+      nodeId: 7b809514-9d66-45d4-ba5d-68ef656aa1a8
+      entranceIn: -1
+      entranceOut: -1
+      gateCondition: 
+    - kind: 0
+      nodeId: fdd41757-67b3-4add-89dc-85b6fed6be9b
+      entranceIn: -1
+      entranceOut: -1
+      gateCondition: 
+    - kind: 1
+      nodeId: e1f05638-ddfe-4bb2-9b7b-68de9e60a628
+      entranceIn: 0
+      entranceOut: -1
+      gateCondition: 
+    - kind: 0
+      nodeId: e179a491-5f75-445d-b2b3-b04178d9ba43
+      entranceIn: -1
+      entranceOut: -1
+      gateCondition: 
+    - kind: 0
+      nodeId: aeb22f6f-e051-4245-9d02-92afcf23088a
+      entranceIn: -1
+      entranceOut: -1
+      gateCondition: 
+    - kind: 0
+      nodeId: efd82fa0-c355-44bb-9f6d-50c203cfaa13
+      entranceIn: -1
+      entranceOut: -1
+      gateCondition: 
+    - kind: 1
+      nodeId: 23885b89-514e-4831-8e52-baa25f4c2085
+      entranceIn: 0
+      entranceOut: -1
+      gateCondition: 
+    - kind: 0
+      nodeId: 10aaff99-cd7f-4c2a-b7bc-4106c47e94b6
+      entranceIn: -1
+      entranceOut: -1
+      gateCondition: 
+    - kind: 0
+      nodeId: 070587d1-da56-4508-8d85-b420d153e1f4
+      entranceIn: -1
+      entranceOut: -1
+      gateCondition: 
+    - kind: 0
+      nodeId: a41925ea-6c83-4673-a2e2-d0bcfe2d40f1
+      entranceIn: -1
+      entranceOut: -1
+      gateCondition: 
+    - kind: 0
+      nodeId: a91f922f-1baa-4392-9d95-e2fa616534cc
+      entranceIn: -1
+      entranceOut: -1
+      gateCondition: 
+    - kind: 0
+      nodeId: 486291ce-e817-4b2b-8b3d-3d3f706f0234
+      entranceIn: -1
+      entranceOut: -1
+      gateCondition: 

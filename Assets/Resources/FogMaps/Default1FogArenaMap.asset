@@ -18,7 +18,7 @@ MonoBehaviour:
     spineStiffness: 0
     limbification: 1
     limbCount: 16
-    limbLength: 2
+    limbLength: 0.582
     limbLengthSpread: 0
     limbAngle: -17.2
     limbDroop: 1

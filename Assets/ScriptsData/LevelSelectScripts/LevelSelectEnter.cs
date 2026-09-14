@@ -64,12 +64,14 @@ public class LevelSelectEnter : MonoBehaviour
         Debug.Log($"Level selected: {gridData.displayName}, entranceIndex: {entranceIndex}");
     }
 
+    // Where the boat stood when it went in, so it can be put back there if the level lets it
+    // out the way it came.
     private void CacheBoatState(LevelSelectBoatControl boatControl)
     {
         if (boatControl == null) return;
-        LevelSelectionCache.BoatSegmentID = boatControl.CurrentSegmentID;
-        LevelSelectionCache.BoatProgress  = boatControl.CurrentProgress;
-        LevelSelectionCache.BoatIsLeftPath = boatControl.IsLeftPath;
+        LevelSelectionCache.BoatHasPose  = true;
+        LevelSelectionCache.BoatPosition = boatControl.Position;
+        LevelSelectionCache.BoatHeading  = boatControl.Heading;
     }
 
     private void LoadScene()

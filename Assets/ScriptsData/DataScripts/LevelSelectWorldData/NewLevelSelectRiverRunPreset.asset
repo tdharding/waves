@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ca54fd08f75c4b3458be97088dfc0f6f, type: 3}
+  m_Name: NewLevelSelectRiverRunPreset
+  m_EditorClassIdentifier: Assembly-CSharp::LevelSelectRiverPreset
+  edgeRipples:
+    reach: 0.45
+    bevel: 0
+    spacing: 0.09
+    strength: 0.6
+    speed: 0
+    width: 0.35
+    softness: 0.6
+    waviness: 0.25
+    wavinessScale: 6
+    meander: 0.35
+    meanderScale: 1.5
+    flow: 0.12
+    poolSpin: 0.02
+    poolRings: 1
+    poolFade: 0.06
+    driftAlongLines: 1
+    flipRiverLines: 0
+    lapFade: 1
+  runShading:
+    outerColour: {r: 0.103773594, g: 0.103773594, b: 0.103773594, a: 1}
+    rimColour: {r: 0.21698111, g: 0.21698111, b: 0.21698111, a: 1}
+    innerColour: {r: 0.7735849, g: 0.7735849, b: 0.7735849, a: 1}
+    grainSize: 0.03
+    grainStrength: 0.241
+    seamColour: {r: 0.03773582, g: 0.03773582, b: 0.03773582, a: 1}
+    seamStrength: 1.11
+    seamExtent: 0.36
+    waterlineColour: {r: 1, g: 1, b: 1, a: 1}
+    waterlineStrength: 1.1
+    waterlineExtent: 0.06
+    lightPosition: {x: 83.5, y: 39.1, z: 21.4}
+    lightStrength: 1

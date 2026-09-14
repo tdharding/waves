@@ -114,7 +114,13 @@ public class SoulFishWaveLinker : MonoBehaviour
     {
         if (_budgetWarned) return;
         _budgetWarned = true;
-        Debug.LogWarning($"[SoulFishWaveLinker] More than {MAX_POINTS} packed zone points on this level — later zones/fish are dropped from the wave mask. Reduce zone node counts or raise MAX_POINTS + SOULFISH_MAX_POINTS together.");
+        // Name what is competing for the budget: a zone that has just been drawn on to its door
+        // grows, and whatever sits after it in this list is what silently stops being painted.
+        var breakdown = new System.Text.StringBuilder();
+        foreach (var entry in activeZones)
+            breakdown.Append($" [{(entry.nodes != null ? entry.nodes.Count : 0)} nodes, r={entry.radius:F2}]");
+        Debug.LogWarning($"[SoulFishWaveLinker] More than {MAX_POINTS} packed zone points on this level — later zones/fish are dropped from the wave mask. Reduce zone node counts or raise MAX_POINTS + SOULFISH_MAX_POINTS together. " +
+                         $"Zones ({activeZones.Count}) asking for:{breakdown} plus {activeFish.Count} loose fish.");
     }
 
     // Dual-write, matching WaveMaterialController.SetGlobalsBackedFloat. These uniforms are bare

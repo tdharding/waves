@@ -105,18 +105,12 @@ MonoBehaviour:
     knotCount: 67
     curveResolution: 16
     souls:
-    - {fileID: 11400000, guid: 87ebe8d28160a494c80690cd4a0a5aeb, type: 2}
+    - {fileID: 11400000, guid: 7210b79e7c0a4f740b649499710cd807, type: 2}
     - {fileID: 11400000, guid: ab353967b8827484988f1e7d391f4605, type: 2}
-    - {fileID: 11400000, guid: b7e3410b320009c4db307d9b98e709a2, type: 2}
     - {fileID: 11400000, guid: 0219c67b8fcf38c4dbda9668a9b9aea6, type: 2}
-    - {fileID: 11400000, guid: 9ba552b8ebe30fc4e80e9bb5b213e6bc, type: 2}
     - {fileID: 11400000, guid: 4b7fa0fa01fa14e47ad1ff389ebac37c, type: 2}
-    - {fileID: 11400000, guid: 30103818d550b73419b6e3b284a760d9, type: 2}
     - {fileID: 11400000, guid: c25f7a84ad8b77c4bb4aee14ad98113d, type: 2}
-    - {fileID: 11400000, guid: 242dafe454d1d3d42a4c35b2a7dbca4a, type: 2}
     - {fileID: 11400000, guid: 2cb9a8ce8efcf1e48ba10a4bd9870d89, type: 2}
-    - {fileID: 11400000, guid: e3fcc291421f1f24d990bd57f7f3260c, type: 2}
-    - {fileID: 11400000, guid: d962b87689ec602478f1744eee173334, type: 2}
     - {fileID: 11400000, guid: a1cd9a6b2b79a6445a63fabd64cac109, type: 2}
     statueGuarded: 0
     linkedStatueId: 0
@@ -153,10 +147,8 @@ MonoBehaviour:
     curveResolution: 6
     souls:
     - {fileID: 11400000, guid: 4e6977c428b669d44977f56091fe3c2c, type: 2}
-    - {fileID: 11400000, guid: af9447c76dcd2ec47b435fb99ce40695, type: 2}
     - {fileID: 11400000, guid: 2bde28db37ec5844cafabfe0d572a533, type: 2}
     - {fileID: 11400000, guid: e5736df3a901bc94fbdef600ec4c6a25, type: 2}
-    - {fileID: 11400000, guid: fbe41a26c37aae54d84163a8922c5c28, type: 2}
     statueGuarded: 0
     linkedStatueId: 1
     ringRadius: 0.08

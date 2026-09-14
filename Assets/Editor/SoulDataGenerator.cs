@@ -6,7 +6,10 @@ using System.Collections.Generic;
 
 public class SoulDataGenerator : EditorWindow
 {
-    private string savePath = "Assets/Data/Souls";
+    // Resources/Souls is where the game reads souls from (SoulRegistry, VideoPlayerController,
+    // TestSoulInjectorUI all use Resources.LoadAll<SoulData>("Souls")), so souls written
+    // anywhere else are invisible at runtime.
+    private string savePath = "Assets/Resources/Souls";
     private string videoPath = "Assets/Resources/Videos";
     private string assetBaseName = "SoulData_";
     private int soulCount = 100;
@@ -57,6 +60,7 @@ public class SoulDataGenerator : EditorWindow
         }
 
         // 3. Generation Loop
+        int created = 0, skipped = 0;
         for (int i = 1; i <= soulCount; i++)
         {
             SoulData newSoul = ScriptableObject.CreateInstance<SoulData>();
@@ -73,12 +77,23 @@ public class SoulDataGenerator : EditorWindow
 
             // Save the Asset
             string fullPath = $"{savePath}/{assetBaseName}{i:000}.asset";
+
+            // Never overwrite a soul that already exists: CreateAsset would replace it with a new
+            // GUID, and every level slot pointing at the old one would come back as a missing
+            // reference.
+            if (AssetDatabase.LoadAssetAtPath<SoulData>(fullPath) != null)
+            {
+                skipped++;
+                continue;
+            }
+
             AssetDatabase.CreateAsset(newSoul, fullPath);
+            created++;
         }
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
         
-        Debug.Log($"Successfully generated {soulCount} SoulData assets in {savePath}");
+        Debug.Log($"Generated {created} new SoulData asset(s) in {savePath}. Left {skipped} existing asset(s) untouched.");
     }
 }

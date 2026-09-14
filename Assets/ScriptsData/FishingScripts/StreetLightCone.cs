@@ -67,13 +67,31 @@ public class StreetLightCone : MonoBehaviour
     /// </summary>
     public void SetBaseAtHeight(float worldY)
     {
+        _targetBaseY    = worldY;
+        _hasTargetBaseY = true;
+        SolveHeightForBase();
+    }
+
+    /// <summary>Where the base has been told to sit, if anything has told it. For diagnostics.</summary>
+    public bool  HasBaseTarget => _hasTargetBaseY;
+    public float BaseTargetY   => _targetBaseY;
+
+    bool  _hasTargetBaseY;
+    float _targetBaseY;
+
+    void SolveHeightForBase()
+    {
         // Only meaningful for a shaft with some downward travel; a horizontal one has no answer.
         float drop = -Axis.y;
         if (drop < 0.001f) return;
 
         // transform.y - topOffset*drop + (height - topOffset + bottomOffset)*drop == worldY
-        float apexY = transform.position.y - topOffset * drop;
-        height = topOffset - bottomOffset + (apexY - worldY) / drop;
+        float apexY  = transform.position.y - topOffset * drop;
+        float solved = topOffset - bottomOffset + (apexY - _targetBaseY) / drop;
+
+        if (Mathf.Abs(solved - height) < 0.0005f) return;   // already there
+
+        height = solved;
         Rebuild();
     }
 
@@ -212,6 +230,10 @@ public class StreetLightCone : MonoBehaviour
     // matches what the shader was given — the mask would otherwise be centred where the lamp was.
     private void LateUpdate()
     {
+        // The lamp is placed, and the level rig moved, after this first sized itself — so the base
+        // is re-solved whenever the apex has moved rather than trusting one pass at spawn.
+        if (_hasTargetBaseY && Apex != _pushedApex) SolveHeightForBase();
+
         if (meshRenderer == null || !meshRenderer.enabled) return;
         if (Apex != _pushedApex) PushShapeToMaterial();
     }

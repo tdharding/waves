@@ -1,0 +1,30 @@
+    private void DeployCinemachine()
+    {
+        var scriptsParent = FindOrCreateParent("LEVELSELECT_SCRIPTS");
+
+        // 1. Add CinemachineBrain to the main camera
+        var mainCam = UnityEngine.Object.FindObjectOfType<Camera>();
+        if (mainCam != null)
+        {
+            if (mainCam.GetComponent<Unity.Cinemachine.CinemachineBrain>() == null)
+                Undo.AddComponent<Unity.Cinemachine.CinemachineBrain>(mainCam.gameObject);
+        }
+        else
+            Debug.LogWarning("[LevelSelectDesigner] No Camera found in scene — add a Main Camera first.");
+
+        // 2. Create CinemachineCamera GO under LEVELSELECT_SCRIPTS
+        var vcamGo = GameObject.Find("LevelSelectVCam");
+        if (vcamGo == null)
+        {
+            vcamGo = new GameObject("LevelSelectVCam");
+            Undo.RegisterCreatedObjectUndo(vcamGo, "Deploy CinemachineCamera");
+            vcamGo.transform.SetParent(scriptsParent.transform, false);
+        }
+
+        var vcam = vcamGo.GetComponent<Unity.Cinemachine.CinemachineCamera>();
+        if (vcam == null) vcam = Undo.AddComponent<Unity.Cinemachine.CinemachineCamera>(vcamGo);
+
+        // Wiring handled by WireAllSceneObjects
+
+        Debug.Log("[LevelSelectDesigner] Cinemachine deployed.");
+    }

@@ -136,7 +136,7 @@ MonoBehaviour:
   flightTimeMin: 20
   flightTimeMax: 40
   perchLeaveMargin: 1.5
-  swoopDuration: 2.5
+  swoopDuration: 5
   swoopCurve:
     serializedVersion: 2
     m_Curve:
@@ -162,7 +162,7 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   perchFootOffset: 0
-  takeOffDuration: 2
+  takeOffDuration: 5
   talkKey: 101
   talkCamera: {fileID: 1626215417565419886}
   talkCameraPriority: 100

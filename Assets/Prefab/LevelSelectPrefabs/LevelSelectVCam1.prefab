@@ -107,13 +107,18 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LevelSelectCameraController
   cam: {fileID: 748590965730954521}
-  followDistance: 8
+  followDistance: 7.01
+  followHeight: 3
+  defaultZoom: 1.74
+  followCatchUpTime: 0.35
   minDistance: 5
   maxDistance: 17.46
   zoomSpeed: 10
+  boatControl: {fileID: 0}
   orbitSpeed: 150
   pitchMin: -60
   pitchMax: 45
+  lockCursorWhileOrbiting: 1
   transitionYaw: -73.31
   transitionPitch: 20
   transitionDistance: 10

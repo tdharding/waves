@@ -64,6 +64,12 @@ public class LevelSpawner : MonoBehaviour
     [Header("Procedural Spikes")]
     [SerializeField] GameObject proceduralSpikePrefab;
 
+    [Header("Arena Entrances")]
+    [Tooltip("Default door prefab for every arena entrance. Each entrance can override it, and a " +
+             "level can override them all via Grid Designer > Arena > Entrance Override. The boat " +
+             "spawns at the ArenaEntranceSpawnPoint inside this prefab.")]
+    [SerializeField] GameObject arenaEntrancePrefab;
+
     [Header("Arena Walls")]
     [Tooltip("The arena boundary prefab, built to each level's Arena Radius. Needs an " +
              "ArenaWallsGenerator on it and a BaselineMarker child. One prefab serves every " +
@@ -258,8 +264,20 @@ public class LevelSpawner : MonoBehaviour
         BaselineMarker baselineMarker = null;
         if (arenaWallsPrefab != null)
         {
+            // A scene object here instead of the project asset means the level clones a wall that
+            // is already in the scene: you get two walls, and the scene one is never given this
+            // level's radius, so it sits at whatever its BaselineMarker last said while the water
+            // is masked at the real radius — the wall then reads as being on the wrong side of the
+            // waterline. Cheap to check, invisible to debug.
+            if (arenaWallsPrefab.scene.IsValid())
+                Debug.LogWarning($"[LevelSpawner] Arena Walls Prefab '{arenaWallsPrefab.name}' is a SCENE object, " +
+                                 $"not the project prefab. Assign Assets/Prefab/LevelPrefabs/ProceduralArenaWalls.prefab " +
+                                 $"and delete the scene copy.", arenaWallsPrefab);
+
             var walls = Instantiate(arenaWallsPrefab, Vector3.zero, Quaternion.identity);
-            walls.GetComponentInChildren<ArenaWallsGenerator>()?.Build(r, activeGridData.waterlineY);
+            walls.GetComponentInChildren<ArenaWallsGenerator>()?.Build(
+                r, activeGridData.waterlineY,
+                activeGridData.arenaWallHeight, activeGridData.arenaWallThickness);
             baselineMarker = walls.GetComponentInChildren<BaselineMarker>(true);
         }
         else Debug.LogWarning("[LevelSpawner] No Arena Walls Prefab assigned — the level has no boundary.");
@@ -282,15 +300,13 @@ float   tileZ  = b.size.z / GridData.GridSize;
 
         if (baselineMarker != null) sonarController?.SetBaselineMarker(baselineMarker);
 
-        // Build absolute tier heights from BaselineMarker.spawnTiers when defined.
-        // Left null if not defined — all downstream tier code falls back to TierConfig offsets unchanged.
+        // Absolute tier heights are authored per level in the Grid Designer now, not on the
+        // walls prefab's BaselineMarker — the marker's spawnTiers are no longer read here.
+        // Left null when the level defines none, so all downstream tier code falls back to
+        // TierConfig offsets exactly as before.
         absoluteTierHeights = null;
-        if (baselineMarker?.spawnTiers != null && baselineMarker.spawnTiers.Length > 0)
-        {
-            absoluteTierHeights = new float[baselineMarker.spawnTiers.Length];
-            for (int i = 0; i < absoluteTierHeights.Length; i++)
-                absoluteTierHeights[i] = baselineMarker.spawnTiers[i].height;
-        }
+        if (activeGridData.spawnTierHeights != null && activeGridData.spawnTierHeights.Length > 0)
+            absoluteTierHeights = (float[])activeGridData.spawnTierHeights.Clone();
 
         // ── Reality Layer — orbs / water / wave modifiers ──
         var  waveModAlign    = waveModifierPrefab != null ? waveModifierPrefab.GetComponentInChildren<PrefabBaselineAlignment>() : null;
@@ -312,49 +328,39 @@ float   tileZ  = b.size.z / GridData.GridSize;
             }
         }
 
-        for (int y = 0; y < GridData.GridSize; y++)
-        {
-            int flippedY = GridData.GridSize - 1 - y;
+        // Water/wave modifiers are free-positioned now. Fold legacy cell-indexed ones (base + tiers)
+        // into free positions, then spawn each at its exact world position (under spawnParent, so the
+        // post-spawn Y180 applies the same as it does to prefab placements).
+        activeGridData.MigrateModifierPositions();
 
-            for (int x = 0; x < GridData.GridSize; x++)
+        if (waterLevelModifierPrefab != null && activeGridData.waterLevelModifierPositions != null)
+            foreach (var mp in activeGridData.waterLevelModifierPositions)
             {
-                int index = flippedY * GridData.GridSize + x;
-
-                Vector3 pos = new Vector3(
-                    origin.x + x * tileX + tileX * 0.5f,
-                    spawnedBaselineWaterY,
-                    origin.z + y * tileZ + tileZ * 0.5f
-                );
-
-                // (Orbs spawned above from free positions — no longer per-cell.)
-
-                if (activeGridData.waterLevelModifierCellIndices != null &&
-                    activeGridData.waterLevelModifierCellIndices.Contains(index) && waterLevelModifierPrefab)
+                Vector3 wpos = NormalizedToWorldPos(mp, origin, tileX, tileZ);
+                wpos.y = spawnedBaselineWaterY;
+                var go = Instantiate(waterLevelModifierPrefab, wpos, Quaternion.identity, spawnParent);
+                if (absoluteTierHeights != null)
                 {
-                    var go = Instantiate(waterLevelModifierPrefab, pos, Quaternion.identity, spawnParent);
-                    if (absoluteTierHeights != null)
-                    {
-                        int gSlot = FindGroundFloorSlot(absoluteTierHeights, spawnedBaselineWaterY);
-                        float[] rel = ToRelativeOffsets(absoluteTierHeights, spawnedBaselineWaterY);
-                        go.GetComponent<WaterLevelModifier>()?.Init(gSlot, rel, "G", spawnedBaselineWaterY);
-                    }
-                    else
-                    {
-                        float[] offsets0 = tierConfig?.offsets;
-                        go.GetComponent<WaterLevelModifier>()?.Init(FindGroundFloorSlot(offsets0), offsets0, "G", spawnedBaselineWaterY);
-                    }
+                    int gSlot   = FindGroundFloorSlot(absoluteTierHeights, spawnedBaselineWaterY);
+                    float[] rel = ToRelativeOffsets(absoluteTierHeights, spawnedBaselineWaterY);
+                    go.GetComponent<WaterLevelModifier>()?.Init(gSlot, rel, "G", spawnedBaselineWaterY);
                 }
-
-                if (activeGridData.waveModifierCellIndices != null &&
-                    activeGridData.waveModifierCellIndices.Contains(index) && waveModifierPrefab)
+                else
                 {
-                    float waveSpawnY = spawnedBaselineWaterY - waveModContactY;
-                    Quaternion waveRot = waveModHasAlign ? baselineRot : Quaternion.identity;
-                    var go = Instantiate(waveModifierPrefab, new Vector3(pos.x, waveSpawnY, pos.z), waveRot, spawnParent);
-                    InitializeWaveModifier(go);
+                    float[] offsets0 = tierConfig?.offsets;
+                    go.GetComponent<WaterLevelModifier>()?.Init(FindGroundFloorSlot(offsets0), offsets0, "G", spawnedBaselineWaterY);
                 }
             }
-        }
+
+        if (waveModifierPrefab != null && activeGridData.waveModifierPositions != null)
+            foreach (var mp in activeGridData.waveModifierPositions)
+            {
+                Vector3 wpos = NormalizedToWorldPos(mp, origin, tileX, tileZ);
+                float waveSpawnY  = spawnedBaselineWaterY - waveModContactY;
+                Quaternion waveRot = waveModHasAlign ? baselineRot : Quaternion.identity;
+                var go = Instantiate(waveModifierPrefab, new Vector3(wpos.x, waveSpawnY, wpos.z), waveRot, spawnParent);
+                InitializeWaveModifier(go);
+            }
 
         // ── Arena Portals (Entrances & Exits) ──
         SpawnArenaPortals();
@@ -417,45 +423,33 @@ float   tileZ  = b.size.z / GridData.GridSize;
                     tierAbsY = spawnedBaselineWaterY + yOff;
                 }
 
-                for (int y = 0; y < GridData.GridSize; y++)
-                {
-                    int flippedY = GridData.GridSize - 1 - y;
-                    for (int x = 0; x < GridData.GridSize; x++)
+                // Tier modifiers — free-positioned, spawned on this tier's floor (baseline + yOff).
+                if (waterLevelModifierPrefab != null && tier.waterLevelModifierPositions != null)
+                    foreach (var mp in tier.waterLevelModifierPositions)
                     {
-                        int index = flippedY * GridData.GridSize + x;
-                        Vector3 pos = new Vector3(
-                            origin.x + x * tileX + tileX * 0.5f,
-                            spawnedBaselineWaterY + yOff,
-                            origin.z + y * tileZ + tileZ * 0.5f
-                        );
-                        Quaternion rot = spawnParent.rotation;
-                        if (applyMinus90XRotation) rot *= Quaternion.Euler(-90f, 0f, 0f);
-
-                        if (tier.waterLevelModifierCellIndices != null &&
-                            tier.waterLevelModifierCellIndices.Contains(index) && waterLevelModifierPrefab)
+                        Vector3 wpos = NormalizedToWorldPos(mp, origin, tileX, tileZ);
+                        wpos.y = spawnedBaselineWaterY + yOff;
+                        var go = Instantiate(waterLevelModifierPrefab, wpos, Quaternion.identity, spawnParent);
+                        if (absoluteTierHeights != null)
                         {
-                            var go = Instantiate(waterLevelModifierPrefab, pos, Quaternion.identity, spawnParent);
-                            if (absoluteTierHeights != null)
-                            {
-                                float[] rel = ToRelativeOffsets(absoluteTierHeights, spawnedBaselineWaterY);
-                                go.GetComponent<WaterLevelModifier>()?.Init(tier.yOffsetSlot, rel, tier.name, spawnedBaselineWaterY);
-                            }
-                            else
-                            {
-                                go.GetComponent<WaterLevelModifier>()?.Init(tier.yOffsetSlot, offsets, tier.name, spawnedBaselineWaterY);
-                            }
+                            float[] rel = ToRelativeOffsets(absoluteTierHeights, spawnedBaselineWaterY);
+                            go.GetComponent<WaterLevelModifier>()?.Init(tier.yOffsetSlot, rel, tier.name, spawnedBaselineWaterY);
                         }
-
-                        if (tier.waveModifierCellIndices != null &&
-                            tier.waveModifierCellIndices.Contains(index) && waveModifierPrefab)
+                        else
                         {
-                            float waveSpawnY = pos.y - waveModContactY;
-                            Quaternion waveRot = waveModHasAlign ? baselineRot : Quaternion.identity;
-                            var go = Instantiate(waveModifierPrefab, new Vector3(pos.x, waveSpawnY, pos.z), waveRot, spawnParent);
-                            InitializeWaveModifier(go);
+                            go.GetComponent<WaterLevelModifier>()?.Init(tier.yOffsetSlot, offsets, tier.name, spawnedBaselineWaterY);
                         }
                     }
-                }
+
+                if (waveModifierPrefab != null && tier.waveModifierPositions != null)
+                    foreach (var mp in tier.waveModifierPositions)
+                    {
+                        Vector3 wpos      = NormalizedToWorldPos(mp, origin, tileX, tileZ);
+                        float waveSpawnY  = (spawnedBaselineWaterY + yOff) - waveModContactY;
+                        Quaternion waveRot = waveModHasAlign ? baselineRot : Quaternion.identity;
+                        var go = Instantiate(waveModifierPrefab, new Vector3(wpos.x, waveSpawnY, wpos.z), waveRot, spawnParent);
+                        InitializeWaveModifier(go);
+                    }
 
                 // Direct prefab placements for this tier
                 if (tier.prefabPlacements != null)
@@ -529,15 +523,18 @@ float   tileZ  = b.size.z / GridData.GridSize;
                 ? whirlpoolManager.whirlpoolHandlesParent
                 : whirlpoolManager.transform;
 
+            activeGridData.MigrateWhirlpoolPositions(); // legacy cell-indexed → free position (idempotent)
+
             int wpCount = Mathf.Min(activeGridData.whirlpools.Count, 8);
             for (int i = 0; i < wpCount; i++)
             {
-                var   wp       = activeGridData.whirlpools[i];
-                int   cellX    = wp.cellIndex % GridData.GridSize;
-                int   cellY    = wp.cellIndex / GridData.GridSize;
-                int   flippedY = GridData.GridSize - 1 - cellY;
-                float wx       = origin.x + cellX    * tileX + tileX * 0.5f;
-                float wz       = origin.z + flippedY * tileZ + tileZ * 0.5f;
+                var   wp    = activeGridData.whirlpools[i];
+                // Free position is the authority now. Resolve to world the same way prefab placements
+                // do; the manual Y180 below stands in for spawnParent's post-spawn flip, since these
+                // handles are parented under the WhirlpoolManager, not spawnParent.
+                Vector3 wpos = NormalizedToWorldPos(wp.position, origin, tileX, tileZ);
+                float wx     = wpos.x;
+                float wz     = wpos.z;
 
                 if (applyPostSpawnY180Rotation)
                 {
@@ -1182,8 +1179,25 @@ else if (controller != null)
             for (int i = 0; i < activeGridData.entrances.Count; i++)
             {
                 var entrance = activeGridData.entrances[i];
+
+                // Most specific wins: the entrance's own Type dropdown, then a level-wide
+                // override, then the spawner default. Doors used to come only from
+                // ArenaProfile.entrancePrefabOverride, so every level asset stores a null prefab
+                // per entrance — without the spawner default at the end no door spawns at all,
+                // and the boat silently starts at the arena centre for want of a spawn point.
+                GameObject entrancePrefab = entrance.prefab
+                                            ?? activeGridData.entrancePrefabOverride
+                                            ?? arenaEntrancePrefab;
+                if (entrancePrefab != null && entrancePrefab.scene.IsValid())
+                    Debug.LogWarning($"[LevelSpawner] Entrance prefab '{entrancePrefab.name}' is a SCENE object, " +
+                                     $"not a project prefab.", entrancePrefab);
+                if (entrancePrefab == null)
+                    Debug.LogWarning($"[LevelSpawner] Entrance '{entrance.id}' has no prefab — no door " +
+                                     $"spawns and the boat has no spawn point. Assign Arena Entrance Prefab " +
+                                     $"on LevelSpawner, or an Entrance Override in the Grid Designer.");
+
                 GameObject instance = SpawnPortalPrefab(
-                    prefab:      activeGridData.entrancePrefabOverride ?? entrance.prefab,
+                    prefab:      entrancePrefab,
                     angle:       entrance.perimeterAngle,
                     tierSlot:    entrance.tierSlot,
                     spawnRadius: entrance.spawnRadius,
@@ -1483,15 +1497,26 @@ else if (controller != null)
                 Debug.Log($"[LevelSpawner]   Zone {zoneIndex} SKIPPED — no nodes.");
                 continue;
             }
-            if (zone.souls == null || zone.souls.Count == 0)
+            // Souls that swam in from the level-select river. A zone pinned to the doors begins
+            // at an entrance, so the door a soul arrived by names the zone it joins.
+            var arrivedSouls = (zone.attachToEntrances && zone.entryEntranceIndex >= 0)
+                ? SoulJourneyData.SoulsIn(levelID, zone.entryEntranceIndex)
+                : new List<int>();
+
+            if ((zone.souls == null || zone.souls.Count == 0) && arrivedSouls.Count == 0)
             {
                 Debug.Log($"[LevelSpawner]   Zone {zoneIndex} SKIPPED — no souls assigned.");
                 continue;
             }
 
+            if (arrivedSouls.Count > 0)
+                Debug.Log($"[LevelSpawner]   Zone {zoneIndex} receives {arrivedSouls.Count} arrived soul(s) " +
+                          $"at entrance {zone.entryEntranceIndex}.");
+
             // Stamp home level on all souls in zone
-            foreach (var s in zone.souls)
-                if (s != null) s.homeLevelID = levelID;
+            if (zone.souls != null)
+                foreach (var s in zone.souls)
+                    if (s != null) s.homeLevelID = levelID;
 
             // Convert node positions → world positions (pre-rotation, for instantiation).
             // Curved segments are pre-sampled into a denser polyline here, so the mask packers,
@@ -1653,8 +1678,39 @@ else if (controller != null)
                 streetChain = containerInstance.AddComponent<SoulZoneStreetLightChain>();
                 streetChain.revealSpeed     = streetLightRevealSpeed;
                 streetChain.poolOpenSeconds = streetLightPoolOpenSeconds;
+                // "Starts Lit" per light in the Grid Designer, collapsed to a prefix count — the
+                // chain lights in order, so a level can begin part-way along its own progression.
                 streetChain.Init(nodeRegPositions, nodeWorldPositions, denseIndices, poolRadii,
-                                 lightControllers, corridorRadius, zone.knotCount, splineContainer);
+                                 lightControllers, corridorRadius, zone.knotCount, splineContainer,
+                                 zone.LitAtStartCount());
+
+                int stranded = zone.FirstStrandedLitLight();
+                if (stranded >= 0)
+                    Debug.LogWarning($"[LevelSpawner]   Zone {zoneIndex}: street light #{stranded + 1} is marked " +
+                                     "'Starts Lit' but a light before it is not — lights only light in order, so it " +
+                                     "starts UNLIT. Mark the lights before it too, or clear it.");
+
+                // Tell the chain where its souls go when the zone is finished — the door this
+                // path is pinned to. Only a zone that actually ends at a door can send souls on;
+                // one without attachToEntrances keeps its fish, as it always has.
+                if (zone.attachToEntrances &&
+                    zone.exitEntranceIndex >= 0 &&
+                    zone.exitEntranceIndex < activeGridData.entrances.Count)
+                {
+                    var exitDoor = activeGridData.entrances[zone.exitEntranceIndex];
+                    streetChain.SetDeparture(levelID, zone.exitEntranceIndex,
+                                             exitDoor.id, exitDoor.isLocked);
+                    Debug.Log($"[LevelSpawner]   Zone {zoneIndex} departs by entrance " +
+                              $"{zone.exitEntranceIndex} ('{exitDoor.id}'){(exitDoor.isLocked ? ", locked" : "")}.");
+                }
+                else
+                {
+                    Debug.LogWarning($"[LevelSpawner]   Zone {zoneIndex} has NO departure — " +
+                                     $"attachToEntrances={zone.attachToEntrances}, " +
+                                     $"exitEntranceIndex={zone.exitEntranceIndex}, " +
+                                     $"entrances on level={activeGridData.entrances?.Count ?? 0}. " +
+                                     "The zone will never draw on to a door.");
+                }
 
                 // Publish the river so a joined tributary can follow its frontier, plus the
                 // authored→dense node mapping its junction index needs.
@@ -1703,6 +1759,7 @@ else if (controller != null)
                 shoal.InitZone(streetChain != null ? streetChain.RevealedRegPath : nodeRegPositions,
                                swimRadius, registerNow: !zone.towerGuarded);
                 shoal.SpawnFish(activeGridData.soulZones, zoneIndex, levelID);
+                shoal.SpawnArrivedFish(arrivedSouls, levelID);
 
                 // Fish-bowl tributary: build the link now, resolve its gate lamp after every zone
                 // has spawned (the main path may come later in this loop).
@@ -1747,7 +1804,8 @@ else if (controller != null)
                 }
             }
 
-            Debug.Log($"[LevelSpawner] Zone {zoneIndex} spawned — {zone.nodePositions.Count} node(s), {zone.souls.Count} soul(s), closed={isClosedLoop}.");
+            Debug.Log($"[LevelSpawner] Zone {zoneIndex} spawned — {zone.nodePositions.Count} node(s), " +
+                      $"{zone.souls?.Count ?? 0} authored + {arrivedSouls.Count} arrived soul(s), closed={isClosedLoop}.");
         }
 
         ResolveTributaryGates();

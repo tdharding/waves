@@ -36,7 +36,7 @@ public class LevelSelectOpeningSequence : MonoBehaviour
 
         Debug.Log($"[OpeningSequence] Awake: boatControl={(boatControl != null ? boatControl.name : "NULL")}, normalCamera={(normalCamera != null ? normalCamera.name : "NULL")}, handTransform={(handTransform != null ? handTransform.name : "NULL")}, barrierCollider={(barrierCollider != null ? barrierCollider.name : "NULL")}, windSource={(windSource != null ? windSource.name : "NULL")}");
 
-        if (!skipIntro && string.IsNullOrEmpty(GameProgressData.GetBoatSegmentID()))
+        if (!skipIntro && !GameProgressData.HasBoatBeenPlaced())
         {
             var music = FindObjectOfType<LevelSelectMusicController>();
             if (music != null) music.playOnStart = false;
@@ -46,7 +46,7 @@ public class LevelSelectOpeningSequence : MonoBehaviour
 
     private void Start()
     {
-        bool isFirstTime = string.IsNullOrEmpty(GameProgressData.GetBoatSegmentID());
+        bool isFirstTime = !GameProgressData.HasBoatBeenPlaced();
         Debug.Log($"[OpeningSequence] Start: isFirstTime={isFirstTime}, skipIntro={skipIntro}, boatTransform={(boatControl?.BoatTransform != null ? boatControl.BoatTransform.position.ToString() : "NULL")}");
 
         if (!isFirstTime || skipIntro)
@@ -58,20 +58,38 @@ public class LevelSelectOpeningSequence : MonoBehaviour
             // so the boat begins beyond the opening-sequence colliders.
             if (skipIntro && isFirstTime && boatControl != null)
             {
-                var container = boatControl.GetCurrentContainer();
-                if (container != null && skipIntroStartPoint != null)
+                // A main river beginning in a pool is cut off outside that pool's rim, so no
+                // point projected onto the river can reach the water the pool holds — the start
+                // point would stand the boat beside it. Put on the pool itself instead.
+                var world = FindFirstObjectByType<LevelSelectDataController>()?.DesignerData;
+                if (world != null &&
+                    world.TryGetBoatStart(out Vector3 poolPos, out Vector3 poolForward,
+                                          out bool poolStart) && poolStart)
                 {
-                    var localPos = container.transform.InverseTransformPoint(skipIntroStartPoint.position);
-                    SplineUtility.GetNearestPoint(container.Spline, (float3)localPos, out _, out float t);
-                    boatControl.RestoreToSegment(container, t);
+                    boatControl.PlaceAt(poolPos, Quaternion.LookRotation(poolForward, Vector3.up));
+                    SplineRiverManager.Instance?.ForceJumpExtrudeToT(skipIntroExtrudeHeadstart);
+                    LevelSelectSplineManager.Instance?.RefreshAdvance();
+                    Debug.Log($"[OpeningSequence] skipIntro: boat placed on the pool at the head " +
+                              $"of the main river, {poolPos}.");
+                    return;
+                }
+
+                float  t         = 0f;
+                string segmentID = skipIntroStartPoint != null
+                    ? LevelSelectBoatPlacement.NearestSegment(skipIntroStartPoint.position, out t)
+                    : string.Empty;
+
+                if (!string.IsNullOrEmpty(segmentID) &&
+                    boatControl.PlaceOnSegment(segmentID, t))
+                {
                     float extrudeT = Mathf.Clamp01(t + skipIntroExtrudeHeadstart);
                     SplineRiverManager.Instance?.ForceJumpExtrudeToT(extrudeT);
                     LevelSelectSplineManager.Instance?.RefreshAdvance();
-                    Debug.Log($"[OpeningSequence] skipIntro: boat at T={t:F3}, river extruded to T={extrudeT:F3}, advance refreshed.");
+                    Debug.Log($"[OpeningSequence] skipIntro: boat on '{segmentID}' at T={t:F3}, river extruded to T={extrudeT:F3}, advance refreshed.");
                 }
                 else
                 {
-                    Debug.LogWarning($"[OpeningSequence] skipIntro: cannot position boat — container={(container != null ? "ok" : "NULL")}, skipIntroStartPoint={(skipIntroStartPoint != null ? "ok" : "NULL")}.");
+                    Debug.LogWarning($"[OpeningSequence] skipIntro: cannot position boat — nearest river='{segmentID}', skipIntroStartPoint={(skipIntroStartPoint != null ? "ok" : "NULL")}.");
                 }
             }
 
@@ -213,17 +231,8 @@ public class LevelSelectOpeningSequence : MonoBehaviour
 
         if (save)
         {
-            var container = boatControl.GetCurrentContainer();
-            var segID     = container?.GetComponent<RiverSegmentID>();
-            if (segID != null)
-            {
-                GameProgressData.SaveBoatState(segID.SegmentID, boatControl.CurrentProgress, false, false);
-                Debug.Log($"[OpeningSequence] CompleteIntroSequence: saved boat state — segment='{segID.SegmentID}', progress={boatControl.CurrentProgress}");
-            }
-            else
-            {
-                Debug.LogWarning($"[OpeningSequence] CompleteIntroSequence: could not save — container={(container != null ? "found" : "NULL")}, segID={(segID != null ? "found" : "NULL")}");
-            }
+            GameProgressData.SaveBoatPose(boatControl.Position, boatControl.Heading);
+            Debug.Log($"[OpeningSequence] CompleteIntroSequence: saved boat pose — {boatControl.Position}, heading {boatControl.Heading:F1}");
         }
     }
 }
