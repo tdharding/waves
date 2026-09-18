@@ -75,10 +75,10 @@ public class EasingTool : AnimateTool
 
         using (new EditorGUILayout.HorizontalScope())
         {
-            if (GUILayout.Button("Linear"))      { easeIn = new Vector2(1f / 3f, 1f / 3f); easeOut = new Vector2(2f / 3f, 2f / 3f); }
-            if (GUILayout.Button("Ease In"))     { easeIn = new Vector2(0.42f, 0f);        easeOut = new Vector2(1f, 1f); }
-            if (GUILayout.Button("Ease Out"))    { easeIn = new Vector2(0f, 0f);           easeOut = new Vector2(0.58f, 1f); }
-            if (GUILayout.Button("Ease In-Out")) { easeIn = new Vector2(0.42f, 0f);        easeOut = new Vector2(0.58f, 1f); }
+            if (GUILayout.Button("Linear"))      PresetLinear   (out easeIn, out easeOut);
+            if (GUILayout.Button("Ease In"))     PresetEaseIn   (out easeIn, out easeOut);
+            if (GUILayout.Button("Ease Out"))    PresetEaseOut  (out easeIn, out easeOut);
+            if (GUILayout.Button("Ease In-Out")) PresetEaseInOut(out easeIn, out easeOut);
         }
 
         EditorGUILayout.LabelField($"({easeIn.x:0.00}, {easeIn.y:0.00})   ({easeOut.x:0.00}, {easeOut.y:0.00})",
@@ -133,12 +133,6 @@ public class EasingTool : AnimateTool
     int Apply(RigContext rig, List<Transform> boneList, float time)
     {
         int changed = 0;
-
-        // Clamped away from the edges: the tangent is y*dv/(x*dt), which runs away as x approaches
-        // zero, and a segment with a zero-width handle is a step, not an ease.
-        float x1 = Mathf.Clamp(easeIn.x,  0.01f, 0.99f);
-        float x2 = Mathf.Clamp(easeOut.x, 0.01f, 0.99f);
-
         Undo.RecordObject(rig.clip, "Ease Keys");
 
         foreach (var bone in boneList)
@@ -147,33 +141,7 @@ public class EasingTool : AnimateTool
             var curve = AnimationUtility.GetEditorCurve(rig.clip, binding);
             if (curve == null || curve.length < 2) continue;
 
-            int i = IndexAt(curve, time);
-            if (i < 0 || i >= curve.length - 1) continue;   // no key here, or nothing follows it
-
-            float dt = curve[i + 1].time - curve[i].time;
-            if (dt <= 1e-6f) continue;
-            float dv = curve[i + 1].value - curve[i].value;
-
-            // Free the tangents first, or Unity recomputes them the moment the keys are written.
-            AnimationUtility.SetKeyRightTangentMode(curve, i,     AnimationUtility.TangentMode.Free);
-            AnimationUtility.SetKeyLeftTangentMode (curve, i + 1, AnimationUtility.TangentMode.Free);
-
-            // Re-read: setting the tangent mode rewrites the keyframes.
-            Keyframe a = curve[i];
-            Keyframe b = curve[i + 1];
-
-            a.outTangent   = dv * easeIn.y / (x1 * dt);
-            a.outWeight    = x1;
-            a.weightedMode = a.weightedMode | WeightedMode.Out;
-
-            b.inTangent    = dv * (1f - easeOut.y) / ((1f - x2) * dt);
-            b.inWeight     = 1f - x2;
-            b.weightedMode = b.weightedMode | WeightedMode.In;
-
-            // Only the near side of each key is touched, so the neighbouring segments keep the
-            // easing they were given.
-            curve.MoveKey(i,     a);
-            curve.MoveKey(i + 1, b);
+            if (!EaseSegment(curve, IndexAt(curve, time), easeIn, easeOut)) continue;
 
             AnimationUtility.SetEditorCurve(rig.clip, binding, curve);
             changed++;
@@ -182,6 +150,49 @@ public class EasingTool : AnimateTool
         EditorUtility.SetDirty(rig.clip);
         return changed;
     }
+
+    // Shapes the segment from key i to key i+1 with the given handles. Shared with the Looper tab,
+    // which eases the move back to the start pose with the same presets.
+    public static bool EaseSegment(AnimationCurve curve, int i, Vector2 easeIn, Vector2 easeOut)
+    {
+        if (i < 0 || i >= curve.length - 1) return false;   // no key here, or nothing follows it
+
+        float dt = curve[i + 1].time - curve[i].time;
+        if (dt <= 1e-6f) return false;
+        float dv = curve[i + 1].value - curve[i].value;
+
+        // Clamped away from the edges: the tangent is y*dv/(x*dt), which runs away as x approaches
+        // zero, and a segment with a zero-width handle is a step, not an ease.
+        float x1 = Mathf.Clamp(easeIn.x,  0.01f, 0.99f);
+        float x2 = Mathf.Clamp(easeOut.x, 0.01f, 0.99f);
+
+        // Free the tangents first, or Unity recomputes them the moment the keys are written.
+        AnimationUtility.SetKeyRightTangentMode(curve, i,     AnimationUtility.TangentMode.Free);
+        AnimationUtility.SetKeyLeftTangentMode (curve, i + 1, AnimationUtility.TangentMode.Free);
+
+        // Re-read: setting the tangent mode rewrites the keyframes.
+        Keyframe a = curve[i];
+        Keyframe b = curve[i + 1];
+
+        a.outTangent   = dv * easeIn.y / (x1 * dt);
+        a.outWeight    = x1;
+        a.weightedMode = a.weightedMode | WeightedMode.Out;
+
+        b.inTangent    = dv * (1f - easeOut.y) / ((1f - x2) * dt);
+        b.inWeight     = 1f - x2;
+        b.weightedMode = b.weightedMode | WeightedMode.In;
+
+        // Only the near side of each key is touched, so the neighbouring segments keep the
+        // easing they were given.
+        curve.MoveKey(i,     a);
+        curve.MoveKey(i + 1, b);
+        return true;
+    }
+
+    public static void PresetLinear   (out Vector2 easeIn, out Vector2 easeOut) { easeIn = new Vector2(1f / 3f, 1f / 3f); easeOut = new Vector2(2f / 3f, 2f / 3f); }
+    public static void PresetEaseIn   (out Vector2 easeIn, out Vector2 easeOut) { easeIn = new Vector2(0.42f, 0f);        easeOut = new Vector2(1f, 1f); }
+    public static void PresetEaseOut  (out Vector2 easeIn, out Vector2 easeOut) { easeIn = new Vector2(0f, 0f);           easeOut = new Vector2(0.58f, 1f); }
+    public static void PresetEaseInOut(out Vector2 easeIn, out Vector2 easeOut) { easeIn = new Vector2(0.42f, 0f);        easeOut = new Vector2(0.58f, 1f); }
 
     // ────────────────────────────────── graph ──────────────────────────────────
 

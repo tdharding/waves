@@ -34,7 +34,8 @@
 // very nearly vertical, and telling them apart needs to know which side of the piece a face is
 // on, which is a thing only the builder knows. So it is settled as the piece is generated and
 // baked into UV2.x — 1 outer, 2 rim, 3 inner, and 0 for a mesh built before any of this, which
-// is left with the colour it came in with.
+// is left with the colour it came in with. UV2.y is the width of the surface the face belongs to,
+// which the seam extent is a percentage of.
 //
 // ── Why the waterline is measured off the rim and not off the world ──────────
 // The water out here is not one flat sheet. It is laid in each river's channel a fixed distance
@@ -108,6 +109,11 @@
 
 float4 _RiverRunSeamColour;
 float  _RiverRunSeamStrength;
+
+// A PERCENTAGE, not metres: how far the gradient reaches off a seam as a share of the width of
+// the surface it runs across, which the builder bakes into UV2.y. One number for every piece, so a
+// wide river and a thin one, a tall wall and a tower stem are each shaded in proportion to
+// themselves.
 float  _RiverRunSeamExtent;
 
 float4 _RiverRunWaterlineColour;
@@ -122,15 +128,17 @@ float4 _RiverRunInnerColour;
 
 // How wide one cell of the grain is, in the units the surface is cut in, and how much of the
 // noise reaches the stone. Either of them at zero is no grain at all.
-float  _RiverRunGrainSize;
-float  _RiverRunGrainStrength;
+// One grain per part of the stone — x outer, y rim, z inner, the same order as the face kinds.
+float4 _RiverRunGrainSizes;
+float4 _RiverRunGrainStrengths;
 
 // How far the water lies beneath the rim top — the world's Water Level, pushed alongside the rest
 // rather than authored a second time.
 float  _RiverRunWaterDepth;
 
 // Where the made-up light stands, in world space. Every pixel works out its own direction to it.
-float4 _RiverRunLightPosition;
+// Authored once for the world in the designer's Aesthetics, and shared with the landscape hills.
+float4 _LevelSelectLightPosition;
 float  _RiverRunLightStrength;
 
 // How far off flat a face may point and still count as facing up — the whole of the channel does,
@@ -186,12 +194,23 @@ float RiverRunGradientNoise(float2 p)
 // It sits ABOUT one rather than under it: the noise darkens and lightens by as much as each
 // other, so graining a colour does not also drag it down. The colour picked for a face is the
 // colour that face averages out at however hard the grain is turned up.
-float RiverRunGrain(float2 uv)
+//
+// Each part of the stone has its own grain, picked by the face kind. A face carrying no kind — a
+// mesh built before they were baked — takes the outer grain.
+float RiverRunGrain(float2 uv, float4 faceData)
 {
-    if (_RiverRunGrainSize <= 0.0 || _RiverRunGrainStrength <= 0.0) return 1.0;
+    int   kind     = faceData.w < 0.5 ? RIVER_RUN_FACE_OUTER : (int)(faceData.x + 0.5);
+    float size     = kind == RIVER_RUN_FACE_RIM   ? _RiverRunGrainSizes.y
+                   : kind == RIVER_RUN_FACE_INNER ? _RiverRunGrainSizes.z
+                                                  : _RiverRunGrainSizes.x;
+    float strength = kind == RIVER_RUN_FACE_RIM   ? _RiverRunGrainStrengths.y
+                   : kind == RIVER_RUN_FACE_INNER ? _RiverRunGrainStrengths.z
+                                                  : _RiverRunGrainStrengths.x;
 
-    float noise = RiverRunGradientNoise(uv / _RiverRunGrainSize);
-    return max(0.0, 1.0 + noise * 2.0 * _RiverRunGrainStrength);
+    if (size <= 0.0 || strength <= 0.0) return 1.0;
+
+    float noise = RiverRunGradientNoise(uv / size);
+    return max(0.0, 1.0 + noise * 2.0 * strength);
 }
 
 // The colour this part of the run is drawn in. A face carrying no kind at all — a mesh built
@@ -246,13 +265,15 @@ void RiverRunShading_float(
 
     // Which way this pixel would have to look to see the light. Normalised because it is only the
     // direction that is wanted — the distance says nothing here.
-    float3 toLight = _RiverRunLightPosition.xyz - WorldPos;
+    float3 toLight = _LevelSelectLightPosition.xyz - WorldPos;
     toLight = dot(toLight, toLight) > 1e-8 ? normalize(toLight) : float3(0.0, 1.0, 0.0);
 
     // Half lambert: 1 square on to the light, 0.5 side on, 0 turned right away. Strength lerps out
     // of it rather than scaling it, so 0 leaves the stone at full and unlit rather than at black.
+    // Past 1 the fade is done and the rest multiplies the lit result, up to 10x brighter.
     float ndl = dot(n, toLight) * 0.5 + 0.5;
-    Light = lerp(1.0, saturate(ndl), saturate(_RiverRunLightStrength));
+    Light = lerp(1.0, saturate(ndl), saturate(_RiverRunLightStrength))
+          * max(_RiverRunLightStrength, 1.0);
 
     // The stone under everything else, and the grain that goes over the top of the lot. The
     // grain is worked out here and spent at the very end: it is the last thing laid on, so it
@@ -260,7 +281,7 @@ void RiverRunShading_float(
     // would only be visible on whatever the two bands left uncovered, which on a run drawn with
     // any real extent is not much of it.
     float3 stone = RiverRunStone(FaceData, BaseColour);
-    float  grain = RiverRunGrain(GrainUV);
+    float  grain = RiverRunGrain(GrainUV, FaceData);
 
     Colour    = stone * Light * grain;
     Tint      = _RiverRunSeamColour.rgb;
@@ -281,7 +302,12 @@ void RiverRunShading_float(
     // big to ever be the smallest, so it simply drops out of this.
     float toSeam = min(min(SeamData.x, SeamData.y), SeamData.z);
 
-    Seam = saturate(RiverRunRamp(toSeam, _RiverRunSeamExtent) * _RiverRunSeamStrength);
+    // The extent in metres for this face: the percentage of its own surface's width. A piece
+    // built before the widths were baked carries no face data, and gets no seams until rebuilt.
+    float surfaceWidth = FaceData.w >= 0.5 ? FaceData.y : 0.0;
+    float seamExtent   = _RiverRunSeamExtent * 0.01 * surfaceWidth;
+
+    Seam = saturate(RiverRunRamp(toSeam, seamExtent) * _RiverRunSeamStrength);
 
     // How far above the water this pixel is. w is zero on the rim top and negative under it, and
     // the water lies WaterDepth beneath the rim, so the two add. Below the water the ramp holds

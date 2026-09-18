@@ -31,6 +31,7 @@ public class GizmoManagerWindow : EditorWindow
     string           filter               = "";
     bool             onlyActive           = false;
     bool             onlyInScene          = false;
+    bool             enabledFirst         = false;
     float            gizmoOpacity         = 1f;
 
     const string OpacityKey = "FogTools.GizmoManager.Opacity";
@@ -57,6 +58,12 @@ public class GizmoManagerWindow : EditorWindow
     {
         gizmoOpacity = EditorPrefs.GetFloat(OpacityKey, 1f);
         OnEnableInner();
+    }
+
+    void OnSelectionChange()
+    {
+        SortEntries();
+        Repaint();
     }
 
     void OnEnableInner()
@@ -163,8 +170,30 @@ public class GizmoManagerWindow : EditorWindow
             }
         }
 
-        entries.Sort((a, b) => string.Compare(a.type.Name, b.type.Name, StringComparison.Ordinal));
+        SortEntries();
         showColliders = ReadColliderVisibility();
+    }
+
+    // Enabled-first is a snapshot taken when sorted, not a live order: re-sorting every frame
+    // would make a row jump out from under the cursor the moment you toggle it.
+    void SortEntries()
+    {
+        // Scripts on the selected objects go above everything else, so the gizmo you're looking
+        // at in the scene is the first row rather than somewhere down an alphabetical list.
+        var onSelection = new HashSet<Type>();
+        foreach (var go in Selection.gameObjects)
+            foreach (var mb in go.GetComponents<MonoBehaviour>())
+                if (mb != null) onSelection.Add(mb.GetType());
+
+        entries.Sort((a, b) =>
+        {
+            bool aSel = onSelection.Contains(a.type), bSel = onSelection.Contains(b.type);
+            if (aSel != bSel)
+                return aSel ? -1 : 1;
+            if (enabledFirst && a.gizmoEnabled != b.gizmoEnabled)
+                return a.gizmoEnabled ? -1 : 1;
+            return string.Compare(a.type.Name, b.type.Name, StringComparison.Ordinal);
+        });
     }
 
     static bool IsSystemAssembly(Assembly asm)
@@ -244,7 +273,13 @@ public class GizmoManagerWindow : EditorWindow
         GUILayout.Label("",           GUILayout.Width(20));  // toggle
         GUILayout.Label("Script",     GUILayout.Width(190));
         GUILayout.Label("Gizmos",     GUILayout.Width(52));
-        GUILayout.Label("Selected",   GUILayout.Width(62));
+        bool newEnabledFirst = GUILayout.Toggle(enabledFirst, "Selected", EditorStyles.toolbarButton,
+                                                GUILayout.Width(62));
+        if (newEnabledFirst != enabledFirst)
+        {
+            enabledFirst = newEnabledFirst;
+            SortEntries();
+        }
         GUILayout.Label("In Scene",   GUILayout.Width(58));
         EditorGUILayout.EndHorizontal();
 

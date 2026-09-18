@@ -435,6 +435,21 @@ public class FogMapWindow : EditorWindow
         EditorGUILayout.BeginVertical(GUILayout.Width(_panelWidth));
         _scroll = EditorGUILayout.BeginScrollView(_scroll);
 
+        EditorGUILayout.LabelField("Optimisation", EditorStyles.boldLabel);
+        Field("obstacleRange", "Obstacle Range");
+        Field("repelLimit", "Repel Limit");
+        Field("maskLimit", "Mask Limit");
+        EditorGUILayout.HelpBox(
+            "Obstacle Range is how far from the boat an obstacle's centre may be and still count. " +
+            "Of those, the nearest Repel Limit push fog (CPU) and the nearest Mask Limit cut the " +
+            "clear edge (GPU). Nearest is measured to each obstacle's edge.", MessageType.None);
+        if (Application.isPlaying)
+            EditorGUILayout.LabelField(" ",
+                $"in range {FogFieldManager.NearRepellerCount}  ·  pushing {FogFieldManager.PushingCount}" +
+                $"  ·  masked {FogFieldManager.MaskedCount} / {_map.maskLimit}",
+                EditorStyles.miniLabel);
+
+        EditorGUILayout.Space(8);
         EditorGUILayout.LabelField("Blob", EditorStyles.boldLabel);
 
         // The mass itself, drawn once at a readable size. With a list of blobs there was nothing
@@ -575,7 +590,9 @@ public class FogMapWindow : EditorWindow
 
         Field("heaviness", "Heaviness");
         Field("blurRadius", "Blur");
-        Field("heightBlurRadius", "Height Blur");
+        Field("heightMapQuality", "Height Map Quality");
+        using (new EditorGUI.DisabledScope(_map.heightMapQuality == FogHeightQuality.Off))
+            Field("heightBlurRadius", "Height Blur");
 
         EditorGUILayout.Space(8);
         EditorGUILayout.LabelField("Pushing", EditorStyles.boldLabel);
@@ -618,6 +635,24 @@ public class FogMapWindow : EditorWindow
             "with the rocks, and the runs are handed out first. Select a run in the scene to " +
             "read its chain length off the gizmo, and keep the total well under 32 or the rocks " +
             "lose their mask.", MessageType.None);
+
+        EditorGUILayout.LabelField("Pools", EditorStyles.miniBoldLabel);
+        Field("poolsRepel", "Pools Repel");
+        Field("poolRepelRadius", "Repel Radius");
+        Field("poolRepelStrength", "Repel Strength");
+        Field("poolMaskRadius", "Mask Radius");
+        Field("poolMaskFeather", "Mask Feather");
+
+        EditorGUILayout.LabelField("Arenas", EditorStyles.miniBoldLabel);
+        Field("arenasRepel", "Arenas Repel");
+        Field("arenaRepelRadius", "Repel Radius");
+        Field("arenaRepelStrength", "Repel Strength");
+        Field("arenaMaskRadius", "Mask Radius");
+        Field("arenaMaskFeather", "Mask Feather");
+        EditorGUILayout.HelpBox(
+            "One circle per pool or arena, sized off the pool's water radius or the arena wall's " +
+            "outer face — the radii here are measured beyond that. Each spends one of the 32 " +
+            "obstacle slots, whatever its size.", MessageType.None);
 
         EditorGUILayout.Space(8);
         EditorGUILayout.LabelField("Look", EditorStyles.boldLabel);

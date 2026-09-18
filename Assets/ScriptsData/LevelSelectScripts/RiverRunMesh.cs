@@ -47,6 +47,14 @@ public class RiverRunMesh : MonoBehaviour
         public float   collar;
     }
 
+    /// <summary>One node of the path the run was swept along, and where it stands.</summary>
+    [Serializable]
+    public class PathNode
+    {
+        public string  nodeId;
+        public Vector3 position;
+    }
+
     [Tooltip("River whose Run Shape this run is built from.")]
     public string riverName;
 
@@ -64,12 +72,19 @@ public class RiverRunMesh : MonoBehaviour
              "pool reaches across the rim it was trimmed against and meets the water inside.")]
     public float waterLeadOut;
 
-    [Tooltip("Whether this run's water laps OVER the water it meets at its start rather than " +
-             "butting onto it. Only a branch leaving another river does: where a river meets a " +
-             "pool it is the POOL's water that laps out over the river, so the river would be " +
-             "lapping back over the very thing lapping it. The fact rather than the distance, so " +
-             "Rebuild Runs picks up whatever Water Branch Overlap is set to now.")]
-    public bool waterLapsAtStart;
+    [Tooltip("The river this run branches off, when it starts at a junction — empty otherwise. " +
+             "Its water carries that river's banks, so its lines take on that river's Reach " +
+             "where the two meet. The name rather than a width, so Rebuild Runs reads that " +
+             "river's shape as it is now.")]
+    public string joinRiver;
+
+    [Tooltip("A point on the centreline of the river this run branches off, at the junction, " +
+             "in this object's local space.")]
+    public Vector3 joinPoint;
+
+    [Tooltip("Flat direction across that river at the junction, facing out toward this branch, " +
+             "in this object's local space.")]
+    public Vector3 joinAcross;
 
     [Tooltip("Sorting Group order for this run's water, on the Default layer: 0 for the main " +
              "river, one higher for each branch deep, so a branch draws over the river it leaves. " +
@@ -95,6 +110,15 @@ public class RiverRunMesh : MonoBehaviour
     public List<Knot> knots = new List<Knot>();
 
     public List<Mouth> mouths = new List<Mouth>();
+
+    [Tooltip("Every node of the path this run was swept along, in this object's local space — " +
+             "where a rim node set on any of them stands. Kept for all of them, not just the ones " +
+             "carrying a rim node, so rim nodes can be added, changed and taken away without a " +
+             "regenerate.")]
+    public List<PathNode> pathNodes = new List<PathNode>();
+
+    [Tooltip("Name of the generated rim node mesh asset, when this run carries any.")]
+    public string rimNodesMeshAssetName;
 
     /// <summary>
     /// Rebuilds the curve the run was swept along.

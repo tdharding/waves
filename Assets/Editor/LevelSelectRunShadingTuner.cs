@@ -62,6 +62,23 @@ public class LevelSelectRunShadingTuner : EditorWindow
         SceneView.RepaintAll();
     }
 
+    /// <summary>
+    /// The Apply Live switch. Turning it on puts this window's numbers in front of the preset;
+    /// turning it off gives the world back. The toolbar button and the Editor Load Monitor both
+    /// come through here.
+    /// </summary>
+    public bool ApplyLive
+    {
+        get => applyLive;
+        set
+        {
+            if (value == applyLive) return;
+            applyLive = value;
+            if (applyLive) TakeOver(); else HandBack();
+            Repaint();
+        }
+    }
+
     /// <summary>Gives the world back to its own preset.</summary>
     private void HandBack()
     {
@@ -102,12 +119,15 @@ public class LevelSelectRunShadingTuner : EditorWindow
         EditorGUILayout.LabelField("Run Shading", EditorStyles.boldLabel);
         EditorGUILayout.LabelField(
             "Four things, all off the same numbers. The stone itself — a colour each for the " +
-            "outer faces, the rim lip and the inside of the channel, with a noise grain over all " +
-            "three. Dark gathered along every seam of it — the rim's two edges, the foot of the " +
+            "outer faces, the rim lip and the inside of the channel, each with its own noise " +
+            "grain. Dark gathered along every seam of it — the rim's two edges, the foot of the " +
             "outer wall, the joints between pieces. White rising off the waterline up the inside " +
             "of the channel. And the made-up light the stone is shaped by, which is what replaced " +
-            "Simulated Lighting Basic on the run shader. Grain size and both extents are metres " +
-            "measured across the surface.",
+            "Simulated Lighting Basic on the run shader. Grain size and the waterline extent are " +
+            "metres; the seam extent is a percentage of the width of each surface, so every piece " +
+            "is shaded in proportion to its own size. The sections below choose which of the three " +
+            "stone colours each part of an outpost, tower, arena wall and archway takes — those " +
+            "are baked into the meshes, so rebuild after changing them.",
             EditorStyles.wordWrappedMiniLabel);
 
         EditorGUI.BeginChangeCheck();
@@ -150,13 +170,8 @@ public class LevelSelectRunShadingTuner : EditorWindow
         {
             GUILayout.FlexibleSpace();
 
-            bool live = GUILayout.Toggle(applyLive, "Apply Live",
+            ApplyLive = GUILayout.Toggle(applyLive, "Apply Live",
                                          EditorStyles.toolbarButton, GUILayout.Width(80));
-            if (live != applyLive)
-            {
-                applyLive = live;
-                if (applyLive) TakeOver(); else HandBack();
-            }
         }
     }
 

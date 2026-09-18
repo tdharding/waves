@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 /// <summary>
 /// What the water is drawn as while the debug view is on: the frame the lines were generated in,
@@ -40,26 +41,11 @@ public enum RiverRippleDebugView
 [System.Serializable]
 public class RiverEdgeRippleSettings
 {
-    [Tooltip("How far in from the bank the ripples carry, in metres. Past this there are none. " +
-             "A branch river's water is about 1.2m across, so much over half a metre has the two " +
-             "banks meeting in the middle.")]
-    [Min(0f)] public float reach = 0.45f;
-
-    [Tooltip("How the ripples end. 0 eases them away so you cannot see where they stop; 1 holds " +
-             "them most of the way in and then stops them on a visible crease.")]
-    [Range(0f, 1f)] public float bevel = 0f;
-
-    [Tooltip("Metres between one line and the next.")]
-    [Min(0.001f)] public float spacing = 0.09f;
+    [Header("Lines — rivers and pools")]
 
     [Tooltip("How white a line gets at its brightest. 0 turns the effect off entirely and gives " +
              "the water back exactly as it was. Above 1 is real overbright, for bloom to find.")]
     [Min(0f)] public float strength = 0.6f;
-
-    [Tooltip("How fast the LINES THEMSELVES travel, in metres per second — a river's inward from " +
-             "its banks, a pool's outward from its middle. Leave at 0 to hold them still and let " +
-             "Flow below be the only movement, which is what the water is meant to read as.")]
-    public float speed = 0f;
 
     [Tooltip("How much of its cycle a line fills. The line is a window rather than a sine, so " +
              "widening one lights more of the cycle without also brightening it.")]
@@ -68,59 +54,117 @@ public class RiverEdgeRippleSettings
     [Tooltip("0 gives a hard-edged line; 1 has it fall away from its middle.")]
     [Range(0f, 1f)] public float softness = 0.6f;
 
-    [Tooltip("How far a line swings from side to side as it runs along the bank, measured in " +
-             "line-widths. Every line shares the same swing, which is what keeps them one body " +
-             "of water.")]
-    public float waviness = 0.25f;
+    [Header("Rivers")]
 
-    [Tooltip("How often that swing repeats along the bank.")]
-    public float wavinessScale = 6f;
+    [Tooltip("Metres between one river line and the next.")]
+    [Min(0.001f)] public float spacing = 0.09f;
 
-    [Tooltip("Irregular drift on top of the swing, in line-widths, so the family never looks " +
-             "stamped. This is the layer that stops the two banks reading as a mirror.")]
-    public float meander = 0.35f;
+    [Tooltip("How fast a river's LINES THEMSELVES travel inward from its banks, in metres per " +
+             "second. Leave at 0 to hold them still and let Distortion Speed be the only movement.")]
+    public float speed = 0f;
 
-    [Tooltip("How fine that drift is. Small numbers are long slow wanders.")]
-    public float meanderScale = 1.5f;
+    [Tooltip("How far in from the bank the ripples carry, as a percentage of the river's width " +
+             "at that spot — so a wide river's lines carry further in than a narrow branch's, each " +
+             "in proportion to itself. 50 has the two banks meeting in the middle. Past this " +
+             "there are none.")]
+    [Range(0f, 100f)] public float reachPercent = 38f;
 
-    // ─────────────────────────────────────────────────────────────
-    // MOVEMENT ALONG THE LINES
-    //
-    // The other movement, and the one meant to carry the water: the lines stand still and the
-    // wander above travels ALONG them, so the water is distorting rather than drifting sideways.
-    // ─────────────────────────────────────────────────────────────
+    [Tooltip("How the ripples end. 0 eases them away so you cannot see where they stop; 1 holds " +
+             "them most of the way in and then stops them on a visible crease.")]
+    [Range(0f, 1f)] public float bevel = 0f;
+
+    [Tooltip("How far the noise pushes a line back and forth, in line-widths: 0.1 shifts a line " +
+             "by a tenth of the spacing.")]
+    public float distortStrength = 0.35f;
+
+    [Tooltip("How fine the distortion's noise is. Small numbers are long slow wanders.")]
+    public float distortScale = 1.5f;
 
     [Tooltip("How fast the distortion travels down a river's channel, in metres per second, " +
              "while the lines themselves stand still. Negative runs it upstream.")]
-    public float flow = 0.12f;
+    [FormerlySerializedAs("flow")] public float distortionSpeed = 0.12f;
 
-    // ─────────────────────────────────────────────────────────────
-    // THE POOL
-    // ─────────────────────────────────────────────────────────────
-
-    [Tooltip("How far in from the pool's wall a pool's rings come up to full, in metres. They " +
-             "fill the whole pool rather than hugging the wall, so this is only there to stop " +
-             "them ending on a hard line where the water meets the wall or the island.")]
-    [Min(0.001f)] public float poolFade = 0.06f;
-
-    // ─────────────────────────────────────────────────────────────
-    // SWITCHES
-    //
-    // Each is a different reading of the same surface, kept in the shader rather than baked into
-    // the mesh so one can be put against the other without a Rebuild Runs in between.
-    // ─────────────────────────────────────────────────────────────
-
-    [Tooltip("Sample the drift in the line's OWN frame, so it travels exactly along the lines " +
-             "and follows a channel round its bends. Off pins it to the world instead, where the " +
-             "field is nailed to the map and never travels — the older reading.")]
+    [Tooltip("Sample the distortion in the line's OWN frame, so it travels exactly along the " +
+             "lines and follows a channel round its bends. Off pins it to the world instead.")]
     public bool driftAlongLines = true;
 
-    [Tooltip("How much of a lap the alpha gradient covers, running back from the far lip. 1 " +
-             "spreads it over the whole lap; a half hugs the lip and leaves the inner half of " +
-             "the lap at full. How LONG the lap itself is, in metres, is Water Branch Overlap " +
-             "and Water Pool Overlap in the Level Select Designer — this only says how much of " +
-             "it the fade uses, so it retunes without a Rebuild Runs.")]
-    [Range(0.01f, 1f)] public float lapFade = 1f;
+    [Tooltip("Where a branch's water runs back over the river it leaves, its lines take on that " +
+             "river's Reach (and Bevel) — held along its banks, gone from its middle — easing over " +
+             "across this many metres past that river's waterline. Needs Rebuild Runs once. 0 " +
+             "leaves the branch's own lines running straight out across it.")]
+    [Min(0f)] public float branchMouthFade = 0f;
+
+    [Tooltip("How far back OUT in the branch that change-over starts, in metres. 0 starts it on " +
+             "the waterline of the river it leaves. Needs Rebuild Runs once.")]
+    [Min(0f)] public float branchMouthInset = 0f;
+
+    [Header("Pools")]
+
+    [Tooltip("Metres between one pool ring and the next.")]
+    [Min(0.001f)] public float poolSpacing = 0.09f;
+
+    [Tooltip("How far in from the pool's waterline (and its island's) the rings carry, in " +
+             "metres. Past this there are none. Set it past the pool's radius to fill the pool.")]
+    [Min(0f)] public float poolReach = 100f;
+
+    [Tooltip("How fast a pool's rings travel outward from its middle, in metres per second. " +
+             "Negative draws them in. 0 holds them still.")]
+    public float poolSpeed = 0f;
+
+    [Tooltip("How far the noise pushes a ring in and out, in ring-widths. The field is fixed in " +
+             "the world, like the rock rings' distortion.")]
+    public float poolDistortStrength = 0.35f;
+
+    [Tooltip("How fine the pool distortion's noise is, in world space. Small numbers are long " +
+             "slow wanders.")]
+    public float poolDistortScale = 1.5f;
+
+    [Tooltip("How fast a pool's distortion spins round the pool's centre, in turns per second, " +
+             "while the rings themselves stand still. Negative spins it the other way.")]
+    public float poolDistortionSpeed = 0.02f;
+
+    [Tooltip("Where a pool's water runs out down a river, its rings take on that river's Reach " +
+             "(and Bevel) — held along the banks, gone from the middle — easing over across this " +
+             "many metres past the pool's circle. Needs Rebuild Runs once. 0 leaves the rings at " +
+             "full all the way down.")]
+    [Min(0f)] public float poolMouthFade = 0f;
+
+    [Tooltip("How far INSIDE the pool's circle that change-over to a river's Reach starts, in " +
+             "metres. 0 starts it on the circle. Needs Rebuild Runs once.")]
+    [FormerlySerializedAs("poolMouthInset")]
+    [Min(0f)] public float poolMouthReachOverlap = 0f;
+
+    [Tooltip("How far past the pool's waterline its rings carry on out into a river, in metres, " +
+             "fading out over that distance. Separate from Reach — this ends the rings outright. " +
+             "The water itself stays solid. 0 leaves them running all the way down.")]
+    [Min(0f)] public float poolMouthExtent = 0f;
+
+    [Header("River fade to pool")]
+
+    [Tooltip("How far back from the far lip of a pool's lap the alpha fades, in metres. Held to " +
+             "the lap's own length — Water Pool Overlap in the designer — so it can never outrun " +
+             "the lap. Retunes without a Rebuild Runs.")]
+    [FormerlySerializedAs("lapFadeDistance")]
+    [Min(0f)] public float riverFadeToPoolDistance = 0.25f;
+
+    [Tooltip("The falloff of that fade over its distance. 1 is an even ramp. Above 1 the water " +
+             "stays faint further in from the lip and comes in late and hard; below 1 it comes " +
+             "in quickly and eases the rest of the way.")]
+    [Min(0.01f)] public float riverFadeToPoolIntensity = 1f;
+
+    [Header("Grain")]
+
+    [Tooltip("How far the grain pushes the water's colour lighter and darker. 0 is no grain.")]
+    [Min(0f)] public float grainStrength = 0f;
+
+    [Tooltip("Metres across one grain. Pinned to the world, so it runs straight across rivers, " +
+             "pools and the joins between them, and it does not move.")]
+    [Min(0.0001f)] public float grainSize = 0.01f;
+
+    [Tooltip("How far the same grain thins the water's alpha where it runs dark. 0 leaves the " +
+             "alpha alone; 1 takes the darkest of the grain fully clear. Separate from Grain " +
+             "Strength, so the alpha can take the grain with or without the colour.")]
+    [Range(0f, 1f)] public float grainAlpha = 0f;
 
     // ─────────────────────────────────────────────────────────────
     // PUSHING
@@ -140,22 +184,34 @@ public class RiverEdgeRippleSettings
     private static readonly RiverEdgeRippleSettings None =
         new RiverEdgeRippleSettings { strength = 0f };
 
-    private static readonly int ReachId         = Shader.PropertyToID("_RiverEdgeRippleReach");
-    private static readonly int BevelId         = Shader.PropertyToID("_RiverEdgeRippleBevel");
-    private static readonly int SpacingId       = Shader.PropertyToID("_RiverEdgeRippleSpacing");
-    private static readonly int StrengthId      = Shader.PropertyToID("_RiverEdgeRippleStrength");
-    private static readonly int SpeedId         = Shader.PropertyToID("_RiverEdgeRippleSpeed");
-    private static readonly int WidthId         = Shader.PropertyToID("_RiverEdgeRippleWidth");
-    private static readonly int SoftnessId      = Shader.PropertyToID("_RiverEdgeRippleSoftness");
-    private static readonly int WavinessId      = Shader.PropertyToID("_RiverEdgeRippleWaviness");
-    private static readonly int WavinessScaleId = Shader.PropertyToID("_RiverEdgeRippleWavinessScale");
-    private static readonly int MeanderId       = Shader.PropertyToID("_RiverEdgeRippleMeander");
-    private static readonly int MeanderScaleId  = Shader.PropertyToID("_RiverEdgeRippleMeanderScale");
-    private static readonly int FlowId          = Shader.PropertyToID("_RiverEdgeRippleFlow");
-    private static readonly int PoolFadeId      = Shader.PropertyToID("_RiverEdgeRipplePoolFade");
-    private static readonly int FlowSpaceId     = Shader.PropertyToID("_RiverEdgeRippleFlowSpace");
-    private static readonly int LapFadeId       = Shader.PropertyToID("_RiverEdgeRippleLapFade");
-    private static readonly int DebugId         = Shader.PropertyToID("_RiverEdgeRippleDebug");
+    private static readonly int SpacingId             = Shader.PropertyToID("_RiverEdgeRippleSpacing");
+    private static readonly int StrengthId            = Shader.PropertyToID("_RiverEdgeRippleStrength");
+    private static readonly int SpeedId               = Shader.PropertyToID("_RiverEdgeRippleSpeed");
+    private static readonly int WidthId               = Shader.PropertyToID("_RiverEdgeRippleWidth");
+    private static readonly int SoftnessId            = Shader.PropertyToID("_RiverEdgeRippleSoftness");
+    private static readonly int ReachId               = Shader.PropertyToID("_RiverEdgeRippleReach");
+    private static readonly int BevelId               = Shader.PropertyToID("_RiverEdgeRippleBevel");
+    private static readonly int DistortStrengthId     = Shader.PropertyToID("_RiverEdgeRippleDistortStrength");
+    private static readonly int DistortScaleId        = Shader.PropertyToID("_RiverEdgeRippleDistortScale");
+    private static readonly int DistortSpeedId        = Shader.PropertyToID("_RiverEdgeRippleDistortSpeed");
+    private static readonly int FlowSpaceId           = Shader.PropertyToID("_RiverEdgeRippleFlowSpace");
+    private static readonly int BranchMouthFadeId     = Shader.PropertyToID("_RiverEdgeRippleBranchMouthFade");
+    private static readonly int BranchMouthInsetId    = Shader.PropertyToID("_RiverEdgeRippleBranchMouthInset");
+    private static readonly int PoolSpacingId         = Shader.PropertyToID("_RiverEdgeRipplePoolSpacing");
+    private static readonly int PoolReachId           = Shader.PropertyToID("_RiverEdgeRipplePoolReach");
+    private static readonly int PoolSpeedId           = Shader.PropertyToID("_RiverEdgeRipplePoolSpeed");
+    private static readonly int PoolDistortStrengthId = Shader.PropertyToID("_RiverEdgeRipplePoolDistortStrength");
+    private static readonly int PoolDistortScaleId    = Shader.PropertyToID("_RiverEdgeRipplePoolDistortScale");
+    private static readonly int PoolDistortSpeedId    = Shader.PropertyToID("_RiverEdgeRipplePoolDistortSpeed");
+    private static readonly int PoolMouthFadeId       = Shader.PropertyToID("_RiverEdgeRipplePoolMouthFade");
+    private static readonly int PoolMouthReachOverlapId = Shader.PropertyToID("_RiverEdgeRipplePoolMouthReachOverlap");
+    private static readonly int PoolMouthExtentId     = Shader.PropertyToID("_RiverEdgeRipplePoolMouthExtent");
+    private static readonly int RiverFadeToPoolDistanceId  = Shader.PropertyToID("_RiverEdgeRippleRiverFadeToPoolDistance");
+    private static readonly int RiverFadeToPoolIntensityId = Shader.PropertyToID("_RiverEdgeRippleRiverFadeToPoolIntensity");
+    private static readonly int GrainStrengthId       = Shader.PropertyToID("_RiverEdgeRippleGrainStrength");
+    private static readonly int GrainSizeId           = Shader.PropertyToID("_RiverEdgeRippleGrainSize");
+    private static readonly int GrainAlphaId          = Shader.PropertyToID("_RiverEdgeRippleGrainAlpha");
+    private static readonly int DebugId               = Shader.PropertyToID("_RiverEdgeRippleDebug");
 
     /// <summary>
     /// Publishes one set of ripple numbers to the shaders — the tuner's if it is driving, this
@@ -187,25 +243,40 @@ public class RiverEdgeRippleSettings
 
     private void Apply()
     {
-        Shader.SetGlobalFloat(ReachId,         reach);
-        Shader.SetGlobalFloat(BevelId,         bevel);
-        Shader.SetGlobalFloat(SpacingId,       spacing);
-        Shader.SetGlobalFloat(StrengthId,      strength);
-        Shader.SetGlobalFloat(SpeedId,         speed);
-        Shader.SetGlobalFloat(WidthId,         width);
-        Shader.SetGlobalFloat(SoftnessId,      softness);
-        Shader.SetGlobalFloat(WavinessId,      waviness);
-        Shader.SetGlobalFloat(WavinessScaleId, wavinessScale);
-        Shader.SetGlobalFloat(MeanderId,       meander);
-        Shader.SetGlobalFloat(MeanderScaleId,  meanderScale);
+        Shader.SetGlobalFloat(SpacingId,             spacing);
+        Shader.SetGlobalFloat(StrengthId,            strength);
+        Shader.SetGlobalFloat(SpeedId,               speed);
+        Shader.SetGlobalFloat(WidthId,               width);
+        Shader.SetGlobalFloat(SoftnessId,            softness);
 
-        Shader.SetGlobalFloat(FlowId,          flow);
-        Shader.SetGlobalFloat(PoolFadeId,      poolFade);
+        Shader.SetGlobalFloat(ReachId,               reachPercent);
+        Shader.SetGlobalFloat(BevelId,               bevel);
+        Shader.SetGlobalFloat(DistortStrengthId,     distortStrength);
+        Shader.SetGlobalFloat(DistortScaleId,        distortScale);
+        Shader.SetGlobalFloat(DistortSpeedId,        distortionSpeed);
 
         // The switch goes over as 1 and 0. There is no bool global to set, and a float is what
         // the shader compares against a half anyway.
-        Shader.SetGlobalFloat(FlowSpaceId,     driftAlongLines ? 1f : 0f);
-        Shader.SetGlobalFloat(LapFadeId,       lapFade);
+        Shader.SetGlobalFloat(FlowSpaceId,           driftAlongLines ? 1f : 0f);
+        Shader.SetGlobalFloat(BranchMouthFadeId,     branchMouthFade);
+        Shader.SetGlobalFloat(BranchMouthInsetId,    branchMouthInset);
+
+        Shader.SetGlobalFloat(PoolSpacingId,         poolSpacing);
+        Shader.SetGlobalFloat(PoolReachId,           poolReach);
+        Shader.SetGlobalFloat(PoolSpeedId,           poolSpeed);
+        Shader.SetGlobalFloat(PoolDistortStrengthId, poolDistortStrength);
+        Shader.SetGlobalFloat(PoolDistortScaleId,    poolDistortScale);
+        Shader.SetGlobalFloat(PoolDistortSpeedId,    poolDistortionSpeed);
+        Shader.SetGlobalFloat(PoolMouthFadeId,       poolMouthFade);
+        Shader.SetGlobalFloat(PoolMouthReachOverlapId, poolMouthReachOverlap);
+        Shader.SetGlobalFloat(PoolMouthExtentId,     poolMouthExtent);
+
+        Shader.SetGlobalFloat(RiverFadeToPoolDistanceId,  riverFadeToPoolDistance);
+        Shader.SetGlobalFloat(RiverFadeToPoolIntensityId, riverFadeToPoolIntensity);
+
+        Shader.SetGlobalFloat(GrainStrengthId,       grainStrength);
+        Shader.SetGlobalFloat(GrainSizeId,           grainSize);
+        Shader.SetGlobalFloat(GrainAlphaId,          grainAlpha);
     }
 
     /// <summary>Field-by-field copy, so the tuner can load a preset without holding on to it.</summary>
@@ -213,21 +284,36 @@ public class RiverEdgeRippleSettings
     {
         if (other == null) return;
 
-        reach         = other.reach;
-        bevel         = other.bevel;
-        spacing       = other.spacing;
-        strength      = other.strength;
-        speed         = other.speed;
-        width         = other.width;
-        softness      = other.softness;
-        waviness      = other.waviness;
-        wavinessScale = other.wavinessScale;
-        meander       = other.meander;
-        meanderScale  = other.meanderScale;
+        spacing  = other.spacing;
+        strength = other.strength;
+        speed    = other.speed;
+        width    = other.width;
+        softness = other.softness;
 
-        flow            = other.flow;
-        poolFade        = other.poolFade;
+        reachPercent    = other.reachPercent;
+        bevel           = other.bevel;
+        distortStrength = other.distortStrength;
+        distortScale    = other.distortScale;
+        distortionSpeed = other.distortionSpeed;
         driftAlongLines = other.driftAlongLines;
-        lapFade         = other.lapFade;
+        branchMouthFade  = other.branchMouthFade;
+        branchMouthInset = other.branchMouthInset;
+
+        poolSpacing         = other.poolSpacing;
+        poolReach           = other.poolReach;
+        poolSpeed           = other.poolSpeed;
+        poolDistortStrength = other.poolDistortStrength;
+        poolDistortScale    = other.poolDistortScale;
+        poolDistortionSpeed = other.poolDistortionSpeed;
+        poolMouthFade       = other.poolMouthFade;
+        poolMouthReachOverlap = other.poolMouthReachOverlap;
+        poolMouthExtent     = other.poolMouthExtent;
+
+        riverFadeToPoolDistance  = other.riverFadeToPoolDistance;
+        riverFadeToPoolIntensity = other.riverFadeToPoolIntensity;
+
+        grainStrength = other.grainStrength;
+        grainSize     = other.grainSize;
+        grainAlpha    = other.grainAlpha;
     }
 }

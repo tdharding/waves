@@ -9,14 +9,15 @@ using UnityEngine;
 ///
 ///        _______
 ///      /  ___    \
-///     |  /   \    |          up      ^  from the rim top the arch stands on
+///     |  /   \    |          up      ^  from the water surface
 ///     | |  +  |   |          across  <-> from the channel centreline
 ///     |_|     |___|          along   into the page, from the arch's front face
 ///   ___|_|_____|___          back through the wall the way you travel
 ///
-/// All three are 0 by default, which puts the prefab at the front face of the arch, on the
-/// centreline, standing on the rim top. Nothing is inherited or settled later — an offset
-/// authored here is exactly the offset applied.
+/// Only Along is used now: how far into the arch the door sheet stands, kept between the arch's
+/// front and back faces, with the entrance prefab's aligner (its wall-depth disc) landing there.
+/// The door is always on the centreline, and its height comes from the aligner on the water, so
+/// Across and Up are no longer read. They are kept only so saved data still loads.
 /// </summary>
 [Serializable]
 public class ArenaEntranceAlignment
@@ -25,7 +26,7 @@ public class ArenaEntranceAlignment
              "through the arch.")]
     public float across;
 
-    [Tooltip("Up from the rim top the arch stands on.")]
+    [Tooltip("Up from the water surface.")]
     public float up;
 
     [Tooltip("Along the river, from the arch's front face. Positive runs back through the wall " +

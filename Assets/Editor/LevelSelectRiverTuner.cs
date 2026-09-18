@@ -73,6 +73,23 @@ public class LevelSelectRiverTuner : EditorWindow
         SceneView.RepaintAll();
     }
 
+    /// <summary>
+    /// The Apply Live switch. Turning it on puts this window's numbers in front of the preset;
+    /// turning it off gives the world back. The toolbar button and the Editor Load Monitor both
+    /// come through here.
+    /// </summary>
+    public bool ApplyLive
+    {
+        get => applyLive;
+        set
+        {
+            if (value == applyLive) return;
+            applyLive = value;
+            if (applyLive) TakeOver(); else HandBack();
+            Repaint();
+        }
+    }
+
     /// <summary>Gives the world back to its own preset.</summary>
     private void HandBack()
     {
@@ -119,9 +136,8 @@ public class LevelSelectRiverTuner : EditorWindow
 
         EditorGUILayout.LabelField("Water Lines", EditorStyles.boldLabel);
         EditorGUILayout.LabelField(
-            "Lines along a river's banks, and rings out of a pool's middle. Both are drawn off a " +
-            "frame baked into the generated mesh, so water built before that frame existed falls " +
-            "back to bank lines and a world-pinned drift until Rebuild Runs.",
+            "Lines along a river's banks, drawn off a frame baked into the generated mesh, and " +
+            "rings out of a pool's middle, measured in world space from the pool's centre.",
             EditorStyles.wordWrappedMiniLabel);
 
         EditorGUI.BeginChangeCheck();
@@ -149,12 +165,12 @@ public class LevelSelectRiverTuner : EditorWindow
         // what stops it being hunted for among the sliders above.
         EditorGUILayout.LabelField("Where Two Waters Meet", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "How far a branch's water laps over the river it leaves, and a pool's over each " +
-            "river that meets it, are GEOMETRY — Water Branch Overlap and Water Pool Overlap in " +
-            "the Level Select Designer's Aesthetics section, applied by Rebuild Runs. " +
-            "Lap Fade above says how much of whatever lap is built the alpha gradient covers, " +
-            "measured back from the far lip, and retunes without a rebuild. Which water draws " +
-            "on top is each water's Sorting Group.",
+            "How far a pool's water laps over each river that meets it is GEOMETRY — Water " +
+            "Pool Overlap in the Level Select Designer's Aesthetics section, applied by " +
+            "Rebuild Runs. " +
+            "How far back from the lip the alpha gradient runs is River Fade To Pool Distance above, in " +
+            "metres — never longer than the lap that was built. Which water draws on top is " +
+            "each water's Sorting Group.",
             MessageType.None);
 
         EditorGUILayout.EndScrollView();
@@ -168,13 +184,8 @@ public class LevelSelectRiverTuner : EditorWindow
         {
             GUILayout.FlexibleSpace();
 
-            bool live = GUILayout.Toggle(applyLive, "Apply Live",
+            ApplyLive = GUILayout.Toggle(applyLive, "Apply Live",
                                          EditorStyles.toolbarButton, GUILayout.Width(80));
-            if (live != applyLive)
-            {
-                applyLive = live;
-                if (applyLive) TakeOver(); else HandBack();
-            }
         }
     }
 

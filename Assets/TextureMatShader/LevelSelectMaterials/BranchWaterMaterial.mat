@@ -66,7 +66,7 @@ Material:
     m_Colors:
     - _BaseColour: {r: 0.836478, g: 0.836478, b: 0.836478, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
-    - _DepthColour: {r: 0.7610062, g: 0.7610062, b: 0.7610062, a: 1}
+    - _DepthColour: {r: 0.49056602, g: 0.49056602, b: 0.49056602, a: 1}
     - _DitherMultiplier: {r: 0, g: 0, b: 0, a: 0}
     - _FadeEndWorld: {r: 115.272606, g: 3.1658895, b: -17.56, a: 0}
     - _FadeStartWorld: {r: 118.43261, g: -3.8941104, b: -13.3, a: 0}

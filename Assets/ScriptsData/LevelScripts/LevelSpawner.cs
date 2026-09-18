@@ -1428,7 +1428,7 @@ else if (controller != null)
         // so translate the instance by the negation of that offset in world space. This shifts
         // radially (in/out of the wall), not tangentially like the previous rot*Vector3.forward.
         if (align != null && align.UseWallDepth)
-            pos -= (rot * align.LocalForward) * align.WallDepth;
+            pos -= (rot * align.WallDepthLocalAxis) * align.WallDepth;
 
 #if UNITY_EDITOR
         // ── TEMP door/portal spawn debug — remove once orientation is confirmed ──

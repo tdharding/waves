@@ -24,9 +24,36 @@ using UnityEngine.Serialization;
 /// Generated positions are normalised 0..1 across one repetition, so a map survives being
 /// rescaled, and are deterministic from the seed - the same map always lays out the same way.
 /// </summary>
+/// <summary>
+/// How detailed the fog's height map is, relative to the density field it sits beside. The height
+/// map only feeds the lighting normals; the outline and the lip band come from the field.
+/// </summary>
+public enum FogHeightQuality
+{
+    Off,      // not painted; the sheet lights as if flat
+    Low,      // half the field's width
+    Medium,   // the field's width
+    High,     // twice the field's width - the original
+}
+
 [CreateAssetMenu(fileName = "FogMap", menuName = "Waves/Fog Arena Map")]
 public class FogMap : ScriptableObject
 {
+    // How many obstacles the fog pays for each frame. Both limits take the NEAREST first (by
+    // distance to the obstacle's edge), so what is dropped is always what is furthest from the boat.
+    [Header("Optimisation")]
+    [Tooltip("How far from the boat an obstacle's centre may be and still count at all, in world " +
+             "units. Outside it an obstacle neither pushes fog nor cuts the mask.")]
+    public float obstacleRange = 18.8f;
+
+    [Tooltip("The most obstacles that PUSH fog each frame, nearest first. Every one is tested " +
+             "against every point of every mass, so this is the CPU cost.")]
+    [Range(1, 256)] public int repelLimit = 64;
+
+    [Tooltip("The most obstacles the MASK cuts each frame, nearest first. Every one is tested by " +
+             "every fog pixel, so this is the GPU cost.")]
+    [Range(0, FogFieldManager.FOG_OBSTACLE_SLOTS)] public int maskLimit = FogFieldManager.FOG_OBSTACLE_SLOTS;
+
     [Header("Blob")]
     [Tooltip("What every mass on this arena is made of. One set of properties, not a list: a " +
              "list bought variety that the per-mass jitter and the size range already provide, " +
@@ -122,6 +149,14 @@ public class FogMap : ScriptableObject
              "widened past what the machine can paint quietly costing you frames.")]
     public int maxGridResolution = 1024;
 
+    [Tooltip("How detailed the height map is — the texture the fog's lighting normals come from, " +
+             "painted and blurred every frame.\n" +
+             "High: twice the field's width (four times its pixels) — the original.\n" +
+             "Medium: the field's width. A quarter of the cost.\n" +
+             "Low: half the field's width. A sixteenth of the cost; the lit rim may soften or facet.\n" +
+             "Off: not painted. The lip band stays and still brightens under a light, but evenly " +
+             "all round rather than catching on the side facing it, and fog away from lights reads flatter.")]
+    public FogHeightQuality heightMapQuality = FogHeightQuality.High;
 
     [Tooltip("Frame-to-frame stickiness. High and the fog is thick and sluggish; low and it is " +
              "wispy and quick. Also does part of the smoothing, so a high value buys back blur.")]
@@ -209,9 +244,9 @@ public class FogMap : ScriptableObject
     public bool runsRepel = true;
 
     [Tooltip("How far apart the circles are strung along a run, IN WORLD UNITS. This is the " +
-             "amount on a chain — the whole budget control. Every circle is one of the " +
-             "thirty-two obstacle slots the mask has, shared with the rocks, so a run chained " +
-             "tightly enough will crowd the rocks out of the mask entirely. Read it against Run " +
+             "amount on a chain — the whole budget control. Every circle is one obstacle, " +
+             "counted against Repel Limit and Mask Limit alongside the rocks, so a run chained " +
+             "tightly enough will crowd further obstacles out. Read it against Run " +
              "Repel Radius: spacing near the radius gives a smooth corridor, spacing well past " +
              "it gives a row of separate clearings.")]
     [Range(0.5f, 20f)] public float runChainSpacing = 2.04f;
@@ -234,6 +269,42 @@ public class FogMap : ScriptableObject
     [Tooltip("How soft that cut is, in world units. Keep it generous — it is also what hides " +
              "the scalloping between one circle on the chain and the next.")]
     public float runMaskFeather = 0.6f;
+
+    [Header("Pools")]
+    [Tooltip("Whether the generated pools push fog about at all. Purely a look. One circle per " +
+             "pool, so each pool spends one of the mask's obstacle slots whatever its size.")]
+    public bool poolsRepel = true;
+
+    [Tooltip("Clear air the SKELETON is pushed out of, beyond the pool's own water radius.")]
+    public float poolRepelRadius = 0.5f;
+
+    [Tooltip("How hard a pool pushes. Above 1 is allowed and is how a pool reaches full push " +
+             "while Global Strength is held low for the rest.")]
+    [Range(0f, 4f)] public float poolRepelStrength = 4f;
+
+    [Tooltip("Clear air the MASK cuts, beyond the pool's own water radius. This is the hard edge.")]
+    public float poolMaskRadius = 0.5f;
+
+    [Tooltip("How soft that cut is, in world units.")]
+    public float poolMaskFeather = 0.6f;
+
+    [Header("Arenas")]
+    [Tooltip("Whether the level select arenas push fog about at all. Purely a look. One circle " +
+             "per arena, so each arena spends one of the mask's obstacle slots whatever its size.")]
+    public bool arenasRepel = true;
+
+    [Tooltip("Clear air the SKELETON is pushed out of, beyond the arena wall's outer face.")]
+    public float arenaRepelRadius = 0.5f;
+
+    [Tooltip("How hard an arena pushes. Above 1 is allowed and is how an arena reaches full push " +
+             "while Global Strength is held low for the rest.")]
+    [Range(0f, 4f)] public float arenaRepelStrength = 4f;
+
+    [Tooltip("Clear air the MASK cuts, beyond the arena wall's outer face. This is the hard edge.")]
+    public float arenaMaskRadius = 0.5f;
+
+    [Tooltip("How soft that cut is, in world units.")]
+    public float arenaMaskFeather = 0.6f;
 
     [Header("Boat")]
     [Tooltip("Clear water the SKELETON is pushed out of, measured from the boat. One radius, not " +

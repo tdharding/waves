@@ -9,12 +9,36 @@
 // Shader.SetGlobalVectorArray / SetGlobalFloat. Because they are re-pushed each frame, a shader
 // reimport that wipes them self-heals on the next frame (same reasoning as the soul-fish masks).
 // A global array locks its size on first set, so the manager always pushes the full slot count.
+//
+// Guarded because FogLights.hlsl includes this to add the boat on top for the fog only.
+#ifndef INSTANCED_LIGHTS_INCLUDED
+#define INSTANCED_LIGHTS_INCLUDED
+
 #define INST_LIGHT_MAX 16
 
 float4 _InstLightPositions[INST_LIGHT_MAX]; // .xyz = world position, .w = radius
 float  _InstLightCount;
 float  _InstLightIntensity;                 // global brightness multiplier
 float  _InstLightFalloff;                   // 0..1: fraction of the radius that stays full before fading
+
+// One light point's contribution, before intensity. Shared so anything adding its own point
+// (the boat, in FogLights.hlsl) lights exactly like a street light does.
+void InstancedLightPoint(float3 WorldPos, float3 n, float3 lp, float radius, float inner,
+                         out float radial, out float ndl)
+{
+    float  r    = max(radius, 0.0001);
+    float3 d    = lp - WorldPos;
+    float  dist = length(d);
+
+    // Radial falloff: 1 inside inner·r, easing to 0 at r — the same shape as the boat's
+    // (1 - smoothstep). Lights past their radius contribute nothing.
+    radial = 1.0 - smoothstep(r * inner, r, dist);
+
+    // Lit side: surfaces facing this light brighten. dir points fragment → light, so a normal
+    // pointing at the light gives N·L > 0. (The boat uses dir-to-boat for its dark side; this
+    // is the same term, oriented to add light on the near-facing side.)
+    ndl = saturate(dot(n, d / max(dist, 1e-4)));
+}
 
 // WorldPos   : fragment world position (Position node, World space)
 // WorldNormal: fragment world normal   (Normal Vector node, World space)
@@ -39,19 +63,9 @@ void InstancedLights_float(
     {
         if (i >= count) break;
 
-        float3 lp   = _InstLightPositions[i].xyz;
-        float  r    = max(_InstLightPositions[i].w, 0.0001);
-        float3 d    = lp - WorldPos;
-        float  dist = length(d);
-
-        // Radial falloff: 1 inside inner·r, easing to 0 at r — the same shape as the boat's
-        // (1 - smoothstep). Lights past their radius contribute nothing.
-        float radial = 1.0 - smoothstep(r * inner, r, dist);
-
-        // Lit side: surfaces facing this light brighten. dir points fragment → light, so a normal
-        // pointing at the light gives N·L > 0. (The boat uses dir-to-boat for its dark side; this
-        // is the same term, oriented to add light on the near-facing side.)
-        float ndl = saturate(dot(n, d / max(dist, 1e-4)));
+        float radial, ndl;
+        InstancedLightPoint(WorldPos, n, _InstLightPositions[i].xyz, _InstLightPositions[i].w,
+                            inner, radial, ndl);
 
         light += radial * ndl;
         prox  += radial;
@@ -75,3 +89,5 @@ void InstancedLights_half(
     Light     = (half)l;
     Proximity = (half)p;
 }
+
+#endif

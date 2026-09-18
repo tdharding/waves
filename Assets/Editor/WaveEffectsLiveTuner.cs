@@ -16,7 +16,8 @@ public class WaveEffectsLiveTuner : EditorWindow
 
     [SerializeField] Material   waveMaterial;
     [SerializeField] WavePreset activePreset;
-    [SerializeField] bool       applyLive   = true;
+    // Off by default and on every scene open: while on, the tuner redraws the scene view every tick.
+    [SerializeField] bool       applyLive   = false;
     [SerializeField] bool tunerActive = false; 
 
     // Wave Motion
@@ -206,6 +207,7 @@ public class WaveEffectsLiveTuner : EditorWindow
     {
         serializedWindow = new SerializedObject(this);
         EditorApplication.update += LiveUpdate;
+        EditorSceneManager.sceneOpened += OnSceneOpened;
         RestoreFromPrefs();
         lastUpdateTime = EditorApplication.timeSinceStartup;
     }
@@ -213,9 +215,26 @@ public class WaveEffectsLiveTuner : EditorWindow
     void OnDisable()
     {
         EditorApplication.update -= LiveUpdate;
+        EditorSceneManager.sceneOpened -= OnSceneOpened;
         StopAllPreviewClips();
         if (testWhirlpoolsEnabled) ClearTestWhirlpools();
         if (testSoulFishEnabled)   ClearTestSoulFish();
+    }
+
+    /// <summary>The Apply Live switch, for the Editor Load Monitor.</summary>
+    public bool ApplyLive
+    {
+        get => applyLive;
+        set { if (value == applyLive) return; applyLive = value; Repaint(); }
+    }
+
+    /// <summary>False until Load/Preview is pressed; until then nothing is applied, live or not.</summary>
+    public bool TunerActive => tunerActive;
+
+    void OnSceneOpened(UnityEngine.SceneManagement.Scene scene, OpenSceneMode mode)
+    {
+        applyLive = false;
+        Repaint();
     }
 
     void RestoreFromPrefs()

@@ -1,0 +1,3523 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!74 &7400000
+AnimationClip:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: WalkingState
+  serializedVersion: 8
+  m_Legacy: 0
+  m_Compressed: 0
+  m_UseHighQualityCurve: 1
+  m_RotationCurves: []
+  m_CompressedRotationCurves: []
+  m_EulerCurves:
+  - curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: {x: 6.104, y: 22.306, z: 46.049}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 2
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.65199995, y: 0.65199995, z: 0.65199995}
+      - serializedVersion: 3
+        time: 1.4
+        value: {x: 6.104, y: 22.306, z: 46.049}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: {x: 0.652, y: 0.652, z: 0.652}
+        outWeight: {x: 0.42, y: 0.42, z: 0.42}
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/L.arm/L.arm2/L.arm3
+  - curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: {x: 27.448, y: -52.637, z: 11.437}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+      - serializedVersion: 3
+        time: 0.7
+        value: {x: 27.448, y: -52.637, z: 25.904}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: -0}
+        tangentMode: 0
+        weightedMode: 2
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.65199995, y: 0.65199995, z: 0.65199995}
+      - serializedVersion: 3
+        time: 1.4
+        value: {x: 27.448, y: -52.637, z: 11.437}
+        inSlope: {x: 0, y: 0, z: -0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: {x: 0.652, y: 0.652, z: 0.652}
+        outWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3
+  - curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: {x: -74.214, y: 77.399, z: -135.905}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+      - serializedVersion: 3
+        time: 0.7
+        value: {x: -74.214, y: 77.399, z: -43.237}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: -0}
+        tangentMode: 0
+        weightedMode: 2
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.65199995, y: 0.65199995, z: 0.65199995}
+      - serializedVersion: 3
+        time: 1.4
+        value: {x: -74.214, y: 77.399, z: -135.905}
+        inSlope: {x: 0, y: 0, z: -0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: {x: 0.652, y: 0.652, z: 0.652}
+        outWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2
+  - curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: {x: -5.857, y: 33.058, z: 11.97}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 2
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.65199995, y: 0.65199995, z: 0.65199995}
+      - serializedVersion: 3
+        time: 1.4
+        value: {x: -5.857, y: 33.058, z: 11.97}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: {x: 0.652, y: 0.652, z: 0.652}
+        outWeight: {x: 0.42, y: 0.42, z: 0.42}
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3/R.arm4/R.arm5
+  - curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: {x: 26.152, y: 9.246, z: 9.409}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 2
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.65199995, y: 0.65199995, z: 0.65199995}
+      - serializedVersion: 3
+        time: 1.4
+        value: {x: 26.152, y: 9.246, z: 9.409}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: {x: 0.652, y: 0.652, z: 0.652}
+        outWeight: {x: 0.42, y: 0.42, z: 0.42}
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3/R.arm4
+  - curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: {x: 65.265, y: 22.494, z: 71.3}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+      - serializedVersion: 3
+        time: 0.7
+        value: {x: 65.265, y: 22.494, z: -32.841}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 2
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.65199995, y: 0.65199995, z: 0.65199995}
+      - serializedVersion: 3
+        time: 1.4
+        value: {x: 65.265, y: 22.494, z: 71.3}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: {x: 0.652, y: 0.652, z: 0.652}
+        outWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/L.arm/L.arm2
+  - curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: {x: -54.738, y: -1.832, z: 53.191}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+      - serializedVersion: 3
+        time: 0.7
+        value: {x: -54.738, y: -1.832, z: -18.368}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 2
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.65199995, y: 0.65199995, z: 0.65199995}
+      - serializedVersion: 3
+        time: 1.4
+        value: {x: -54.738, y: -1.832, z: 53.191}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: {x: 0.652, y: 0.652, z: 0.652}
+        outWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/R.thigh1/R.leg2
+  - curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: {x: -14.142, y: -4.082, z: 1.143}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+      - serializedVersion: 3
+        time: 0.7
+        value: {x: -14.142, y: -4.082, z: -15.222}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 2
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.65199995, y: 0.65199995, z: 0.65199995}
+      - serializedVersion: 3
+        time: 1.4
+        value: {x: -14.142, y: -4.082, z: 1.143}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: {x: 0.652, y: 0.652, z: 0.652}
+        outWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/R.thigh1/R.leg2/R.leg3/R.leg4
+  - curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: {x: 2.05, y: -0.577, z: -46.017}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 2
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.65199995, y: 0.65199995, z: 0.65199995}
+      - serializedVersion: 3
+        time: 1.4
+        value: {x: 2.05, y: -0.577, z: -46.017}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: {x: 0.652, y: 0.652, z: 0.652}
+        outWeight: {x: 0.42, y: 0.42, z: 0.42}
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2/L.leg3
+  - curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: {x: 8.165, y: 3.277, z: -3.444}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 2
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.65199995, y: 0.65199995, z: 0.65199995}
+      - serializedVersion: 3
+        time: 1.4
+        value: {x: 8.165, y: 3.277, z: -3.444}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: {x: 0.652, y: 0.652, z: 0.652}
+        outWeight: {x: 0.42, y: 0.42, z: 0.42}
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2/L.leg3/L.leg4
+  - curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: {x: 59.969, y: 2.076, z: -4.583}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+      - serializedVersion: 3
+        time: 0.7
+        value: {x: 59.969, y: 2.076, z: 47.668}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: -0}
+        tangentMode: 0
+        weightedMode: 2
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.65199995, y: 0.65199995, z: 0.65199995}
+      - serializedVersion: 3
+        time: 1.4
+        value: {x: 59.969, y: 2.076, z: -4.583}
+        inSlope: {x: 0, y: 0, z: -0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: {x: 0.652, y: 0.652, z: 0.652}
+        outWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2
+  m_PositionCurves:
+  - curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: {x: 0.00000020861623, y: 0.87988925, z: 0.0000059008607}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 2
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.65199995, y: 0.65199995, z: 0.65199995}
+      - serializedVersion: 3
+        time: 1.4
+        value: {x: 0.00000020861623, y: 0.87988925, z: 0.0000059008607}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: {x: 0.652, y: 0.652, z: 0.652}
+        outWeight: {x: 0.42, y: 0.42, z: 0.42}
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/L.arm/L.arm2/L.arm3
+  - curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: {x: 0.00000423193, y: 0.761111, z: 0.000019311903}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+      - serializedVersion: 3
+        time: 0.7
+        value: {x: 0.00000008940697, y: 0.7611015, z: -0.000004649162}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 2
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.65199995, y: 0.65199995, z: 0.65199995}
+      - serializedVersion: 3
+        time: 1.4
+        value: {x: 0.00000423193, y: 0.761111, z: 0.000019311903}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: {x: 0.652, y: 0.652, z: 0.652}
+        outWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3
+  - curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: {x: -0.0000039748843, y: 0.6497536, z: 0.0000067949286}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 2
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.65199995, y: 0.65199995, z: 0.65199995}
+      - serializedVersion: 3
+        time: 1.4
+        value: {x: -0.0000039748843, y: 0.6497536, z: 0.0000067949286}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: {x: 0.652, y: 0.652, z: 0.652}
+        outWeight: {x: 0.42, y: 0.42, z: 0.42}
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2
+  - curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: {x: 0.000025089825, y: 0.31910902, z: 0.00001259893}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 2
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.65199995, y: 0.65199995, z: 0.65199995}
+      - serializedVersion: 3
+        time: 1.4
+        value: {x: 0.000025089825, y: 0.31910902, z: 0.00001259893}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: {x: 0.652, y: 0.652, z: 0.652}
+        outWeight: {x: 0.42, y: 0.42, z: 0.42}
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3/R.arm4/R.arm5
+  - curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: {x: -0.0000012442471, y: 0.7266975, z: -0.000004049391}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 2
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.65199995, y: 0.65199995, z: 0.65199995}
+      - serializedVersion: 3
+        time: 1.4
+        value: {x: -0.0000012442471, y: 0.7266975, z: -0.000004049391}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: {x: 0.652, y: 0.652, z: 0.652}
+        outWeight: {x: 0.42, y: 0.42, z: 0.42}
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3/R.arm4
+  - curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: {x: -0.0000054724514, y: 0.50230074, z: 0.000005841255}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 2
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.65199995, y: 0.65199995, z: 0.65199995}
+      - serializedVersion: 3
+        time: 1.4
+        value: {x: -0.0000054724514, y: 0.50230074, z: 0.000005841255}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: {x: 0.652, y: 0.652, z: 0.652}
+        outWeight: {x: 0.42, y: 0.42, z: 0.42}
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/L.arm/L.arm2
+  - curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: {x: -0.00001129508, y: 0.4958498, z: -0.000012844801}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 2
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.65199995, y: 0.65199995, z: 0.65199995}
+      - serializedVersion: 3
+        time: 1.4
+        value: {x: -0.00001129508, y: 0.4958498, z: -0.000012844801}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: {x: 0.652, y: 0.652, z: 0.652}
+        outWeight: {x: 0.42, y: 0.42, z: 0.42}
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/R.thigh1/R.leg2
+  - curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: {x: -0.0000028785282, y: 0.7496492, z: -0.000002472331}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+      - serializedVersion: 3
+        time: 0.7
+        value: {x: -0.000006640565, y: 0.7496475, z: -0.000008057416}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 2
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.65199995, y: 0.65199995, z: 0.65199995}
+      - serializedVersion: 3
+        time: 1.4
+        value: {x: -0.0000028785282, y: 0.7496492, z: -0.000002472331}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: {x: 0.652, y: 0.652, z: 0.652}
+        outWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/R.thigh1/R.leg2/R.leg3/R.leg4
+  - curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: {x: -0.000005200505, y: 0.8158872, z: -0.000018596651}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 2
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.65199995, y: 0.65199995, z: 0.65199995}
+      - serializedVersion: 3
+        time: 1.4
+        value: {x: -0.000005200505, y: 0.8158872, z: -0.000018596651}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: {x: 0.652, y: 0.652, z: 0.652}
+        outWeight: {x: 0.42, y: 0.42, z: 0.42}
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2/L.leg3
+  - curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: {x: 0.0000031567388, y: 0.7761503, z: 0.000012821279}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 2
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.65199995, y: 0.65199995, z: 0.65199995}
+      - serializedVersion: 3
+        time: 1.4
+        value: {x: 0.0000031567388, y: 0.7761503, z: 0.000012821279}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: {x: 0.652, y: 0.652, z: 0.652}
+        outWeight: {x: 0.42, y: 0.42, z: 0.42}
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2/L.leg3/L.leg4
+  - curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: {x: 0.000000016763806, y: 0.5347044, z: 0.000000049360096}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+      - serializedVersion: 3
+        time: 0.7
+        value: {x: -0.0000015906987, y: 0.5347103, z: -0.0000036358833}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: -0, z: 0}
+        tangentMode: 0
+        weightedMode: 2
+        inWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0.65199995, y: 0.65199995, z: 0.65199995}
+      - serializedVersion: 3
+        time: 1.4
+        value: {x: 0.000000016763806, y: 0.5347044, z: 0.000000049360096}
+        inSlope: {x: 0, y: -0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: {x: 0.652, y: 0.652, z: 0.652}
+        outWeight: {x: 0.33333334, y: 0.33333334, z: 0.33333334}
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2
+  m_ScaleCurves: []
+  m_FloatCurves: []
+  m_PPtrCurves: []
+  m_SampleRate: 60
+  m_WrapMode: 0
+  m_Bounds:
+    m_Center: {x: 0, y: 0, z: 0}
+    m_Extent: {x: 0, y: 0, z: 0}
+  m_ClipBindingConstant:
+    genericBindings:
+    - serializedVersion: 2
+      path: 460846790
+      attribute: 1
+      script: {fileID: 0}
+      typeID: 4
+      customType: 0
+      isPPtrCurve: 0
+      isIntCurve: 0
+      isSerializeReferenceCurve: 0
+      metaData: 0
+    - serializedVersion: 2
+      path: 3950318299
+      attribute: 1
+      script: {fileID: 0}
+      typeID: 4
+      customType: 0
+      isPPtrCurve: 0
+      isIntCurve: 0
+      isSerializeReferenceCurve: 0
+      metaData: 0
+    - serializedVersion: 2
+      path: 3017589634
+      attribute: 1
+      script: {fileID: 0}
+      typeID: 4
+      customType: 0
+      isPPtrCurve: 0
+      isIntCurve: 0
+      isSerializeReferenceCurve: 0
+      metaData: 0
+    - serializedVersion: 2
+      path: 3464186469
+      attribute: 1
+      script: {fileID: 0}
+      typeID: 4
+      customType: 0
+      isPPtrCurve: 0
+      isIntCurve: 0
+      isSerializeReferenceCurve: 0
+      metaData: 0
+    - serializedVersion: 2
+      path: 1773157948
+      attribute: 1
+      script: {fileID: 0}
+      typeID: 4
+      customType: 0
+      isPPtrCurve: 0
+      isIntCurve: 0
+      isSerializeReferenceCurve: 0
+      metaData: 0
+    - serializedVersion: 2
+      path: 1864998539
+      attribute: 1
+      script: {fileID: 0}
+      typeID: 4
+      customType: 0
+      isPPtrCurve: 0
+      isIntCurve: 0
+      isSerializeReferenceCurve: 0
+      metaData: 0
+    - serializedVersion: 2
+      path: 3520904000
+      attribute: 1
+      script: {fileID: 0}
+      typeID: 4
+      customType: 0
+      isPPtrCurve: 0
+      isIntCurve: 0
+      isSerializeReferenceCurve: 0
+      metaData: 0
+    - serializedVersion: 2
+      path: 679459384
+      attribute: 1
+      script: {fileID: 0}
+      typeID: 4
+      customType: 0
+      isPPtrCurve: 0
+      isIntCurve: 0
+      isSerializeReferenceCurve: 0
+      metaData: 0
+    - serializedVersion: 2
+      path: 3258799807
+      attribute: 1
+      script: {fileID: 0}
+      typeID: 4
+      customType: 0
+      isPPtrCurve: 0
+      isIntCurve: 0
+      isSerializeReferenceCurve: 0
+      metaData: 0
+    - serializedVersion: 2
+      path: 520686533
+      attribute: 1
+      script: {fileID: 0}
+      typeID: 4
+      customType: 0
+      isPPtrCurve: 0
+      isIntCurve: 0
+      isSerializeReferenceCurve: 0
+      metaData: 0
+    - serializedVersion: 2
+      path: 1091657617
+      attribute: 1
+      script: {fileID: 0}
+      typeID: 4
+      customType: 0
+      isPPtrCurve: 0
+      isIntCurve: 0
+      isSerializeReferenceCurve: 0
+      metaData: 0
+    - serializedVersion: 2
+      path: 460846790
+      attribute: 4
+      script: {fileID: 0}
+      typeID: 4
+      customType: 4
+      isPPtrCurve: 0
+      isIntCurve: 0
+      isSerializeReferenceCurve: 0
+      metaData: 0
+    - serializedVersion: 2
+      path: 3950318299
+      attribute: 4
+      script: {fileID: 0}
+      typeID: 4
+      customType: 4
+      isPPtrCurve: 0
+      isIntCurve: 0
+      isSerializeReferenceCurve: 0
+      metaData: 0
+    - serializedVersion: 2
+      path: 3017589634
+      attribute: 4
+      script: {fileID: 0}
+      typeID: 4
+      customType: 4
+      isPPtrCurve: 0
+      isIntCurve: 0
+      isSerializeReferenceCurve: 0
+      metaData: 0
+    - serializedVersion: 2
+      path: 3464186469
+      attribute: 4
+      script: {fileID: 0}
+      typeID: 4
+      customType: 4
+      isPPtrCurve: 0
+      isIntCurve: 0
+      isSerializeReferenceCurve: 0
+      metaData: 0
+    - serializedVersion: 2
+      path: 1773157948
+      attribute: 4
+      script: {fileID: 0}
+      typeID: 4
+      customType: 4
+      isPPtrCurve: 0
+      isIntCurve: 0
+      isSerializeReferenceCurve: 0
+      metaData: 0
+    - serializedVersion: 2
+      path: 1864998539
+      attribute: 4
+      script: {fileID: 0}
+      typeID: 4
+      customType: 4
+      isPPtrCurve: 0
+      isIntCurve: 0
+      isSerializeReferenceCurve: 0
+      metaData: 0
+    - serializedVersion: 2
+      path: 3520904000
+      attribute: 4
+      script: {fileID: 0}
+      typeID: 4
+      customType: 4
+      isPPtrCurve: 0
+      isIntCurve: 0
+      isSerializeReferenceCurve: 0
+      metaData: 0
+    - serializedVersion: 2
+      path: 679459384
+      attribute: 4
+      script: {fileID: 0}
+      typeID: 4
+      customType: 4
+      isPPtrCurve: 0
+      isIntCurve: 0
+      isSerializeReferenceCurve: 0
+      metaData: 0
+    - serializedVersion: 2
+      path: 3258799807
+      attribute: 4
+      script: {fileID: 0}
+      typeID: 4
+      customType: 4
+      isPPtrCurve: 0
+      isIntCurve: 0
+      isSerializeReferenceCurve: 0
+      metaData: 0
+    - serializedVersion: 2
+      path: 520686533
+      attribute: 4
+      script: {fileID: 0}
+      typeID: 4
+      customType: 4
+      isPPtrCurve: 0
+      isIntCurve: 0
+      isSerializeReferenceCurve: 0
+      metaData: 0
+    - serializedVersion: 2
+      path: 1091657617
+      attribute: 4
+      script: {fileID: 0}
+      typeID: 4
+      customType: 4
+      isPPtrCurve: 0
+      isIntCurve: 0
+      isSerializeReferenceCurve: 0
+      metaData: 0
+    pptrCurveMapping: []
+  m_AnimationClipSettings:
+    serializedVersion: 2
+    m_AdditiveReferencePoseClip: {fileID: 0}
+    m_AdditiveReferencePoseTime: 0
+    m_StartTime: 0
+    m_StopTime: 1.4
+    m_OrientationOffsetY: 0
+    m_Level: 0
+    m_CycleOffset: 0
+    m_HasAdditiveReferencePose: 0
+    m_LoopTime: 1
+    m_LoopBlend: 0
+    m_LoopBlendOrientation: 0
+    m_LoopBlendPositionY: 0
+    m_LoopBlendPositionXZ: 0
+    m_KeepOriginalOrientation: 0
+    m_KeepOriginalPositionY: 1
+    m_KeepOriginalPositionXZ: 0
+    m_HeightFromFeet: 0
+    m_Mirror: 0
+  m_EditorCurves:
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.00000020861623
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 0.00000020861623
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/L.arm/L.arm2/L.arm3
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.87988925
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 0.87988925
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/L.arm/L.arm2/L.arm3
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.0000059008607
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 0.0000059008607
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/L.arm/L.arm2/L.arm3
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 6.104
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 6.104
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/L.arm/L.arm2/L.arm3
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 22.306
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 22.306
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/L.arm/L.arm2/L.arm3
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 46.049
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 46.049
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/L.arm/L.arm2/L.arm3
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.00000423193
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.7
+        value: 0.00000008940697
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 0.00000423193
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: 0.652
+        outWeight: 0.33333334
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.761111
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.7
+        value: 0.7611015
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 0.761111
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: 0.652
+        outWeight: 0.33333334
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.000019311903
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.7
+        value: -0.000004649162
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 0.000019311903
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: 0.652
+        outWeight: 0.33333334
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 27.448
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.7
+        value: 27.448
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 27.448
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: 0.652
+        outWeight: 0.33333334
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: -52.637
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.7
+        value: -52.637
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: -52.637
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: 0.652
+        outWeight: 0.33333334
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 11.437
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.7
+        value: 25.904
+        inSlope: 0
+        outSlope: -0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 11.437
+        inSlope: -0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: 0.652
+        outWeight: 0.33333334
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: -0.0000039748843
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: -0.0000039748843
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.6497536
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 0.6497536
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.0000067949286
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 0.0000067949286
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: -74.214
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.7
+        value: -74.214
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: -74.214
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: 0.652
+        outWeight: 0.33333334
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 77.399
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.7
+        value: 77.399
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 77.399
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: 0.652
+        outWeight: 0.33333334
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: -135.905
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.7
+        value: -43.237
+        inSlope: 0
+        outSlope: -0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: -135.905
+        inSlope: -0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: 0.652
+        outWeight: 0.33333334
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.000025089825
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 0.000025089825
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3/R.arm4/R.arm5
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.31910902
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 0.31910902
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3/R.arm4/R.arm5
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.00001259893
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 0.00001259893
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3/R.arm4/R.arm5
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: -5.857
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: -5.857
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3/R.arm4/R.arm5
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 33.058
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 33.058
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3/R.arm4/R.arm5
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 11.97
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 11.97
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3/R.arm4/R.arm5
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: -0.0000012442471
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: -0.0000012442471
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3/R.arm4
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.7266975
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 0.7266975
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3/R.arm4
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: -0.000004049391
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: -0.000004049391
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3/R.arm4
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 26.152
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 26.152
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3/R.arm4
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 9.246
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 9.246
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3/R.arm4
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 9.409
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 9.409
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3/R.arm4
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: -0.0000054724514
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: -0.0000054724514
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/L.arm/L.arm2
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.50230074
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 0.50230074
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/L.arm/L.arm2
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.000005841255
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 0.000005841255
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/L.arm/L.arm2
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 65.265
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.7
+        value: 65.265
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 65.265
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: 0.652
+        outWeight: 0.33333334
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/L.arm/L.arm2
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 22.494
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.7
+        value: 22.494
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 22.494
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: 0.652
+        outWeight: 0.33333334
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/L.arm/L.arm2
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 71.3
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.7
+        value: -32.841
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 71.3
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: 0.652
+        outWeight: 0.33333334
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/L.arm/L.arm2
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: -0.00001129508
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: -0.00001129508
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/R.thigh1/R.leg2
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.4958498
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 0.4958498
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/R.thigh1/R.leg2
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: -0.000012844801
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: -0.000012844801
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/R.thigh1/R.leg2
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: -54.738
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.7
+        value: -54.738
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: -54.738
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: 0.652
+        outWeight: 0.33333334
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/R.thigh1/R.leg2
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: -1.832
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.7
+        value: -1.832
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: -1.832
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: 0.652
+        outWeight: 0.33333334
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/R.thigh1/R.leg2
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 53.191
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.7
+        value: -18.368
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 53.191
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: 0.652
+        outWeight: 0.33333334
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/R.thigh1/R.leg2
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: -0.0000028785282
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.7
+        value: -0.000006640565
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: -0.0000028785282
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: 0.652
+        outWeight: 0.33333334
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/R.thigh1/R.leg2/R.leg3/R.leg4
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.7496492
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.7
+        value: 0.7496475
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 0.7496492
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: 0.652
+        outWeight: 0.33333334
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/R.thigh1/R.leg2/R.leg3/R.leg4
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: -0.000002472331
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.7
+        value: -0.000008057416
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: -0.000002472331
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: 0.652
+        outWeight: 0.33333334
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/R.thigh1/R.leg2/R.leg3/R.leg4
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: -14.142
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.7
+        value: -14.142
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: -14.142
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: 0.652
+        outWeight: 0.33333334
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/R.thigh1/R.leg2/R.leg3/R.leg4
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: -4.082
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.7
+        value: -4.082
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: -4.082
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: 0.652
+        outWeight: 0.33333334
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/R.thigh1/R.leg2/R.leg3/R.leg4
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 1.143
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.7
+        value: -15.222
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 1.143
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: 0.652
+        outWeight: 0.33333334
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/R.thigh1/R.leg2/R.leg3/R.leg4
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: -0.000005200505
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: -0.000005200505
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2/L.leg3
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.8158872
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 0.8158872
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2/L.leg3
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: -0.000018596651
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: -0.000018596651
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2/L.leg3
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 2.05
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 2.05
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2/L.leg3
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: -0.577
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: -0.577
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2/L.leg3
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: -46.017
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: -46.017
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2/L.leg3
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.0000031567388
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 0.0000031567388
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2/L.leg3/L.leg4
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.7761503
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 0.7761503
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2/L.leg3/L.leg4
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.000012821279
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 0.000012821279
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2/L.leg3/L.leg4
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 8.165
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 8.165
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2/L.leg3/L.leg4
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 3.277
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 3.277
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2/L.leg3/L.leg4
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: -3.444
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: -3.444
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 3
+        inWeight: 0.652
+        outWeight: 0.42
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2/L.leg3/L.leg4
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.000000016763806
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.7
+        value: -0.0000015906987
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 0.000000016763806
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: 0.652
+        outWeight: 0.33333334
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.5347044
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.7
+        value: 0.5347103
+        inSlope: 0
+        outSlope: -0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 0.5347044
+        inSlope: -0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: 0.652
+        outWeight: 0.33333334
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.000000049360096
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.7
+        value: -0.0000036358833
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 0.000000049360096
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: 0.652
+        outWeight: 0.33333334
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 59.969
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.7
+        value: 59.969
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 59.969
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: 0.652
+        outWeight: 0.33333334
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 2.076
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.7
+        value: 2.076
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: 2.076
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: 0.652
+        outWeight: 0.33333334
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: -4.583
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.7
+        value: 47.668
+        inSlope: 0
+        outSlope: -0
+        tangentMode: 9
+        weightedMode: 2
+        inWeight: 0.33333334
+        outWeight: 0.65199995
+      - serializedVersion: 3
+        time: 1.4
+        value: -4.583
+        inSlope: -0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 1
+        inWeight: 0.652
+        outWeight: 0.33333334
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  m_EulerEditorCurves:
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3/R.arm4/R.arm5
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3/R.arm4/R.arm5
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3/R.arm4/R.arm5
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2/L.leg3/L.leg4
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2/L.leg3/L.leg4
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2/L.leg3/L.leg4
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/L.arm/L.arm2/L.arm3
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/L.arm/L.arm2/L.arm3
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/L.arm/L.arm2/L.arm3
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3/R.arm4
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3/R.arm4
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3/R.arm4
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/L.arm/L.arm2
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/L.arm/L.arm2
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/L.arm/L.arm2
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/ChestBone/R.arm/R.arm2/R.arm3
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/R.thigh1/R.leg2/R.leg3/R.leg4
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/R.thigh1/R.leg2/R.leg3/R.leg4
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/R.thigh1/R.leg2/R.leg3/R.leg4
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2/L.leg3
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2/L.leg3
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2/L.leg3
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/R.thigh1/R.leg2
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/R.thigh1/R.leg2
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/R.thigh1/R.leg2
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.x
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.y
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.z
+    path: Mesh/ObserversCharacterMesh/Armature/WaistBone/L.thigh1/L.leg2
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  m_HasGenericRootTransform: 0
+  m_HasMotionFloatCurves: 0
+  m_Events: []

@@ -2,27 +2,79 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
-// Looper tab — ties the last keyframe of a clip to the first, and stretches the timeline.
+// Looper tab — sends a clip back to its starting pose, and stretches the timeline.
 //
-// Keep Linked is the point of it: with it on, whatever you key on the first frame is copied onto
-// the last frame as you work, so a cycle stays joined up while you are still changing the pose it
-// starts and ends on. It only travels one way, first to last, exactly as a loop needs.
+// Return to Start adds a key after the last one that copies the first, so a clip keyed A → B plays
+// A → B → A. The trip back takes as long as the trip there. Pressed again once that return key
+// exists, it refreshes the key instead of adding another — so after changing the first pose, press
+// it again to carry the change to the end.
 //
 // Like the Easing tab this edits the CLIP ASSET, not the scene.
 [System.Serializable]
 public class LooperTool : AnimateTool
 {
-    [SerializeField] bool linkLive;
-    [SerializeField] int  targetFrames = 24;
+    // None keeps the slope the clip leaves its first key with, so the join back to the start is
+    // seamless. The rest shape the move back instead, the same presets as the Easing tab.
+    public enum ReturnEase { None, Linear, EaseIn, EaseOut, EaseInOut }
 
-    [System.NonSerialized] List<float> firstKeys;
-    [System.NonSerialized] double      nextPoll;
+    [SerializeField] int        targetFrames = 24;
+    [SerializeField] ReturnEase returnEase   = ReturnEase.None;
+    [SerializeField] float      easeIntensity = 0.5f;
 
     public override string Title => "Looper";
 
+    // Every key frame in the clip, listed in order, with the return key shown where it is or where
+    // it will go — so what the button does can be read off before pressing it.
+    static void DrawKeyList(AnimationClip clip, float fps, bool returning, float at, bool usable)
+    {
+        var times = KeyTimes(clip);
+
+        using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+        {
+            if (!usable)
+            {
+                EditorGUILayout.LabelField(times.Count == 0 ? "The clip has no keys."
+                                                            : "Needs at least two keys at different frames.",
+                                           EditorStyles.wordWrappedMiniLabel);
+                return;
+            }
+
+            int shown = returning ? times.Count - 1 : times.Count;
+            for (int i = 0; i < shown; i++)
+                EditorGUILayout.LabelField($"Key {i + 1}", $"frame {times[i] * fps:0}" +
+                                           (i == 0 ? "   (start pose)" : ""));
+
+            var prev = GUI.color;
+            GUI.color = returning ? prev : new Color(1f, 0.85f, 0.4f, 1f);
+            EditorGUILayout.LabelField("Return", $"frame {at * fps:0}   " +
+                                       (returning ? "(already there — will be updated)" : "(will be added)"));
+            GUI.color = prev;
+        }
+    }
+
+    static List<float> KeyTimes(AnimationClip clip)
+    {
+        var times = new List<float>();
+        foreach (var binding in AnimationUtility.GetCurveBindings(clip))
+        {
+            var curve = AnimationUtility.GetEditorCurve(clip, binding);
+            if (curve == null) continue;
+
+            foreach (var k in curve.keys)
+            {
+                bool held = false;
+                foreach (float t in times)
+                    if (Mathf.Abs(t - k.time) < 1e-4f) { held = true; break; }
+                if (!held) times.Add(k.time);
+            }
+        }
+        times.Sort();
+        return times;
+    }
+
     public override void OnGUI(RigContext rig)
     {
-        EditorGUILayout.HelpBox("Ties the end of the clip to its start. Edits the clip asset, not the scene.",
+        EditorGUILayout.HelpBox("Sends the clip back to its starting pose. Edits the clip asset, not the scene.",
                                 MessageType.None);
 
         if (!rig.DrawClipField()) return;
@@ -33,18 +85,32 @@ public class LooperTool : AnimateTool
                                    EditorStyles.miniLabel);
 
         EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Loop Ends", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Return to Start", EditorStyles.boldLabel);
 
-        linkLive = EditorGUILayout.Toggle("Keep Linked", linkLive);
-        if (linkLive)
-            EditorGUILayout.HelpBox("Whatever you key on the first frame is copied to the last as you work.",
-                                    MessageType.None);
+        KeySpan(rig.clip, out float start, out float end);
+        float fps       = Mathf.Max(1f, rig.clip.frameRate);
+        bool  returning = EndsOnStart(rig.clip);
+        float at        = returning ? end : end + (end - start);
 
-        if (GUILayout.Button("Link Ends Now"))
+        DrawKeyList(rig.clip, fps, returning, at, end > start);
+
+        using (new EditorGUI.DisabledScope(end <= start))
         {
-            int n = LinkEnds(rig.clip);
-            firstKeys = FirstKeySignature(rig.clip);
-            Debug.Log($"[Animate Suite] Looped {n} curves in {rig.clip.name}.");
+            returnEase = (ReturnEase)EditorGUILayout.EnumPopup(
+                new GUIContent("Return Easing", "How the move back to the start pose speeds up and slows down."),
+                returnEase);
+
+            using (new EditorGUI.DisabledScope(returnEase == ReturnEase.None || returnEase == ReturnEase.Linear))
+                easeIntensity = EditorGUILayout.Slider(
+                    new GUIContent("Intensity", "0 is no easing, 0.5 the standard ease, 1 the strongest."),
+                    easeIntensity, 0f, 1f);
+
+            if (GUILayout.Button(returning ? "Update Return to Start" : "Add Return to Start"))
+            {
+                int n = ReturnToStart(rig.clip, returnEase, easeIntensity);
+                Debug.Log($"[Animate Suite] {(returning ? "Updated" : "Added")} the return to start " +
+                          $"on {n} curves in {rig.clip.name}.");
+            }
         }
 
         EditorGUILayout.Space();
@@ -65,84 +131,115 @@ public class LooperTool : AnimateTool
         }
     }
 
-    // ────────────────────────────────── live link ──────────────────────────────────
+    // ────────────────────────────────── return to start ──────────────────────────────────
 
-    // Polls the clip rather than hooking the Animation window, whose recording state is internal.
-    // Ten times a second is plenty for keeping up with hand-keying and keeps the cost off the
-    // editor loop on a clip with a lot of curves.
-    public override void OnUpdate(RigContext rig)
+    // The earliest and latest key times across the whole clip. Bones keyed on fewer frames than
+    // others still return on the same frame as everything else.
+    static void KeySpan(AnimationClip clip, out float start, out float end)
     {
-        if (!linkLive || !rig.ClipEditable) { firstKeys = null; return; }
-
-        if (EditorApplication.timeSinceStartup < nextPoll) return;
-        nextPoll = EditorApplication.timeSinceStartup + 0.1;
-
-        var now = FirstKeySignature(rig.clip);
-        if (firstKeys != null && Same(firstKeys, now)) return;
-
-        // Writing the last keys leaves the first ones alone, so the signature settles and this does
-        // not chase itself.
-        if (firstKeys != null) LinkEnds(rig.clip);
-        firstKeys = now;
+        start = float.MaxValue; end = float.MinValue;
+        foreach (var binding in AnimationUtility.GetCurveBindings(clip))
+        {
+            var curve = AnimationUtility.GetEditorCurve(clip, binding);
+            if (curve == null || curve.length == 0) continue;
+            start = Mathf.Min(start, curve[0].time);
+            end   = Mathf.Max(end,   curve[curve.length - 1].time);
+        }
+        if (start > end) start = end = 0f;
     }
 
-    static List<float> FirstKeySignature(AnimationClip clip)
+    // Whether the clip's final frame already holds the first pose, on every curve keyed there. A bone
+    // that never moved matches trivially, so a clip only reads as returning once the moved ones do.
+    static bool EndsOnStart(AnimationClip clip)
     {
-        var values = new List<float>();
+        KeySpan(clip, out float start, out float end);
+        if (end <= start) return false;
+
         foreach (var binding in AnimationUtility.GetCurveBindings(clip))
         {
             var curve = AnimationUtility.GetEditorCurve(clip, binding);
             if (curve == null || curve.length < 2) continue;
 
-            Keyframe k = curve[0];
-            values.Add(k.value);
-            values.Add(k.inTangent);
-            values.Add(k.outTangent);
+            Keyframe last = curve[curve.length - 1];
+            if (!Mathf.Approximately(last.time, end)) return false;
+            if (Mathf.Abs(last.value - curve[0].value) > 1e-4f) return false;
         }
-        return values;
-    }
-
-    static bool Same(List<float> a, List<float> b)
-    {
-        if (a.Count != b.Count) return false;
-        for (int i = 0; i < a.Count; i++)
-            if (Mathf.Abs(a[i] - b[i]) > 1e-6f) return false;
         return true;
     }
 
-    // ────────────────────────────────── operations ──────────────────────────────────
-
-    // Copies the first key onto the last of every curve, keeping the last key where it is in time.
+    // Adds a key after the last one holding the first key's pose, the same gap on from the last key
+    // as the last key is from the first. If the clip already ends on its first pose, that end key is
+    // refreshed in place rather than a second one added.
     //
-    // The slope travels too, and specifically the FIRST key's OUT tangent becomes the LAST key's IN
-    // tangent. That is the continuity the wrap actually needs: playback arrives at the last key on
-    // its in-tangent, then restarts leaving the first key on its out-tangent. Match values only and
-    // the pose is right but the motion visibly kinks at the join.
-    public static int LinkEnds(AnimationClip clip)
+    // The slope travels too, and specifically the FIRST key's OUT tangent becomes the return key's IN
+    // tangent. That is the continuity a loop needs: playback arrives at the end on its in-tangent,
+    // then restarts leaving the first key on its out-tangent. Match values only and the pose is right
+    // but the motion visibly kinks at the join.
+    //
+    // With an ease picked, the move back is then reshaped by it, which replaces that slope on the
+    // way in to the return key and on the way out of the key before it. Updating re-applies whatever
+    // ease and intensity are set now, so the move back can be retuned and pressed again.
+    public static int ReturnToStart(AnimationClip clip, ReturnEase ease, float intensity)
     {
+        KeySpan(clip, out float start, out float end);
+        if (end <= start) return 0;
+
+        bool  update = EndsOnStart(clip);
+        float at     = update ? end : end + (end - start);
+
         int changed = 0;
-        Undo.RecordObject(clip, "Loop Ends");
+        Undo.RecordObject(clip, "Return to Start");
 
         foreach (var binding in AnimationUtility.GetCurveBindings(clip))
         {
             var curve = AnimationUtility.GetEditorCurve(clip, binding);
-            if (curve == null || curve.length < 2) continue;
+            if (curve == null || curve.length == 0) continue;
 
-            int      lastIndex = curve.length - 1;
-            Keyframe first     = curve[0];
-            Keyframe last      = curve[lastIndex];
+            Keyframe first = curve[0];
+            int      index;
 
-            AnimationUtility.SetKeyLeftTangentMode(curve, lastIndex, AnimationUtility.TangentMode.Free);
-            last = curve[lastIndex];   // re-read: setting the mode rewrites the keyframe
+            if (update && curve.length >= 2)
+                index = curve.length - 1;
+            else
+            {
+                index = curve.AddKey(new Keyframe(at, first.value));
+                if (index < 0) continue;   // a key already sits at that time
 
-            last.value        = first.value;
-            last.inTangent    = first.outTangent;
-            last.inWeight     = first.outWeight;
-            last.outTangent   = first.outTangent;
-            last.outWeight    = first.outWeight;
-            last.weightedMode = first.weightedMode;
+                // The old last key may be auto-smoothed; re-applying its own mode recalculates its
+                // slope now that it has a key after it instead of being the end of the curve.
+                if (index > 0)
+                    AnimationUtility.SetKeyRightTangentMode(curve, index - 1,
+                        AnimationUtility.GetKeyRightTangentMode(curve, index - 1));
+            }
 
-            curve.MoveKey(lastIndex, last);
+            AnimationUtility.SetKeyLeftTangentMode (curve, index, AnimationUtility.TangentMode.Free);
+            AnimationUtility.SetKeyRightTangentMode(curve, index, AnimationUtility.TangentMode.Free);
+            Keyframe k = curve[index];   // re-read: setting the mode rewrites the keyframe
+
+            k.value        = first.value;
+            k.inTangent    = first.outTangent;
+            k.inWeight     = first.outWeight;
+            k.outTangent   = first.outTangent;
+            k.outWeight    = first.outWeight;
+            k.weightedMode = first.weightedMode;
+
+            curve.MoveKey(index, k);
+
+            if (ease != ReturnEase.None && index > 0)
+            {
+                EasePreset(ease, intensity, out Vector2 easeIn, out Vector2 easeOut);
+                EasingTool.EaseSegment(curve, index - 1, easeIn, easeOut);
+            }
+            else if (update && index > 0)
+            {
+                // Back to None after an ease: an earlier press left the key before the return eased
+                // on its way out. Hand that side back to Unity's default smoothing, unweighted.
+                Keyframe prev = curve[index - 1];
+                prev.weightedMode &= ~WeightedMode.Out;
+                curve.MoveKey(index - 1, prev);
+                AnimationUtility.SetKeyRightTangentMode(curve, index - 1, AnimationUtility.TangentMode.ClampedAuto);
+            }
+
             AnimationUtility.SetEditorCurve(clip, binding, curve);
             changed++;
         }
@@ -188,6 +285,46 @@ public class LooperTool : AnimateTool
 
         EditorUtility.SetDirty(clip);
         return changed;
+    }
+
+    // Intensity slides the graph handles along a line: linear at 0, the Easing tab's preset at 0.5,
+    // and the handles pushed right into the corners at 1 — as sharp as that ease can get while still
+    // starting and ending on the right poses.
+    static void EasePreset(ReturnEase ease, float intensity, out Vector2 easeIn, out Vector2 easeOut)
+    {
+        EasingTool.PresetLinear(out Vector2 linIn, out Vector2 linOut);
+        Vector2 midIn, midOut, maxIn, maxOut;
+
+        switch (ease)
+        {
+            case ReturnEase.EaseIn:
+                EasingTool.PresetEaseIn(out midIn, out midOut);
+                maxIn = new Vector2(1f, 0f); maxOut = new Vector2(1f, 1f);
+                break;
+            case ReturnEase.EaseOut:
+                EasingTool.PresetEaseOut(out midIn, out midOut);
+                maxIn = new Vector2(0f, 0f); maxOut = new Vector2(0f, 1f);
+                break;
+            case ReturnEase.EaseInOut:
+                EasingTool.PresetEaseInOut(out midIn, out midOut);
+                maxIn = new Vector2(1f, 0f); maxOut = new Vector2(0f, 1f);
+                break;
+            default:
+                easeIn = linIn; easeOut = linOut;
+                return;
+        }
+
+        intensity = Mathf.Clamp01(intensity);
+        if (intensity <= 0.5f)
+        {
+            easeIn  = Vector2.Lerp(linIn,  midIn,  intensity * 2f);
+            easeOut = Vector2.Lerp(linOut, midOut, intensity * 2f);
+        }
+        else
+        {
+            easeIn  = Vector2.Lerp(midIn,  maxIn,  (intensity - 0.5f) * 2f);
+            easeOut = Vector2.Lerp(midOut, maxOut, (intensity - 0.5f) * 2f);
+        }
     }
 
     static int FrameCount(AnimationClip clip) =>

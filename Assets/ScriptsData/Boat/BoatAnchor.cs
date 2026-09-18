@@ -44,6 +44,15 @@ public class BoatAnchor : MonoBehaviour
     /// </summary>
     public void SetKeyLocked(bool locked) => _keyLocked = locked;
 
+    /// <summary>True while something else owns the anchor and the player's key is held back.</summary>
+    public bool KeyLocked => _keyLocked;
+
+    /// <summary>
+    /// Held still by the player's own key, not by a conversation or other trigger that has taken
+    /// over. The camera reads this to offer turning about the boat rather than following behind it.
+    /// </summary>
+    public bool HeldByPlayer => _anchored && !_keyLocked;
+
     // Resolved lazily: the boat is built with the level, after this may already be sitting in the
     // scene, so asking once in Start would find nothing.
     BoatMovement Boat

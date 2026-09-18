@@ -49,6 +49,9 @@ MonoBehaviour:
   heightBlurRadius: 0.2
   spawnRadius: 4.61
   cullRadius: 5.14
+  obstacleRange: 19.45
+  repelLimit: 64
+  maskLimit: 128
   repelStrength: 1
   rockClearRadius: 0.06
   rockStrength: 1

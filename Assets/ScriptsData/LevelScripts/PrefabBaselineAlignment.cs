@@ -30,6 +30,11 @@ public class PrefabBaselineAlignment : MonoBehaviour
     [Tooltip("World-units to shift the prefab along its forward direction at spawn. Positive = toward arena centre, " +
              "negative = out into the wall.")]
     [SerializeField] float wallDepth = 0f;
+    [Tooltip("Which prefab axis points through the wall. Forward = the FORWARD arrow (the original behaviour). " +
+             "The others use a fixed prefab axis, for prefabs whose wall doesn't sit across their facing direction.")]
+    [SerializeField] WallDepthAxis wallDepthAxis = WallDepthAxis.Forward;
+
+    public enum WallDepthAxis { Forward, PlusX, MinusX, PlusY, MinusY, PlusZ, MinusZ }
 
     [Header("Designer Scale Radius")]
     [Tooltip("When enabled, the Grid Designer draws a proportional footprint ring for this prefab and lets you scale placements up/down.")]
@@ -54,6 +59,24 @@ public class PrefabBaselineAlignment : MonoBehaviour
     public bool  UseWallDepth => useWallDepth;
     public float WallDepth    => wallDepth;
 
+    // Direction the wall-depth offset runs along, in the same prefab space as LocalForward.
+    public Vector3 WallDepthLocalAxis
+    {
+        get
+        {
+            switch (wallDepthAxis)
+            {
+                case WallDepthAxis.PlusX:  return Vector3.right;
+                case WallDepthAxis.MinusX: return Vector3.left;
+                case WallDepthAxis.PlusY:  return Vector3.up;
+                case WallDepthAxis.MinusY: return Vector3.down;
+                case WallDepthAxis.PlusZ:  return Vector3.forward;
+                case WallDepthAxis.MinusZ: return Vector3.back;
+                default:                   return LocalForward;
+            }
+        }
+    }
+
     // Prefab top marker. Height is world-units above the waterline disc; 0 when disabled.
     public bool    UsePrefabTopMarker => usePrefabTopMarker;
     public float   PrefabTopHeight    => usePrefabTopMarker ? Mathf.Max(0f, prefabTopHeight) : 0f;
@@ -75,7 +98,7 @@ public class PrefabBaselineAlignment : MonoBehaviour
         // Wall-depth offset — drawn independently of showDebug so the intersection point is visible while authoring.
         if (useWallDepth && Mathf.Abs(wallDepth) > 0.0001f)
         {
-            Vector3 fwd = transform.TransformDirection(LocalForward).normalized;
+            Vector3 fwd = transform.TransformDirection(WallDepthLocalAxis).normalized;
             Vector3 from = transform.position;
             Vector3 to   = from + fwd * wallDepth;
             Gizmos.color = new Color(0.2f, 0.9f, 1f, 0.9f);

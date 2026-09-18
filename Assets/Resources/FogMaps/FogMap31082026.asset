@@ -43,12 +43,16 @@ MonoBehaviour:
   windAngle: 20
   windSpeed: 0.07
   unitsPerTexel: 0.053
-  maxGridResolution: 1024
+  maxGridResolution: 512
+  heightMapQuality: 2
   heaviness: 0.98
   blurRadius: 0.112
   heightBlurRadius: 0.2
   spawnRadius: 3.95
   cullRadius: 4.7
+  obstacleRange: 18.82
+  repelLimit: 64
+  maskLimit: 128
   globalRepelStrength: 1
   rockRepelRadius: 0.33
   rockRepelStrength: 4
@@ -60,6 +64,22 @@ MonoBehaviour:
   lampRepelStrength: 1.08
   lampMaskRadius: 0.34
   lampMaskFeather: 0.2
+  runsRepel: 1
+  runChainSpacing: 2.04
+  runRepelRadius: 2.91
+  runRepelStrength: 4
+  runMaskRadius: 0.5
+  runMaskFeather: 0.6
+  poolsRepel: 1
+  poolRepelRadius: 0.5
+  poolRepelStrength: 4
+  poolMaskRadius: 0.5
+  poolMaskFeather: 0.6
+  arenasRepel: 1
+  arenaRepelRadius: 0.5
+  arenaRepelStrength: 4
+  arenaMaskRadius: 0.5
+  arenaMaskFeather: 0.6
   boatRepelRadius: 0.66
   boatRepelStrength: 4
   boatMaskRadius: 0.05

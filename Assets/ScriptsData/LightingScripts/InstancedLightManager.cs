@@ -81,6 +81,13 @@ public class InstancedLightManager : MonoBehaviour
         _lights.Remove(light);
     }
 
+    /// <summary>
+    /// Make sure the manager exists so intensity/falloff get pushed even with no lights registered.
+    /// The fog's boat light reads them, and a scene with no street lights would otherwise leave
+    /// them at zero and the boat dark.
+    /// </summary>
+    public static void EnsureExists() => EnsureInstance();
+
     static void EnsureInstance()
     {
         if (_instance != null) return;

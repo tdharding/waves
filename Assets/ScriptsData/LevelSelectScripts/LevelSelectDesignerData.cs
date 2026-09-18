@@ -9,6 +9,21 @@ public class LevelSelectDesignerData : ScriptableObject
     public enum NodeType { Waypoint, JunctionSplit, ArenaEnd, ShopEnd }
     public enum SegmentType { MainRiver, PrimaryBranch, Secondary, Tertiary }
 
+    /// <summary>The four sides of a pool a river can come in on. North is +Z, east is +X.</summary>
+    public enum Compass { North, East, South, West }
+
+    /// <summary>
+    /// A node a pool places on one of its compass points, so the river meeting it arrives square
+    /// on to the rim and at the pool's own height. It is locked to the pool: it moves with it
+    /// and cannot be dragged on its own.
+    /// </summary>
+    [Serializable]
+    public class PoolLeadIn
+    {
+        public string  nodeId;
+        public Compass compass;
+    }
+
     [Serializable]
     public class LandscapeHillPoint
     {
@@ -16,6 +31,13 @@ public class LevelSelectDesignerData : ScriptableObject
         public Vector2 positionXZ;
         public float   scale  = 5f;
         public float   height = 1f;
+
+        [Tooltip("1 = smooth rounded hill. Lower flattens the top and steepens the sides; 0 is a " +
+                 "plateau with near-vertical cliffs.")]
+        [Range(0f, 1f)] public float smoothness = 1f;
+
+        [Tooltip("Rocky noise across this hill's shape. 0 = none.")]
+        [Range(0f, 1f)] public float noise = 0f;
     }
 
     [Serializable]
@@ -85,6 +107,10 @@ public class LevelSelectDesignerData : ScriptableObject
         public string nodeId;
         public int    entranceIndex;
 
+        [Tooltip("The side of the arena this entrance sits on, once its arena's entrances are " +
+                 "on compass points.")]
+        public Compass compass;
+
         [Tooltip("Tick to give the river arriving at this entrance its own overlap. Left off, " +
                  "it follows River Overlap in Procedural Generation.")]
         public bool overrideRunOverlap;
@@ -150,13 +176,35 @@ public class LevelSelectDesignerData : ScriptableObject
 
         // One entry per additional entrance beyond the primary (nodeId above)
         public List<DesignerArenaEntrance> secondaryEntrances = new List<DesignerArenaEntrance>();
+
+        [Tooltip("On once Refresh Lead-ins has put this arena's entrances on compass points. " +
+                 "From then on the entrances are locked to those points.")]
+        public bool compassEntrances;
+
+        [Tooltip("The side of the arena the primary entrance sits on, when Compass Entrances is on.")]
+        public Compass compass = Compass.South;
+
+        [Tooltip("The lead-in nodes this arena placed, one per entrance a river arrives at.")]
+        public List<ArenaLeadIn> leadIns = new();
+    }
+
+    /// <summary>
+    /// A node an arena places straight out from one of its entrances, so the river arrives square
+    /// on to it. Locked to the arena, the same way a pool's lead-in is.
+    /// </summary>
+    [Serializable]
+    public class ArenaLeadIn
+    {
+        public string nodeId;
+        public string entranceNodeId;
     }
 
     /// <summary>
     /// A circular basin on the river, built by revolving the same cross-section a run is swept
     /// along. <see cref="islandRadius"/> is what separates the shapes the designer draws: 0 for
     /// an open pool, anything larger for a pool with a centre — and a pool that several rivers
-    /// meet is a roundabout. Any path starting or ending on <see cref="nodeId"/> arrives at it.
+    /// meet is a roundabout. Any path starting, ending or passing through <see cref="nodeId"/>
+    /// meets it — a path passing through is split there, in on one side and out on the other.
     /// </summary>
     [Serializable]
     public class DesignerPool
@@ -185,6 +233,264 @@ public class LevelSelectDesignerData : ScriptableObject
         [Min(0f)] public float floorDepth = 0f;
 
         public Color editorColor = new Color(0.35f, 0.75f, 1f);
+
+        [Tooltip("The lead-in nodes this pool placed on its compass points, one per river.")]
+        public List<PoolLeadIn> leadIns = new();
+
+        [Tooltip("Stand a lollipop tower in the middle of the island. Only built when the island " +
+                 "radius is above 0.5.")]
+        public bool hasTower;
+
+        [Tooltip("The tower in the middle of the island — stem and orb sizes.")]
+        public LollipopTower tower = new LollipopTower { stemRadius = 0.05f, stemHeight = 0.8f, orbRadius = 0.25f,
+                                                     baseRadius = 0.12f, baseHeight = 0.08f };
+
+        [Tooltip("The tower preset last loaded onto this pool's tower or saved from it. Copied, " +
+                 "not linked — editing either one leaves the other as it was.")]
+        public LollipopTowerPreset towerPreset;
+    }
+
+    /// <summary>A pool's island has to be wider than this for a tower to stand in its middle.</summary>
+    public const float PoolTowerMinIsland = 0.5f;
+
+    public enum OutpostSide { Left, Right }
+
+    /// <summary>
+    /// A square block standing beside a river run — an installation outpost. It is placed at a
+    /// point along a path and stands on one bank, butted against the run's outer edge, with a
+    /// wall around the top.
+    ///
+    ///          |<---- width (along the river) ---->|
+    ///           _____                         _____    <- wall top (height + wall height)
+    ///          |     |_______________________|     |   <- floor    (height)
+    ///   run    |                                   |
+    ///  ________|                                   |   <- rim top  (0)
+    ///          |<- depth (away from the river) ->  |
+    ///
+    /// The bottom carries on down with every other generated piece, so it is not authored here.
+    /// </summary>
+    [Serializable]
+    public class DesignerOutpost
+    {
+        public string outpostId;
+        public string pathId;
+        public float  pathT;
+
+        [Tooltip("Which bank it stands on, looking down the path the way it was drawn.")]
+        public OutpostSide side = OutpostSide.Right;
+
+        [Tooltip("How far it runs along the river.")]
+        [Min(0.01f)] public float width = 1.2f;
+
+        [Tooltip("How far it reaches away from the river, measured out from the run's outer edge.")]
+        [Min(0.01f)] public float depth = 0.8f;
+
+        [Tooltip("How far its floor stands above the rim top of the river run.")]
+        [Min(0f)] public float height = 0.6f;
+
+        [Tooltip("Thickness of the wall around the top.")]
+        [Min(0f)] public float wallThickness = 0.05f;
+
+        [Tooltip("How far the wall around the top stands above the floor.")]
+        [Min(0f)] public float wallHeight = 0.1f;
+
+        [Tooltip("The lollipop tower standing on the floor — stem and orb sizes.")]
+        public LollipopTower tower = new LollipopTower();
+
+        [Tooltip("Moves the tower's base across the floor from its centre: x along the river, " +
+                 "y away from it.")]
+        public Vector2 towerOffset = Vector2.zero;
+
+        [Tooltip("The observers standing on the floor, each placed around the lollipop tower.")]
+        public List<OutpostObserver> observers = new();
+
+        [Tooltip("The preset last loaded onto this outpost or saved from it. Its settings are " +
+                 "copied, not linked — editing either one leaves the other as it was.")]
+        public InstallationOutpostPreset preset;
+
+        [Tooltip("The tower preset last loaded onto this outpost's tower or saved from it. Copied, " +
+                 "not linked — editing either one leaves the other as it was.")]
+        public LollipopTowerPreset towerPreset;
+    }
+
+    /// <summary>
+    /// One observer standing on an outpost's floor, moved off the floor's centre the same way the
+    /// tower is. Facing goes clockwise seen from above from the river, so it reads the same on
+    /// either bank.
+    /// </summary>
+    [Serializable]
+    public class OutpostObserver
+    {
+        [Tooltip("Moves it along the river from the floor's centre, down the path the way it was drawn.")]
+        public float offsetAlong = 0f;
+
+        [Tooltip("Moves it away from the river from the floor's centre.")]
+        public float offsetAway = 0f;
+
+        [Tooltip("Which way it faces, in degrees. 0 = facing the river, clockwise seen from above.")]
+        public float facing = 0f;
+
+        [Tooltip("How tall it stands, from its feet to the top marker on its prefab.")]
+        [Min(0.001f)] public float height = 0.15f;
+
+        public OutpostObserver Clone() => (OutpostObserver)MemberwiseClone();
+    }
+
+    public enum RimNodeSide { Left, Right, Both }
+
+    /// <summary>
+    /// A rim node: a round platform standing on a river's rim at one of its nodes — a cylinder
+    /// centred on the middle of the rim, bulging out past the outer edge and into the channel,
+    /// its top a little above the rim and its wall running down to the drop. One side of the
+    /// river or both, the same size either side.
+    /// </summary>
+    [Serializable]
+    public class DesignerRimNode
+    {
+        public string nodeId;
+
+        [Tooltip("Which bank it stands on, looking down the path the way it was drawn — or both.")]
+        public RimNodeSide side = RimNodeSide.Right;
+
+        [Tooltip("Radius of the platform. Held between just over half the rim width, so it " +
+                 "reaches past both of the rim's edges, and just short of the river's centreline.")]
+        public float radius = 0.1f;
+
+        [Tooltip("How far its top stands above the rim.")]
+        public float height = 0.01f;
+
+        [Tooltip("What stands on top of it, in the middle — on each side when it is on both.")]
+        public RimNodeTopper topper = RimNodeTopper.None;
+
+        [Tooltip("The lollipop tower standing on it, when Topper is Lollipop Tower.")]
+        public LollipopTower tower = new LollipopTower();
+
+        [Tooltip("The tower preset last loaded onto this tower or saved from it. Copied, not " +
+                 "linked — editing either one leaves the other as it was.")]
+        public LollipopTowerPreset towerPreset;
+
+        [Tooltip("How tall the vert display point stands, from the node floor to the top marker " +
+                 "on its prefab, when Topper is Vert Display Point.")]
+        [Min(0.001f)] public float displayHeight = 0.15f;
+
+        [Tooltip("What stands on the Left platform when Side is Both. The Topper, Tower and " +
+                 "Display Height fields above are then the Right platform's.")]
+        public RimNodeTopping bothLeft = new RimNodeTopping();
+
+        /// <summary>
+        /// What stands on one platform — +1 the right, -1 the left, looking down the path the
+        /// way it was drawn. A copy: hand it back through <see cref="SetToppingOn"/>.
+        /// </summary>
+        public RimNodeTopping ToppingOn(int side)
+        {
+            if (side < 0 && this.side == RimNodeSide.Both)
+                return (bothLeft ?? new RimNodeTopping()).Clone();
+
+            return new RimNodeTopping
+            {
+                topper        = topper,
+                tower         = tower?.Clone(),
+                towerPreset   = towerPreset,
+                displayHeight = displayHeight,
+            };
+        }
+
+        public void SetToppingOn(int side, RimNodeTopping topping)
+        {
+            if (side < 0 && this.side == RimNodeSide.Both)
+            {
+                bothLeft = topping.Clone();
+                return;
+            }
+
+            topper        = topping.topper;
+            tower         = topping.tower?.Clone();
+            towerPreset   = topping.towerPreset;
+            displayHeight = topping.displayHeight;
+        }
+    }
+
+    /// <summary>What can stand on top of a rim node.</summary>
+    public enum RimNodeTopper { None, LollipopTower, VertDisplayPoint }
+
+    /// <summary>What stands on one rim node platform, and its sizes.</summary>
+    [Serializable]
+    public class RimNodeTopping
+    {
+        [Tooltip("What stands in the middle of the platform's top.")]
+        public RimNodeTopper topper = RimNodeTopper.None;
+
+        [Tooltip("The lollipop tower standing on it, when Topper is Lollipop Tower.")]
+        public LollipopTower tower = new LollipopTower();
+
+        [Tooltip("The tower preset last loaded onto this tower or saved from it. Copied, not " +
+                 "linked — editing either one leaves the other as it was.")]
+        public LollipopTowerPreset towerPreset;
+
+        [Tooltip("How tall the vert display point stands, from the node floor to the top marker " +
+                 "on its prefab, when Topper is Vert Display Point.")]
+        [Min(0.001f)] public float displayHeight = 0.15f;
+
+        public RimNodeTopping Clone()
+        {
+            var copy = (RimNodeTopping)MemberwiseClone();
+            copy.tower = tower?.Clone();
+            return copy;
+        }
+    }
+
+    /// <summary>One node of a pipe: where it is on the map, and optionally its own height.</summary>
+    [Serializable]
+    public class PipeNode
+    {
+        public Vector2 positionXZ;
+
+        [Tooltip("Tick to give this node its own height. Left off, it takes the pipe's height.")]
+        public bool overrideHeight;
+
+        [Tooltip("How far the pipe's centre line stands above the water here, when Override " +
+                 "Height is on.")]
+        [Min(0f)] public float height = 0.5f;
+    }
+
+    /// <summary>A support on a pipe: which leg it is on (node i to node i + 1), and how far along it.</summary>
+    [Serializable]
+    public class PipeSupport
+    {
+        public int leg;
+        [Range(0f, 1f)] public float along = 0.5f;
+    }
+
+    /// <summary>
+    /// A pipe standing over the map on support stems — drawn node by node in Pipe mode, with
+    /// supports placed along it. Rounded at every bend; hollow, open at both ends. Only for
+    /// looks: nothing travels along it, and it has no collider.
+    /// </summary>
+    [Serializable]
+    public class DesignerPipe
+    {
+        public string pipeId;
+        public List<PipeNode>    nodes    = new();
+        public List<PipeSupport> supports = new();
+
+        [Tooltip("How far the pipe's centre line stands above the water, at every node that " +
+                 "doesn't override it.")]
+        [Min(0f)] public float height = 0.5f;
+
+        [Tooltip("The pipe's thickness, across the outside. The bends are rounded to match it.")]
+        [Min(0.01f)] public float pipeThickness = 0.2f;
+
+        [Tooltip("Thickness of the pipe's wall — the hollow is what is left inside it.")]
+        [Min(0f)] public float wallThickness = 0.03f;
+
+        [Tooltip("Thickness of each support stem. Each ring is as long as this.")]
+        [Min(0.005f)] public float supportThickness = 0.06f;
+
+        [Tooltip("How far each ring stands out beyond the pipe.")]
+        [Min(0f)] public float ringOverhang = 0.02f;
+
+        public float HeightAt(int node) =>
+            nodes[node].overrideHeight ? nodes[node].height : height;
     }
 
     public List<LandscapeHillPoint> hillPoints = new();
@@ -196,6 +502,9 @@ public class LevelSelectDesignerData : ScriptableObject
     public List<DesignerObstacle> obstacles = new();
     public List<DesignerArena>    arenas    = new();
     public List<DesignerPool>     pools     = new();
+    public List<DesignerOutpost>  outposts  = new();
+    public List<DesignerRimNode>  rimNodes  = new();
+    public List<DesignerPipe>     pipes     = new();
 
     // Tool settings
     // Retired with the on-rails boat. Kept so designer assets written before that still
@@ -212,6 +521,10 @@ public class LevelSelectDesignerData : ScriptableObject
     [Tooltip("Material on the generated arena walls. Falls back to the river material when " +
              "left empty, so a wall is never generated unshaded.")]
     public Material           arenaWallMaterial;
+
+    [Tooltip("Material on the door filling each archway's opening. Falls back to the wall " +
+             "material when left empty.")]
+    public Material           arenaDoorMaterial;
 
     [Tooltip("Water is generated as permanent mesh sitting in every river channel. Untick to " +
              "go back to the SplineExtrude water that unfolds ahead of the boat.")]
@@ -238,11 +551,6 @@ public class LevelSelectDesignerData : ScriptableObject
     // them at 0 and every surface butts exactly as it did before.
     // ─────────────────────────────────────────────
 
-    [Tooltip("How far a branch's water carries on PAST the river it leaves, over that river's " +
-             "own water, before fading out. 0 butts it onto the channel edge as before. " +
-             "Geometry — needs a Rebuild Runs.")]
-    [Min(0f)] public float     waterBranchOverlap = 0f;
-
     [Tooltip("How far a pool's water carries on OUT into each river that meets it, over that " +
              "river's own water, before fading out. 0 butts it onto the line the river's water " +
              "ends on as before. Geometry — needs a Rebuild Runs.")]
@@ -258,6 +566,14 @@ public class LevelSelectDesignerData : ScriptableObject
 
     [Tooltip("Shape every pool takes unless it overrides it.")]
     public PoolShape          defaultPoolShape    = new PoolShape();
+
+    [Tooltip("How far a pool's lead-in nodes stand out past the point its rivers are cut off " +
+             "at (the rim, plus the collar). 0 puts them right on the cut.")]
+    [Min(0f)] public float    poolLeadInDistance  = 0.5f;
+
+    [Tooltip("How far an arena's lead-in nodes stand out from the entrance they lead to. " +
+             "0 puts them right on the entrance.")]
+    [Min(0f)] public float    arenaLeadInDistance = 0.5f;
 
     [Tooltip("Shape every arena wall takes unless it overrides it.")]
     public ArenaWallProfile   defaultArenaWall    = new ArenaWallProfile();
@@ -277,7 +593,6 @@ public class LevelSelectDesignerData : ScriptableObject
 
     public float      junctionGapPadding      = 0f;
     public float      splineInstantiateSpacing = 0.15f;
-    public int        curveSubdivisions        = 2;
     public float      arenaHeadOffset          = 5f;
     public float      shopHeadOffset           = 5f;
 
@@ -286,6 +601,11 @@ public class LevelSelectDesignerData : ScriptableObject
     public float landscapeTileSize = 41.62f;
     public int landscapeTilesX = 5;
     public int landscapeTilesZ = 5;
+
+    [Tooltip("Grid squares along each side of every landscape tile. The hills are raised in the " +
+             "shader, so more squares give smoother hill shapes at the cost of more vertices.")]
+    [Range(1, 100)] public int landscapeTileSubdivisions = 20;
+
     public Vector2 landscapeOffset = new Vector2(-97.9f, -130.9f);
     public float landscapeWorldY = -1.65f;
 
@@ -293,6 +613,10 @@ public class LevelSelectDesignerData : ScriptableObject
              "keep their heights measured from the tile base, so the landscape shape rides with " +
              "the tiles unchanged.")]
     public float landscapeHeightOffset = 0f;
+
+    [Tooltip("How fine the rocky noise on hills is — its frequency across the world. Only hills " +
+             "with a Rocky Noise amount show it.")]
+    public float landscapeNoiseScale = 0.25f;
 
     /// <summary>
     /// How wide the tile family is, corner to corner on its longer side. Tiles are laid from
@@ -379,6 +703,17 @@ public class LevelSelectDesignerData : ScriptableObject
              "means bare unlit stone, for the same reason as above.")]
     public LevelSelectRiverStructurePreset structurePreset;
 
+    [Tooltip("How the LANDSCAPE hills look — three stone variants and which part of the landscape " +
+             "(ground, tops, cliffs, holes) wears each. Authored in Tools > Waves > Level Select " +
+             "Landscape Tuner. No preset means plain unlit stone.")]
+    public LevelSelectLandscapePreset landscapePreset;
+
+    // The default is the position the run shading preset carried when the light moved here, so a
+    // world saved before then is lit from exactly where it was.
+    [Tooltip("Where the world's made-up light stands, in world space — shared by the river runs " +
+             "and the landscape hills. Each has its own strength in its tuner.")]
+    public Vector3 lightPosition = new Vector3(362.3f, 259.8f, -3.2f);
+
     [Tooltip("Draws the frame each water surface was generated in instead of the water itself — " +
              "which way its lines are lying, and how much of it is really there under an " +
              "overlap. A way of reading the water rather than a way it looks, so it lives here " +
@@ -394,6 +729,7 @@ public class LevelSelectDesignerData : ScriptableObject
 
     private static readonly int WhiteGradientPosId    = Shader.PropertyToID("_WhiteGradientPos");
     private static readonly int DistanceFadeRadiusId  = Shader.PropertyToID("_DistanceFadeRadius");
+    private static readonly int LightPositionId       = Shader.PropertyToID("_LevelSelectLightPosition");
 
     /// <summary>
     /// Publishes this world's look to the shaders. Called every frame rather than once: these
@@ -418,6 +754,13 @@ public class LevelSelectDesignerData : ScriptableObject
         // globals.
         RiverEdgeRippleSettings.Push(waterPreset     != null ? waterPreset.edgeRipples    : null);
         RiverRunShadingSettings.Push(structurePreset != null ? structurePreset.runShading : null);
+        LandscapeShadingSettings.Push(landscapePreset != null ? landscapePreset.landscapeShading : null);
+
+        // The one light both the runs and the hills are turned against.
+        Shader.SetGlobalVector(LightPositionId, lightPosition);
+
+        // Where the tile surface sits, which the landscape's Tops and Holes are measured from.
+        LandscapeShadingSettings.PushBaseY(landscapeWorldY + landscapeHeightOffset);
 
         // Where the water lies, which is what places the waterline band on the stone. Pushed from
         // the world rather than carried on the preset: it is already authored once as Water Level,
@@ -616,6 +959,13 @@ public float canvasOriginX      = 0f;
         return node != null ? node.worldPosition : Vector3.zero;
     }
 
+    /// <summary>The rim node set on a node, or null when it carries none.</summary>
+    public DesignerRimNode RimNodeAt(string nodeId)
+    {
+        if (string.IsNullOrEmpty(nodeId) || rimNodes == null) return null;
+        return rimNodes.Find(r => r != null && r.nodeId == nodeId);
+    }
+
     /// <summary>The pool sitting on a node, or null when it carries none.</summary>
     public DesignerPool PoolAt(string nodeId)
     {
@@ -623,21 +973,51 @@ public float canvasOriginX      = 0f;
         return pools.Find(p => p != null && p.nodeId == nodeId);
     }
 
-    /// <summary>
-    /// Every path arriving at a pool, paired with the end it arrives on. A path meets a pool by
-    /// starting or ending on its node — so a river can run in, and another can run out the far
-    /// side, without either owning the pool.
-    /// </summary>
-    public List<(DesignerPath path, bool atEnd)> PathsAtPool(DesignerPool pool)
+    /// <summary>The pool a node is a lead-in of, or null when it is not one.</summary>
+    public DesignerPool PoolOfLeadIn(string nodeId)
     {
-        var arrivals = new List<(DesignerPath, bool)>();
+        if (string.IsNullOrEmpty(nodeId)) return null;
+        return pools.Find(p => p?.leadIns != null && p.leadIns.Exists(l => l.nodeId == nodeId));
+    }
+
+    /// <summary>The arena a node is a lead-in of, or null when it is not one.</summary>
+    public DesignerArena ArenaOfLeadIn(string nodeId)
+    {
+        if (string.IsNullOrEmpty(nodeId)) return null;
+        return arenas.Find(a => a?.leadIns != null && a.leadIns.Exists(l => l.nodeId == nodeId));
+    }
+
+    /// <summary>Flat world direction of a compass point.</summary>
+    public static Vector3 CompassDirection(Compass c) => c switch
+    {
+        Compass.North => Vector3.forward,
+        Compass.East  => Vector3.right,
+        Compass.South => Vector3.back,
+        _             => Vector3.left,
+    };
+
+    /// <summary>
+    /// Every river meeting a pool, one entry per mouth, paired with the node it comes in from.
+    /// A path meets a pool on every side of the pool's node it has a neighbour: once where it
+    /// starts or ends there, twice where it is drawn straight THROUGH the pool — in on one side,
+    /// out on the other. Any number of rivers can meet the same pool, and none of them owns it.
+    /// </summary>
+    public List<(DesignerPath path, string neighbourId)> PathsAtPool(DesignerPool pool)
+    {
+        var arrivals = new List<(DesignerPath, string)>();
         if (pool == null || string.IsNullOrEmpty(pool.nodeId)) return arrivals;
 
         foreach (var path in paths)
         {
-            if (path.nodeIds.Count < 2) continue;
-            if (path.nodeIds[path.nodeIds.Count - 1] == pool.nodeId) arrivals.Add((path, true));
-            else if (path.nodeIds[0] == pool.nodeId)                 arrivals.Add((path, false));
+            int n = path.nodeIds.Count;
+            if (n < 2) continue;
+
+            for (int i = 0; i < n; i++)
+            {
+                if (path.nodeIds[i] != pool.nodeId) continue;
+                if (i > 0)     arrivals.Add((path, path.nodeIds[i - 1]));
+                if (i < n - 1) arrivals.Add((path, path.nodeIds[i + 1]));
+            }
         }
 
         return arrivals;

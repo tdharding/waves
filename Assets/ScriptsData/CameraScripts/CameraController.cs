@@ -63,8 +63,25 @@ public class CameraController : MonoBehaviour
     private CameraProfile activeProfile;
     private bool orbitalActive = false;
 
+    [Header("Follow Pose")]
+[Tooltip("How far behind the boat the camera sits, along the ground.")]
+[SerializeField] private float followDistance = 7.01f;
+[Tooltip("How far above the boat it sits. Together with the distance this is the whole resting " +
+         "shot — the camera looks straight at the boat from there.")]
+[SerializeField] private float followHeight = 3f;
+[Tooltip("The resting zoom. 1 is the shot exactly as the distance and height describe it; the scroll " +
+         "wheel moves out from here, held in by Manual Min/Max Distance.")]
+[SerializeField] private float defaultZoom = 1.74f;
+[Tooltip("How long the camera takes to swing back in behind the boat. 0 pins it rigidly to the stern; " +
+         "a little lets it lag through a turn and catch up after it.")]
+[SerializeField] private float followCatchUpTime = 1f;
+[Tooltip("Transform whose forward is the boat's heading. Leave blank to use BoatMovement's transform — " +
+         "the follow target itself is usually a child that never rotates, so its forward is useless here.")]
+[SerializeField] private Transform boatHeadingSource;
+
     [Header("Manual Orbit")]
-[Tooltip("Player-driven camera: the mouse orbits the boat and the scroll wheel moves it in and out. " +
+[Tooltip("Player-driven camera: follows behind the boat under way, and the mouse turns it about the " +
+         "boat while it is stopped with the anchor key. The scroll wheel moves it in and out. " +
          "Off means the camera is left to Cinemachine / the level's CameraProfile.")]
 [SerializeField] private bool manualOrbitActive = false;
 [Tooltip("Base rotation speed in degrees per second of mouse travel, before Mouse Sensitivity is " +
@@ -76,15 +93,16 @@ public class CameraController : MonoBehaviour
 [SerializeField] private float manualMinDistance = 4f;
 [Tooltip("Furthest the scroll wheel can push the camera out.")]
 [SerializeField] private float manualMaxDistance = 16f;
-[Tooltip("Lowest vertical angle. Negative looks up from below the boat — the low-angle zoom exists " +
-         "to stop this dipping under the water surface.")]
+[Tooltip("Lowest vertical angle while turning about the anchored boat. Negative looks up from below " +
+         "the boat — the low-angle zoom exists to stop this dipping under the water surface.")]
 [SerializeField] private float manualPitchMin = -60f;
 [Tooltip("Highest vertical angle. Positive looks down on the boat.")]
 [SerializeField] private float manualPitchMax = 45f;
 
 [Header("Mouse Look")]
-[Tooltip("Mouse moves the camera with no button held. The cursor is locked while this is on — " +
-         "press the free cursor key to release it and click on things.")]
+[Tooltip("While the boat is anchored, the mouse turns the camera with no button held and the cursor " +
+         "is locked — press the free cursor key to release it and click on things. Off = hold Right " +
+         "or Middle Mouse to turn. Under way the cursor is always free.")]
 [SerializeField] private bool mouseLookEnabled = true;
 [Tooltip("Toggles the cursor between locked (camera control) and free (clicking).")]
 [SerializeField] private KeyCode freeCursorKey = KeyCode.I;
@@ -100,7 +118,8 @@ public class CameraController : MonoBehaviour
 [SerializeField] private bool invertMouseY = false;
 
 [Header("Low Angle Zoom")]
-[Tooltip("Pulls the camera in as the pitch drops, so it never dips below the water surface.")]
+[Tooltip("Pulls the camera in as the pitch drops, so it never dips below the water surface. Only while " +
+         "turning about the anchored boat — under way the follow pose is the shot.")]
 [SerializeField] private bool lowAngleZoomEnabled = true;
 [Tooltip("Pitch (degrees) below which the camera starts zooming in. Above this the manual zoom distance is used.")]
 [SerializeField] private float lowAngleZoomPitchThreshold = 5f;
@@ -108,33 +127,6 @@ public class CameraController : MonoBehaviour
 [SerializeField] private float lowAngleZoomDistance = 3f;
 [Tooltip("How quickly the zoom eases toward its target. Higher = snappier.")]
 [SerializeField] private float lowAngleZoomSmoothing = 8f;
-
-[Header("Auto Follow Behind Boat")]
-[Tooltip("After the player stops turning, the camera drifts round to sit behind the boat while it " +
-         "is moving. Any mouse rotation cancels it and restarts the delay.")]
-[SerializeField] private bool autoFollowBehindBoat = true;
-[Tooltip("Seconds of no mouse rotation before the camera starts drifting round.")]
-[SerializeField] private float autoFollowDelay = 2f;
-[Tooltip("Degrees per second the camera turns while catching up. Keep it low — this should be a " +
-         "drift the player barely notices, not a snap.")]
-[SerializeField] private float autoFollowSpeed = 25f;
-[Tooltip("How fast the boat must be moving (world units per second) for the drift to engage. " +
-         "A stationary boat never pulls the camera round.")]
-[SerializeField] private float autoFollowMinBoatSpeed = 0.5f;
-[Tooltip("How far off from directly behind the boat the camera must be before the drift starts, in " +
-         "degrees. Stops it constantly nudging at small offsets — raise it to let the player hold a " +
-         "slightly off-centre view without being pulled straight.")]
-[SerializeField] private float autoFollowMinAngle = 10f;
-[Tooltip("Seconds spent easing up to full Auto Follow Speed after the drift engages. The turn starts " +
-         "slow and builds, so it never begins with a lurch. 0 = start at full speed immediately.")]
-[SerializeField] private float autoFollowEaseInTime = 1f;
-[Tooltip("Degrees out from directly behind the boat at which the camera starts slowing down, so it " +
-         "settles instead of stopping dead. 0 = no ease out. Keep this below Auto Follow Min Angle or " +
-         "small corrections will spend their whole turn easing.")]
-[SerializeField] private float autoFollowEaseOutAngle = 8f;
-[Tooltip("Transform whose forward is the boat's heading. Leave blank to use BoatMovement's transform — " +
-         "the follow target itself is usually a child that never rotates, so its forward is useless here.")]
-[SerializeField] private Transform boatHeadingSource;
 
 [Header("Height Floor")]
 [Tooltip("Hard backstop so the camera can never drop below the boat, whatever combination of pitch " +
@@ -167,10 +159,17 @@ public class CameraController : MonoBehaviour
 
 private float _manualYaw = -128.6533f;
 private float _manualPitch = 44.56071f;
-private float _manualDistance = 9f;
+// The scroll wheel's zoom on the resting shot. Kept as a zoom rather than a distance, so the shot
+// returns to it without forgetting the height it was paired with.
+private float _zoom = 1f;
 
-// Distance actually used by the camera — _manualDistance eased toward the low-angle zoom.
+// Distance actually used by the camera — the scroll distance, eased toward the low-angle zoom while
+// anchored.
 private float _currentDistance = 9f;
+
+private float _yawVelocity;
+private float _pitchVelocity;
+private float _distanceVelocity;
 
 private bool _cursorFree = false;
 private bool _cursorStateApplied = false;
@@ -184,28 +183,26 @@ private bool  _sonarView = false;
 private bool  _restoringPitch = false;
 private float _pitchBeforeSonar;
 
-private float   _lastRotateInputTime = -999f;
-private Vector3 _lastBoatPosition;
-private bool    _hasLastBoatPosition = false;
 private BoatMovement _boatMovement;
-
-// Auto-follow stays engaged once it starts, so it can finish the turn instead of switching off the
-// moment the offset drops back under the minimum angle. The ramp is the ease-in.
-private bool  _autoFollowEngaged = false;
-private float _autoFollowRamp = 0f;
-
-// Close enough to be done — small enough that the last degree isn't visible as a crawl.
-private const float AutoFollowStopAngle = 0.5f;
-
-// Floor on the ease-out, so the tail of the turn still closes at a visible rate.
-private const float AutoFollowMinEaseOut = 0.08f;
 
 // Pitch is driven by sonar rather than the mouse.
 private bool PitchLocked => lockPitchInSonar && _sonarView;
 
+// The resting shot as an angle and a length down the view ray, so the one piece of orbit maths
+// carries both the follow and the turning about the boat.
+private float RestPitch    => Mathf.Atan2(followHeight, Mathf.Max(followDistance, 0.001f)) * Mathf.Rad2Deg;
+private float RestDistance => Mathf.Max(new Vector2(followDistance, followHeight).magnitude, 0.001f);
+
+// How far out the camera wants to be: the resting shot at the current zoom, held inside the limits.
+private float ScrollDistance => Mathf.Clamp(RestDistance * _zoom, manualMinDistance, manualMaxDistance);
+
+// The boat is held still with the anchor key, and turning about it is offered. Not while a
+// conversation has taken the anchor — the camera is on someone else then.
+private bool IsAnchored => BoatAnchor.Instance != null && BoatAnchor.Instance.HeldByPlayer;
+
 // Cursor is only captured while the mouse is actually driving the camera.
 private bool WantCursorLocked =>
-    mouseLookEnabled && manualOrbitActive && !_cursorFree && !PauseManager.IsPaused;
+    mouseLookEnabled && manualOrbitActive && IsAnchored && !_cursorFree && !PauseManager.IsPaused;
 
 // =====================================================
 // UNITY
@@ -214,7 +211,8 @@ private bool WantCursorLocked =>
 private void Awake()
 {
     Instance = this;
-    _currentDistance = _manualDistance;
+    _zoom            = Mathf.Max(defaultZoom, 0.01f);
+    _currentDistance = ScrollDistance;
 
     if (orbitalCam != null)
     {
@@ -252,13 +250,18 @@ private void Update()
     float scroll = Input.GetAxis("Mouse ScrollWheel");
     if (!paused && Mathf.Abs(scroll) >= 0.01f)
     {
-        _manualDistance = Mathf.Clamp(_manualDistance - scroll * manualZoomSpeed, manualMinDistance, manualMaxDistance);
+        float wanted = Mathf.Clamp(ScrollDistance - scroll * manualZoomSpeed, manualMinDistance, manualMaxDistance);
+        _zoom = wanted / RestDistance;
     }
+
+    // Turning about the boat is offered only while it is anchored. Under way the camera keeps its
+    // place behind the stern (LateUpdate).
+    if (!IsAnchored) return;
 
     // Orbit — mouse movement alone when mouse look is on, otherwise the old Right/Middle Mouse drag
     bool orbitFromMouse = mouseLookEnabled
         ? (!paused && !_cursorFree)
-        : (Input.GetMouseButton(1) || Input.GetMouseButton(2));
+        : (!paused && (Input.GetMouseButton(1) || Input.GetMouseButton(2)));
 
     if (orbitFromMouse)
     {
@@ -278,27 +281,9 @@ private void Update()
             _manualPitch  = Mathf.Clamp(_manualPitch, manualPitchMin, manualPitchMax);
         }
 
-        // Any deliberate turn hands control back to the player and restarts the auto-follow delay
-        if (Mathf.Abs(yawInput) > 0.001f || Mathf.Abs(pitchInput) > 0.001f)
-        {
-            _lastRotateInputTime = Time.time;
-            CancelAutoFollow();
-        }
+        // Let the follow's eases go, so the swing back in behind the boat starts from rest.
+        _yawVelocity = _pitchVelocity = 0f;
     }
-
-    UpdateAutoFollow();
-    UpdateSonarPitch();
-
-    // Ease toward the pitch-driven distance so the camera never drops under the water surface
-    float target = TargetDistance();
-    _currentDistance = lowAngleZoomSmoothing > 0f
-        ? Mathf.Lerp(_currentDistance, target, 1f - Mathf.Exp(-lowAngleZoomSmoothing * Time.deltaTime))
-        : target;
-
-    // Last word on pitch — depends on the distance just settled above
-    ClampCameraHeight();
-
-    ApplyZoomDepthOfField();
 }
 
 // =====================================================
@@ -355,7 +340,7 @@ private void OnDisable()
 }
 
 // =====================================================
-// AUTO FOLLOW
+// FOLLOW
 // =====================================================
 
 // The transform that actually turns. The camera's follow target is typically a child that holds a
@@ -388,99 +373,37 @@ private BoatMovement ResolveBoatMovement()
     return _boatMovement;
 }
 
-// Drifts the yaw round to sit behind the boat once the player has stopped turning and the boat is
-// actually under way. A stationary boat, or one only bobbing on the waves, never drags the camera.
-private void UpdateAutoFollow()
+// The resting shot: dead behind the boat, at the authored height and zoom. The angles are eased
+// rather than set, so a turn leaves the camera trailing the stern for a moment and it comes round
+// after — the catching up that gives a turning its weight. Sonar's pitch stands in for the resting
+// one while it runs.
+private void EaseTowardsFollowPose()
 {
-    if (boatTarget == null) return;
+    float targetYaw = _manualYaw;
 
-    BoatMovement movement = ResolveBoatMovement();
-
-    // Prefer the movement script's own speed; fall back to how far the target actually travelled.
-    float boatSpeed;
-    if (movement != null)
+    Transform heading = HeadingSource;
+    if (heading != null)
     {
-        boatSpeed = Mathf.Abs(movement.CurrentSpeed);
-        _hasLastBoatPosition = false;
-    }
-    else
-    {
-        Vector3 position = boatTarget.position;
-        boatSpeed = 0f;
-
-        if (_hasLastBoatPosition && Time.deltaTime > 0f)
-        {
-            Vector3 travel = position - _lastBoatPosition;
-            travel.y = 0f;                               // heaving on the waves is not travel
-            boatSpeed = travel.magnitude / Time.deltaTime;
-        }
-
-        _lastBoatPosition    = position;
-        _hasLastBoatPosition = true;
+        // Behind the boat = looking the way the boat faces
+        Vector3 forward = heading.forward;
+        forward.y = 0f;
+        if (forward.sqrMagnitude > 1e-6f)
+            targetYaw = Mathf.Atan2(forward.x, forward.z) * Mathf.Rad2Deg;
     }
 
-    if (!autoFollowBehindBoat || boatSpeed < autoFollowMinBoatSpeed ||
-        Time.time - _lastRotateInputTime < autoFollowDelay)
+    float targetPitch = Mathf.Clamp(PitchLocked ? sonarPitch : RestPitch, manualPitchMin, manualPitchMax);
+
+    if (followCatchUpTime <= 0f)
     {
-        CancelAutoFollow();
+        _manualYaw       = targetYaw;
+        _manualPitch     = targetPitch;
+        _currentDistance = ScrollDistance;
         return;
     }
 
-    Transform heading = HeadingSource;
-    if (heading == null) { CancelAutoFollow(); return; }
-
-    // Behind the boat = looking the way the boat faces
-    Vector3 forward = heading.forward;
-    forward.y = 0f;
-    if (forward.sqrMagnitude < 1e-6f) { CancelAutoFollow(); return; }
-
-    float targetYaw = Mathf.Atan2(forward.x, forward.z) * Mathf.Rad2Deg;
-    float offset    = Mathf.Abs(Mathf.DeltaAngle(_manualYaw, targetYaw));
-
-    if (_autoFollowEngaged)
-    {
-        // Keep going until the turn is actually finished, not until it dips back under the minimum
-        if (offset <= AutoFollowStopAngle)
-        {
-            _manualYaw = targetYaw;
-            CancelAutoFollow();
-            return;
-        }
-    }
-    else
-    {
-        if (offset < autoFollowMinAngle) return;
-        _autoFollowEngaged = true;
-        _autoFollowRamp    = 0f;
-    }
-
-    // Ease in — SmoothStep starts near zero, so the turn creeps into motion rather than lurching
-    _autoFollowRamp = autoFollowEaseInTime > 0f
-        ? Mathf.Min(1f, _autoFollowRamp + Time.deltaTime / autoFollowEaseInTime)
-        : 1f;
-
-    float easeIn  = Mathf.SmoothStep(0f, 1f, _autoFollowRamp);
-    float easeOut = EaseOutFactor(offset);
-
-    float speed = autoFollowSpeed * easeIn * easeOut;
-    _manualYaw  = Mathf.MoveTowardsAngle(_manualYaw, targetYaw, speed * Time.deltaTime);
-}
-
-// Slows the turn down over the last few degrees so it settles rather than stopping dead.
-// Floored well above zero — a pure ease would go asymptotic and leave the final degree crawling for
-// seconds, which reads as the camera sticking rather than arriving.
-private float EaseOutFactor(float offset)
-{
-    if (autoFollowEaseOutAngle <= 0f) return 1f;
-
-    float t = Mathf.Clamp01(offset / autoFollowEaseOutAngle);
-    return Mathf.Max(Mathf.SmoothStep(0f, 1f, t), AutoFollowMinEaseOut);
-}
-
-private void CancelAutoFollow()
-{
-    _autoFollowEngaged = false;
-    _autoFollowRamp    = 0f;
+    _manualYaw       = Mathf.SmoothDampAngle(_manualYaw, targetYaw, ref _yawVelocity, followCatchUpTime);
+    _manualPitch     = Mathf.SmoothDampAngle(_manualPitch, targetPitch, ref _pitchVelocity, followCatchUpTime);
+    _currentDistance = Mathf.SmoothDamp(_currentDistance, ScrollDistance, ref _distanceVelocity, followCatchUpTime);
 }
 
 // Hard floor on how low the camera can sit. The rig puts the camera at a height of
@@ -555,13 +478,13 @@ private static float Damp(float from, float to, float smoothing)
 private float TargetDistance()
 {
     if (!lowAngleZoomEnabled || _manualPitch >= lowAngleZoomPitchThreshold)
-        return _manualDistance;
+        return ScrollDistance;
 
     float span = lowAngleZoomPitchThreshold - manualPitchMin;
     if (span <= 0.001f) return lowAngleZoomDistance;
 
     float t = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(manualPitchMin, lowAngleZoomPitchThreshold, _manualPitch));
-    return Mathf.Lerp(lowAngleZoomDistance, _manualDistance, t);
+    return Mathf.Lerp(lowAngleZoomDistance, ScrollDistance, t);
 }
 
 // =====================================================
@@ -590,6 +513,31 @@ private void LateUpdate()
 {
     if (manualOrbitActive && boatTarget != null && boatFollowCam != null)
     {
+        // Eased here rather than in Update, so the follow reads where the boat got to this frame.
+        if (IsAnchored)
+        {
+            // The mouse has the angles (Update); sonar may hold the pitch, and the distance pulls in
+            // as the pitch drops so the camera never goes under the water surface.
+            UpdateSonarPitch();
+
+            float target = TargetDistance();
+            _currentDistance  = lowAngleZoomSmoothing > 0f
+                ? Mathf.Lerp(_currentDistance, target, 1f - Mathf.Exp(-lowAngleZoomSmoothing * Time.deltaTime))
+                : target;
+            _distanceVelocity = 0f;
+        }
+        else
+        {
+            // Under way the camera keeps its place behind the boat.
+            _restoringPitch = false;
+            EaseTowardsFollowPose();
+        }
+
+        // Last word on pitch — depends on the distance just settled above
+        ClampCameraHeight();
+
+        ApplyZoomDepthOfField();
+
         Quaternion rotation = Quaternion.Euler(_manualPitch, _manualYaw, 0f);
         boatFollowCam.transform.position = BoatFollowPoint + rotation * (Vector3.back * _currentDistance);
         boatFollowCam.transform.rotation = rotation;
@@ -665,6 +613,7 @@ private void LateUpdate()
 
         UnityEditor.Undo.RecordObject(boatFollowCam.transform, "Preview Manual Orbit");
 
+        _zoom            = Mathf.Max(defaultZoom, 0.01f);
         _currentDistance = TargetDistance();
 
         Quaternion rotation = Quaternion.Euler(_manualPitch, _manualYaw, 0f);
@@ -729,8 +678,7 @@ public void SetTargets(Transform newCenter, Transform newBoat)
     boatTarget = newBoat;
 
     // New boat — re-resolve the heading/speed source next frame
-    _boatMovement        = null;
-    _hasLastBoatPosition = false;
+    _boatMovement = null;
 
     if (boatTarget != null && boatFollowCam != null && (manualOrbitActive || initializing))
     {
@@ -742,8 +690,10 @@ public void SetTargets(Transform newCenter, Transform newBoat)
         _manualYaw = Mathf.Atan2(dir.x, dir.z) * Mathf.Rad2Deg;
         _manualPitch = -Mathf.Asin(Mathf.Clamp(dir.y, -1f, 1f)) * Mathf.Rad2Deg;
         _manualPitch = Mathf.Clamp(_manualPitch, manualPitchMin, manualPitchMax);
-        _manualDistance = Mathf.Clamp(offset.magnitude, manualMinDistance, manualMaxDistance);
-        _currentDistance = TargetDistance();
+        // Starts from where the camera was placed and eases in behind the boat from there.
+        _zoom            = Mathf.Max(defaultZoom, 0.01f);
+        _currentDistance = Mathf.Clamp(offset.magnitude, manualMinDistance, manualMaxDistance);
+        _yawVelocity = _pitchVelocity = _distanceVelocity = 0f;
     }
 
     // Assign the correct camera to BoatCameraZoom
@@ -775,7 +725,7 @@ public void SetTargets(Transform newCenter, Transform newBoat)
         sb.AppendLine("<b>[Camera Snapshot]</b> Copy these values for your defaults:");
         sb.AppendLine($"Manual Yaw: {_manualYaw}");
         sb.AppendLine($"Manual Pitch: {_manualPitch}");
-        sb.AppendLine($"Manual Distance: {_manualDistance}");
+        sb.AppendLine($"Zoom: {_zoom}  (Scroll Distance: {ScrollDistance})");
         sb.AppendLine($"Current Distance (after low-angle zoom): {_currentDistance}");
         sb.AppendLine($"Current Follow Offset (after zoom scaling): {CurrentFollowOffset}");
 

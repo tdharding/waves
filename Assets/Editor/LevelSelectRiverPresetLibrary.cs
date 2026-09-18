@@ -36,11 +36,14 @@ public static class LevelSelectRiverPresetLibrary
     /// are made and renamed while these windows are open, and a stale list is worse than a
     /// slightly slow one at the rate a picker is drawn.
     /// </summary>
-    public static List<T> All<T>() where T : ScriptableObject
-    {
-        if (!AssetDatabase.IsValidFolder(Folder)) return new List<T>();
+    public static List<T> All<T>() where T : ScriptableObject => All<T>(Folder);
 
-        return AssetDatabase.FindAssets($"t:{typeof(T).Name}", new[] { Folder })
+    /// <summary>The same, for presets kept in a folder of their own.</summary>
+    public static List<T> All<T>(string folder) where T : ScriptableObject
+    {
+        if (!AssetDatabase.IsValidFolder(folder)) return new List<T>();
+
+        return AssetDatabase.FindAssets($"t:{typeof(T).Name}", new[] { folder })
                             .Select(AssetDatabase.GUIDToAssetPath)
                             .Select(AssetDatabase.LoadAssetAtPath<T>)
                             .Where(p => p != null)
@@ -57,8 +60,12 @@ public static class LevelSelectRiverPresetLibrary
     /// case this whole folder exists to make obvious.
     /// </summary>
     public static T DrawPicker<T>(GUIContent label, T current) where T : ScriptableObject
+        => DrawPicker(label, current, Folder);
+
+    /// <summary>The same, for presets kept in a folder of their own.</summary>
+    public static T DrawPicker<T>(GUIContent label, T current, string folder) where T : ScriptableObject
     {
-        var presets = All<T>();
+        var presets = All<T>(folder);
 
         bool strayHeld = current != null && !presets.Contains(current);
         if (strayHeld) presets.Add(current);
@@ -66,7 +73,7 @@ public static class LevelSelectRiverPresetLibrary
         var labels = new List<string> { NoneLabel };
         labels.AddRange(presets.Select(
             p => p == current && strayHeld
-                ? $"{p.name}   (outside {System.IO.Path.GetFileName(Folder)})"
+                ? $"{p.name}   (outside {System.IO.Path.GetFileName(folder)})"
                 : p.name));
 
         int index = current == null ? 0 : presets.IndexOf(current) + 1;
@@ -81,11 +88,14 @@ public static class LevelSelectRiverPresetLibrary
     /// path that does not exist — Unity silently falls back to Assets/ when it does, which is how
     /// presets end up scattered in the first place.
     /// </summary>
-    public static string EnsureFolder()
-    {
-        if (AssetDatabase.IsValidFolder(Folder)) return Folder;
+    public static string EnsureFolder() => EnsureFolder(Folder);
 
-        string[] parts = Folder.Split('/');
+    /// <summary>The same, for presets kept in a folder of their own.</summary>
+    public static string EnsureFolder(string folder)
+    {
+        if (AssetDatabase.IsValidFolder(folder)) return folder;
+
+        string[] parts = folder.Split('/');
         string built = parts[0];                       // "Assets"
 
         for (int i = 1; i < parts.Length; i++)
@@ -95,6 +105,6 @@ public static class LevelSelectRiverPresetLibrary
             built = next;
         }
 
-        return Folder;
+        return folder;
     }
 }

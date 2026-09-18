@@ -12,7 +12,7 @@ using UnityEngine.Splines;
 public partial class LevelSelectDesignerWindow : EditorWindow
 {
     // ── Modes ─────────────────────────────────────────────────────
-    private enum DesignerMode { Draw, Select, Junction, Arena, Obstacle, Shop, Landscape, SoulRoute, Pool }
+    private enum DesignerMode { Draw, Select, Junction, Arena, Obstacle, Shop, Landscape, SoulRoute, Pipe }
 
     // ── Data ──────────────────────────────────────────────────────
     private LevelSelectDesignerData _sourceData; // The actual asset on disk
@@ -275,6 +275,7 @@ public partial class LevelSelectDesignerWindow : EditorWindow
         while (arena.secondaryEntrances.Count > needed)
         {
             var last = arena.secondaryEntrances[arena.secondaryEntrances.Count - 1];
+            RemoveArenaLeadIns(arena, last.nodeId);
             _data.nodes.RemoveAll(n => n.id == last.nodeId);
             arena.secondaryEntrances.RemoveAt(arena.secondaryEntrances.Count - 1);
         }
@@ -309,6 +310,9 @@ public partial class LevelSelectDesignerWindow : EditorWindow
                 entranceIndex = i + 1
             });
         }
+
+        // A new entrance on a compass arena takes a free point, and a lead-in if it has a river.
+        if (arena.compassEntrances) RefreshArenaLeadIns(arena);
 
         MarkDirty();
     }
@@ -448,7 +452,11 @@ public partial class LevelSelectDesignerWindow : EditorWindow
     private void OnGUI()
     {
         if (Event.current.type == EventType.Layout)
+        {
+            SyncPoolLeadIns();
+            SyncArenaLeadIns();
             RunValidation();
+        }
 
         DrawToolbar();
         DrawModeBar();
@@ -607,12 +615,13 @@ public partial class LevelSelectDesignerWindow : EditorWindow
         EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
         GUILayout.Space(_leftPanelWidth + HANDLE_W);
 
-        string[] modeLabels = { "Draw", "Select", "Junction", "Arena", "Obstacle", "Shop", "Landscape", "Souls", "Pool" };
+        string[] modeLabels = { "Draw", "Select", "Junction", "Arena", "Obstacle", "Shop", "Landscape", "Souls", "Pipes" };
         var newMode = (DesignerMode)GUILayout.Toolbar((int)_mode, modeLabels,
             EditorStyles.toolbarButton, GUILayout.Width(canvasW), GUILayout.Height(18));
         if (newMode != _mode)
         {
             _mode = newMode;
+            if (_isDrawingPipe) FinishDrawingPipe();
             _isDrawing          = false;
             _isDraggingObstacle = false;
             _draggingObstacleId = null;
@@ -919,9 +928,14 @@ public partial class LevelSelectDesignerWindow : EditorWindow
 
         _leftScroll = EditorGUILayout.BeginScrollView(_leftScroll);
 
+        DrawSelectedNodeActions();
         DrawSelectedPathProps();
+        DrawSelectedRimNodeProps();
         DrawSelectedObstacleProps();
+        DrawSelectedOutpostProps();
+        DrawSelectedPipeProps();
         DrawSelectedArenaProps();
+        DrawSelectedPoolProps();
         DrawSelectedShopProps();
         DrawCanvasSettingsSection();
 
@@ -1082,9 +1096,16 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             MarkDirty();
         }
 
-        // ── Node Y heights ────────────────────────────────────────
+        // ── Nodes: height, what sits on each, add before/after ────
         EditorGUILayout.Space(4);
-        EditorGUILayout.LabelField("Node Heights (Y)", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Nodes", EditorStyles.boldLabel);
+        EditorGUILayout.BeginHorizontal();
+        EditorGUILayout.LabelField("",        GUILayout.Width(36));
+        EditorGUILayout.LabelField("Height",  EditorStyles.miniLabel, GUILayout.Width(52));
+        EditorGUILayout.LabelField("On node", EditorStyles.miniLabel);
+        EditorGUILayout.EndHorizontal();
+
+        int insertAt = -1;   // index in path.nodeIds the new node takes
         for (int i = 0; i < path.nodeIds.Count; i++)
         {
             var node = _data.nodes.Find(n => n.id == path.nodeIds[i]);
@@ -1105,15 +1126,40 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             EditorGUILayout.BeginHorizontal(EditorStyles.helpBox);
             EditorGUILayout.LabelField($"{typeLabel} {i}", GUILayout.Width(36));
             EditorGUI.BeginChangeCheck();
+            // Lead-ins and compass entrances take their pool's or arena's height — edited there.
+            GUI.enabled = !IsLockedNode(node.id);
             float newY = EditorGUILayout.FloatField(node.worldPosition.y, GUILayout.Width(52));
+            GUI.enabled = true;
             if (EditorGUI.EndChangeCheck())
             {
                 Undo.RecordObject(_data, "Edit Node Y");
                 node.worldPosition = new Vector3(node.worldPosition.x, newY, node.worldPosition.z);
                 MarkDirty();
             }
+
+            EditorGUILayout.LabelField(NodeDetails(path, node.id), EditorStyles.miniLabel);
+
+            GUI.enabled = CanInsertNodeAt(path, i);
+            if (GUILayout.Button(new GUIContent("+ Before", "Add a node between this one and the one before it."),
+                                 EditorStyles.miniButtonLeft, GUILayout.Width(58)))
+                insertAt = i;
+            GUI.enabled = CanInsertNodeAt(path, i + 1);
+            if (GUILayout.Button(new GUIContent("+ After", "Add a node between this one and the one after it."),
+                                 EditorStyles.miniButtonRight, GUILayout.Width(52)))
+                insertAt = i + 1;
+            GUI.enabled = true;
+
             EditorGUILayout.EndHorizontal();
             GUI.backgroundColor = prevBg;
+        }
+
+        if (insertAt >= 0)
+        {
+            Undo.RecordObject(_data, "Add Node");
+            var added = InsertNodeInPath(path, insertAt);
+            _selectedNodeId = added.id;
+            MarkDirty();
+            Repaint();
         }
 
         // ── Arena info ────────────────────────────────────────────
@@ -1274,6 +1320,21 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             SyncEntranceNodes(arena);
             _selectedEntranceIdx = -1;
             MarkDirty();
+        }
+
+        EditorGUILayout.LabelField(
+            arena.compassEntrances
+                ? $"Entrances on compass points  |  Lead-ins: {arena.leadIns?.Count ?? 0}"
+                : "Entrances free — Refresh Lead-ins puts them on compass points",
+            EditorStyles.miniLabel);
+        if (GUILayout.Button("Refresh Lead-ins"))
+        {
+            Undo.RecordObject(_data, "Refresh Arena Lead-ins");
+            _consoleStatusMsg = RefreshArenaLeadIns(arena)
+                ? $"Arena lead-ins refreshed ({arena.leadIns.Count})."
+                : "Arena has more than four entrances — lead-ins not refreshed.";
+            MarkDirty();
+            Repaint();
         }
 
         // ── Entrance list ─────────────────────────────────────────
@@ -1624,40 +1685,21 @@ public partial class LevelSelectDesignerWindow : EditorWindow
 
         DrawPoolShape("Default (all pools)", _data.defaultPoolShape);
 
-        if (_data.pools.Count == 0)
-            EditorGUILayout.LabelField("  (no pools)", EditorStyles.miniLabel);
-
-        foreach (var pool in _data.pools)
+        EditorGUI.BeginChangeCheck();
+        float leadInDistance = EditorGUILayout.FloatField(
+            new GUIContent("Lead-in Distance",
+                "How far each pool's lead-in nodes stand out past the point its rivers are cut off " +
+                "at (the rim, plus the collar). 0 puts them right on the cut."),
+            _data.poolLeadInDistance);
+        if (EditorGUI.EndChangeCheck())
         {
-            if (pool == null || string.IsNullOrEmpty(pool.nodeId)) continue;
-
-            if (!pool.overrideShape)
-            {
-                EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField(pool.nodeId, EditorStyles.miniLabel);
-                if (GUILayout.Button("Override shape", EditorStyles.miniButton, GUILayout.Width(110)))
-                {
-                    Undo.RecordObject(_data, "Add Pool Shape");
-                    // Start the override from the default, so it opens on what it already looked like.
-                    LevelSelectDesignerData.ApplyPoolShape(pool, _data.defaultPoolShape.Clone());
-                    pool.overrideShape = true;
-                    MarkDirty();
-                }
-                EditorGUILayout.EndHorizontal();
-                continue;
-            }
-
-            var own = _data.PoolShapeFor(pool);
-            if (DrawPoolShape(pool.nodeId, own, removable: true))
-            {
-                Undo.RecordObject(_data, "Remove Pool Shape");
-                pool.overrideShape = false;
-                MarkDirty();
-                RebuildPoolMeshes();
-                break;
-            }
-            LevelSelectDesignerData.ApplyPoolShape(pool, own);
+            Undo.RecordObject(_data, "Edit Lead-in Distance");
+            _data.poolLeadInDistance = Mathf.Max(0f, leadInDistance);
+            MarkDirty();
         }
+
+        // Each pool's own override is authored on the pool itself — select it and it shows in
+        // the left panel.
 
         EditorGUILayout.Space(2);
         if (GUILayout.Button("Rebuild Pools"))
@@ -1667,6 +1709,101 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             _consoleStatusMsg = $"Rebuilt {n} pool(s).";
             Debug.Log($"[LevelSelectDesigner] Rebuilt {n} pool(s) from the current shapes.");
         }
+    }
+
+    /// <summary>
+    /// Everything about the selected pool, in the left panel: its canvas colour, its shape (the
+    /// default, or its own override of it), its lead-ins and its tower.
+    /// </summary>
+    private void DrawSelectedPoolProps()
+    {
+        if (string.IsNullOrEmpty(_selectedPoolNodeId)) return;
+        var pool = _data.PoolAt(_selectedPoolNodeId);
+        if (pool == null) return;
+
+        int arrivals = _data.PathsAtPool(pool).Count;
+
+        EditorGUILayout.Space(6);
+        EditorGUILayout.LabelField("Pool", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField(
+            $"{PoolKindLabel(pool, arrivals)}  |  {arrivals} river{(arrivals == 1 ? "" : "s")}",
+            EditorStyles.miniLabel);
+
+        EditorGUI.BeginChangeCheck();
+        Color colour = EditorGUILayout.ColorField("Editor Colour", pool.editorColor);
+        if (EditorGUI.EndChangeCheck())
+        {
+            Undo.RecordObject(_data, "Edit Pool");
+            pool.editorColor = colour;
+            MarkDirty();
+            Repaint();
+        }
+
+        // ── Shape (procedural) ────────────────────────────────────
+        EditorGUILayout.Space(4);
+        string poolRiver = _data.PoolRiverName(pool);
+        EditorGUILayout.LabelField(
+            $"Cross-section from river: {(string.IsNullOrEmpty(poolRiver) ? "(default)" : poolRiver)}",
+            EditorStyles.miniLabel);
+
+        // Always editable. A pool on the default shows the default's numbers; editing one gives
+        // this pool its own shape, starting from them — the default itself is never touched here.
+        var shape = _data.PoolShapeFor(pool).Clone();
+        var before = shape.Clone();
+        if (DrawPoolShape(pool.overrideShape ? "Shape: own" : "Shape: default", shape,
+                          removable: pool.overrideShape))
+        {
+            Undo.RecordObject(_data, "Use Default Pool Shape");
+            pool.overrideShape = false;
+            MarkDirty();
+            RebuildPoolMeshes();
+        }
+        else if (shape.poolRadius   != before.poolRadius   ||
+                 shape.islandRadius != before.islandRadius ||
+                 shape.floorDepth   != before.floorDepth)
+        {
+            LevelSelectDesignerData.ApplyPoolShape(pool, shape);
+            pool.overrideShape = true;
+        }
+
+        if (GUILayout.Button("Rebuild Pools"))
+        {
+            int n = RebuildPoolMeshes();
+            AssetDatabase.SaveAssets();
+            _consoleStatusMsg = $"Rebuilt {n} pool(s).";
+            Debug.Log($"[LevelSelectDesigner] Rebuilt {n} pool(s) from the current shapes.");
+        }
+        EditorGUILayout.LabelField(
+            "The boat ring is generated but not yet wired to boat travel.",
+            EditorStyles.miniLabel);
+
+        // ── Lead-ins ──────────────────────────────────────────────
+        EditorGUILayout.Space(4);
+        EditorGUILayout.LabelField(
+            $"Lead-ins: {pool.leadIns?.Count ?? 0} of {arrivals} river{(arrivals == 1 ? "" : "s")}",
+            EditorStyles.miniLabel);
+        if (GUILayout.Button("Refresh Lead-ins"))
+        {
+            Undo.RecordObject(_data, "Refresh Pool Lead-ins");
+            int missed = RefreshPoolLeadIns(pool);
+            _consoleStatusMsg = missed > 0
+                ? $"Lead-ins refreshed — {missed} river(s) left without one (four compass points)."
+                : $"Lead-ins refreshed ({pool.leadIns.Count}).";
+            MarkDirty();
+            Repaint();
+        }
+
+        // ── Tower ─────────────────────────────────────────────────
+        EditorGUILayout.Space(4);
+        DrawPoolTowerFields(pool);
+    }
+
+    // What the designer drew reads straight off the numbers, so name it that way.
+    private static string PoolKindLabel(LevelSelectDesignerData.DesignerPool pool, int arrivals)
+    {
+        return pool.islandRadius <= 0f ? "Open pool"
+             : arrivals >= 3           ? "Roundabout"
+                                       : "Pool with a centre";
     }
 
     // Returns true when the designer asked to drop this pool back to the default shape.
@@ -1741,6 +1878,19 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             "closest approach to the centre - with the thickness laid off outward. Height is " +
             "measured up from the water surface; how far it carries on below is the one Drop.",
             MessageType.None);
+
+        EditorGUI.BeginChangeCheck();
+        float arenaLeadIn = EditorGUILayout.FloatField(
+            new GUIContent("Lead-in Distance",
+                "How far each arena's lead-in nodes stand out from the entrance they lead to. " +
+                "0 puts them right on the entrance."),
+            _data.arenaLeadInDistance);
+        if (EditorGUI.EndChangeCheck())
+        {
+            Undo.RecordObject(_data, "Edit Arena Lead-in Distance");
+            _data.arenaLeadInDistance = Mathf.Max(0f, arenaLeadIn);
+            MarkDirty();
+        }
 
         EditorGUI.BeginChangeCheck();
         float overlap = EditorGUILayout.FloatField(
@@ -1977,19 +2127,20 @@ public partial class LevelSelectDesignerWindow : EditorWindow
     }
 
     /// <summary>
-    /// Where the entrance prefab stands inside the archway at each door.
+    /// How far into the archway the door sits at each entrance — the one number that places it.
+    /// The door always stands on the channel centreline, and its height comes from the entrance
+    /// prefab's aligner sitting on the water, so across and up are not authored.
     ///
-    /// One place fits nearly every arch, so the default is what is usually edited — a door that
-    /// wants the prefab further under its arch, or off to one side, is ticked off the default
-    /// and given its own three numbers.
+    /// One depth fits nearly every arch, so the default is what is usually edited; a door that
+    /// wants to sit deeper or shallower is ticked off the default and given its own.
     /// </summary>
     private void DrawEntranceAlignments()
     {
         EditorGUILayout.Space(6);
-        EditorGUILayout.LabelField("Entrance in the archway", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Door in the archway", EditorStyles.boldLabel);
         EditorGUILayout.LabelField(
-            "Measured in the arch's own frame, so it reads the same at every door. Moving an " +
-            "entrance needs a full Generate.",
+            "How far into the arch the door sits, from its front face. Moving a door needs a " +
+            "full Generate.",
             EditorStyles.miniLabel);
 
         DrawAlignment("Default (all entrances)", _data.defaultEntranceAlignment);
@@ -2017,7 +2168,8 @@ public partial class LevelSelectDesignerWindow : EditorWindow
         }
     }
 
-    /// <summary>The three numbers on their own, as the default block shows them.</summary>
+    /// <summary>The default depth on its own. Arches differ in depth, so it is clamped into
+    /// each arch where it is used rather than here.</summary>
     private void DrawAlignment(string header, ArenaEntranceAlignment alignment)
     {
         if (alignment == null) return;
@@ -2026,22 +2178,16 @@ public partial class LevelSelectDesignerWindow : EditorWindow
         EditorGUILayout.LabelField(header, EditorStyles.boldLabel);
 
         EditorGUI.BeginChangeCheck();
-        float across = EditorGUILayout.FloatField(
-            new GUIContent("Across", "Sideways from the channel centreline, 0 being dead centre " +
-                                     "under the arch."), alignment.across);
-        float up     = EditorGUILayout.FloatField(
-            new GUIContent("Up", "Up from the rim top the arch stands on."), alignment.up);
-        float along  = EditorGUILayout.FloatField(
-            new GUIContent("Along", "Along the river from the arch's front face. Positive runs " +
-                                    "back out through the wall, negative comes in toward the arena."),
+        float along = EditorGUILayout.FloatField(
+            new GUIContent("Along", "How far into the archway the door sits: 0 is the arch's " +
+                                    "front face on the arena side, the arch's depth is its back " +
+                                    "face out over the river."),
             alignment.along);
 
         if (EditorGUI.EndChangeCheck())
         {
-            Undo.RecordObject(_data, "Edit Entrance Alignment");
-            alignment.across = across;
-            alignment.up     = up;
-            alignment.along  = along;
+            Undo.RecordObject(_data, "Edit Door Depth");
+            alignment.along = Mathf.Max(0f, along);
             MarkDirty();
         }
 
@@ -2049,13 +2195,9 @@ public partial class LevelSelectDesignerWindow : EditorWindow
     }
 
     /// <summary>
-    /// One door's row: the tick that takes it off the default, and the three sliders it stands
-    /// by once it is. Unticked it stays a single line showing the numbers it is following,
-    /// greyed, so the whole list can be read at a glance; ticking it opens the sliders.
-    ///
-    /// Each slider is ranged against the arch that door actually stands in — see
-    /// <see cref="AlignmentRangeAt"/> — so sliding one end to the other says something in the
-    /// arch rather than covering an arbitrary span of numbers.
+    /// One door's row: the tick that takes it off the default, and the slider it stands by once
+    /// it is. Unticked it stays a single line showing the depth it is following, greyed.
+    /// The slider runs from the front face to the back face of the arch at that door.
     /// </summary>
     private void DrawOneEntranceAlignment(string label,
                                           LevelSelectDesignerData.DesignerArena arena,
@@ -2070,26 +2212,20 @@ public partial class LevelSelectDesignerWindow : EditorWindow
         bool nowOver = EditorGUILayout.ToggleLeft(label, over, GUILayout.Width(160f));
         if (EditorGUI.EndChangeCheck())
         {
-            Undo.RecordObject(_data, "Override Entrance Alignment");
+            Undo.RecordObject(_data, "Override Door Depth");
             // Opens on the place it was already standing, so ticking it moves nothing by itself.
             if (nowOver && !over)
-            {
-                value.across = _data.defaultEntranceAlignment.across;
-                value.up     = _data.defaultEntranceAlignment.up;
-                value.along  = _data.defaultEntranceAlignment.along;
-            }
+                value.along = _data.defaultEntranceAlignment.along;
             over = nowOver;
             MarkDirty();
         }
 
-        // Following the default: the numbers it is standing by, greyed, on the one line.
         if (!over)
         {
-            var follows = _data.defaultEntranceAlignment;
             using (new EditorGUI.DisabledScope(true))
             {
-                GUILayout.Label($"across {follows.across:0.##}   up {follows.up:0.##}   " +
-                                $"along {follows.along:0.##}", EditorStyles.miniLabel);
+                GUILayout.Label($"along {_data.defaultEntranceAlignment.along:0.##}",
+                                EditorStyles.miniLabel);
             }
             EditorGUILayout.EndHorizontal();
             return;
@@ -2097,59 +2233,45 @@ public partial class LevelSelectDesignerWindow : EditorWindow
 
         EditorGUILayout.EndHorizontal();
 
-        AlignmentRangeAt(arena, entranceIndex,
-                         out float acrossReach, out float upReach, out float backReach, out float outReach);
+        float depth = ArchDepthAt(arena, entranceIndex);
 
         EditorGUI.indentLevel++;
         EditorGUI.BeginChangeCheck();
-        float across = EditorGUILayout.Slider(
-            new GUIContent("Across", "Sideways from the channel centreline. End to end is the " +
-                                     "width of the opening."),
-            Mathf.Clamp(value.across, -acrossReach, acrossReach), -acrossReach, acrossReach);
-        float up = EditorGUILayout.Slider(
-            new GUIContent("Up", "Up from the rim top the arch stands on. The top of the slider " +
-                                 "is the top of the opening."),
-            Mathf.Clamp(value.up, 0f, upReach), 0f, upReach);
         float along = EditorGUILayout.Slider(
-            new GUIContent("Along", "Along the river. 0 is the arch's front face; back is the " +
-                                    "arena centre, forward is out through the wall."),
-            Mathf.Clamp(value.along, -backReach, outReach), -backReach, outReach);
+            new GUIContent("Along", "How far into the archway the door sits. 0 is the front " +
+                                    "face on the arena side; the far end is the back face."),
+            Mathf.Clamp(value.along, 0f, depth), 0f, depth);
 
         if (EditorGUI.EndChangeCheck())
         {
-            Undo.RecordObject(_data, "Edit Entrance Alignment");
-            value.across = across;
-            value.up     = up;
-            value.along  = along;
+            Undo.RecordObject(_data, "Edit Door Depth");
+            value.along = along;
             MarkDirty();
         }
         EditorGUI.indentLevel--;
     }
 
-    /// <summary>
-    /// How far a door's sliders reach, taken from the arch standing at that door with every
-    /// inherited number settled — so the ends of a slider are places in the arch, not round
-    /// numbers: half the opening either side, the height of the opening up, and along the river
-    /// anywhere from the arena centre out to the back face of the arch.
-    /// </summary>
-    private void AlignmentRangeAt(LevelSelectDesignerData.DesignerArena arena, int entranceIndex,
-                                  out float acrossReach, out float upReach,
-                                  out float backReach, out float outReach)
+    /// <summary>The depth of the arch standing at a door, with every inherited number settled.</summary>
+    private float ArchDepthAt(LevelSelectDesignerData.DesignerArena arena, int entranceIndex)
     {
-        acrossReach = 1f;
-        upReach     = 1f;
-        backReach   = 1f;
-        outReach    = 1f;
-        if (arena == null) return;
+        if (arena == null) return 1f;
 
-        var wall  = _data.ArenaWallFor(arena);
-        var site  = ArenaEntranceSites(arena).FirstOrDefault(x => x.entranceIndex == entranceIndex);
-        var arch  = _data.ArchwayFor(arena).Resolve(_data.ProfileFor(site.riverName), wall.thickness);
+        var wall = _data.ArenaWallFor(arena);
+        var site = ArenaEntranceSites(arena).FirstOrDefault(x => x.entranceIndex == entranceIndex);
+        var arch = _data.ArchwayFor(arena).Resolve(_data.ProfileFor(site.riverName), wall.thickness);
+        return Mathf.Max(0.01f, arch.depth);
+    }
 
-        acrossReach = Mathf.Max(0.01f, arch.openingWidth * 0.5f);
-        upReach     = Mathf.Max(0.01f, arch.legHeight + arch.archHeight);
-        backReach   = Mathf.Max(0.01f, wall.radius);     // back as far as the arena centre
-        outReach    = Mathf.Max(0.01f, arch.depth);      // out to the arch's back face
+    /// <summary>
+    /// Where the door sits along an arch — the entrance's Along, kept between the arch's front
+    /// and back faces. The door sheet and the entrance prefab both read it from here, so they
+    /// can never disagree.
+    /// </summary>
+    private float DoorAlong(LevelSelectDesignerData.DesignerArena arena, string entranceNodeId,
+                            int entranceIndex)
+    {
+        float along = _data.EntranceAlignmentFor(arena, entranceNodeId).along;
+        return Mathf.Clamp(along, 0f, ArchDepthAt(arena, entranceIndex));
     }
 
     // Returns true when the designer asked to drop this arena back to the default shape.
@@ -2300,6 +2422,7 @@ public partial class LevelSelectDesignerWindow : EditorWindow
         _data.arenaPrefab         = (GameObject)EditorGUILayout.ObjectField("Arena Head",     _data.arenaPrefab,         typeof(GameObject), false);
         _data.arenaEntrancePrefab = (GameObject)EditorGUILayout.ObjectField("Arena Entrance", _data.arenaEntrancePrefab, typeof(GameObject), false);
         _data.arenaWallMaterial   = (Material)EditorGUILayout.ObjectField("Wall Material",    _data.arenaWallMaterial,   typeof(Material), false);
+        _data.arenaDoorMaterial   = (Material)EditorGUILayout.ObjectField("Door Material",    _data.arenaDoorMaterial,   typeof(Material), false);
         if (EditorGUI.EndChangeCheck()) MarkDirty();
 
         EditorGUILayout.LabelField("Wall shape is authored under Procedural Generation.",
@@ -2393,11 +2516,18 @@ public partial class LevelSelectDesignerWindow : EditorWindow
                            "_DistanceFadeRadius. Exposed on the shader, so this is written onto " +
                            "the Run Material as well as pushed as a global."),
             _data.distanceFadeRadius);
+        Vector3 lightPosition = EditorGUILayout.Vector3Field(
+            new GUIContent("Light Position",
+                           "Where the world's made-up light stands, in world space — shared by " +
+                           "the river runs and the landscape hills. Each sets its own strength " +
+                           "in its tuner."),
+            _data.lightPosition);
         if (EditorGUI.EndChangeCheck())
         {
             Undo.RecordObject(_data, "Set Aesthetics");
             _data.whiteGradientPos    = whiteGradientPos;
             _data.distanceFadeRadius  = distanceFadeRadius;
+            _data.lightPosition       = lightPosition;
             MarkDirty();
 
             // Straight into the shaders so the scene view moves with the field. The pump keeps
@@ -2470,6 +2600,31 @@ public partial class LevelSelectDesignerWindow : EditorWindow
         if (GUILayout.Button("Open Run Shading Tuner"))
             LevelSelectRunShadingTuner.Open();
 
+        EditorGUILayout.Space();
+
+        var pickedLandscape = LevelSelectRiverPresetLibrary.DrawPicker(
+            new GUIContent("Landscape Preset",
+                           "How this world's LANDSCAPE hills look — three stone variants and " +
+                           "which part (ground, tops, cliffs, holes) wears each. Authored in the " +
+                           "Level Select Landscape Tuner. None means plain unlit stone."),
+            _data.landscapePreset);
+
+        var landscapePreset = (LevelSelectLandscapePreset)EditorGUILayout.ObjectField(
+            pickedLandscape, typeof(LevelSelectLandscapePreset), false);
+
+        if (landscapePreset != _data.landscapePreset)
+        {
+            Undo.RecordObject(_data, "Set Landscape Preset");
+            _data.landscapePreset = landscapePreset;
+            MarkDirty();
+
+            _data.ApplyAesthetics();
+            SceneView.RepaintAll();
+        }
+
+        if (GUILayout.Button("Open Landscape Tuner"))
+            LevelSelectLandscapeTuner.Open();
+
         // Not part of the preset: it is a way of READING the water rather than a way the water is
         // meant to look, so it belongs to the world and no preset can carry it on by accident.
         EditorGUI.BeginChangeCheck();
@@ -2493,17 +2648,11 @@ public partial class LevelSelectDesignerWindow : EditorWindow
 
         EditorGUILayout.Space();
 
-        // Geometry, not globals — which is the whole reason these two are here and not in the
-        // tuner alongside everything else the water is drawn with.
+        // Geometry, not globals — which is the whole reason this is here and not in the tuner
+        // alongside everything else the water is drawn with.
         EditorGUILayout.LabelField("Where Two Waters Meet", EditorStyles.boldLabel);
 
         EditorGUI.BeginChangeCheck();
-        float branchOverlap = EditorGUILayout.FloatField(
-            new GUIContent("Water Branch Overlap",
-                           "How far a branch's water carries on past the river it leaves, over " +
-                           "that river's own water, fading out as it goes. 0 butts it onto the " +
-                           "channel edge as before."),
-            _data.waterBranchOverlap);
         float poolOverlap = EditorGUILayout.FloatField(
             new GUIContent("Water Pool Overlap",
                            "How far a pool's water carries on out into each river that meets " +
@@ -2513,14 +2662,13 @@ public partial class LevelSelectDesignerWindow : EditorWindow
         if (EditorGUI.EndChangeCheck())
         {
             Undo.RecordObject(_data, "Set Water Overlap");
-            _data.waterBranchOverlap = Mathf.Max(0f, branchOverlap);
-            _data.waterPoolOverlap   = Mathf.Max(0f, poolOverlap);
+            _data.waterPoolOverlap = Mathf.Max(0f, poolOverlap);
             MarkDirty();
         }
 
         EditorGUILayout.LabelField(
-            "Both change the generated mesh — press Rebuild Runs to see them. How much of " +
-            "the lap the alpha gradient covers is Lap Fade, in the tuner.",
+            "Changes the generated mesh — press Rebuild Runs to see it. How much of " +
+            "the lap the alpha gradient covers is River Fade To Pool Distance, in the River Tuner.",
             EditorStyles.wordWrappedMiniLabel);
 
         EditorGUILayout.Space();
@@ -3846,7 +3994,6 @@ public partial class LevelSelectDesignerWindow : EditorWindow
         EditorGUILayout.LabelField("Canvas", EditorStyles.boldLabel);
         EditorGUI.BeginChangeCheck();
         _data.canvasWorldY     = EditorGUILayout.FloatField("World Y", _data.canvasWorldY);
-        _data.curveSubdivisions  = EditorGUILayout.IntSlider("Curve Subdivisions", _data.curveSubdivisions, 1, 60);
         _data.arenaHeadOffset    = EditorGUILayout.FloatField("Arena Head Offset", _data.arenaHeadOffset);
         _data.shopHeadOffset     = EditorGUILayout.FloatField("Shop Head Offset", _data.shopHeadOffset);
         if (EditorGUI.EndChangeCheck()) MarkDirty();
@@ -4009,6 +4156,10 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             DrawLandscapeTilesOnCanvas();
             DrawPaths();
             DrawPools();
+            DrawPoolTowers();
+            DrawOutposts();
+            DrawPipes();
+            DrawRimNodes();
             DrawSoulRoutes();
             DrawArenaOrbitRings();
             DrawNodes();
@@ -4037,7 +4188,9 @@ public partial class LevelSelectDesignerWindow : EditorWindow
                 DesignerMode.Shop      => "Click an endpoint node to toggle ShopEnd",
                 DesignerMode.Landscape => "Landscape mode — set tile prefab & counts in left panel, then Generate Tiles",
                 DesignerMode.SoulRoute => "Click points in travel order — arenas included — Shift+click sets the origin pool",
-                DesignerMode.Pool      => "Click a node to toggle a pool — set its radii in the right panel",
+                DesignerMode.Pipe      => _isDrawingPipe
+                    ? "Click to place pipe nodes — Enter/Esc/double-click to finish"
+                    : "Click empty space to start a pipe — Shift+click a pipe to add a support — drag to move — right-click/Delete to remove",
                 _ => ""
             };
             var style = new GUIStyle(EditorStyles.miniLabel)
@@ -4188,7 +4341,7 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             e.Use();
         }
 
-        if (!inCanvas && !_canvasFocused && !_isDraggingNode && !_isPanning) return;
+        if (!inCanvas && !_canvasFocused && !_isDraggingNode && !_isDraggingPipe && !_isPanning) return;
 
         // Space + left-drag  OR  middle-mouse: pan
         bool startSpacePan  = _spaceHeld && e.type == EventType.MouseDown && e.button == 0 && inCanvas;
@@ -4235,7 +4388,10 @@ public partial class LevelSelectDesignerWindow : EditorWindow
         // Don't dispatch to mode handlers while space-panning
         if (_spaceHeld || _isPanning) return;
 
-        if (!inCanvas && !_isDraggingNode) return;
+        if (!inCanvas && !_isDraggingNode && !_isDraggingPipe) return;
+
+        // Outpost points open their settings from any mode.
+        if (HandleOutpostPointClick(e)) return;
 
         switch (_mode)
         {
@@ -4247,7 +4403,7 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             case DesignerMode.Shop:      HandleShopMode(e);      break;
             case DesignerMode.Landscape: HandleLandscapeMode(e); break;
             case DesignerMode.SoulRoute: HandleSoulRouteMode(e); break;
-            case DesignerMode.Pool:      HandlePoolMode(e);      break;
+            case DesignerMode.Pipe:      HandlePipeMode(e);      break;
         }
     }
 
@@ -4286,8 +4442,10 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             {
                 if (snapId != null)
                 {
-                    // If snapping to the last node of any existing path, extend that path
-                    var extPath = _data.paths.Find(p =>
+                    // If snapping to the last node of any existing path, extend that path.
+                    // Not from a pool: a pool is where rivers meet, so drawing out of one
+                    // starts a river of its own instead of carrying on the one that ends there.
+                    var extPath = _data.PoolAt(snapId) != null ? null : _data.paths.Find(p =>
                         p.nodeIds.Count > 0 && p.nodeIds[p.nodeIds.Count - 1] == snapId);
                     if (extPath != null)
                     {
@@ -4391,7 +4549,10 @@ public partial class LevelSelectDesignerWindow : EditorWindow
         // a dangling path left over from a deleted junction.
         string endNodeId   = _drawingNodeIds[_drawingNodeIds.Count - 1];
         string startNodeId = _drawingNodeIds[0];
-        var existingPath = _data.paths.Find(p =>
+
+        // Never into a river leaving a pool — a river drawn in to a pool stays its own river,
+        // for the same reason drawing out of one starts a new one.
+        var existingPath = _data.PoolAt(endNodeId) != null ? null : _data.paths.Find(p =>
             p.nodeIds.Count > 0 && p.nodeIds[0] == endNodeId);
 
         LevelSelectDesignerData.DesignerPath path;
@@ -4451,6 +4612,7 @@ public partial class LevelSelectDesignerWindow : EditorWindow
                 _selectedPathId     = _data.paths.Find(p => p.nodeIds.Contains(nodeId))?.pathId;
                 _selectedArenaNodeId = node?.type == LevelSelectDesignerData.NodeType.ArenaEnd ? nodeId : null;
                 _selectedShopNodeId  = node?.type == LevelSelectDesignerData.NodeType.ShopEnd  ? nodeId : null;
+                _selectedPoolNodeId  = _data.PoolAt(nodeId) != null ? nodeId : null;
                 _selectedEntranceIdx = -1;
                 Repaint();
                 e.Use();
@@ -4463,6 +4625,7 @@ public partial class LevelSelectDesignerWindow : EditorWindow
                 _selectedObstacleId    = obsId;
                 _selectedNodeId        = null;
                 _selectedShopNodeId    = null;
+                _selectedPoolNodeId    = null;
                 _isDraggingObstacle    = true;
                 _draggingObstacleId    = obsId;
                 Repaint();
@@ -4493,6 +4656,7 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             _selectedPathId     = pathId;
             _selectedNodeId     = null;
             _selectedObstacleId = null;
+            _selectedPoolNodeId = null;
             Repaint();
             e.Use();
         }
@@ -4500,7 +4664,8 @@ public partial class LevelSelectDesignerWindow : EditorWindow
         if (e.type == EventType.MouseDrag && _isDraggingNode)
         {
             var node = _data.nodes.Find(n => n.id == _draggingNodeId);
-            if (node != null)
+            // Lead-ins and compass entrances are locked to their pool or arena — they move with it.
+            if (node != null && !IsLockedNode(node.id))
             {
                 Undo.RecordObject(_data, "Move Node");
                 var np = CanvasToWorldPos(e.mousePosition - _dragOffset);
@@ -4555,7 +4720,14 @@ public partial class LevelSelectDesignerWindow : EditorWindow
 
         if (e.type == EventType.KeyDown && e.keyCode == KeyCode.Delete)
         {
-            if (_selectedNodeId != null)
+            if (_selectedNodeId != null && IsLeadInNode(_selectedNodeId))
+            {
+                _consoleStatusMsg = "That node is a lead-in — it is locked to its pool or arena. " +
+                                    "Remove that, or use Refresh Lead-ins on it.";
+                Repaint();
+                e.Use();
+            }
+            else if (_selectedNodeId != null)
             {
                 Undo.RecordObject(_data, "Delete Node");
                 DeleteNode(_selectedNodeId);
@@ -4708,6 +4880,7 @@ public partial class LevelSelectDesignerWindow : EditorWindow
     {
         var node = _data.nodes.Find(n => n.id == nodeId);
         if (node != null) node.type = LevelSelectDesignerData.NodeType.Waypoint;
+        RemoveArenaLeadIns(_data.arenas.Find(a => a.nodeId == nodeId));
         _data.arenas.RemoveAll(a => a.nodeId == nodeId);
         if (_selectedArenaNodeId == nodeId) _selectedArenaNodeId = null;
         foreach (var p in _data.paths)
@@ -4744,6 +4917,8 @@ public partial class LevelSelectDesignerWindow : EditorWindow
                     p.leadsToArena = true;
                     p.arenaIsAtEnd = true;
                 }
+
+            RefreshArenaLeadIns(_data.arenas.Find(a => a.nodeId == nodeId));
         }
 
         MarkDirty();
@@ -4751,36 +4926,63 @@ public partial class LevelSelectDesignerWindow : EditorWindow
         e.Use();
     }
 
-    // ── Pool mode ─────────────────────────────────────────────────
-    private void HandlePoolMode(Event e)
+    // ── Selected node: Add Pool / Add Outpost ─────────────────────
+    /// <summary>
+    /// Buttons for the selected node, when it sits on a river: make it a pool (or take the pool
+    /// away), or stand an outpost beside the river at it.
+    /// </summary>
+    private void DrawSelectedNodeActions()
     {
-        if (e.type != EventType.MouseDown || e.button != 0) return;
+        if (_selectedNodeId == null) return;
+        string nodeId = _selectedNodeId;
 
-        string nodeId = FindNodeAtCanvas(e.mousePosition);
-        if (nodeId == null) return;
+        var path = _data.paths.Find(p => p.pathId == _selectedPathId && p.nodeIds.Contains(nodeId))
+                ?? _data.paths.Find(p => p.nodeIds.Contains(nodeId));
+        if (path == null) return;
 
-        Undo.RecordObject(_data, "Toggle Pool");
+        EditorGUILayout.Space(6);
+        EditorGUILayout.LabelField("Selected Node", EditorStyles.boldLabel);
 
+        EditorGUILayout.BeginHorizontal();
+        bool hasPool = _data.PoolAt(nodeId) != null;
+        if (GUILayout.Button(hasPool ? "Remove Pool" : "Add Pool"))
+            TogglePoolAt(nodeId);
+        GUI.enabled = path.nodeIds.Count >= 2;
+        if (GUILayout.Button("Add Outpost"))
+            AddOutpostAt(path, nodeId);
+        GUI.enabled = true;
+        EditorGUILayout.EndHorizontal();
+    }
+
+    private void TogglePoolAt(string nodeId)
+    {
         if (_data.PoolAt(nodeId) != null)
         {
+            Undo.RecordObject(_data, "Remove Pool");
+            RemovePoolLeadIns(_data.PoolAt(nodeId));
             _data.pools.RemoveAll(p => p.nodeId == nodeId);
             if (_selectedPoolNodeId == nodeId) _selectedPoolNodeId = null;
         }
         else
         {
+            Undo.RecordObject(_data, "Add Pool");
             // Off, so a new pool follows the default shape. Pools drawn before there was a
             // default keep their own — see DesignerPool.overrideShape.
-            _data.pools.Add(new LevelSelectDesignerData.DesignerPool
+            var pool = new LevelSelectDesignerData.DesignerPool
             {
                 nodeId        = nodeId,
                 overrideShape = false,
-            });
+            };
+            _data.pools.Add(pool);
             _selectedPoolNodeId = nodeId;
+
+            int missed = RefreshPoolLeadIns(pool);
+            if (missed > 0)
+                _consoleStatusMsg = $"Pool added — {missed} river(s) left without a lead-in (four compass points).";
         }
 
         MarkDirty();
         Repaint();
-        e.Use();
     }
 
     // ── Obstacle mode ─────────────────────────────────────────────
@@ -4864,6 +5066,9 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             Color col      = path.editorColor;
             float width    = selected ? 3f : 2f;
 
+            if (Event.current.type == EventType.Repaint)
+                DrawPathRims(path, selected);
+
             for (int i = 0; i < path.nodeIds.Count - 1; i++)
             {
                 var nodeA = _data.nodes.Find(n => n.id == path.nodeIds[i]);
@@ -4884,6 +5089,89 @@ public partial class LevelSelectDesignerWindow : EditorWindow
                 Handles.DrawAAPolyLine(width, (Vector3)(mid + dir), (Vector3)(mid + perp));
             }
         }
+    }
+
+    /// <summary>
+    /// The run's two rims, drawn to scale from its river's profile: each a solid band
+    /// rimWidth wide, standing innerWidth apart, following the drawn path. Ends that sit on
+    /// a pool stop at the pool's outer rim rather than crossing the water.
+    /// </summary>
+    private void DrawPathRims(LevelSelectDesignerData.DesignerPath path, bool selected)
+    {
+        var points = new List<Vector3>(path.nodeIds.Count);
+        foreach (string id in path.nodeIds)
+        {
+            var node = _data.nodes.Find(n => n.id == id);
+            if (node == null) return;
+            points.Add(node.worldPosition);
+        }
+
+        TrimRimEndAtPool(points, path.nodeIds[0], 0, 1);
+        TrimRimEndAtPool(points, path.nodeIds[path.nodeIds.Count - 1], points.Count - 1, points.Count - 2);
+
+        var   profile = _data.ProfileFor(path.riverName);
+        float offset  = profile.innerWidth * 0.5f + profile.rimWidth * 0.5f;
+        float thick   = Mathf.Max(1f, profile.rimWidth * _zoom);
+
+        Color col = selected ? Color.white : path.editorColor;
+        col.a = 1f;
+        Handles.color = col;
+
+        DrawRimLine(points, offset, thick);
+        DrawRimLine(points, -offset, thick);
+    }
+
+    // A path end on a pool is pulled back to where the run meets the pool's outer rim.
+    private void TrimRimEndAtPool(List<Vector3> points, string nodeId, int end, int neighbour)
+    {
+        var pool = _data.PoolAt(nodeId);
+        if (pool == null) return;
+
+        var   shape = _data.PoolShapeFor(pool);
+        float reach = shape.poolRadius + _data.ProfileFor(_data.PoolRiverName(pool)).rimWidth;
+
+        Vector3 dir = points[neighbour] - points[end];
+        dir.y = 0f;
+        float length = dir.magnitude;
+        if (length <= reach) return;
+        points[end] += dir / length * reach;
+    }
+
+    // One rim: the path offset sideways by 'offset' world units (right is Cross(up, forward),
+    // the frame the run is swept on), mitred at each bend so the band keeps its width.
+    private void DrawRimLine(List<Vector3> points, float offset, float thickness)
+    {
+        int count  = points.Count;
+        var canvas = new Vector3[count];
+
+        for (int i = 0; i < count; i++)
+        {
+            Vector3 right = Vector3.zero;
+            if (i > 0)         right += SegmentRight(points[i - 1], points[i]);
+            if (i < count - 1) right += SegmentRight(points[i], points[i + 1]);
+            if (right.sqrMagnitude < 1e-8f) right = i > 0 ? SegmentRight(points[i - 1], points[i]) : Vector3.zero;
+            right.Normalize();
+
+            // Mitre: push the corner out so both neighbouring edges stay 'offset' away.
+            float scale = 1f;
+            if (i > 0)
+            {
+                float cos = Vector3.Dot(right, SegmentRight(points[i - 1], points[i]));
+                scale = 1f / Mathf.Max(0.25f, cos);
+            }
+
+            canvas[i] = WorldToCanvas(points[i] + right * (offset * scale));
+        }
+
+        Handles.DrawAAPolyLine(thickness, canvas);
+    }
+
+    private static Vector3 SegmentRight(Vector3 a, Vector3 b)
+    {
+        Vector3 forward = b - a;
+        forward.y = 0f;
+        if (forward.sqrMagnitude < 1e-8f) return Vector3.zero;
+        return Vector3.Cross(Vector3.up, forward.normalized);
     }
 
     /// <summary>
@@ -4928,12 +5216,8 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             DrawPoolRoute(pool, centre, selected);
 
             // Where each river breaks through the rim.
-            foreach (var (path, atEnd) in _data.PathsAtPool(pool))
+            foreach (var (path, neighbourId) in _data.PathsAtPool(pool))
             {
-                string neighbourId = atEnd
-                    ? path.nodeIds[path.nodeIds.Count - 2]
-                    : path.nodeIds[1];
-
                 Vector3 outward = _data.NodeWorldPosition(neighbourId) - node.worldPosition;
                 outward.y = 0f;
                 if (outward.sqrMagnitude < 0.0001f) continue;
@@ -5571,9 +5855,6 @@ public partial class LevelSelectDesignerWindow : EditorWindow
                 EditorGUI.indentLevel++;
                 DrawProcGenDropField();
                 DrawSetupSubFoldout(ref _foldProcGenRivers, "River Runs",  DrawProcGenRiversSection);
-                DrawSetupSubFoldout(ref _foldProcGenPools,  "Pools",       DrawProcGenPoolsSection);
-                DrawSetupSubFoldout(ref _foldProcGenArenas,    "Arena Walls", DrawProcGenArenaWallsSection);
-                DrawSetupSubFoldout(ref _foldProcGenEntrances, "Entrances",   DrawProcGenEntrancesSection);
                 EditorGUI.indentLevel--;
             }
             EditorGUILayout.Space(2);
@@ -5599,12 +5880,29 @@ public partial class LevelSelectDesignerWindow : EditorWindow
 
             // ── Arenas ────────────────────────────────────────────
             _foldArenas = EditorGUILayout.Foldout(_foldArenas, $"Arenas ({_data.arenas.Count})", true, EditorStyles.foldoutHeader);
-            if (_foldArenas) DrawArenasList();
+            if (_foldArenas)
+            {
+                // The arena walls and entrance archways every arena generates sit with the
+                // arenas themselves, as the pools' defaults do with the pools.
+                EditorGUI.indentLevel++;
+                DrawSetupSubFoldout(ref _foldProcGenArenas,    "Arena Walls", DrawProcGenArenaWallsSection);
+                DrawSetupSubFoldout(ref _foldProcGenEntrances, "Entrances",   DrawProcGenEntrancesSection);
+                EditorGUI.indentLevel--;
+                DrawArenasList();
+            }
             EditorGUILayout.Space(2);
 
             // ── Pools ─────────────────────────────────────────────
             _foldPools = EditorGUILayout.Foldout(_foldPools, $"Pools ({_data.pools.Count})", true, EditorStyles.foldoutHeader);
-            if (_foldPools) DrawPoolsList();
+            if (_foldPools)
+            {
+                // The procedural defaults every pool takes sit with the pools themselves; each
+                // pool's own override shows in the left panel when it is selected.
+                EditorGUI.indentLevel++;
+                DrawSetupSubFoldout(ref _foldProcGenPools, "Procedural Defaults", DrawProcGenPoolsSection);
+                EditorGUI.indentLevel--;
+                DrawPoolsList();
+            }
             EditorGUILayout.Space(2);
 
             // ── Rivers ────────────────────────────────────────────
@@ -5632,7 +5930,7 @@ public partial class LevelSelectDesignerWindow : EditorWindow
     private void DrawPoolsList()
     {
         EditorGUILayout.LabelField(
-            "Pool mode: click a node to make it a pool. Island 0 = open pool.",
+            "Select a node on a river and press Add Pool. Island 0 = open pool.",
             EditorStyles.miniLabel);
 
         if (_data.pools.Count == 0)
@@ -5651,16 +5949,17 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             EditorGUILayout.BeginHorizontal();
             GUI.backgroundColor = selected ? pool.editorColor : Color.clear;
 
-            // What the designer drew reads straight off the numbers, so name it that way.
-            string shape = pool.islandRadius <= 0f ? "Open pool"
-                         : arrivals >= 3           ? "Roundabout"
-                                                   : "Pool with a centre";
+            string shape = PoolKindLabel(pool, arrivals);
+            string own   = pool.overrideShape ? "  · own shape" : "";
 
-            if (GUILayout.Button($"{shape}  ({arrivals} river{(arrivals == 1 ? "" : "s")})",
+            if (GUILayout.Button($"{shape}  ({arrivals} river{(arrivals == 1 ? "" : "s")}){own}",
                                  EditorStyles.miniButton))
             {
-                _selectedPoolNodeId = selected ? null : pool.nodeId;
-                _selectedNodeId     = pool.nodeId;
+                _selectedPoolNodeId  = selected ? null : pool.nodeId;
+                _selectedNodeId      = pool.nodeId;
+                _selectedArenaNodeId = null;
+                _selectedShopNodeId  = null;
+                _selectedObstacleId  = null;
                 Repaint();
             }
             GUI.backgroundColor = prevBg;
@@ -5669,48 +5968,13 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             {
                 Undo.RecordObject(_data, "Remove Pool");
                 if (_selectedPoolNodeId == pool.nodeId) _selectedPoolNodeId = null;
+                RemovePoolLeadIns(pool);
                 _data.pools.RemoveAt(i);
                 MarkDirty();
                 EditorGUILayout.EndHorizontal();
                 continue;
             }
             EditorGUILayout.EndHorizontal();
-
-            if (!selected) continue;
-
-            EditorGUI.indentLevel++;
-            EditorGUI.BeginChangeCheck();
-
-            Color colour = EditorGUILayout.ColorField("Editor Colour", pool.editorColor);
-
-            if (EditorGUI.EndChangeCheck())
-            {
-                Undo.RecordObject(_data, "Edit Pool");
-                pool.editorColor = colour;
-                MarkDirty();
-                Repaint();
-            }
-
-            // The shape is authored under Procedural Generation — the default, or this pool's
-            // own override of it. Only what the pool looks like on the canvas is authored here.
-            var    poolShape = _data.PoolShapeFor(pool);
-            string poolRiver = _data.PoolRiverName(pool);
-            EditorGUILayout.LabelField(
-                $"Shape from river: {(string.IsNullOrEmpty(poolRiver) ? "(default)" : poolRiver)}",
-                EditorStyles.miniLabel);
-            EditorGUILayout.LabelField(
-                pool.overrideShape
-                    ? $"Own shape: radius {poolShape.poolRadius:F2}, island {poolShape.islandRadius:F2}"
-                    : $"Default shape: radius {poolShape.poolRadius:F2}, island {poolShape.islandRadius:F2}",
-                EditorStyles.miniLabel);
-            EditorGUILayout.LabelField(
-                $"Boat ring radius: {RiverMeshBuilder.PoolChannelRadius(poolShape.poolRadius, poolShape.islandRadius):F2}",
-                EditorStyles.miniLabel);
-            EditorGUILayout.LabelField(
-                "The ring is generated but not yet wired to boat travel.",
-                EditorStyles.miniLabel);
-
-            EditorGUI.indentLevel--;
         }
     }
 
@@ -6231,6 +6495,8 @@ public partial class LevelSelectDesignerWindow : EditorWindow
 
     private void DeleteNode(string nodeId)
     {
+        RemovePoolLeadIns(_data.PoolAt(nodeId));
+        RemoveArenaLeadIns(_data.arenas.Find(a => a.nodeId == nodeId));
         _data.nodes.RemoveAll(n => n.id == nodeId);
         foreach (var p in _data.paths) p.nodeIds.Remove(nodeId);
         _data.paths.RemoveAll(p => p.nodeIds.Count < 2);
@@ -6238,6 +6504,90 @@ public partial class LevelSelectDesignerWindow : EditorWindow
         _data.arenas.RemoveAll(a => a.nodeId == nodeId);
         _data.pools.RemoveAll(p => p.nodeId == nodeId);
         _data.shops.RemoveAll(s => s.nodeId == nodeId);
+        _data.rimNodes?.RemoveAll(r => r.nodeId == nodeId);
+    }
+
+    // What sits on a node, for the Nodes list: pool, rim node, lead-in, arena, shop, junction,
+    // and any other river that shares it.
+    private string NodeDetails(LevelSelectDesignerData.DesignerPath path, string nodeId)
+    {
+        var parts = new List<string>();
+        var node  = _data.nodes.Find(n => n.id == nodeId);
+        if (_data.PoolAt(nodeId) != null)                   parts.Add("Pool");
+        if (_data.RimNodeAt(nodeId) != null)                parts.Add("Rim node");
+        if (_data.PoolOfLeadIn(nodeId) != null)             parts.Add("Pool lead-in");
+        if (_data.ArenaOfLeadIn(nodeId) != null)            parts.Add("Arena lead-in");
+        if (_data.arenas.Exists(a => a.nodeId == nodeId))   parts.Add("Arena");
+        if (node?.type == LevelSelectDesignerData.NodeType.ShopEnd) parts.Add("Shop");
+        if (_data.junctions.Exists(j => j.nodeId == nodeId)) parts.Add("Junction");
+        foreach (var other in _data.paths)
+            if (other != path && other.nodeIds.Contains(nodeId))
+                parts.Add($"Joins {other.segmentId}");
+        return parts.Count > 0 ? string.Join(", ", parts) : "—";
+    }
+
+    // A river end can only be carried on when nothing is anchored to it — otherwise the new
+    // node would pull the river off its pool, arena, shop or junction.
+    private bool IsFreeEnd(LevelSelectDesignerData.DesignerPath path, string nodeId)
+    {
+        var node = _data.nodes.Find(n => n.id == nodeId);
+        if (node == null || IsLockedNode(nodeId)) return false;
+        if (node.type == LevelSelectDesignerData.NodeType.ArenaEnd ||
+            node.type == LevelSelectDesignerData.NodeType.ShopEnd) return false;
+        if (_data.PoolAt(nodeId) != null) return false;
+        if (_data.arenas.Exists(a => a.nodeId == nodeId)) return false;
+        if (_data.junctions.Exists(j => j.nodeId == nodeId)) return false;
+        return !_data.paths.Exists(p => p != path && p.nodeIds.Contains(nodeId));
+    }
+
+    // Whether a node can go in at `at` (0 = off the start, Count = off the end, else between
+    // at-1 and at). Never between a lead-in and the pool or arena it is locked to.
+    private bool CanInsertNodeAt(LevelSelectDesignerData.DesignerPath path, int at)
+    {
+        var ids = path.nodeIds;
+        if (ids.Count < 2) return false;
+        if (at <= 0)         return IsFreeEnd(path, ids[0]);
+        if (at >= ids.Count) return IsFreeEnd(path, ids[ids.Count - 1]);
+
+        string a = ids[at - 1], b = ids[at];
+        bool LockedPair(string leadIn, string owner) =>
+            _data.PoolOfLeadIn(leadIn)?.nodeId == owner || _data.ArenaOfLeadIn(leadIn)?.nodeId == owner;
+        return !LockedPair(a, b) && !LockedPair(b, a);
+    }
+
+    /// <summary>
+    /// Adds a waypoint at `at` in the river: halfway between the two nodes either side, or off
+    /// an end by half the end stretch's length. Gates, outposts and shops keep their places.
+    /// </summary>
+    private LevelSelectDesignerData.DesignerNode InsertNodeInPath(LevelSelectDesignerData.DesignerPath path, int at)
+    {
+        var ids = path.nodeIds;
+
+        if (at > 0 && at < ids.Count)
+        {
+            Vector3 mid  = (_data.NodeWorldPosition(ids[at - 1]) + _data.NodeWorldPosition(ids[at])) * 0.5f;
+            var     node = AddNode(mid, LevelSelectDesignerData.NodeType.Waypoint);
+            InsertNodeBetween(path, ids[at - 1], ids[at], node);
+            return node;
+        }
+
+        bool    atStart = at <= 0;
+        Vector3 end     = _data.NodeWorldPosition(atStart ? ids[0] : ids[ids.Count - 1]);
+        Vector3 inner   = _data.NodeWorldPosition(atStart ? ids[1] : ids[ids.Count - 2]);
+        Vector3 step    = end - inner; step.y = 0f;
+        var     added   = AddNode(end + step * 0.5f, LevelSelectDesignerData.NodeType.Waypoint);
+
+        // Fractions along the river are per stretch, so one more stretch slides everything;
+        // re-work them so each stays where it was.
+        int   segments = ids.Count - 1;
+        float Remap(float t) => (t * segments + (atStart ? 1f : 0f)) / (segments + 1);
+        foreach (var o in _data.obstacles) if (o.pathId == path.pathId) o.pathT = Remap(o.pathT);
+        foreach (var o in _data.outposts)  if (o.pathId == path.pathId) o.pathT = Remap(o.pathT);
+        foreach (var s in _data.shops)     if (s.pathId == path.pathId) s.pathT = Remap(s.pathT);
+
+        if (atStart) ids.Insert(0, added.id);
+        else         ids.Add(added.id);
+        return added;
     }
 
     private void DeletePath(string pathId)
@@ -6251,6 +6601,7 @@ public partial class LevelSelectDesignerWindow : EditorWindow
         }
         _data.paths.RemoveAll(p => p.pathId == pathId);
         _data.obstacles.RemoveAll(o => o.pathId == pathId);
+        _data.outposts.RemoveAll(o => o.pathId == pathId);
         foreach (var j in _data.junctions) j.pathIds.Remove(pathId);
     }
 
@@ -6287,6 +6638,9 @@ public partial class LevelSelectDesignerWindow : EditorWindow
     {
         if (_data == null) { Debug.LogWarning("[LevelSelectDesigner] No data asset."); return; }
 
+        SyncPoolLeadIns();
+        SyncArenaLeadIns();
+
         int undoGroup = Undo.GetCurrentGroup();
         Undo.SetCurrentGroupName("Generate Level Select");
 
@@ -6314,7 +6668,11 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             foreach (var nid in p.nodeIds)
                 nodeCounts[nid] = nodeCounts.TryGetValue(nid, out int c) ? c + 1 : 1;
 
-        var effectiveJunctions = new List<LevelSelectDesignerData.DesignerJunction>(_data.junctions);
+        // Not an explicit junction on a pool either — one clicked in Junction mode and later
+        // made a pool would otherwise have the river carry straight on through the pool.
+        var effectiveJunctions = _data.junctions
+            .Where(j => j != null && _data.PoolAt(j.nodeId) == null)
+            .ToList();
         foreach (var kvp in nodeCounts)
         {
             // A pool node is where rivers meet the pool, not each other — it gets a mouth cut
@@ -6339,6 +6697,7 @@ public partial class LevelSelectDesignerWindow : EditorWindow
         _arenaEntranceDirections.Clear();
         _junctionBranchStart.Clear();
         _junctionWaterLeadIn.Clear();
+        _junctionJoin.Clear();
         _poolEdgeDistance.Clear();
         _poolCentre.Clear();
         _poolWaterReach.Clear();
@@ -6477,29 +6836,40 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             }
         }
 
-        foreach (var path in _data.paths)
+        _legSourcePathId.Clear();
+
+        foreach (var drawn in _data.paths)
         {
-            if (path.nodeIds.Count < 2) continue;
-            bool isMain = path.segmentType == LevelSelectDesignerData.SegmentType.MainRiver;
+            if (drawn.nodeIds.Count < 2) continue;
+            bool isMain = drawn.segmentType == LevelSelectDesignerData.SegmentType.MainRiver;
             var  parent = isMain ? mainVisuals : branches;
 
-            // Collect ALL mid-path junctions for this path, sorted by node index
-            var pathJunctions = effectiveJunctions
-                .Where(j => { int idx = path.nodeIds.IndexOf(j.nodeId);
-                              return idx > 0 && idx < path.nodeIds.Count - 1; })
-                .OrderBy(j => path.nodeIds.IndexOf(j.nodeId))
-                .ToList();
-
-            if (pathJunctions.Count > 0)
-                GenerateJunctionSplit(path, pathJunctions, parent, generatedContainers);
-            else
+            // Split where the river is drawn through a pool, so each leg meets it at an end.
+            // Legs are made as each path comes up, not all up front: an earlier river's
+            // junction writes its branch's side flags, and a copy made before that would miss it.
+            foreach (var path in PoolLegs(drawn))
             {
-                var c = GenerateSimpleSegment(path, parent);
-                if (c != null) generatedContainers.Add(c);
+                // Collect ALL mid-path junctions for this path, sorted by node index
+                var pathJunctions = effectiveJunctions
+                    .Where(j => { int idx = path.nodeIds.IndexOf(j.nodeId);
+                                  return idx > 0 && idx < path.nodeIds.Count - 1; })
+                    .OrderBy(j => path.nodeIds.IndexOf(j.nodeId))
+                    .ToList();
+
+                if (pathJunctions.Count > 0)
+                    GenerateJunctionSplit(path, pathJunctions, parent, generatedContainers);
+                else
+                {
+                    var c = GenerateSimpleSegment(path, parent);
+                    if (c != null) generatedContainers.Add(c);
+                }
             }
         }
 
         GeneratePools(poolsGO);
+        RebuildPoolTowers();
+        GenerateOutposts(FindOrCreateParent(OutpostsParent));
+        GeneratePipes(FindOrCreateParent(PipesParent));
         GenerateObstacles(obstaclesGO);
         GenerateArenaWalls(FindOrCreateParent("ARENAS"));
         GenerateArenaArchways(FindOrCreateParent("ARENAS"));
@@ -6549,6 +6919,77 @@ public partial class LevelSelectDesignerWindow : EditorWindow
         return container;
     }
 
+    /// <summary>
+    /// A path cut into legs at every pool it is drawn through, so each leg meets a pool only
+    /// at its ends — which is the one case the trim against a pool and its mouth handle. A
+    /// river drawn through a pool goes in on one side and out on the other, and the pool is
+    /// one piece of water between the two.
+    ///
+    /// A path with no pool in its middle comes back as itself, untouched. Otherwise each leg is
+    /// a copy carrying the path's settings over its own stretch of nodes: the first keeps the
+    /// segment ID, and the rest take a suffix so their meshes and segments do not collide.
+    /// Only the leg that actually reaches an arena still leads to it.
+    /// </summary>
+    private List<LevelSelectDesignerData.DesignerPath> PoolLegs(LevelSelectDesignerData.DesignerPath path)
+    {
+        var legs = new List<LevelSelectDesignerData.DesignerPath>();
+        int n    = path.nodeIds.Count;
+
+        var cuts = new List<int>();
+        for (int i = 1; i < n - 1; i++)
+            if (_data.PoolAt(path.nodeIds[i]) != null) cuts.Add(i);
+
+        if (cuts.Count == 0) { legs.Add(path); return legs; }
+        cuts.Add(n - 1);
+
+        int from = 0;
+        for (int k = 0; k < cuts.Count; k++)
+        {
+            int  to    = cuts[k];
+            bool first = k == 0;
+            bool last  = k == cuts.Count - 1;
+
+            var leg = new LevelSelectDesignerData.DesignerPath
+            {
+                pathId                 = $"{path.pathId}#pool{k}",
+                segmentId              = first ? path.segmentId : $"{path.segmentId}_Pool{k}",
+                nodeIds                = path.nodeIds.GetRange(from, to - from + 1),
+                isLeftPath             = path.isLeftPath,
+                isRightPath            = path.isRightPath,
+                segmentType            = path.segmentType,
+                riverName              = path.riverName,
+                leadsToArena           = path.leadsToArena && (path.arenaIsAtEnd ? last : first),
+                arenaIsAtEnd           = path.arenaIsAtEnd,
+                extrudeOnExit          = path.extrudeOnExit,
+                tJunctionBidirectional = path.tJunctionBidirectional,
+                arenaGridDataGuid      = path.arenaGridDataGuid,
+                editorColor            = path.editorColor,
+                curveStrength          = path.curveStrength,
+                curveSubdivisions      = path.curveSubdivisions,
+            };
+
+            _legSourcePathId[leg.pathId] = path.pathId;
+            legs.Add(leg);
+            from = to;
+        }
+
+        Debug.Log($"[LevelSelectDesigner] '{path.segmentId}' runs through {cuts.Count - 1} " +
+                  $"pool(s) — generated as {legs.Count} legs.");
+        return legs;
+    }
+
+    // The drawn path each generated leg was cut from, keyed by the leg's own ID.
+    private readonly Dictionary<string, string> _legSourcePathId = new();
+
+    /// <summary>
+    /// The drawn path behind a generated one — itself, unless it is a leg of a river cut at a
+    /// pool. Anything asking "is this some OTHER river" has to compare drawn paths, or a leg
+    /// finds the very river it was cut from and takes it for a branch.
+    /// </summary>
+    private string SourcePathId(LevelSelectDesignerData.DesignerPath path)
+        => path != null && _legSourcePathId.TryGetValue(path.pathId, out string source)
+         ? source : path?.pathId;
+
     // Handles 1..N junctions on a single path in one pass.
     private void GenerateJunctionSplit(
         LevelSelectDesignerData.DesignerPath path,
@@ -6597,7 +7038,7 @@ public partial class LevelSelectDesignerWindow : EditorWindow
 
             // ── The direction the branch actually leaves in drives everything ──
             var branchPath = _data.paths.FirstOrDefault(
-                p => p.pathId != path.pathId && p.nodeIds.Contains(junc.nodeId));
+                p => p.pathId != SourcePathId(path) && p.nodeIds.Contains(junc.nodeId));
 
             Vector3 branchDir = Vector3.zero;
             if (branchPath != null)
@@ -6655,6 +7096,13 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             // Its water carries the whole way in to this river's centreline, where the two
             // channels are already the same depth and one surface runs into the other.
             _junctionWaterLeadIn[junc.nodeId] = collar;
+
+            // This river's centreline across the junction, facing out toward the branch, so the
+            // branch's water can be told how far each of its corners lies from this river's banks.
+            Vector3 acrossWorld = Vector3.Cross(Vector3.up, new Vector3(tanWorld.x, 0f, tanWorld.z));
+            if (Vector3.Dot(acrossWorld, branchDir) < 0f) acrossWorld = -acrossWorld;
+            if (acrossWorld.sqrMagnitude > 1e-8f)
+                _junctionJoin[junc.nodeId] = (actualJuncWorld, acrossWorld.normalized, path.riverName);
 
             // The visual run carries straight on through; this gap only splits the spline
             // so the boat has a segment either side of the mouth to route between.
@@ -6773,7 +7221,7 @@ public partial class LevelSelectDesignerWindow : EditorWindow
 
                 // Top/bottom for branch
                 var branchPath = _data.paths.FirstOrDefault(
-                    p => p.pathId != path.pathId && p.nodeIds.Contains(r.junction.nodeId));
+                    p => p.pathId != SourcePathId(path) && p.nodeIds.Contains(r.junction.nodeId));
                 if (branchPath != null)
                 {
                     int    bIdx   = branchPath.nodeIds.IndexOf(r.junction.nodeId);
@@ -7137,16 +7585,18 @@ public partial class LevelSelectDesignerWindow : EditorWindow
         record.meshAssetName = runName;
         record.waterLeadIn       = WaterLeadInFor(path);
         record.waterLeadOut      = WaterLeadOutFor(path);
-        record.waterLapsAtStart  = WaterLapsAtStart(path);
         record.waterSortingOrder = WaterSortingOrder(path);
+        RecordJoin(record, path, segmentGO);
         record.capStart      = capStart;
         record.capEnd        = capEnd;
         record.arenaAtStart  = arenaStart;
         record.arenaAtEnd    = arenaEnd;
         record.RecordSpline(spline);
         if (mouths != null) record.mouths = new List<RiverRunMesh.Mouth>(mouths);
+        RecordPathNodes(record, path, segmentGO);
 
         RefreshWater(record, profile, centres, forwards);
+        RefreshRimNodes(record, profile, centres, forwards);
         RefreshBanks(record, profile, centres, forwards, notches, capStart, capEnd);
 
         Debug.Log($"[LevelSelectDesigner] Run '{runName}' river='{path.riverName}' " +
@@ -7232,6 +7682,7 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             filter.sharedMesh = mesh;
             EditorUtility.SetDirty(filter);
             RefreshWater(record, profile, centres, forwards);
+            RefreshRimNodes(record, profile, centres, forwards);
             RefreshBanks(record, profile, centres, forwards, notches,
                          record.capStart, record.capEnd);
 
@@ -7271,24 +7722,29 @@ public partial class LevelSelectDesignerWindow : EditorWindow
     }
 
     /// <summary>
-    /// Whether a run's water laps OVER the water it meets at its start, rather than butting onto
-    /// it — which is what carries its lines across the join instead of ending them on it.
+    /// Records the river a branch leaves, as a straight line across the junction, so its water
+    /// can carry that river's banks and its lines take on that river's Reach where the two meet.
     ///
-    /// Only a branch leaving another river does. Where a river meets a POOL it is the pool's water
-    /// that laps out over the river (Water Pool Overlap), so a lead-in taken from a pool says no
-    /// here: the river would be lapping back over the very thing lapping it, and the two would
-    /// draw over each other twice in the strip they share.
-    ///
-    /// The fact and not the distance, because this is recorded on the run and read back by
-    /// Rebuild Runs — which never sees a path again, and would otherwise keep rebuilding to
-    /// whatever the overlap was set to on the last full Generate.
+    /// The river's name and not its width, so Rebuild Runs measures the shore against whatever
+    /// that river's Run Shape and the water level are now. Cleared for anything that does not
+    /// start at a junction — a river leaving a pool gets its Reach from the pool's own strips.
     /// </summary>
-    private bool WaterLapsAtStart(LevelSelectDesignerData.DesignerPath path)
+    private void RecordJoin(
+        RiverRunMesh record, LevelSelectDesignerData.DesignerPath path, GameObject segmentGO)
     {
-        if (path == null || path.nodeIds.Count == 0) return false;
-        if (_poolWaterReach.ContainsKey(path.nodeIds[0])) return false;
+        record.joinRiver  = null;
+        record.joinPoint  = Vector3.zero;
+        record.joinAcross = Vector3.zero;
 
-        return _junctionWaterLeadIn.ContainsKey(path.nodeIds[0]);
+        if (path == null || path.nodeIds.Count == 0 || segmentGO == null) return;
+
+        string start = path.nodeIds[0];
+        if (_poolWaterReach.ContainsKey(start)) return;
+        if (!_junctionJoin.TryGetValue(start, out var join)) return;
+
+        record.joinRiver  = join.river;
+        record.joinPoint  = segmentGO.transform.InverseTransformPoint(join.point);
+        record.joinAcross = segmentGO.transform.InverseTransformDirection(join.across).normalized;
     }
 
     /// <summary>
@@ -7326,19 +7782,39 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             return;
         }
 
-        // Whether this end laps at all was worked out with the run, because only the path knows
-        // a junction from a pool; how far it laps is read fresh, so Rebuild Runs answers to
-        // whatever the number is now. Nothing laps at the far end — the only thing a run ever
-        // ends against is a pool, and there it is the pool's own water that does the lapping.
-        float overlapIn = record.waterLapsAtStart ? Mathf.Max(0f, _data.waterBranchOverlap) : 0f;
-
-        WaterSweep(record.waterLeadIn + overlapIn, record.waterLeadOut,
+        WaterSweep(record.waterLeadIn, record.waterLeadOut,
                    Mathf.Max(0.01f, _data.splineInstantiateSpacing),
                    centres, forwards, out var waterCentres, out var waterForwards);
 
+        // A branch's water carries the banks of the river it leaves, so its lines can take on
+        // that river's Reach where it lies over it.
+        RiverMeshBuilder.RiverJoin? join = null;
+        if (!string.IsNullOrEmpty(record.joinRiver) && record.joinAcross.sqrMagnitude > 0.5f)
+        {
+            var joined = _data.ProfileFor(record.joinRiver);
+            join = new RiverMeshBuilder.RiverJoin
+            {
+                point  = record.joinPoint,
+                across = record.joinAcross,
+                shore  = RiverMeshBuilder.WaterHalfWidth(joined, _data.waterLevel),
+                extent = joined.OuterWidth,
+            };
+        }
+
         var mesh = SaveGeneratedMesh(waterName,
             RiverMeshBuilder.BuildWater(profile, _data.waterLevel, waterCentres, waterForwards,
-                                        overlapIn, 0f));
+                                        join));
+
+        // DEBUG (branch mouth fade at pools)
+        Debug.Log($"[BranchMouthDebug] water='{waterName}' joinRiver='{record.joinRiver}' " +
+                  $"leadIn={record.waterLeadIn:F2} leadOut={record.waterLeadOut:F2} " +
+                  $"length={RiverMeshBuilder.DebugWaterLength:F2} " +
+                  (join.HasValue
+                      ? $"shore={join.Value.shore:F2} extent={join.Value.extent:F2} " +
+                        $"flaggedQuads={RiverMeshBuilder.DebugJoinQuads} " +
+                        $"flaggedToAlong={RiverMeshBuilder.DebugJoinAlong:F2} " +
+                        $"maxInsideJoined={RiverMeshBuilder.DebugJoinMaxIn:F2}"
+                      : "no join"));
         if (mesh == null) return;
 
         GameObject waterGO;
@@ -7406,9 +7882,14 @@ public partial class LevelSelectDesignerWindow : EditorWindow
         while (path != null && path.nodeIds.Count > 0 && visited.Add(path))
         {
             string start = path.nodeIds[0];
+
+            // A river leaving a pool is not a branch of anything, even when it is the far leg
+            // of a river drawn through that pool.
+            if (_data.PoolAt(start) != null) break;
+
             var parent = _data.paths.FirstOrDefault(p =>
             {
-                if (p == path) return false;
+                if (p == path || p.pathId == SourcePathId(path)) return false;
                 int i = p.nodeIds.IndexOf(start);
                 return i > 0 && i < p.nodeIds.Count - 1;
             });
@@ -7459,7 +7940,7 @@ public partial class LevelSelectDesignerWindow : EditorWindow
         var mesh = SaveGeneratedMesh(banksName,
             RiverMeshBuilder.BuildRunBanks(profile, _data.waterLevel,
                                           centres, forwards, notches, MeshEdge,
-                                          capStart, capEnd));
+                                          capStart, capEnd, RimNodesFor(record)));
 
         EnsureCollisionChild(record.transform, banksName, mesh, existing);
     }
@@ -7849,6 +8330,10 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             record.floorDepth    = shape.floorDepth;
             record.mouths        = mouths;
 
+            // The pool's fog circle, sized off the record and numbered from the FogMap — the
+            // pool's answer to the run's chain.
+            meshGO.AddComponent<RiverPoolFogRepeller>();
+
             RefreshPoolWater(record, profile);
             RefreshPoolBanks(record, profile);
 
@@ -7902,6 +8387,9 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             RefreshPoolBanks(record, profile);
             rebuilt++;
         }
+
+        // An island resized past the tower's minimum either way takes its tower with it.
+        RebuildPoolTowers();
         return rebuilt;
     }
 
@@ -8212,6 +8700,11 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             record.profile       = profile.Clone();
             EditorUtility.SetDirty(record);
 
+            // The arena's fog circle, sized off the wall record and numbered from the FogMap.
+            // Checked rather than added blind because an existing wall is reused here.
+            if (go.GetComponent<LevelSelectArenaFogRepeller>() == null)
+                go.AddComponent<LevelSelectArenaFogRepeller>();
+
             Debug.Log($"[LevelSelectDesigner] Arena wall '{wallName}' radius={profile.radius} " +
                       $"thickness={profile.thickness} height={profile.height} drop={profile.drop}");
         }
@@ -8248,10 +8741,50 @@ public partial class LevelSelectDesignerWindow : EditorWindow
         return rebuilt;
     }
 
-    private static Mesh BuildArenaWallMesh(ArenaWallProfile profile) =>
-        ProceduralArenaWallMesh.Build(ProceduralArenaWallMesh.Shape.Circle,
-                                      profile.radius, profile.thickness,
-                                      profile.height, profile.drop);
+    // Carries the river run stone shading. The wall is built standing on the water surface, so
+    // the rivers' rim top — what the waterline is placed off — is the water level above it; the
+    // wall's own lip is its top.
+    // Each part takes the stone colour the Run Shading Tuner's Arena Walls section gives it.
+    private Mesh BuildArenaWallMesh(ArenaWallProfile profile)
+    {
+        var parts = new List<ProceduralArenaWallMesh.Part>();
+        var wall  = ProceduralArenaWallMesh.Build(ProceduralArenaWallMesh.Shape.Circle,
+                                                  profile.radius, profile.thickness,
+                                                  profile.height, profile.drop, parts);
+
+        var shading = StoneShadingForBuild;
+        var kinds   = parts.ConvertAll(p => (float)(shading == null ? StoneFaceKind.Auto
+            : p == ProceduralArenaWallMesh.Part.InnerFace ? shading.arenaInnerFace
+            : p == ProceduralArenaWallMesh.Part.OuterFace ? shading.arenaOuterFace
+                                                          : shading.arenaTop));
+
+        return RiverMeshBuilder.ShadeAsStone(wall, BoatSplineDrop, profile.height, kinds);
+    }
+
+    // An archway, carrying the stone shading with each part coloured as the Run Shading Tuner's
+    // Arena Archways section says.
+    private Mesh BuildArchwayMesh(ArenaArchwayProfile settled)
+    {
+        var parts = new List<ArenaArchwayMesh.Part>();
+        var arch  = ArenaArchwayMesh.Build(settled, MeshEdge, parts);
+
+        var shading = StoneShadingForBuild;
+        var kinds   = parts.ConvertAll(p => (float)(shading == null ? StoneFaceKind.Auto
+            : p == ArenaArchwayMesh.Part.Inside  ? shading.archwayInside
+            : p == ArenaArchwayMesh.Part.Outside ? shading.archwayOutside
+            : p == ArenaArchwayMesh.Part.Faces   ? shading.archwayFaces
+                                                 : shading.archwayFeet));
+
+        return RiverMeshBuilder.ShadeAsStone(arch, 0f, null, kinds);
+    }
+
+    /// <summary>
+    /// The stone shading settings a piece being generated takes its part colours from — the Run
+    /// Shading Tuner's while it is driving, the world's structure preset otherwise.
+    /// </summary>
+    private RiverRunShadingSettings StoneShadingForBuild =>
+        RiverRunShadingSettings.ForBuild(
+            _data != null && _data.structurePreset != null ? _data.structurePreset.runShading : null);
 
     private void ApplyArenaWallMesh(GameObject go, Mesh mesh)
     {
@@ -8265,6 +8798,16 @@ public partial class LevelSelectDesignerWindow : EditorWindow
         renderer.sharedMaterial = _data.arenaWallMaterial != null
                                 ? _data.arenaWallMaterial : _data.riverMaterial;
         EditorUtility.SetDirty(renderer);
+
+        var col = go.GetComponent<MeshCollider>();
+        if (col == null) col = go.AddComponent<MeshCollider>();
+
+        // Cleared first, as the banks are: a collider handed the mesh it already holds does not
+        // always rebake, and a rebuilt wall would keep its old shape.
+        col.sharedMesh = null;
+        col.convex     = false;
+        col.sharedMesh = mesh;
+        EditorUtility.SetDirty(col);
     }
 
     private static string ArenaWallMeshName(LevelSelectDesignerData.DesignerArena arena) =>
@@ -8275,6 +8818,7 @@ public partial class LevelSelectDesignerWindow : EditorWindow
     private struct ArchwaySite
     {
         public int     entranceIndex;
+        public string  nodeId;
         public Vector3 outward;
         public string  riverName;
     }
@@ -8302,6 +8846,7 @@ public partial class LevelSelectDesignerWindow : EditorWindow
         sites.Add(new ArchwaySite
         {
             entranceIndex = arena.entranceIndex,
+            nodeId        = arena.nodeId,
             outward       = -inward,
             riverName     = branch != null ? branch.riverName : null,
         });
@@ -8324,6 +8869,7 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             sites.Add(new ArchwaySite
             {
                 entranceIndex = sec.entranceIndex,
+                nodeId        = sec.nodeId,
                 outward       = dir.normalized,
                 riverName     = path != null ? path.riverName
                                              : (branch != null ? branch.riverName : null),
@@ -8364,7 +8910,7 @@ public partial class LevelSelectDesignerWindow : EditorWindow
                 var settled = shape.Resolve(river, wall.thickness);
 
                 string archName = ArchwayMeshName(arena, site.entranceIndex);
-                var    mesh     = SaveGeneratedMesh(archName, ArenaArchwayMesh.Build(settled, MeshEdge));
+                var    mesh     = SaveGeneratedMesh(archName, BuildArchwayMesh(settled));
                 if (mesh == null) continue;
 
                 var existing = FindObjectsOfType<LevelSelectArenaArchwayMesh>()
@@ -8390,6 +8936,7 @@ public partial class LevelSelectDesignerWindow : EditorWindow
                 go.transform.localScale = Vector3.one;
 
                 ApplyArenaWallMesh(go, mesh);
+                ApplyArchwayDoor(go, arena, site, settled, archName);
 
                 var record = go.GetComponent<LevelSelectArenaArchwayMesh>();
                 record.nodeId        = arena.nodeId;
@@ -8429,9 +8976,10 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             var arena = _data.arenas.Find(a => a.nodeId == record.nodeId);
 
             ArenaArchwayProfile settled;
+            ArchwaySite         site = default;
             if (arena != null)
             {
-                var site  = ArenaEntranceSites(arena)
+                site      = ArenaEntranceSites(arena)
                     .FirstOrDefault(x => x.entranceIndex == record.entranceIndex);
                 var river = _data.ProfileFor(site.riverName);
                 settled   = _data.ArchwayFor(arena).Resolve(river, _data.ArenaWallFor(arena).thickness);
@@ -8442,10 +8990,12 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             }
             if (settled == null) continue;
 
-            var mesh = SaveGeneratedMesh(record.meshAssetName, ArenaArchwayMesh.Build(settled, MeshEdge));
+            var mesh = SaveGeneratedMesh(record.meshAssetName, BuildArchwayMesh(settled));
             if (mesh == null) continue;
 
             ApplyArenaWallMesh(record.gameObject, mesh);
+            if (arena != null)
+                ApplyArchwayDoor(record.gameObject, arena, site, settled, record.meshAssetName);
             record.profile = settled;
             EditorUtility.SetDirty(record);
             rebuilt++;
@@ -8454,17 +9004,65 @@ public partial class LevelSelectDesignerWindow : EditorWindow
     }
 
     /// <summary>
-    /// Where an entrance prefab stands when its arena has archways: inside the arch at that
-    /// door, carried by the alignment authored for it. False when there is no arch there — the
-    /// entrance then keeps its old place at the arena centre.
+    /// The door filling an archway's opening, as a "Door" child of the arch so it stands in the
+    /// arch's own frame. It runs from the channel floor of the river at that entrance up to the
+    /// underside of the crown, and stands as far back along the tunnel as the entrance's Along —
+    /// the same place the entrance prefab's wall-depth disc is put, see
+    /// <see cref="TryEntranceInArchway"/>, so the door and the prefab meet.
+    /// </summary>
+    private void ApplyArchwayDoor(GameObject arch, LevelSelectDesignerData.DesignerArena arena,
+                                  ArchwaySite site, ArenaArchwayProfile settled, string archName)
+    {
+        var   river = _data.ProfileFor(site.riverName);
+        float floor = river != null ? river.riverDepth : 0.16f;
+        float along = DoorAlong(arena, site.nodeId, site.entranceIndex);
+
+        string doorName = archName.Replace("ArenaArchway_", "ArenaDoor_");
+        var    mesh     = SaveGeneratedMesh(doorName,
+                              ArenaArchwayMesh.BuildDoor(settled, floor, along, MeshEdge));
+        if (mesh == null) return;
+
+        Transform door = arch.transform.Find(ArchwayDoorChild);
+        if (door == null)
+        {
+            var go = new GameObject(ArchwayDoorChild);
+            Undo.RegisterCreatedObjectUndo(go, "Generate Archway Door");
+            go.transform.SetParent(arch.transform, false);
+            door = go.transform;
+        }
+        door.localPosition = Vector3.zero;
+        door.localRotation = Quaternion.identity;
+        door.localScale    = Vector3.one;
+
+        var filter = door.GetComponent<MeshFilter>();
+        if (filter == null) filter = door.gameObject.AddComponent<MeshFilter>();
+        filter.sharedMesh = mesh;
+        EditorUtility.SetDirty(filter);
+
+        var renderer = door.GetComponent<MeshRenderer>();
+        if (renderer == null) renderer = door.gameObject.AddComponent<MeshRenderer>();
+        renderer.sharedMaterial = _data.arenaDoorMaterial != null ? _data.arenaDoorMaterial
+                                : _data.arenaWallMaterial != null ? _data.arenaWallMaterial
+                                : _data.riverMaterial;
+        EditorUtility.SetDirty(renderer);
+    }
+
+    private const string ArchwayDoorChild = "Door";
+
+    /// <summary>
+    /// Where an entrance prefab stands when its arena has archways, and which way it faces. False
+    /// when there is no arch there — the entrance then keeps its old place at the arena centre.
     ///
-    /// The arch's own frame is what an alignment is measured in — across the channel, up from
-    /// the rim top, and along the river out through the wall — the same frame the arch mesh is
-    /// built in, so one set of numbers reads the same at every door however an arena is turned.
+    /// Placed off the prefab's PrefabBaselineAlignment. Its wall-depth disc — the aligner, carried
+    /// Wall Depth along its wall axis — lands on the water surface on the arch's centreline, as
+    /// far into the arch as the door sheet stands (<see cref="DoorAlong"/>). With a forward
+    /// override the prefab turns so FORWARD points down the river, away from the arena, and UP
+    /// points world-up — the OPPOSITE of LevelSpawner in-level, where FORWARD faces the arena
+    /// centre. Without one it keeps <paramref name="rotation"/> as handed in.
     /// </summary>
     private bool TryEntranceInArchway(LevelSelectDesignerData.DesignerArena arena,
                                       string entranceNodeId, int entranceIndex,
-                                      out Vector3 position)
+                                      out Vector3 position, ref Quaternion rotation)
     {
         position = Vector3.zero;
         if (arena == null || !arena.archwayOnEntrances) return false;
@@ -8476,7 +9074,38 @@ public partial class LevelSelectDesignerWindow : EditorWindow
         Vector3    archPos = GetTrueArenaCenter(arena) + site.outward * _data.ArenaWallFor(arena).radius;
         Quaternion archRot = Quaternion.LookRotation(site.outward, Vector3.up);
 
-        position = archPos + archRot * _data.EntranceAlignmentFor(arena, entranceNodeId).Offset;
+        // On the centreline, on the water - the arch's y = 0 is the rim top, the water is
+        // BoatSplineDrop below it - at the depth the door sheet stands.
+        float   along  = DoorAlong(arena, entranceNodeId, entranceIndex);
+        Vector3 target = archPos + archRot * new Vector3(0f, -BoatSplineDrop, along);
+
+        var prefab  = _data.arenaEntrancePrefab;
+        var aligner = prefab != null ? prefab.GetComponentInChildren<PrefabBaselineAlignment>(true) : null;
+        if (aligner == null)
+        {
+            Debug.LogWarning($"[LevelSelectDesigner] {(prefab != null ? prefab.name : "Entrance prefab")} " +
+                             "has no PrefabBaselineAlignment — placed by its root instead.");
+            position = target;
+            return true;
+        }
+
+        // What the aligner says, in the prefab root's own frame.
+        Transform  root   = prefab.transform;
+        Quaternion toRoot = Quaternion.Inverse(root.rotation);
+        Vector3    disc   = toRoot * (aligner.transform.position - root.position);
+        if (aligner.UseWallDepth)
+            disc += toRoot * aligner.transform.TransformDirection(aligner.WallDepthLocalAxis).normalized
+                           * aligner.WallDepth;
+
+        if (aligner.UseForwardOverride)
+        {
+            Vector3 fwd = toRoot * aligner.transform.TransformDirection(aligner.LocalForward);
+            Vector3 up  = toRoot * aligner.transform.TransformDirection(aligner.LocalUp);
+            rotation = Quaternion.LookRotation(site.outward, Vector3.up)
+                     * Quaternion.Inverse(Quaternion.LookRotation(fwd, up));
+        }
+
+        position = target - rotation * disc;
         return true;
     }
 
@@ -8585,11 +9214,11 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             var entGO = (GameObject)PrefabUtility.InstantiatePrefab(_data.arenaEntrancePrefab);
             Undo.RegisterCreatedObjectUndo(entGO, "Generate Arena Entrance");
             entGO.transform.SetParent(arenaGO.transform, false);
-            if (TryEntranceInArchway(arena, arena.nodeId, arena.entranceIndex, out Vector3 entPos))
+            Quaternion desiredWorld = Quaternion.Euler(-90f, arrivalYAngle, 0f);
+            if (TryEntranceInArchway(arena, arena.nodeId, arena.entranceIndex, out Vector3 entPos, ref desiredWorld))
                 entGO.transform.position = entPos;
             else
                 entGO.transform.localPosition = Vector3.zero;
-            Quaternion desiredWorld = Quaternion.Euler(-90f, arrivalYAngle, 0f);
             entGO.transform.localRotation = Quaternion.Inverse(arenaGO.transform.rotation) * desiredWorld;
             entGO.name = "Entrance_0";
 
@@ -8631,11 +9260,12 @@ public partial class LevelSelectDesignerWindow : EditorWindow
                 var secEntGO = (GameObject)PrefabUtility.InstantiatePrefab(_data.arenaEntrancePrefab);
                 Undo.RegisterCreatedObjectUndo(secEntGO, "Generate Secondary Arena Entrance");
                 secEntGO.transform.SetParent(arenaGO.transform, false);
-                if (TryEntranceInArchway(arena, secEnt.nodeId, secEnt.entranceIndex, out Vector3 secPos))
+                Quaternion secRot = Quaternion.Euler(-90f, secRotationY, 0f);
+                if (TryEntranceInArchway(arena, secEnt.nodeId, secEnt.entranceIndex, out Vector3 secPos, ref secRot))
                     secEntGO.transform.position = secPos;
                 else
                     secEntGO.transform.localPosition = Vector3.zero;
-                secEntGO.transform.rotation = Quaternion.Euler(-90f, secRotationY, 0f);
+                secEntGO.transform.rotation = secRot;
                 secEntGO.name = $"Entrance_{secEnt.entranceIndex}";
 
                 if (ctrl != null)
@@ -8925,7 +9555,7 @@ public partial class LevelSelectDesignerWindow : EditorWindow
     private static readonly string[] ClearableParents =
     {
         "MAINRIVERVISUALS", "RIVERBRANCHES", "RIVERJUNCTIONS", "RIVERGATEsobstacles",
-        "RIVERPOOLS", "ARENAS", "SHOPS", "BoatPaths", "LANDSCAPETILES",
+        "RIVERPOOLS", "OUTPOSTS", "PIPES", "ARENAS", "SHOPS", "BoatPaths", "LANDSCAPETILES",
         "LEVELSELECT_SCRIPTS", "PlayerBoat", "CANVAS", "RiverExtrusion", "CAMERA"
     };
 
@@ -9349,6 +9979,10 @@ public partial class LevelSelectDesignerWindow : EditorWindow
     // river it joins across the mouth cut between them.
     private readonly Dictionary<string, float> _junctionWaterLeadIn = new();
 
+    // The river a branch leaves, as a line across the junction: a point on its centreline, the
+    // flat direction out toward the branch, and that river's name.
+    private readonly Dictionary<string, (Vector3 point, Vector3 across, string river)> _junctionJoin = new();
+
     // How far from a pool's centre a river arriving at it has to stop, so it butts onto the
     // pool's outer wall instead of running through it. Keyed by the pool's node.
     private readonly Dictionary<string, float> _poolEdgeDistance = new();
@@ -9548,6 +10182,30 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             $"Tile surface sits at Y {_data.landscapeWorldY + _data.landscapeHeightOffset:0.###}",
             EditorStyles.miniLabel);
 
+        EditorGUI.BeginChangeCheck();
+        _data.landscapeTileSubdivisions = EditorGUILayout.IntSlider(
+            "Subdivisions", _data.landscapeTileSubdivisions, 1, 100);
+        if (EditorGUI.EndChangeCheck())
+        {
+            MarkDirty();
+            ApplyLandscapeSubdivisions();
+            Repaint();
+        }
+
+        EditorGUI.BeginChangeCheck();
+        float noiseScale = EditorGUILayout.FloatField(
+            new GUIContent("Noise Scale", "How fine the rocky noise on hills is — its frequency " +
+                                          "across the world. Only hills with Rocky Noise show it."),
+            _data.landscapeNoiseScale);
+        if (EditorGUI.EndChangeCheck())
+        {
+            Undo.RecordObject(_data, "Landscape Noise Scale");
+            _data.landscapeNoiseScale = noiseScale;
+            MarkDirty();
+            SyncHillPointsToScene();
+            Repaint();
+        }
+
         EditorGUILayout.Space(4);
         var prevBg = GUI.backgroundColor;
         GUI.backgroundColor = new Color(0.5f, 0.8f, 1f);
@@ -9575,7 +10233,8 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             GUI.backgroundColor = rowBg;
 
             EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button(sel ? $"● Hill {i}" : $"  Hill {i}", EditorStyles.miniButton))
+            string kind = hp.height < 0f ? "Hole" : "Hill";
+            if (GUILayout.Button(sel ? $"● {kind} {i}" : $"  {kind} {i}", EditorStyles.miniButton))
             {
                 _selectedHillPointId = sel ? null : hp.id;
                 Repaint();
@@ -9590,6 +10249,8 @@ public partial class LevelSelectDesignerWindow : EditorWindow
                     positionXZ = hp.positionXZ + new Vector2(2f, 2f),
                     scale      = hp.scale,
                     height     = hp.height,
+                    smoothness = hp.smoothness,
+                    noise      = hp.noise,
                 };
                 _data.hillPoints.Insert(i + 1, dupe);
                 _selectedHillPointId = dupe.id;
@@ -9622,6 +10283,14 @@ public partial class LevelSelectDesignerWindow : EditorWindow
                 hp.positionXZ = EditorGUILayout.Vector2Field("Position XZ", hp.positionXZ);
                 hp.scale      = EditorGUILayout.Slider("Radius",          hp.scale,  0.1f, 50f);
                 hp.height     = EditorGUILayout.Slider("Height (- = hole)", hp.height, -15f, 50f);
+                hp.smoothness = EditorGUILayout.Slider(
+                    new GUIContent("Smoothness", "1 = smooth rounded hill. Lower flattens the top " +
+                                                 "and steepens the sides; 0 is a plateau with " +
+                                                 "near-vertical cliffs."),
+                    hp.smoothness, 0f, 1f);
+                hp.noise      = EditorGUILayout.Slider(
+                    new GUIContent("Rocky Noise", "Rocky noise across this hill's shape. 0 = none."),
+                    hp.noise, 0f, 1f);
                 if (EditorGUI.EndChangeCheck())
                 {
                     Undo.RecordObject(_data, "Edit Hill Point");
@@ -9786,8 +10455,10 @@ public partial class LevelSelectDesignerWindow : EditorWindow
                 var tileMesh = go.GetComponent<LandscapeTileMesh>();
                 if (tileMesh != null)
                 {
-                    tileMesh.width = size;
-                    tileMesh.depth = size;
+                    tileMesh.width         = size;
+                    tileMesh.depth         = size;
+                    tileMesh.subdivisionsX = _data.landscapeTileSubdivisions;
+                    tileMesh.subdivisionsZ = _data.landscapeTileSubdivisions;
                     tileMesh.GenerateMesh();
                 }
             }
@@ -9824,6 +10495,31 @@ public partial class LevelSelectDesignerWindow : EditorWindow
         SyncHillPointsToScene();
     }
 
+    /// <summary>
+    /// Rebuilds every already-generated tile's mesh at the current Subdivisions, so the change
+    /// shows without a regenerate.
+    /// </summary>
+    private void ApplyLandscapeSubdivisions()
+    {
+        if (_data == null) return;
+
+        var parent = GameObject.Find("LANDSCAPETILES");
+        if (parent == null) return;
+
+        int subdivisions = _data.landscapeTileSubdivisions;
+
+        foreach (Transform child in parent.transform)
+        {
+            var tileMesh = child.GetComponent<LandscapeTileMesh>();
+            if (tileMesh == null) continue;
+            Undo.RecordObject(tileMesh, "Landscape Subdivisions");
+            tileMesh.subdivisionsX = subdivisions;
+            tileMesh.subdivisionsZ = subdivisions;
+            tileMesh.GenerateMesh();
+            PrefabUtility.RecordPrefabInstancePropertyModifications(tileMesh);
+        }
+    }
+
     private void ClearLandscapeTiles()
     {
         var go = GameObject.Find("LANDSCAPETILES");
@@ -9843,12 +10539,23 @@ public partial class LevelSelectDesignerWindow : EditorWindow
 
         if (_data == null) return;
 
+        var tool = container.parent.GetComponent<LandscapeTool>();
+        if (tool != null && tool.noiseScale != _data.landscapeNoiseScale)
+        {
+            tool.noiseScale = _data.landscapeNoiseScale;
+            EditorUtility.SetDirty(tool);
+        }
+
         foreach (var hp in _data.hillPoints)
         {
             var go = new GameObject($"HillPoint_{hp.id.Substring(0, 6)}");
             go.transform.SetParent(container, false);
             go.transform.position   = new Vector3(hp.positionXZ.x, hp.height, hp.positionXZ.y);
             go.transform.localScale = Vector3.one * hp.scale;
+
+            var shape = go.AddComponent<HillPoint>();
+            shape.smoothness = hp.smoothness;
+            shape.noise      = hp.noise;
         }
     }
 

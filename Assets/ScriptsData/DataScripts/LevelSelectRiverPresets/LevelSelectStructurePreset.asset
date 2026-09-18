@@ -14,15 +14,34 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::LevelSelectRiverStructurePreset
   runShading:
     outerColour: {r: 0.103773594, g: 0.103773594, b: 0.103773594, a: 1}
-    rimColour: {r: 0.21698111, g: 0.21698111, b: 0.21698111, a: 1}
+    outerGrainSize: 0.09
+    outerGrainStrength: 0.241
+    rimColour: {r: 0.2924528, g: 0.2924528, b: 0.2924528, a: 1}
+    rimGrainSize: 0.17
+    rimGrainStrength: 0.241
     innerColour: {r: 0.7735849, g: 0.7735849, b: 0.7735849, a: 1}
-    grainSize: 0.03
-    grainStrength: 0.241
+    innerGrainSize: 0.09
+    innerGrainStrength: 0.241
     seamColour: {r: 0.03773582, g: 0.03773582, b: 0.03773582, a: 1}
-    seamStrength: 1.11
-    seamExtent: 0.36
+    seamStrength: 0.97
+    seamExtentPercent: 14.4
     waterlineColour: {r: 1, g: 1, b: 1, a: 1}
     waterlineStrength: 1.1
     waterlineExtent: 0.06
-    lightPosition: {x: 83.5, y: 39.1, z: 21.4}
+    lightPosition: {x: 362.3, y: 259.8, z: -3.2}
     lightStrength: 1
+    outpostOutsideWalls: 0
+    outpostWallTop: 3
+    outpostInsideWalls: 0
+    outpostFloor: 2
+    towerOrb: 3
+    towerStem: 3
+    towerBaseSides: 2
+    towerBaseTop: 3
+    arenaInnerFace: 0
+    arenaOuterFace: 0
+    arenaTop: 0
+    archwayInside: 0
+    archwayOutside: 0
+    archwayFaces: 0
+    archwayFeet: 0

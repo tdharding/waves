@@ -147,7 +147,7 @@ Material:
     - _BoatRippleSpeed: 0.2
     - _BoatRipplesFrequency: 10
     - _BoatSonarPosition: 0
-    - _BoatSpeed01: 0.41956383
+    - _BoatSpeed01: 0.34347486
     - _BoatTrailWidth: 40
     - _BowAmplitude: -2.43
     - _BowFrontWaveClamp: 1
@@ -188,7 +188,7 @@ Material:
     - _FoamSoftness: 4.33
     - _FoamSpeed: 0.2
     - _FoamStrength: -1.56
-    - _Frequency: 0.57
+    - _Frequency: 7.9
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
@@ -206,7 +206,7 @@ Material:
     - _Parallax: 0.005
     - _PeakRingWave1Brightness: -0.44
     - _PeakRingWave1Contrast: 0.83
-    - _PeakRingWave2Brightness: 8.91
+    - _PeakRingWave2Brightness: 13.88
     - _PeakRingWave2Contrast: -0.01
     - _PeakTroughSmoothStepFactor: 0.22
     - _QueueControl: 1
@@ -216,7 +216,7 @@ Material:
     - _RingFalloff: 1.5
     - _RingFrequency: 8
     - _RingScrollSpeed: 3
-    - _RippleDepth: 0.04
+    - _RippleDepth: 0.02
     - _ShadowStep: 0
     - _SmoothStepNormalDepthWave: 0.57
     - _Smoothness: 0
@@ -252,7 +252,7 @@ Material:
     - _SoulFishStrength9: 4.51
     - _SoulFishTwirlStrength: 0.78
     - _SpecularHighlights: 1
-    - _Speed: 0.13
+    - _Speed: 1.28
     - _SrcBlend: 1
     - _SrcBlendAlpha: 1
     - _Strength: 0.01
@@ -261,7 +261,7 @@ Material:
     - _TimeNormal2: 0.01
     - _Transparency: 1
     - _TroughBrightness: 0
-    - _TroughRingWave1Brightness: 1.88
+    - _TroughRingWave1Brightness: 0.03
     - _TroughRingWave1Contrast: 0.7
     - _TroughRingWave2Brightness: 1.8
     - _TroughRingWave2Contrast: 1.1
@@ -298,12 +298,12 @@ Material:
     m_Colors:
     - _ArenaMask: {r: 0, g: 0, b: 0, a: 0}
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
-    - _BoatCenter: {r: 2.0631344, g: 0, b: 7.381077, a: 0}
-    - _BoatForward: {r: 0.9734866, g: -0.0036172667, b: -0.22871494, a: 0}
-    - _BoatForwardLocal: {r: 0.9734866, g: -0.22871497, b: 0, a: 0}
-    - _BoatPosition: {r: 2.1604831, g: -0.039811827, b: 7.3582044, a: 0}
-    - _BoatRight: {r: -0.22869094, g: 0.0060540605, b: -0.97348017, a: 0}
-    - _BoatSonarPosition: {r: 2.0632708, g: 0, b: 7.381655, a: 0}
+    - _BoatCenter: {r: 0.9764057, g: 0, b: 4.522966, a: 0}
+    - _BoatForward: {r: -0.12341357, g: -0.017027056, b: -0.9922094, a: 0}
+    - _BoatForwardLocal: {r: -0.12341357, g: -0.9922095, b: 0, a: 0}
+    - _BoatPosition: {r: 0.9640643, g: -0.0016849099, b: 4.4237447, a: 0}
+    - _BoatRight: {r: -0.9918897, g: -0.028514458, b: 0.12386314, a: 0}
+    - _BoatSonarPosition: {r: 0.9769965, g: 0, b: 4.5228915, a: 0}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _DeepColour: {r: 1, g: 0, b: 0, a: 1}
     - _DepthColour: {r: 1, g: 1, b: 1, a: 0}

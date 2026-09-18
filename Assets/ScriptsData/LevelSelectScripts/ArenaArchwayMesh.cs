@@ -24,16 +24,22 @@ public static class ArenaArchwayMesh
     // has to read as a curve rather than a corner.
     private const int MinCrownSegments = 8;
 
+    /// <summary>Which part of the arch a triangle belongs to — see the parts list on Build.</summary>
+    public enum Part { Inside, Outside, Faces, Feet }
+
     /// <summary>
     /// Sweeps the arch band. <paramref name="profile"/> must already be resolved — every
     /// inherited number settled — see <see cref="ArenaArchwayProfile.Resolve"/>.
     ///
     /// <paramref name="edge"/> is the target length of an edge anywhere in the mesh, the same
     /// number the runs and pools are built from, so the arch carries their density.
+    ///
+    /// <paramref name="parts"/>, when given, is filled with one entry per triangle of the finished
+    /// mesh saying which part of the arch it is, for the stone shading to colour each part.
     /// </summary>
-    public static Mesh Build(ArenaArchwayProfile profile, float edge)
+    public static Mesh Build(ArenaArchwayProfile profile, float edge, List<Part> parts = null)
     {
-        var b = new MeshBuild();
+        var b = new MeshBuild { Parts = parts };
         if (profile == null) return b.ToMesh("ArenaArchway");
 
         edge = Mathf.Max(edge, 0.005f);
@@ -73,16 +79,19 @@ public static class ArenaArchwayMesh
             float   u0 = run[i],           u1 = run[i + 1];
 
             // Soffit — the surface you pass under, facing in toward the opening.
+            b.Part = Part.Inside;
             b.Quad(i0, i0 + back, i1 + back, i1,
                    new Vector2(u0, 0f), new Vector2(u0, depth),
                    new Vector2(u1, depth), new Vector2(u1, 0f));
 
             // Extrados — the outside of the arch.
+            b.Part = Part.Outside;
             b.Quad(o0, o1, o1 + back, o0 + back,
                    new Vector2(u0, 0f), new Vector2(u1, 0f),
                    new Vector2(u1, depth), new Vector2(u0, depth));
 
             // The band itself, at each end of the tunnel.
+            b.Part = Part.Faces;
             b.Quad(i0, i1, o1, o0,
                    new Vector2(u0, 0f), new Vector2(u1, 0f),
                    new Vector2(u1, thick), new Vector2(u0, thick));
@@ -93,10 +102,88 @@ public static class ArenaArchwayMesh
 
         // The feet the arch stands on — one at each end of the outline, closing the solid where
         // it meets the rim.
+        b.Part = Part.Feet;
         Foot(b, inner[0],     outer[0],     back, thick, depth, true);
         Foot(b, inner[n - 1], outer[n - 1], back, thick, depth, false);
 
         return b.ToMesh("ArenaArchway");
+    }
+
+    /// <summary>
+    /// The door: a flat sheet filling the arch's opening, from <paramref name="floor"/> below the
+    /// rim top (the channel floor) up to the underside of the crown, standing
+    /// <paramref name="along"/> back from the front face. Built in the same frame as
+    /// <see cref="Build"/>, and its curved edge walks the very stations the arch's inner edge
+    /// does, so the two meet exactly rather than nearly.
+    ///
+    /// Faces both ways — it is seen from the river on the way in and from the arena on the way
+    /// out. UV0 runs 0 to 1 across the opening and from the floor to the crown.
+    /// </summary>
+    public static Mesh BuildDoor(ArenaArchwayProfile profile, float floor, float along, float edge)
+    {
+        var mesh = new Mesh { name = "ArenaDoor" };
+        if (profile == null) return mesh;
+
+        edge = Mathf.Max(edge, 0.005f);
+
+        float half  = Mathf.Max(0.005f, profile.openingWidth * 0.5f);
+        float thick = Mathf.Max(0.005f, profile.thickness);
+        float leg   = Mathf.Max(0f,     profile.legHeight);
+        float crown = Mathf.Max(0.005f, profile.archHeight);
+        floor = Mathf.Max(0f, floor);
+
+        // Stations counted exactly as Build counts them, so the door's edge is the arch's.
+        int legSteps = leg <= 0.0001f ? 0 : Mathf.Max(1, Mathf.CeilToInt(leg / edge));
+        int crownSeg = CrownSegments(half + thick, crown + thick, edge);
+
+        // The opening's outline: down at the floor on the left, up the arch's inner edge and
+        // over, and down to the floor on the right. Rectangle plus half-ellipse — convex, so a
+        // fan from inside it covers it.
+        var rim = new List<Vector2> { new Vector2(-half, -floor) };
+        rim.AddRange(Outline(half, leg, crown, legSteps, crownSeg));
+        rim.Add(new Vector2(half, -floor));
+
+        float   bottom = -floor, top = leg + crown;
+        Vector2 centre = new Vector2(0f, (bottom + leg) * 0.5f);
+
+        var verts = new List<Vector3>();
+        var norms = new List<Vector3>();
+        var uvs   = new List<Vector2>();
+        var tris  = new List<int>();
+
+        // One side each: the arena side faces -z, the river side +z.
+        for (int side = 0; side < 2; side++)
+        {
+            Vector3 n    = side == 0 ? Vector3.back : Vector3.forward;
+            int     hub  = verts.Count;
+            AddDoorVert(centre, n);
+
+            for (int i = 0; i < rim.Count; i++) AddDoorVert(rim[i], n);
+
+            // Closing the fan back to the start runs along the floor, left to right.
+            for (int i = 0; i < rim.Count; i++)
+            {
+                int a = hub + 1 + i;
+                int b = hub + 1 + (i + 1) % rim.Count;
+                if (side == 0) { tris.Add(hub); tris.Add(a); tris.Add(b); }
+                else           { tris.Add(hub); tris.Add(b); tris.Add(a); }
+            }
+        }
+
+        mesh.SetVertices(verts);
+        mesh.SetNormals(norms);
+        mesh.SetUVs(0, uvs);
+        mesh.SetTriangles(tris, 0);
+        mesh.RecalculateBounds();
+        return mesh;
+
+        void AddDoorVert(Vector2 p, Vector3 n)
+        {
+            verts.Add(new Vector3(p.x, p.y, along));
+            norms.Add(n);
+            uvs.Add(new Vector2(Mathf.InverseLerp(-half, half, p.x),
+                                Mathf.InverseLerp(bottom, top, p.y)));
+        }
     }
 
     private static Vector3 At(Vector2 p) => new Vector3(p.x, p.y, 0f);
@@ -166,6 +253,10 @@ public static class ArenaArchwayMesh
         private readonly List<Vector2> _uvs   = new List<Vector2>();
         private readonly List<int>     _tris  = new List<int>();
 
+        // Where each triangle's part is recorded, if anyone asked, and the part being built now.
+        public List<Part> Parts;
+        public Part       Part;
+
         // Wound a-c-b rather than a-b-c: the corners are handed in walking the arch outline,
         // which traces the solid the other way round. Taken at face value every face of the
         // archway points into it and the whole thing renders inside out.
@@ -187,6 +278,7 @@ public static class ArenaArchwayMesh
             _norms.Add(n); _norms.Add(n); _norms.Add(n);
             _uvs.Add(ua);  _uvs.Add(ub);  _uvs.Add(uc);
             _tris.Add(i0); _tris.Add(i0 + 1); _tris.Add(i0 + 2);
+            Parts?.Add(Part);
         }
 
         public Mesh ToMesh(string name)

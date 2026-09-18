@@ -153,8 +153,19 @@ public class FogBlob
     /// dials that live on the field rather than the preset — wind, wander, and how hard things
     /// push fog away.
     /// </summary>
-    public void Simulate(float dt, Vector2 wind, in FogFieldSettings settings,
-                         List<IFogRepeller> repellers)
+    /// <summary>
+    /// One obstacle as the push needs it: where it is, how far it keeps fog off, and how hard.
+    /// Read once per frame by the manager, just before the masses simulate, so a moving
+    /// repeller — the boat — is exactly where it is this frame. Building these once saved
+    /// reading five properties through the interface for every chain, every pass.
+    /// </summary>
+    public struct RepelDisc
+    {
+        public Vector2 Centre;
+        public float   Keep, KeepSq, Strength;
+    }
+
+    public void Simulate(float dt, Vector2 wind, RepelDisc[] repellers, int repellerCount)
     {
         if (!Alive) { DotCount = 0; return; }
 
@@ -177,7 +188,7 @@ public class FogBlob
             _spine[i] = Centre + Rotate(local, Rotation);
         }
 
-        Deform(_spine, SPINE_SAMPLES, repellers, settings, Shape.spineStiffness);
+        Deform(_spine, SPINE_SAMPLES, repellers, repellerCount, Shape.spineStiffness);
         LayChain(_spine, SPINE_SAMPLES, isLimb: false, ref maxReach);
 
         // ── Limbs ────────────────────────────────────────────────────────────
@@ -214,7 +225,7 @@ public class FogBlob
                 _chain[i] = p;
             }
 
-            Deform(_chain, LIMB_SAMPLES, repellers, settings, Shape.spineStiffness);
+            Deform(_chain, LIMB_SAMPLES, repellers, repellerCount, Shape.spineStiffness);
             LayChain(_chain, LIMB_SAMPLES, isLimb: true, ref maxReach);
         }
 
@@ -228,12 +239,11 @@ public class FogBlob
     /// edge, so the relax pass runs after — and pushes again, because relaxing can walk a point
     /// back inside.
     /// </summary>
-    void Deform(Vector2[] chain, int count, List<IFogRepeller> repellers,
-                in FogFieldSettings settings, float stiffness)
+    void Deform(Vector2[] chain, int count, RepelDisc[] repellers, int repellerCount, float stiffness)
     {
-        if (repellers == null || repellers.Count == 0) return;
+        if (repellers == null || repellerCount == 0) return;
 
-        PushOut(chain, count, repellers, settings);
+        PushOut(chain, count, repellers, repellerCount);
 
         // Stiffness resists bending, so a stiff spine keeps its shape and shoulders past a rock
         // while a slack one drapes around it.
@@ -248,35 +258,35 @@ public class FogBlob
                 chain[i] = Vector2.Lerp(here, avg, relax);
                 prev = here;
             }
-            PushOut(chain, count, repellers, settings);
+            PushOut(chain, count, repellers, repellerCount);
         }
     }
 
-    void PushOut(Vector2[] chain, int count, List<IFogRepeller> repellers,
-                 in FogFieldSettings settings)
+    void PushOut(Vector2[] chain, int count, RepelDisc[] repellers, int repellerCount)
     {
-        for (int r = 0; r < repellers.Count; r++)
+        // The box the chain's points sit in. A repeller whose keep circle does not reach the box
+        // cannot reach any point in it, so it is skipped without visiting a single point — which
+        // is nearly all of them, since a mass is a few units across and the obstacles are spread
+        // over the whole field. The box only ever GROWS when a push moves a point, so nothing that
+        // could touch a point is ever skipped: the chain comes out exactly as a full test leaves it.
+        Vector2 min = chain[0], max = chain[0];
+        for (int i = 1; i < count; i++)
         {
-            var rep = repellers[r];
-            if (rep == null || !rep.RepelActive) continue;
+            Vector2 p = chain[i];
+            if (p.x < min.x) min.x = p.x; else if (p.x > max.x) max.x = p.x;
+            if (p.y < min.y) min.y = p.y; else if (p.y > max.y) max.y = p.y;
+        }
 
-            Vector3 c3 = rep.RepelCentre;
-            Vector2 c  = new Vector2(c3.x, c3.z);
+        for (int r = 0; r < repellerCount; r++)
+        {
+            ref readonly RepelDisc rep = ref repellers[r];
+            Vector2 c = rep.Centre;
 
-            // The obstacle's own radius plus the clearance it asks for. There used to be a third
-            // global term on top, meant to compensate for dots having width — but dot radii vary
-            // several-fold along a body, so one number could not do that job, and it was only ever
-            // a second dial onto this same sum.
-            float keep = rep.RepelRadius + rep.RepelClearRadius;
-            if (keep <= 0f) continue;
+            float bx = c.x < min.x ? min.x - c.x : (c.x > max.x ? c.x - max.x : 0f);
+            float by = c.y < min.y ? min.y - c.y : (c.y > max.y ? c.y - max.y : 0f);
+            if (bx * bx + by * by >= rep.KeepSq) continue;
 
-            // The PRODUCT is clamped, not the repeller's own value. Clamping that first meant a
-            // per-obstacle strength could never make up for a low global multiplier, so raising
-            // it past 1 did nothing at all.
-            float strength = Mathf.Clamp01(rep.RepelStrength * settings.RepelStrength);
-            if (strength <= 0f) continue;
-
-            float keepSq = keep * keep;
+            float keep = rep.Keep, keepSq = rep.KeepSq, strength = rep.Strength;
             for (int i = 0; i < count; i++)
             {
                 Vector2 d = chain[i] - c;
@@ -287,7 +297,11 @@ public class FogBlob
                 Vector2 outward = d / dist;
                 // Partial strength lets a moving repeller (the boat) be pressed into and recovered
                 // from, rather than pinning the skeleton exactly on the ring every frame.
-                chain[i] = Vector2.Lerp(chain[i], c + outward * keep, strength);
+                Vector2 moved = Vector2.Lerp(chain[i], c + outward * keep, strength);
+                chain[i] = moved;
+
+                if (moved.x < min.x) min.x = moved.x; else if (moved.x > max.x) max.x = moved.x;
+                if (moved.y < min.y) min.y = moved.y; else if (moved.y > max.y) max.y = moved.y;
             }
         }
     }

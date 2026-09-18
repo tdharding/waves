@@ -54,16 +54,16 @@ Material:
     - _Ambient: 0.341
     - _Curvature: 0.55
     - _EdgeSoftness: 0.1434
-    - _GrainAmount: 0.56
-    - _GrainScale: 83
+    - _GrainAmount: 0.33
+    - _GrainScale: 10
     - _HeightScale: 1.6
     - _LipLight: 1.92
     - _LipWidth: 0.132
     - _Opacity: 1
     - _QueueControl: 0
     - _QueueOffset: 0
-    - _Threshold: 0.349
-    - _Transparency: 0.803
+    - _Threshold: 0.274
+    - _Transparency: 0.57
     - _UndulationAmount: 0
     - _UndulationScale: 0.05
     m_Colors:

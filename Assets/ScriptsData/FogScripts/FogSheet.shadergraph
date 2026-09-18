@@ -2143,7 +2143,7 @@
     "m_Group": {
         "m_Id": ""
     },
-    "m_Name": "InstancedLights (Custom Function)",
+    "m_Name": "FogLights (Custom Function)",
     "m_DrawState": {
         "m_Expanded": true,
         "m_Position": {
@@ -2180,8 +2180,8 @@
         "m_SerializableColors": []
     },
     "m_SourceType": 0,
-    "m_FunctionName": "InstancedLights",
-    "m_FunctionSource": "9e4d7c2a1b8f4063a5e6d9c0b1a2f3e4",
+    "m_FunctionName": "FogLights",
+    "m_FunctionSource": "4b7e1f0a9c3d4e52b8a6f2d1c0e9a7b3",
     "m_FunctionSourceUsePragmas": true,
     "m_FunctionBody": "Enter function body here..."
 }

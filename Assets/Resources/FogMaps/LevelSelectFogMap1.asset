@@ -12,6 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 62a877791e9312444a218bdc460321c9, type: 3}
   m_Name: LevelSelectFogMap1
   m_EditorClassIdentifier: Assembly-CSharp::FogMap
+  obstacleRange: 63.33
+  repelLimit: 64
+  maskLimit: 128
   properties:
     spineBend1: -0.368
     spineBend2: 0.36
@@ -43,7 +46,8 @@ MonoBehaviour:
   windAngle: 20
   windSpeed: 0.4
   unitsPerTexel: 0.053
-  maxGridResolution: 1024
+  maxGridResolution: 256
+  heightMapQuality: 0
   heaviness: 0.98
   blurRadius: 0.213
   heightBlurRadius: 2
@@ -61,18 +65,28 @@ MonoBehaviour:
   lampMaskRadius: 0.34
   lampMaskFeather: 0.2
   runsRepel: 1
-  runChainSpacing: 2.4
-  runRepelRadius: 2.5
+  runChainSpacing: 3.1
+  runRepelRadius: 2.14
   runRepelStrength: 0.5
-  runMaskRadius: 0.5
+  runMaskRadius: 1.18
   runMaskFeather: 0.6
+  poolsRepel: 1
+  poolRepelRadius: 1.65
+  poolRepelStrength: 4
+  poolMaskRadius: 1.28
+  poolMaskFeather: 0.6
+  arenasRepel: 1
+  arenaRepelRadius: 0.73
+  arenaRepelStrength: 4
+  arenaMaskRadius: 0.27
+  arenaMaskFeather: 0.6
   boatRepelRadius: 0
   boatRepelStrength: 0.6
   boatMaskRadius: 2.14
   boatMaskFeather: 0.4
   fogMaterial: {fileID: 2100000, guid: 46e2e25193da1f44e8078d278e21e7f9, type: 2}
   overrideLook: 1
-  threshold: 0.349
+  threshold: 0.274
   edgeSoftness: 0.1434
   undulationAmount: 0
   undulationScale: 0.05
@@ -84,6 +98,6 @@ MonoBehaviour:
   litColour: {r: 1, g: 1, b: 1, a: 1}
   ambient: 0.341
   interiorFill: 1
-  transparencyFalloff: 0.803
-  grainAmount: 0.56
-  grainScale: 83
+  transparencyFalloff: 0.57
+  grainAmount: 0.33
+  grainScale: 10

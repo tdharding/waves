@@ -2,6 +2,7 @@
 using UnityEngine.Serialization;
 using UnityEngine.Rendering;
 using System.Collections.Generic;
+using Unity.Profiling;
 
 /// <summary>
 /// Runs the whole fog field: fills the masses a level's FogMap allocates, moves their
@@ -56,6 +57,17 @@ public class FogFieldManager : MonoBehaviour
 
 
     // ── Cull ─────────────────────────────────────────────────────────────────
+    // How many obstacles the fog pays for. Seeded from the map, like everything else here.
+    [Header("Optimisation")]
+    [Tooltip("How far from the boat an obstacle's centre may be and still count at all.")]
+    [SerializeField] float obstacleRange = 18.8f;
+
+    [Tooltip("The most obstacles that push fog each frame, nearest first.")]
+    [Range(1, 256)] [SerializeField] int repelLimit = 64;
+
+    [Tooltip("The most obstacles the mask cuts each frame, nearest first.")]
+    [Range(0, FOG_OBSTACLE_SLOTS)] [SerializeField] int maskLimit = FOG_OBSTACLE_SLOTS;
+
     // HOW MUCH WATER IS SIMULATED, and the only thing that decides it.
     [Header("Cull")]
     [Tooltip("Where masses are BORN, in world units. That is all it does.")]
@@ -165,7 +177,19 @@ public class FogFieldManager : MonoBehaviour
     /// The height map, at double the grid. Normals amplify whatever roughness is in their source,
     /// so a coarse height map gives facetted shading even when the outline is perfect.
     /// </summary>
-    int HeightResolution => Mathf.Clamp(GridResolution * 2, 32, 4096);
+    int HeightResolution => heightMapQuality switch
+    {
+        FogHeightQuality.Low    => Mathf.Clamp(GridResolution / 2, 32, 4096),
+        FogHeightQuality.Medium => Mathf.Clamp(GridResolution,     32, 4096),
+        _                       => Mathf.Clamp(GridResolution * 2, 32, 4096),
+    };
+
+    [Tooltip("How detailed the height map the lighting normals come from is. Lower is cheaper; " +
+             "Off skips its paint and both blurs and the sheet lights as if flat. The map " +
+             "overwrites this on load.")]
+    [SerializeField] FogHeightQuality heightMapQuality = FogHeightQuality.High;
+
+    bool HeightMapOn => heightMapQuality != FogHeightQuality.Off;
 
     [Tooltip("Frame-to-frame stickiness. High and the fog is thick and sluggish; low and it is " +
              "wispy and quick. Also does part of the smoothing, so a high value buys back blur.")]
@@ -280,6 +304,10 @@ public class FogFieldManager : MonoBehaviour
         if (_instance == null || from == null) return;
         if (_instance.fogMap != from) return;
 
+        _instance.obstacleRange = from.obstacleRange;
+        _instance.repelLimit    = from.repelLimit;
+        _instance.maskLimit     = from.maskLimit;
+
         _instance.windAngle = from.windAngle;
         _instance.windSpeed = from.windSpeed;
 
@@ -295,6 +323,7 @@ public class FogFieldManager : MonoBehaviour
 
         _instance.unitsPerTexel     = from.unitsPerTexel;
         _instance.maxGridResolution = from.maxGridResolution;
+        _instance.heightMapQuality  = from.heightMapQuality;
         _instance.heaviness        = from.heaviness;
         _instance.blurRadius       = from.blurRadius;
         _instance.heightBlurRadius = from.heightBlurRadius;
@@ -321,6 +350,18 @@ public class FogFieldManager : MonoBehaviour
         _instance.runRepelStrength = from.runRepelStrength;
         _instance.runMaskRadius    = from.runMaskRadius;
         _instance.runMaskFeather   = from.runMaskFeather;
+
+        _instance.poolsRepel        = from.poolsRepel;
+        _instance.poolRepelRadius   = from.poolRepelRadius;
+        _instance.poolRepelStrength = from.poolRepelStrength;
+        _instance.poolMaskRadius    = from.poolMaskRadius;
+        _instance.poolMaskFeather   = from.poolMaskFeather;
+
+        _instance.arenasRepel        = from.arenasRepel;
+        _instance.arenaRepelRadius   = from.arenaRepelRadius;
+        _instance.arenaRepelStrength = from.arenaRepelStrength;
+        _instance.arenaMaskRadius    = from.arenaMaskRadius;
+        _instance.arenaMaskFeather   = from.arenaMaskFeather;
     }
 
     [Header("Weather")]
@@ -337,6 +378,13 @@ public class FogFieldManager : MonoBehaviour
     [Tooltip("Where the field centres. Falls back to _BoatWorldCenter, which every other " +
              "boat-centred effect already agrees with.")]
     [SerializeField] Transform boat;
+
+    [Header("Boat Light")]
+    [Tooltip("The boat as one more instanced light point on the fog, lighting its rim and body " +
+             "like a street light (same intensity and falloff, from InstancedLightManager). " +
+             "Fog only — the object graphs already light from the boat on their own. 0 turns it " +
+             "off. For reference, BoatLightController's light pool is 6.55.")]
+    [Min(0f)] [SerializeField] float boatLightRadius = 6.55f;
 
     [Header("Rocks")]
     [Tooltip("Adopt anything already throwing rock rings, so a level's spikes push fog without " +
@@ -410,6 +458,52 @@ public class FogFieldManager : MonoBehaviour
     public static float RunMaskRadius    => _instance != null ? _instance.runMaskRadius    : 0.5f;
     public static float RunMaskFeather   => _instance != null ? _instance.runMaskFeather   : 0.6f;
 
+    [Header("Pools")]
+    [Tooltip("Whether the generated pools push fog about at all.")]
+    [SerializeField] bool poolsRepel = true;
+
+    [Tooltip("Clear air the skeleton is pushed out of, beyond the pool's own water radius.")]
+    [SerializeField] float poolRepelRadius = 0.5f;
+
+    [Tooltip("How hard a pool pushes. Above 1 is allowed.")]
+    [Range(0f, 4f)] [SerializeField] float poolRepelStrength = 4f;
+
+    [Tooltip("Clear air the mask cuts, beyond the pool's own water radius.")]
+    [SerializeField] float poolMaskRadius = 0.5f;
+
+    [Tooltip("How soft that cut is, in world units.")]
+    [SerializeField] float poolMaskFeather = 0.6f;
+
+    // Read by RiverPoolFogRepeller, which owns no fog numbers of its own.
+    public static bool  PoolsRepel        => _instance != null && _instance.poolsRepel;
+    public static float PoolRepelRadius   => _instance != null ? _instance.poolRepelRadius   : 0.5f;
+    public static float PoolRepelStrength => _instance != null ? _instance.poolRepelStrength : 4f;
+    public static float PoolMaskRadius    => _instance != null ? _instance.poolMaskRadius    : 0.5f;
+    public static float PoolMaskFeather   => _instance != null ? _instance.poolMaskFeather   : 0.6f;
+
+    [Header("Arenas")]
+    [Tooltip("Whether the level select arenas push fog about at all.")]
+    [SerializeField] bool arenasRepel = true;
+
+    [Tooltip("Clear air the skeleton is pushed out of, beyond the arena wall's outer face.")]
+    [SerializeField] float arenaRepelRadius = 0.5f;
+
+    [Tooltip("How hard an arena pushes. Above 1 is allowed.")]
+    [Range(0f, 4f)] [SerializeField] float arenaRepelStrength = 4f;
+
+    [Tooltip("Clear air the mask cuts, beyond the arena wall's outer face.")]
+    [SerializeField] float arenaMaskRadius = 0.5f;
+
+    [Tooltip("How soft that cut is, in world units.")]
+    [SerializeField] float arenaMaskFeather = 0.6f;
+
+    // Read by LevelSelectArenaFogRepeller, which owns no fog numbers of its own.
+    public static bool  ArenasRepel        => _instance != null && _instance.arenasRepel;
+    public static float ArenaRepelRadius   => _instance != null ? _instance.arenaRepelRadius   : 0.5f;
+    public static float ArenaRepelStrength => _instance != null ? _instance.arenaRepelStrength : 4f;
+    public static float ArenaMaskRadius    => _instance != null ? _instance.arenaMaskRadius    : 0.5f;
+    public static float ArenaMaskFeather   => _instance != null ? _instance.arenaMaskFeather   : 0.6f;
+
     // ── Shader ids ───────────────────────────────────────────────────────────
     static readonly int FieldTexId    = Shader.PropertyToID("_FogField");
     static readonly int HeightTexId   = Shader.PropertyToID("_FogHeight");
@@ -429,7 +523,8 @@ public class FogFieldManager : MonoBehaviour
 
     // Must match FOG_OBSTACLE_SLOTS in FogMask.hlsl. A global array locks its size on the first
     // set, so the whole array goes out every frame even when three obstacles are near.
-    public const int FOG_OBSTACLE_SLOTS = 32;
+    // A change here only lands after an editor restart, for the same reason.
+    public const int FOG_OBSTACLE_SLOTS = 128;
     static readonly Vector4[] _obstacleBuf = new Vector4[FOG_OBSTACLE_SLOTS];
 
     // Must match FOG_BLOB_SLOTS in FogGrain.hlsl. Also the wrap on blob ids, so an id is directly
@@ -437,6 +532,7 @@ public class FogFieldManager : MonoBehaviour
     public const int FOG_BLOB_SLOTS = 64;
     static readonly Vector4[] _centreBuf = new Vector4[FOG_BLOB_SLOTS];
     static readonly int BoatCentreId  = Shader.PropertyToID("_BoatWorldCenter");
+    static readonly int BoatLightId   = Shader.PropertyToID("_FogBoatLight");
 
     // ── Registration ─────────────────────────────────────────────────────────
     static readonly List<IFogRepeller> _repellers = new List<IFogRepeller>();
@@ -462,6 +558,29 @@ public class FogFieldManager : MonoBehaviour
     /// from a dot count of zero and have completely different fixes.
     /// </summary>
     public static int FadedCount { get; private set; }
+
+    /// <summary>Obstacles close enough to the boat to push fog this frame — every one is tested against every chain point.</summary>
+    public static int NearRepellerCount { get; private set; }
+
+    /// <summary>Obstacles that actually pushed fog this frame, after Repel Limit.</summary>
+    public static int PushingCount { get; private set; }
+
+    /// <summary>Obstacles the mask actually cut this frame, after Mask Limit.</summary>
+    public static int MaskedCount { get; private set; }
+
+    // Timing markers for each part of the frame's fog work. Named "Fog.*" so the Play Test tool
+    // picks them up on its own; free when nothing is recording them.
+    static readonly ProfilerMarker s_MarkerTextures   = new ProfilerMarker("Fog.EnsureTextures");
+    static readonly ProfilerMarker s_MarkerRocks      = new ProfilerMarker("Fog.RescanRocks");
+    static readonly ProfilerMarker s_MarkerRepellers  = new ProfilerMarker("Fog.GatherRepellers");
+    static readonly ProfilerMarker s_MarkerPopulate   = new ProfilerMarker("Fog.Populate");
+    static readonly ProfilerMarker s_MarkerSimulate   = new ProfilerMarker("Fog.SimulateBlobs");
+    static readonly ProfilerMarker s_MarkerSnapshot   = new ProfilerMarker("Fog.SimulateBlobs.SnapshotRepellers");
+    static readonly ProfilerMarker s_MarkerDeform     = new ProfilerMarker("Fog.SimulateBlobs.DeformAndDots");
+    static readonly ProfilerMarker s_MarkerUpload     = new ProfilerMarker("Fog.SimulateBlobs.UploadDots");
+    static readonly ProfilerMarker s_MarkerPaint      = new ProfilerMarker("Fog.Paint");
+    static readonly ProfilerMarker s_MarkerExecute    = new ProfilerMarker("Fog.Paint.ExecuteCommandBuffer");
+    static readonly ProfilerMarker s_MarkerGlobals    = new ProfilerMarker("Fog.PushGlobals");
 
     // ── Runtime state ────────────────────────────────────────────────────────
     readonly List<FogBlob> _blobs = new List<FogBlob>();
@@ -650,15 +769,16 @@ public class FogFieldManager : MonoBehaviour
         float dt = Application.isPlaying ? Time.deltaTime : 1f / 60f;
         float time = Application.isPlaying ? Time.time : (float)UnityEditor_Time();
 
-        EnsureTextures();
+        using (s_MarkerTextures.Auto()) EnsureTextures();
         CentreField();
 
-        RescanRocks(dt);
-        GatherRepellers();
-        Populate(dt);
-        SimulateBlobs(dt, time);
-        Paint();
-        PushGlobals();
+        using (s_MarkerRocks.Auto())     RescanRocks(dt);
+        using (s_MarkerRepellers.Auto()) GatherRepellers();
+        NearRepellerCount = _near.Count;
+        using (s_MarkerPopulate.Auto())  Populate(dt);
+        using (s_MarkerSimulate.Auto())  SimulateBlobs(dt, time);
+        using (s_MarkerPaint.Auto())     Paint();
+        using (s_MarkerGlobals.Auto())   PushGlobals();
 
         if (_snapFramesLeft > 0) CaptureFrame();
 
@@ -993,18 +1113,27 @@ public class FogFieldManager : MonoBehaviour
             _field        = NewRT(gridPx, "FogField");
             _fieldHistory = NewRT(gridPx, "FogFieldHistory");
             _scratch      = NewRT(gridPx, "FogFieldScratch");
-            _height       = NewRT(heightPx, "FogHeight");
-            _heightScratch = NewRT(heightPx, "FogHeightScratch");
+        }
+
+        if (!HeightMapOn)
+        {
+            // Switched off: the two largest textures in the fog are given back, not just left idle.
+            ReleaseHeightTextures();
         }
         else if (_height == null || _height.width != heightPx)
         {
-            if (_height != null) _height.Release();
-            if (_heightScratch != null) _heightScratch.Release();
+            ReleaseHeightTextures();
             _height = NewRT(heightPx, "FogHeight");
             _heightScratch = NewRT(heightPx, "FogHeightScratch");
         }
 
         _cmd ??= new CommandBuffer { name = "Fog Field" };
+    }
+
+    void ReleaseHeightTextures()
+    {
+        if (_height != null)        { _height.Release();        _height = null; }
+        if (_heightScratch != null) { _heightScratch.Release(); _heightScratch = null; }
     }
 
     static RenderTexture NewRT(int size, string name)
@@ -1028,8 +1157,7 @@ public class FogFieldManager : MonoBehaviour
         if (_field != null)        { _field.Release();        _field = null; }
         if (_fieldHistory != null) { _fieldHistory.Release(); _fieldHistory = null; }
         if (_scratch != null)      { _scratch.Release();      _scratch = null; }
-        if (_height != null)       { _height.Release();       _height = null; }
-        if (_heightScratch != null){ _heightScratch.Release();_heightScratch = null; }
+        ReleaseHeightTextures();
         _dotGpu?.Release();
         _dotGpu = null;
         _dotCpu = null;   // released together, or the pair disagree about whether they exist
@@ -1109,10 +1237,10 @@ public class FogFieldManager : MonoBehaviour
 
     void GatherRepellers()
     {
-        // Only what could possibly reach the grid. A level carrying forty rocks pays for the
-        // handful near the boat.
+        // Only what is within Obstacle Range of the boat. A level carrying forty rocks pays for
+        // the handful near it.
         _near.Clear();
-        float limit = coverage * 0.5f + 12f;
+        float limit = Mathf.Max(obstacleRange, 0f);
         float limitSq = limit * limit;
 
         // Refreshed from the map rather than cached, so editing the numbers moves the fog while
@@ -1127,6 +1255,43 @@ public class FogFieldManager : MonoBehaviour
 
         for (int i = 0; i < _repellers.Count; i++) Consider(_repellers[i], limitSq);
         for (int i = 0; i < _rocks.Count; i++)     Consider(_rocks[i], limitSq);
+
+        SortNearestFirst();
+    }
+
+    IFogRepeller[] _nearSorted = new IFogRepeller[64];
+    float[] _nearKey = new float[64];
+
+    /// <summary>
+    /// Nearest first, by distance to the obstacle's EDGE rather than its centre, so a pool or an
+    /// arena the boat is right beside is not ranked behind a small rock that happens to sit
+    /// nearer its middle. Both limits take from the front of this list, so what they drop is
+    /// always what is furthest from the boat — never whatever happened to register last.
+    /// </summary>
+    void SortNearestFirst()
+    {
+        int n = _near.Count;
+        if (n < 2) return;
+        if (_nearSorted.Length < n)
+        {
+            _nearSorted = new IFogRepeller[Mathf.NextPowerOfTwo(n)];
+            _nearKey    = new float[_nearSorted.Length];
+        }
+
+        for (int i = 0; i < n; i++)
+        {
+            var r = _near[i];
+            Vector3 c = r.RepelCentre;
+            float dx = c.x - _boatCentre.x, dz = c.z - _boatCentre.y;
+            float reach = Mathf.Max(r.RepelRadius + r.RepelClearRadius, r.RepelRadius + r.MaskClearRadius);
+            _nearSorted[i] = r;
+            _nearKey[i]    = Mathf.Sqrt(dx * dx + dz * dz) - reach;
+        }
+
+        System.Array.Sort(_nearKey, _nearSorted, 0, n);
+
+        _near.Clear();
+        for (int i = 0; i < n; i++) { _near.Add(_nearSorted[i]); _nearSorted[i] = null; }
     }
 
     void Consider(IFogRepeller r, float limitSq)
@@ -1336,6 +1501,52 @@ public class FogFieldManager : MonoBehaviour
 
 
 
+    FogBlob.RepelDisc[] _repelDiscs = new FogBlob.RepelDisc[64];
+    int _repelDiscCount;
+
+    /// <summary>
+    /// The nearby obstacles as the push needs them, in the same order and passing the same tests
+    /// the push used to apply to each one itself: active, some keep distance, some strength.
+    /// </summary>
+    void BuildRepelDiscs()
+    {
+        if (_repelDiscs.Length < _near.Count)
+            _repelDiscs = new FogBlob.RepelDisc[Mathf.NextPowerOfTwo(_near.Count)];
+
+        // Repel Limit: _near is nearest first, so stopping early drops the furthest.
+        int cap = Mathf.Max(repelLimit, 1);
+
+        _repelDiscCount = 0;
+        for (int i = 0; i < _near.Count && _repelDiscCount < cap; i++)
+        {
+            var rep = _near[i];
+            if (rep == null || !rep.RepelActive) continue;
+
+            Vector3 c3 = rep.RepelCentre;
+
+            // The obstacle's own radius plus the clearance it asks for. There used to be a third
+            // global term on top, meant to compensate for dots having width — but dot radii vary
+            // several-fold along a body, so one number could not do that job, and it was only ever
+            // a second dial onto this same sum.
+            float keep = rep.RepelRadius + rep.RepelClearRadius;
+            if (keep <= 0f) continue;
+
+            // The PRODUCT is clamped, not the repeller's own value. Clamping that first meant a
+            // per-obstacle strength could never make up for a low global multiplier, so raising
+            // it past 1 did nothing at all.
+            float strength = Mathf.Clamp01(rep.RepelStrength * settings.RepelStrength);
+            if (strength <= 0f) continue;
+
+            _repelDiscs[_repelDiscCount++] = new FogBlob.RepelDisc
+            {
+                Centre   = new Vector2(c3.x, c3.z),
+                Keep     = keep,
+                KeepSq   = keep * keep,
+                Strength = strength,
+            };
+        }
+    }
+
     // ────────────────────────────────────────────────────────────────────────
     void SimulateBlobs(float dt, float time)
     {
@@ -1347,17 +1558,26 @@ public class FogFieldManager : MonoBehaviour
         // hidden, which meant the mask silently decided which masses had bodies at all — and a
         // mass with no dots is a mass that cannot come into view when you sail toward it. Cull is
         // the budget; the mask is a fade.
+        // Read every nearby obstacle once, here, after GatherRepellers has put the boat's repeller
+        // where the boat is THIS frame. Nothing moves between this and the masses simulating, so
+        // a moving repeller pushes from exactly where it is — nothing is carried between frames.
+        using (s_MarkerSnapshot.Auto()) BuildRepelDiscs();
+        PushingCount = _repelDiscCount;
+
         int total = 0, faded = 0;
-        for (int i = 0; i < _blobs.Count; i++)
+        using (s_MarkerDeform.Auto())
         {
-            var b = _blobs[i];
+            for (int i = 0; i < _blobs.Count; i++)
+            {
+                var b = _blobs[i];
 
-            // Full strength. What reaches the screen is decided in the shader, from one radius and
-            // one feather, which is what a mask should be.
-            b.LodFade = 1f;
+                // Full strength. What reaches the screen is decided in the shader, from one radius and
+                // one feather, which is what a mask should be.
+                b.LodFade = 1f;
 
-            b.Simulate(dt, wind, in settings, _near);
-            total += b.DotCount;
+                b.Simulate(dt, wind, _repelDiscs, _repelDiscCount);
+                total += b.DotCount;
+            }
         }
         BlobCount = _blobs.Count;
         DotTotal = total;
@@ -1375,23 +1595,26 @@ public class FogFieldManager : MonoBehaviour
             _dotGpu = new GraphicsBuffer(GraphicsBuffer.Target.Structured, capacity, DOT_STRIDE);
         }
 
-        int w = 0;
-        for (int i = 0; i < _blobs.Count && w < capacity; i++)
+        using (s_MarkerUpload.Auto())
         {
-            var b = _blobs[i];
-            for (int d = 0; d < b.DotCount && w < capacity; d++)
+            int w = 0;
+            for (int i = 0; i < _blobs.Count && w < capacity; i++)
             {
-                var s = b.Dots[d];
-                _dotCpu[w++] = new FogDotGPU
+                var b = _blobs[i];
+                for (int d = 0; d < b.DotCount && w < capacity; d++)
                 {
-                    pos = s.Position, axis = s.Axis, radius = s.Radius,
-                    stretch = s.Stretch, height = s.Height,
-                    strength = s.Strength, blobId = s.BlobId,
-                };
+                    var s = b.Dots[d];
+                    _dotCpu[w++] = new FogDotGPU
+                    {
+                        pos = s.Position, axis = s.Axis, radius = s.Radius,
+                        stretch = s.Stretch, height = s.Height,
+                        strength = s.Strength, blobId = s.BlobId,
+                    };
+                }
             }
+            DotTotal = w;
+            if (w > 0) _dotGpu.SetData(_dotCpu, 0, 0, w);
         }
-        DotTotal = w;
-        if (w > 0) _dotGpu.SetData(_dotCpu, 0, 0, w);
     }
 
     // ────────────────────────────────────────────────────────────────────────
@@ -1424,24 +1647,28 @@ public class FogFieldManager : MonoBehaviour
         }
 
         // ── height ───────────────────────────────────────────────────────────
-        _cmd.SetRenderTarget(_height);
-        _cmd.ClearRenderTarget(false, true, Color.clear);
-        if (DotTotal > 0)
+        // Skipped outright when the map's Height Map Quality is Off: no paint, no blur.
+        if (HeightMapOn && _height != null)
         {
-            _cmd.SetGlobalBuffer(DotBufferId, _dotGpu);
-            _cmd.DrawProcedural(Matrix4x4.identity, paintMaterial, 1, MeshTopology.Triangles, 6, DotTotal);
-        }
+            _cmd.SetRenderTarget(_height);
+            _cmd.ClearRenderTarget(false, true, Color.clear);
+            if (DotTotal > 0)
+            {
+                _cmd.SetGlobalBuffer(DotBufferId, _dotGpu);
+                _cmd.DrawProcedural(Matrix4x4.identity, paintMaterial, 1, MeshTopology.Triangles, 6, DotTotal);
+            }
 
-        // ── blur the height map ──────────────────────────────────────────────
-        // Not optional. A raw union of domes reads as a corrugated sausage with every dot
-        // visible along it, however clean the outline over the top of it is.
-        // WORLD units, converted to UV here. Measured in texels it changed width whenever the
-        // texture was resized, so the cull radius silently resized every blob.
-        float hStep = heightBlurRadius / Mathf.Max(coverage, 0.001f);
-        _cmd.SetGlobalVector(BlurStepId, new Vector4(hStep, 0f, 0f, 0f));
-        _cmd.Blit(_height, _heightScratch, blurMaterial, 0);
-        _cmd.SetGlobalVector(BlurStepId, new Vector4(0f, hStep, 0f, 0f));
-        _cmd.Blit(_heightScratch, _height, blurMaterial, 0);
+            // ── blur the height map ──────────────────────────────────────────
+            // Not optional. A raw union of domes reads as a corrugated sausage with every dot
+            // visible along it, however clean the outline over the top of it is.
+            // WORLD units, converted to UV here. Measured in texels it changed width whenever the
+            // texture was resized, so the cull radius silently resized every blob.
+            float hStep = heightBlurRadius / Mathf.Max(coverage, 0.001f);
+            _cmd.SetGlobalVector(BlurStepId, new Vector4(hStep, 0f, 0f, 0f));
+            _cmd.Blit(_height, _heightScratch, blurMaterial, 0);
+            _cmd.SetGlobalVector(BlurStepId, new Vector4(0f, hStep, 0f, 0f));
+            _cmd.Blit(_heightScratch, _height, blurMaterial, 0);
+        }
 
         // ── separable blur ───────────────────────────────────────────────────
         float texel = 1f / Mathf.Max(_field != null ? _field.width : GridResolution, 1);
@@ -1463,7 +1690,7 @@ public class FogFieldManager : MonoBehaviour
         _cmd.Blit(_scratch, _field, blurMaterial, 1);
         _cmd.CopyTexture(_field, _fieldHistory);
 
-        Graphics.ExecuteCommandBuffer(_cmd);
+        using (s_MarkerExecute.Auto()) Graphics.ExecuteCommandBuffer(_cmd);
     }
 
     void PushGlobals()
@@ -1488,10 +1715,21 @@ public class FogFieldManager : MonoBehaviour
         Shader.SetGlobalFloat(MaskFeatherId, LodFeather);
         Shader.SetGlobalFloat(OpacityId,     Mathf.Clamp01(fogOpacity));
 
+        // The boat as a light point for FogLights.hlsl — the same boat the field centres on, so
+        // the lit rim and the cleared water around the hull never disagree.
+        // Its intensity and falloff are InstancedLightManager's, which otherwise only exists once
+        // a street light registers.
+        if (boatLightRadius > 0f) InstancedLightManager.EnsureExists();
+        Vector3 boatPos = ResolveBoat();
+        Shader.SetGlobalVector(BoatLightId, new Vector4(boatPos.x, boatPos.y, boatPos.z,
+                                                        Mathf.Max(boatLightRadius, 0f)));
+
         // Obstacle circles for the fragment mask. The same repellers that push the skeleton, but
         // here they cut fog exactly — which is what lets the push be gentle enough not to lurch.
+        // Mask Limit, nearest first like the push.
+        int maskCap = Mathf.Clamp(maskLimit, 0, FOG_OBSTACLE_SLOTS);
         int obstacles = 0;
-        for (int i = 0; i < _near.Count && obstacles < FOG_OBSTACLE_SLOTS; i++)
+        for (int i = 0; i < _near.Count && obstacles < maskCap; i++)
         {
             var r = _near[i];
             if (r == null || !r.RepelActive) continue;
@@ -1510,12 +1748,15 @@ public class FogFieldManager : MonoBehaviour
 
         Shader.SetGlobalVectorArray(ObstaclesId, _obstacleBuf);
         Shader.SetGlobalFloat(ObstacleCountId, obstacles);
+        MaskedCount = obstacles;
 
         // The look, every frame. See FogMap's Look header for why this is no longer once-only.
         fogMap?.ApplyLook();
 
         Shader.SetGlobalTexture(FieldTexId, _field);
-        Shader.SetGlobalTexture(HeightTexId, _height);
+        // Black when the height map is Off: zero everywhere, so the normals come out pointing
+        // straight up and the sheet lights flat instead of reading a released texture.
+        Shader.SetGlobalTexture(HeightTexId, HeightMapOn && _height != null ? _height : Texture2D.blackTexture);
         Shader.SetGlobalVector(OriginId, new Vector4(_fieldCentre.x - coverage * 0.5f,
                                                      _fieldCentre.y - coverage * 0.5f,
                                                      1f / coverage, coverage));

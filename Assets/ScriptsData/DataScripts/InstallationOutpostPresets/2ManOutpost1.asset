@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 331b298af9e9e5e41a7750abff499d6a, type: 3}
+  m_Name: 2ManOutpost1
+  m_EditorClassIdentifier: Assembly-CSharp::InstallationOutpostPreset
+  width: 3.24
+  depth: 2.54
+  height: 0.32
+  wallThickness: 0.44
+  wallHeight: 0.22
+  tower:
+    stemRadius: 0.15
+    stemHeight: 1.74
+    orbRadius: 0.5
+    baseRadius: 0.62
+    baseHeight: 0.3
+    rampHeight: 0.56
+    base2Radius: 0.29
+    base2Height: 0.17
+  towerOffset: {x: 0.62, y: 0}
+  observers:
+  - offsetAlong: -0.84
+    offsetAway: -0.59
+    facing: 11.75
+    height: 0.6
+  - offsetAlong: 0.94
+    offsetAway: -0.59
+    facing: 0
+    height: 0.6

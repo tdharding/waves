@@ -18,6 +18,9 @@ public static class ProceduralArenaWallMesh
 {
     public enum Shape { Circle, Square }
 
+    /// <summary>Which part of the wall a triangle belongs to — see the parts list on Build.</summary>
+    public enum Part { InnerFace, OuterFace, Top }
+
     // Circle resolution. Fixed rather than exposed — 96 segments is smooth at every arena
     // size the game uses, and the wall is a few hundred verts either way.
     const int CircleSegments = 96;
@@ -26,7 +29,10 @@ public static class ProceduralArenaWallMesh
     // averaged normal so the circle reads as smooth. Circle steps are 3.75°, square corners 90°.
     const float SharpCornerDegrees = 35f;
 
-    public static Mesh Build(Shape shape, float innerRadius, float thickness, float height, float drop)
+    // parts, when given, is filled with one entry per triangle saying which part of the wall it is,
+    // for the level select's stone shading to colour each part as it is told.
+    public static Mesh Build(Shape shape, float innerRadius, float thickness, float height, float drop,
+                             List<Part> parts = null)
     {
         float th   = Mathf.Max(0.001f, thickness);
         float yTop = height;
@@ -113,18 +119,21 @@ public static class ProceduralArenaWallMesh
                     inA + bot, inB + bot, inB + top, inA + top, -nA, -nB,
                     new Vector2(uA, yBot), new Vector2(uB, yBot),
                     new Vector2(uB, yTop), new Vector2(uA, yTop));
+            parts?.Add(Part.InnerFace); parts?.Add(Part.InnerFace);
 
             // Outer face.
             AddQuad(verts, norms, uvs, tris,
                     outA + bot, outB + bot, outB + top, outA + top, nA, nB,
                     new Vector2(uA, yBot), new Vector2(uB, yBot),
                     new Vector2(uB, yTop), new Vector2(uA, yTop));
+            parts?.Add(Part.OuterFace); parts?.Add(Part.OuterFace);
 
             // Top cap — v runs across the wall thickness so the texture keeps world scale.
             AddQuad(verts, norms, uvs, tris,
                     inA + top, inB + top, outB + top, outA + top, Vector3.up, Vector3.up,
                     new Vector2(uA, 0f), new Vector2(uB, 0f),
                     new Vector2(uB, th), new Vector2(uA, th));
+            parts?.Add(Part.Top); parts?.Add(Part.Top);
         }
 
         var mesh = new Mesh { name = "ProceduralArenaWall" };

@@ -21,7 +21,7 @@ using UnityEngine.Splines;
 /// the fog sees of any obstacle is its footprint, and that is all it has ever seen.
 ///
 /// Every number lives on the FogMap, like the rocks and the lamps: the run owns none of them.
-/// Spacing is the one that matters, because each circle is one of the thirty-two obstacle slots.
+/// Spacing is the one that matters, because each circle counts against the Repel and Mask Limits.
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(RiverRunMesh))]

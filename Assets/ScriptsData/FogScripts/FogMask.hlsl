@@ -22,7 +22,7 @@
 
 // Must match FOG_OBSTACLE_SLOTS in FogFieldManager. A global array locks its size on first set,
 // so the manager always sends the full count even when three obstacles are near.
-#define FOG_OBSTACLE_SLOTS 32
+#define FOG_OBSTACLE_SLOTS 128
 
 float4 _FogObstacles[FOG_OBSTACLE_SLOTS];   // xy = centre, z = clear radius, w = edge softness
 float  _FogObstacleCount;

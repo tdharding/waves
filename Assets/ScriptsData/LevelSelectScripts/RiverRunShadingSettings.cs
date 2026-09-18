@@ -1,4 +1,46 @@
 using UnityEngine;
+using UnityEngine.Serialization;
+
+using System.Collections.Generic;
+
+/// <summary>
+/// Which of the three stone colours a part of a piece takes. Auto leaves it to RiverMeshBuilder to
+/// work out from where the face sits, which is what every part got before it could be chosen. The
+/// numbers are what RiverMeshBuilder bakes into UV2.x and RiverRunShading.hlsl reads, so they must
+/// not change.
+/// </summary>
+public enum StoneFaceKind
+{
+    Auto  = 0,
+    Outer = 1,
+    Rim   = 2,
+    Inner = 3,
+}
+
+/// <summary>Tagging the triangles of a piece with the stone colour each part takes.</summary>
+public static class StoneFaces
+{
+    /// <summary>
+    /// Brings <paramref name="kinds"/> up to one entry per triangle in <paramref name="tris"/>,
+    /// the new entries carrying <paramref name="kind"/>. Call after adding each part.
+    /// </summary>
+    public static void Tag(List<float> kinds, List<int> tris, StoneFaceKind kind)
+    {
+        if (kinds == null) return;
+        while (kinds.Count < tris.Count / 3) kinds.Add((float)kind);
+    }
+
+    /// <summary>
+    /// Brings <paramref name="parts"/> up to one entry per triangle in <paramref name="tris"/>,
+    /// the new entries carrying <paramref name="part"/>. Faces of different parts always meet at a
+    /// seam — see <see cref="RiverMeshBuilder.ShadeAsStone"/>.
+    /// </summary>
+    public static void Part(List<int> parts, List<int> tris, int part)
+    {
+        if (parts == null) return;
+        while (parts.Count < tris.Count / 3) parts.Add(part);
+    }
+}
 
 /// <summary>
 /// How the level select's stone rivers are shaded: the stone's own colour, one for each part of a
@@ -18,10 +60,11 @@ using UnityEngine;
 /// on a preset of their own — they are a different material on different geometry, tuned in a
 /// different window, and holding the two on one asset only gave them somewhere to drift apart.
 ///
-/// Both extents are METRES on the mesh, measured across the surface. The seams they run from are
-/// worked out by RiverMeshBuilder as each piece is generated and baked into UV1, and which part of
-/// a run each face belongs to is worked out alongside them and baked into UV2 — so a change here
-/// is live, and it is only the seams and the face kinds themselves that need a Rebuild Runs.
+/// The seam extent is a PERCENTAGE of the width of the surface a face belongs to — one number for
+/// every piece, so a wide river, a thin one, an outpost wall and a tower stem each get a gradient
+/// in proportion to themselves. The waterline extent is metres. The seams, the surface widths and
+/// which colour each face takes are worked out as each piece is generated and baked into UV1/UV2 —
+/// so the numbers here are live, while the part colour choices need the pieces rebuilt.
 /// </summary>
 [System.Serializable]
 public class RiverRunShadingSettings
@@ -41,50 +84,80 @@ public class RiverRunShadingSettings
     // colour the run graph hands it.
     // ─────────────────────────────────────────────────────────────
 
+    // Each of the three carries its own grain. Grain size is how wide one cell of the noise is,
+    // in metres — the rivers are small out here, so a couple of centimetres is already coarse —
+    // and 0 turns it off. Strength is how far the grain pulls either side of the colour: it
+    // darkens and lightens by as much as each other, so it grains a colour without dragging it
+    // down, and it goes on last, over the seams and the waterline too. 0 leaves the stone clean.
+    //
+    // The grains were one shared pair before, so each of the three picks up that pair from a
+    // preset saved then.
+
+    [Header("Stone — every piece")]
+    [Header("Outer")]
     [Tooltip("The outer walls, the underside, and the open ends where one piece butts onto the " +
              "next — everything the run turns to the world rather than to the water.")]
     public Color outerColour = new Color(0.786f, 0.786f, 0.786f, 1f);
 
+    [Tooltip("How wide one cell of the grain is on outer faces, in metres. 0 turns it off.")]
+    [FormerlySerializedAs("grainSize")]
+    [Min(0f)] public float outerGrainSize = 0.02f;
+
+    [Tooltip("How far the grain pulls either side of the outer colour. 0 leaves it clean.")]
+    [FormerlySerializedAs("grainStrength")]
+    [Range(0f, 1f)] public float outerGrainStrength = 0.3f;
+
+    [Header("Rim")]
     [Tooltip("The flat lip laid round the top of the run, between the outer wall and the channel.")]
     public Color rimColour = new Color(0.786f, 0.786f, 0.786f, 1f);
 
+    [Tooltip("How wide one cell of the grain is on rim faces, in metres. 0 turns it off.")]
+    [FormerlySerializedAs("grainSize")]
+    [Min(0f)] public float rimGrainSize = 0.02f;
+
+    [Tooltip("How far the grain pulls either side of the rim colour. 0 leaves it clean.")]
+    [FormerlySerializedAs("grainStrength")]
+    [Range(0f, 1f)] public float rimGrainStrength = 0.3f;
+
+    [Header("Inner")]
     [Tooltip("The inside of the channel — the faces the water runs down, above the surface and " +
              "below it.")]
     public Color innerColour = new Color(0.786f, 0.786f, 0.786f, 1f);
 
-    [Tooltip("How wide one cell of the grain is, in metres. The generated stone is cut in " +
-             "metres, so this is the size of a speckle on the surface — the rivers are small " +
-             "out here, so a couple of centimetres is already a coarse grain. 0 turns it off.")]
-    [Min(0f)] public float grainSize = 0.02f;
+    [Tooltip("How wide one cell of the grain is on inner faces, in metres. 0 turns it off.")]
+    [FormerlySerializedAs("grainSize")]
+    [Min(0f)] public float innerGrainSize = 0.02f;
 
-    [Tooltip("How far the grain pulls either side of the colour underneath it. It darkens and " +
-             "lightens by as much as each other, so turning this up grains a colour without " +
-             "also dragging it down. It goes on last, over the seams and the waterline as well " +
-             "as over the bare stone. 0 leaves the stone clean.")]
-    [Range(0f, 1f)] public float grainStrength = 0.3f;
+    [Tooltip("How far the grain pulls either side of the inner colour. 0 leaves it clean.")]
+    [FormerlySerializedAs("grainStrength")]
+    [Range(0f, 1f)] public float innerGrainStrength = 0.3f;
 
     // ─────────────────────────────────────────────────────────────
     // THE SEAMS
     // ─────────────────────────────────────────────────────────────
 
-    [Tooltip("The colour gathered along the seams — the rim's two edges, the foot of the outer " +
-             "wall, and the joints where one generated piece butts onto the next.")]
+    [Header("Seams — every piece")]
+    [Tooltip("The colour gathered along the seams — every hard corner, inner or outer: a rim's " +
+             "two edges, the foot and top of a wall, where a tower's stem meets its base and orb.")]
     public Color seamColour = Color.black;
 
     [Tooltip("How much of that colour sits on the seam itself. 0 turns the seams off entirely " +
              "and gives the stone back exactly as it was.")]
     [Min(0f)] public float seamStrength = 1f;
 
-    [Tooltip("How far the darkness carries off a seam, in metres. The rim is about 0.43m across " +
-             "at the authored shape, so anything over half of that has its two edges meeting in " +
-             "the middle. 0 turns the seams off.")]
-    [Min(0f)] public float seamExtent = 0.12f;
+    [Tooltip("How far the gradient reaches off each seam, as a percentage of the width of the " +
+             "surface it runs across — a rim strip's width, a wall's height, a channel's width. " +
+             "One number for every piece, so each is shaded in proportion to its own size. 50 " +
+             "has the two edges of a surface meeting in the middle. 0 turns the seams off.")]
+    [Range(0f, 100f)] public float seamExtentPercent = 20f;
 
     // ─────────────────────────────────────────────────────────────
     // THE WATERLINE
     // ─────────────────────────────────────────────────────────────
 
-    [Tooltip("The colour rising off the water up the inside of the channel.")]
+    [Header("River Runs — waterline")]
+    [Tooltip("The colour rising off the water up the inside of the channel. River runs and pools " +
+             "sort their own faces into outer, rim and inner, as they always have.")]
     public Color waterlineColour = Color.white;
 
     [Tooltip("How much of that colour sits at the waterline. 0 turns the band off entirely.")]
@@ -109,17 +182,77 @@ public class RiverRunShadingSettings
     // same answer, which is a sun, and a sun cannot be aimed at anything.
     // ─────────────────────────────────────────────────────────────
 
-    [Tooltip("Where the light stands, in world space. Every pixel works out its own direction to " +
-             "it, so moving it round the map changes which runs are raked and which fall away. " +
-             "Read a spot off the scene view and type it in — the rivers sit around y = 0, so a " +
-             "light wants to be some way above that to reach the rim tops.")]
-    public Vector3 lightPosition = new Vector3(40f, 25f, 20f);
+    // Where the light STANDS is not here: it is the world's, authored in the designer's Aesthetics
+    // and shared with the landscape hills, so the two can never be lit from two places.
 
-    [Tooltip("How hard the stone is turned against that light. 0 leaves it flat and unlit — the " +
+    [Header("Light — every piece")]
+    [Tooltip("How hard the stone is turned against the world's light (its position is in the " +
+             "designer's Aesthetics). 0 leaves it flat and unlit — the " +
              "colour exactly as it came in — and 1 is the full turn, darkest on the faces backing " +
              "away from the light. There is no falloff with distance: the position says which way " +
-             "the light comes from, this says how much of it there is.")]
-    [Range(0f, 1f)] public float lightStrength = 0.6f;
+             "the light comes from, this says how much of it there is. Past 1 the lit result is " +
+             "multiplied, up to 10x brighter on the faces toward the light.")]
+    [Range(0f, 10f)] public float lightStrength = 0.6f;
+
+    // ─────────────────────────────────────────────────────────────
+    // PIECE COLOURS
+    //
+    // Which of the three stone colours each part of each kind of piece takes. A run's way of
+    // sorting its faces — outer walls, a flat lip, a channel — does not fit an outpost or a tower,
+    // so each part is told instead. Auto keeps what the builder worked out before this existed.
+    // Baked into the meshes, so a change here needs the pieces rebuilt.
+    // ─────────────────────────────────────────────────────────────
+
+    [Header("Outposts — needs rebuild")]
+    [Tooltip("The four walls round the outside of the block, from the top of its wall down.")]
+    public StoneFaceKind outpostOutsideWalls = StoneFaceKind.Auto;
+
+    [Tooltip("The top of the wall round the floor.")]
+    public StoneFaceKind outpostWallTop = StoneFaceKind.Auto;
+
+    [Tooltip("The inside faces of the wall, facing in across the floor.")]
+    public StoneFaceKind outpostInsideWalls = StoneFaceKind.Auto;
+
+    [Tooltip("The floor inside the wall — or the whole flat top of an outpost with no wall.")]
+    public StoneFaceKind outpostFloor = StoneFaceKind.Auto;
+
+    [Header("Lollipop Towers — needs rebuild")]
+    [Tooltip("The orb on top of every lollipop tower, on outposts, pools or anywhere else.")]
+    public StoneFaceKind towerOrb = StoneFaceKind.Auto;
+
+    [Tooltip("The stem of every lollipop tower.")]
+    public StoneFaceKind towerStem = StoneFaceKind.Auto;
+
+    [Tooltip("The round side of the base every lollipop tower stands on.")]
+    [FormerlySerializedAs("towerBase")]
+    public StoneFaceKind towerBaseSides = StoneFaceKind.Auto;
+
+    [Tooltip("The flat top of the base, round the foot of the stem.")]
+    [FormerlySerializedAs("towerBase")]
+    public StoneFaceKind towerBaseTop = StoneFaceKind.Auto;
+
+    [Header("Arena Walls — needs rebuild")]
+    [Tooltip("The face of the wall looking in toward the arena.")]
+    public StoneFaceKind arenaInnerFace = StoneFaceKind.Auto;
+
+    [Tooltip("The face of the wall looking out, away from the arena.")]
+    public StoneFaceKind arenaOuterFace = StoneFaceKind.Auto;
+
+    [Tooltip("The top of the wall.")]
+    public StoneFaceKind arenaTop = StoneFaceKind.Auto;
+
+    [Header("Arena Archways — needs rebuild")]
+    [Tooltip("The inside of the arch — the surface you pass under.")]
+    public StoneFaceKind archwayInside = StoneFaceKind.Auto;
+
+    [Tooltip("The outside of the arch, over its top and down its legs.")]
+    public StoneFaceKind archwayOutside = StoneFaceKind.Auto;
+
+    [Tooltip("The front and back faces of the arch band.")]
+    public StoneFaceKind archwayFaces = StoneFaceKind.Auto;
+
+    [Tooltip("The feet the arch stands on.")]
+    public StoneFaceKind archwayFeet = StoneFaceKind.Auto;
 
     // ─────────────────────────────────────────────────────────────
     // PUSHING
@@ -143,15 +276,15 @@ public class RiverRunShadingSettings
     private static readonly RiverRunShadingSettings None =
         new RiverRunShadingSettings
         {
-            grainStrength = 0f,
+            outerGrainStrength = 0f, rimGrainStrength = 0f, innerGrainStrength = 0f,
             seamStrength  = 0f, waterlineStrength = 0f, lightStrength = 0f,
         };
 
     private static readonly int OuterColourId     = Shader.PropertyToID("_RiverRunOuterColour");
     private static readonly int RimColourId       = Shader.PropertyToID("_RiverRunRimColour");
     private static readonly int InnerColourId     = Shader.PropertyToID("_RiverRunInnerColour");
-    private static readonly int GrainSizeId       = Shader.PropertyToID("_RiverRunGrainSize");
-    private static readonly int GrainStrengthId   = Shader.PropertyToID("_RiverRunGrainStrength");
+    private static readonly int GrainSizeId       = Shader.PropertyToID("_RiverRunGrainSizes");
+    private static readonly int GrainStrengthId   = Shader.PropertyToID("_RiverRunGrainStrengths");
     private static readonly int SeamColourId      = Shader.PropertyToID("_RiverRunSeamColour");
     private static readonly int SeamStrengthId    = Shader.PropertyToID("_RiverRunSeamStrength");
     private static readonly int SeamExtentId      = Shader.PropertyToID("_RiverRunSeamExtent");
@@ -159,7 +292,6 @@ public class RiverRunShadingSettings
     private static readonly int WaterStrengthId   = Shader.PropertyToID("_RiverRunWaterlineStrength");
     private static readonly int WaterExtentId     = Shader.PropertyToID("_RiverRunWaterlineExtent");
     private static readonly int WaterDepthId      = Shader.PropertyToID("_RiverRunWaterDepth");
-    private static readonly int LightPosId        = Shader.PropertyToID("_RiverRunLightPosition");
     private static readonly int LightStrengthId   = Shader.PropertyToID("_RiverRunLightStrength");
 
     /// <summary>
@@ -172,6 +304,14 @@ public class RiverRunShadingSettings
     {
         (Live ?? settings ?? None).Apply();
     }
+
+    /// <summary>
+    /// The settings a mesh being built right now should bake its choices from — the tuner's if it
+    /// is driving, so a rebuild shows what the tuner shows, and this world's otherwise. Null when
+    /// neither exists, which leaves every face kind worked out the ordinary way.
+    /// </summary>
+    public static RiverRunShadingSettings ForBuild(RiverRunShadingSettings settings) =>
+        Live ?? settings;
 
     /// <summary>
     /// How far the water lies beneath the rim top, which is what places the waterline band.
@@ -197,18 +337,20 @@ public class RiverRunShadingSettings
         Shader.SetGlobalColor(RimColourId,     Opaque(rimColour));
         Shader.SetGlobalColor(InnerColourId,   Opaque(innerColour));
 
-        Shader.SetGlobalFloat(GrainSizeId,     grainSize);
-        Shader.SetGlobalFloat(GrainStrengthId, grainStrength);
+        // x outer, y rim, z inner — the same order as the face kinds.
+        Shader.SetGlobalVector(GrainSizeId,
+            new Vector4(outerGrainSize, rimGrainSize, innerGrainSize, 0f));
+        Shader.SetGlobalVector(GrainStrengthId,
+            new Vector4(outerGrainStrength, rimGrainStrength, innerGrainStrength, 0f));
 
         Shader.SetGlobalColor(SeamColourId,    seamColour);
         Shader.SetGlobalFloat(SeamStrengthId,  seamStrength);
-        Shader.SetGlobalFloat(SeamExtentId,    seamExtent);
+        Shader.SetGlobalFloat(SeamExtentId,    seamExtentPercent);
 
         Shader.SetGlobalColor(WaterColourId,   waterlineColour);
         Shader.SetGlobalFloat(WaterStrengthId, waterlineStrength);
         Shader.SetGlobalFloat(WaterExtentId,   waterlineExtent);
 
-        Shader.SetGlobalVector(LightPosId,      lightPosition);
         Shader.SetGlobalFloat(LightStrengthId,  lightStrength);
     }
 
@@ -233,18 +375,40 @@ public class RiverRunShadingSettings
         outerColour       = other.outerColour;
         rimColour         = other.rimColour;
         innerColour       = other.innerColour;
-        grainSize         = other.grainSize;
-        grainStrength     = other.grainStrength;
+        outerGrainSize     = other.outerGrainSize;
+        outerGrainStrength = other.outerGrainStrength;
+        rimGrainSize       = other.rimGrainSize;
+        rimGrainStrength   = other.rimGrainStrength;
+        innerGrainSize     = other.innerGrainSize;
+        innerGrainStrength = other.innerGrainStrength;
 
         seamColour        = other.seamColour;
         seamStrength      = other.seamStrength;
-        seamExtent        = other.seamExtent;
+        seamExtentPercent = other.seamExtentPercent;
 
         waterlineColour   = other.waterlineColour;
         waterlineStrength = other.waterlineStrength;
         waterlineExtent   = other.waterlineExtent;
 
-        lightPosition     = other.lightPosition;
         lightStrength     = other.lightStrength;
+
+        outpostOutsideWalls = other.outpostOutsideWalls;
+        outpostWallTop      = other.outpostWallTop;
+        outpostInsideWalls  = other.outpostInsideWalls;
+        outpostFloor        = other.outpostFloor;
+
+        towerOrb          = other.towerOrb;
+        towerStem         = other.towerStem;
+        towerBaseSides    = other.towerBaseSides;
+        towerBaseTop      = other.towerBaseTop;
+
+        arenaInnerFace    = other.arenaInnerFace;
+        arenaOuterFace    = other.arenaOuterFace;
+        arenaTop          = other.arenaTop;
+
+        archwayInside     = other.archwayInside;
+        archwayOutside    = other.archwayOutside;
+        archwayFaces      = other.archwayFaces;
+        archwayFeet       = other.archwayFeet;
     }
 }
