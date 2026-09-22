@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Unity.Mathematics;
@@ -48,16 +48,11 @@ public partial class LevelSelectDesignerWindow
         };
         _data.outposts.Add(outpost);
 
-        // Open its settings, the same as clicking its point.
-        _selectedOutpostId   = outpost.outpostId;
-        _selectedPathId      = null;
-        _selectedNodeId      = null;
-        _selectedObstacleId  = null;
-        _selectedArenaNodeId = null;
-        _selectedShopNodeId  = null;
-        _selectedPoolNodeId  = null;
-        _selectedEntranceIdx = -1;
-        _leftScroll          = Vector2.zero;
+        // Open its settings under the node it was added at, with that node's row left open.
+        _selectedOutpostId  = outpost.outpostId;
+        _selectedPathId     = path.pathId;
+        _selectedNodeId     = nodeId;
+        _selectedObstacleId = null;
         GUI.FocusControl(null);
 
         MarkDirty();

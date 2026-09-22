@@ -13,30 +13,38 @@ MonoBehaviour:
   m_Name: LevelSelectWaterPreset
   m_EditorClassIdentifier: Assembly-CSharp::LevelSelectRiverWaterPreset
   edgeRipples:
-    strength: 4.46
-    width: 0.568
+    strength: 0.37
+    width: 0.904
     softness: 1
-    spacing: 0.41
+    spacing: 0.14
     speed: 0
-    reachPercent: 38
-    bevel: 0.022
-    distortStrength: 1.13
-    distortScale: 1.5
+    reachPercent: 32.6
+    bevel: 0.247
+    distortStrength: 0.48
+    distortScale: 5.4
     distortionSpeed: 0.12
     driftAlongLines: 1
-    branchMouthFade: 0.58
-    branchMouthInset: 0
-    poolSpacing: 0.45
-    poolReach: 1.6
+    secondDistortStrength: 2.65
+    secondDistortScale: 1.33
+    secondDistortionSpeed: 0.12
+    branchMouthFade: 2.75
+    branchMouthInset: 1.63
+    poolSpacing: 0.2
+    poolWidth: 0.617
+    poolSoftness: 0.557
+    poolReach: 0.84
     poolSpeed: 0
-    poolDistortStrength: 0.37
-    poolDistortScale: 1.97
+    poolDistortStrength: 0.67
+    poolDistortScale: 3.7
     poolDistortionSpeed: 0.01
+    poolSecondDistortStrength: 0.44
+    poolSecondDistortScale: 1.36
+    poolSecondDistortionSpeed: 0
     poolMouthFade: 5.63
-    poolMouthReachOverlap: 5.33
+    poolMouthReachOverlap: 7.22
     poolMouthExtent: 0.9
     riverFadeToPoolDistance: 4.84
     riverFadeToPoolIntensity: 17.58
-    grainStrength: 0.03
-    grainSize: 0.02
-    grainAlpha: 0.266
+    grainStrength: 0.08
+    grainSize: 1.04
+    grainAlpha: 0.081

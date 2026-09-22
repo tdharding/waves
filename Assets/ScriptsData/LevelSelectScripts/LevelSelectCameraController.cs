@@ -43,6 +43,22 @@ public class LevelSelectCameraController : MonoBehaviour
              "mouse can be moved on and on one way without meeting the edge of the screen.")]
     public bool lockCursorWhileOrbiting = true;
 
+    [Header("Interact Lean")]
+    [Tooltip("How far the camera turns its head towards an interact point it is passing, as a " +
+             "share of the angle to it. 0 looks straight down the boat's heading as before; " +
+             "1 would face the point outright. A quarter reads as a glance.")]
+    [Range(0f, 1f)] public float interactLean = 0.25f;
+    [Tooltip("The most the glance is ever allowed to be worth, in degrees, however far off to " +
+             "the side the point sits. This is what keeps it a lean rather than a look.")]
+    [Min(0f)] public float maxInteractLeanAngle = 12f;
+    [Tooltip("How long the glance takes to come on and to go again. Its own time rather than " +
+             "the follow's, so the camera can swing back in behind the boat briskly and still " +
+             "notice things slowly. 0 turns the head at once.")]
+    [Min(0f)] public float interactLeanTime = 0.6f;
+    [Tooltip("How far the camera draws in while it is glancing, as a share of the distance it " +
+             "sits at. 0 keeps its distance; a little leans in with the look.")]
+    [Range(0f, 0.9f)] public float interactLeanZoom = 0.12f;
+
     [Header("Transition Target")]
     public float transitionYaw      = 0f;
     public float transitionPitch    = 20f;
@@ -72,6 +88,11 @@ public class LevelSelectCameraController : MonoBehaviour
     private float _pitchVelocity;
     private float _distanceVelocity;
 
+    private float _leanYaw;            // the glance, in degrees off the shot the follow holds
+    private float _leanWeight;         // how far into a point's reach the boat stands, eased
+    private float _leanYawVelocity;
+    private float _leanWeightVelocity;
+
     private bool           _isOrbiting;
     private CursorLockMode _cursorLockBeforeOrbit;
     private bool           _cursorVisibleBeforeOrbit;
@@ -88,8 +109,15 @@ public class LevelSelectCameraController : MonoBehaviour
     /// held inside the distance the map allows.</summary>
     private float TargetDistance => Mathf.Clamp(RestDistance * _zoom, minDistance, maxDistance);
 
-    /// <summary>The boat is held still with Q, and turning about it is offered.</summary>
-    private bool IsAnchored => boatControl != null && boatControl.HeldByPlayer;
+    /// <summary>The boat is held still with Q, and turning about it is offered. A display point
+    /// holds the view as well as the boat, and while one is up this goes false again, so the
+    /// mouse is left alone.</summary>
+    private bool IsAnchored => boatControl != null && boatControl.CanLookAround;
+
+    /// <summary>A display point has the boat and the view both: the angles stay exactly where
+    /// they were, so the camera neither answers the mouse nor swings back in behind the boat
+    /// while what was opened is on screen.</summary>
+    private bool IsViewHeld => boatControl != null && boatControl.LookLocked;
 
     private void Awake()
     {
@@ -230,11 +258,14 @@ public class LevelSelectCameraController : MonoBehaviour
     {
         if (cam == null || _orbitPivot == null) return;
 
-        // Update pivot rotation based on internal yaw/pitch
-        _orbitPivot.rotation = Quaternion.Euler(_pitch, _yaw, 0f);
+        // Update pivot rotation based on internal yaw/pitch, with the glance laid over it
+        _orbitPivot.rotation = Quaternion.Euler(_pitch, _yaw + _leanYaw, 0f);
 
-        // Position camera relative to pivot manually
-        cam.transform.position = _orbitPivot.position + _orbitPivot.rotation * (Vector3.back * _currentDistance);
+        // Position camera relative to pivot manually, drawn in by however much of the glance is
+        // in. The zoom is read here rather than eased, so moving the slider is felt at once.
+        float distance = _currentDistance * (1f - interactLeanZoom * _leanWeight);
+
+        cam.transform.position = _orbitPivot.position + _orbitPivot.rotation * (Vector3.back * distance);
         cam.transform.rotation = _orbitPivot.rotation;
     }
 
@@ -247,6 +278,89 @@ public class LevelSelectCameraController : MonoBehaviour
 
         cam.Lens.FieldOfView = Mathf.Clamp(defaultVerticalFOV, 1f, 179f);
     }
+
+    /// <summary>
+    /// The glance: the camera notices an interact point it is passing and turns its head a
+    /// little towards it, drawing in as it does. It is a share of the angle to the point and
+    /// held to a few degrees, so something dead ahead moves the camera not at all and something
+    /// abeam moves it a little - the head turning while the walking carries on.
+    ///
+    /// Only the nearest point in reach counts, and reach is the point's own radius, so the
+    /// glance and the prompt come up together. It fades in across the outer part of the radius
+    /// rather than arriving at its edge, and is eased on its own time: the camera may swing
+    /// back in behind the boat at quite another speed from the one it notices things at.
+    /// </summary>
+    private void EaseInteractLean(bool offered)
+    {
+        float targetYaw    = 0f;
+        float targetWeight = 0f;
+
+        if (offered) LeanTarget(out targetYaw, out targetWeight);
+
+        if (interactLeanTime <= 0f)
+        {
+            _leanYaw            = targetYaw;
+            _leanWeight         = targetWeight;
+            _leanYawVelocity    = 0f;
+            _leanWeightVelocity = 0f;
+            return;
+        }
+
+        _leanYaw    = Mathf.SmoothDampAngle(_leanYaw, targetYaw, ref _leanYawVelocity,
+                                            interactLeanTime);
+        _leanWeight = Mathf.SmoothDamp(_leanWeight, targetWeight, ref _leanWeightVelocity,
+                                       interactLeanTime);
+    }
+
+    /// <summary>Where the glance wants to be this frame: how far off the boat's heading the
+    /// nearest point in reach lies, and how far into its reach the boat stands.</summary>
+    private void LeanTarget(out float leanYaw, out float weight)
+    {
+        leanYaw = 0f;
+        weight  = 0f;
+
+        if (interactLean <= 0f && interactLeanZoom <= 0f) return;
+
+        Vector3 boat = _boatTarget.position;
+
+        LevelSelectInteractPoint nearest = null;
+        float nearestDistance = float.MaxValue;
+
+        var points = LevelSelectInteractPoint.All;
+        for (int i = 0; i < points.Count; i++)
+        {
+            var point = points[i];
+            if (point == null || !point.InReach(boat)) continue;
+
+            float distance = point.FlatDistanceTo(boat);
+            if (distance >= nearestDistance) continue;
+
+            nearest         = point;
+            nearestDistance = distance;
+        }
+
+        if (nearest == null) return;
+
+        // Nothing at the very edge of reach, all of it once well inside.
+        float radius  = Mathf.Max(nearest.radius, 0.001f);
+        float inwards = Mathf.Clamp01((radius - nearestDistance) / (radius * LeanFadeShare));
+        weight        = Mathf.SmoothStep(0f, 1f, inwards);
+
+        Vector3 towards = nearest.Position - boat;
+        towards.y = 0f;
+        if (towards.sqrMagnitude < 0.0001f) return;
+
+        // How far round from the stern-on shot the point sits, signed, so the glance goes the
+        // way the point is.
+        float pointYaw = Mathf.Atan2(towards.x, towards.z) * Mathf.Rad2Deg;
+        float offset   = Mathf.DeltaAngle(_boatTarget.eulerAngles.y, pointYaw);
+
+        leanYaw = Mathf.Clamp(offset * interactLean * weight,
+                              -maxInteractLeanAngle, maxInteractLeanAngle);
+    }
+
+    /// <summary>The outer share of a point's reach the glance fades in across.</summary>
+    private const float LeanFadeShare = 0.45f;
 
     /// <summary>
     /// The resting shot: dead behind the boat, at the authored height and zoom. The angles are
@@ -278,6 +392,11 @@ public class LevelSelectCameraController : MonoBehaviour
         // Always keep pivot on the boat
         _orbitPivot.position = _boatTarget.position;
 
+        // The glance belongs to being under way: the intro drives the camera itself, the mouse
+        // has the angles while anchored, and a display point holds them. In each case it eases
+        // home rather than sticking where it was.
+        EaseInteractLean(!_isTransitioning && IsControlEnabled && !IsAnchored && !IsViewHeld);
+
         if (_isTransitioning) return;
 
         if (!IsControlEnabled)
@@ -298,8 +417,9 @@ public class LevelSelectCameraController : MonoBehaviour
         }
 
         // Under way the camera keeps its place behind the boat; anchored, the mouse has the
-        // angles and only the distance is still eased.
-        if (!IsAnchored)
+        // angles and only the distance is still eased. Held at a display point, the angles are
+        // nobody's and simply stay put.
+        if (!IsAnchored && !IsViewHeld)
         {
             EaseTowardsFollowPose();
         }

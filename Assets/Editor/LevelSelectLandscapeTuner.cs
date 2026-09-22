@@ -108,11 +108,14 @@ public class LevelSelectLandscapeTuner : EditorWindow
 
         EditorGUILayout.LabelField("Landscape Shading", EditorStyles.boldLabel);
         EditorGUILayout.LabelField(
-            "Three stone variants, each a colour with its own grain, and four parts of the " +
-            "landscape that each wear one. Cliffs are faces steeper than Cliff Angle; Tops sit " +
-            "above Top Height and Holes below Hole Depth, both measured from the tile base. " +
-            "Everything else is Ground. All live — nothing to rebuild. The light's position is " +
-            "in the Level Select Designer's Aesthetics, shared with the river runs.",
+            "Three stone variants, each a colour with its own grain, and three parts of the " +
+            "landscape that each wear one. Holes are everything below Hole Depth off the tile " +
+            "base; all the rest is NoiseUp or NoiseDown, whichever way the rocky noise leans " +
+            "there. Ground flat enough to lean neither way sits on the NoiseDown side, or " +
+            "halfway between the two once Noise Softness is up off zero. Hills with no noise " +
+            "on them are one flat colour — the noise is the only thing marking the land now. " +
+            "All live — nothing to rebuild. The light's position is in the Level Select " +
+            "Designer's Aesthetics, shared with the river runs.",
             EditorStyles.wordWrappedMiniLabel);
 
         EditorGUI.BeginChangeCheck();

@@ -44,8 +44,8 @@ public static class StoneFaces
 
 /// <summary>
 /// How the level select's stone rivers are shaded: the stone's own colour, one for each part of a
-/// run and grained with a noise, dark gathered along every seam, and white rising off the
-/// waterline up the inside of the channel.
+/// run and grained with a noise, dark gathered along every seam, white rising off the waterline
+/// up the inside of the channel, and hand-drawn decals scattered over the lot.
 ///
 /// These are bare $Globals in the shader, not properties on the run material — one set of numbers
 /// for every generated piece in the world, so the look is authored once rather than per material,
@@ -65,6 +65,11 @@ public static class StoneFaces
 /// in proportion to themselves. The waterline extent is metres. The seams, the surface widths and
 /// which colour each face takes are worked out as each piece is generated and baked into UV1/UV2 —
 /// so the numbers here are live, while the part colour choices need the pieces rebuilt.
+///
+/// The decals are drawings kept in a folder rather than numbers typed in — see
+/// RiverRunDecalLibrary, which gathers them onto the one sheet the shader reads and which
+/// names that folder. The sheet is held here with the rest, because there is nothing on the
+/// material for it to live on either.
 /// </summary>
 [System.Serializable]
 public class RiverRunShadingSettings
@@ -169,6 +174,63 @@ public class RiverRunShadingSettings
     [Min(0f)] public float waterlineExtent = 0.2f;
 
     // ─────────────────────────────────────────────────────────────
+    // THE DECALS
+    //
+    // Hand-drawn marks stamped over the stone. Scattered rather than placed: there is far more
+    // generated stone out here than anybody is going to decorate by hand.
+    //
+    // Every drawing in Assets/TextureMatShader/LevelSelectMaterials/RiverRunDecals is carried on
+    // ONE sheet, side by side in equal cells, so the shader reads one texture however many decals
+    // there are. The sheet is built by the Run Shading Tuner and held here — the numbers beside
+    // it describe its cells rather than how the scatter looks, which is why they are hidden from
+    // the sliders and drawn by the tuner itself, above them.
+    //
+    // They are scattered across the WORLD in metres, not across a UV. UV0, which the grain
+    // still uses, is flattened per triangle — each one onto whichever axis plane it most
+    // nearly faces — so a drawing laid across two triangles that chose differently is cut along
+    // the edge between them. A noise at two centimetres never showed that; a recognisable
+    // drawing shows it at once. The scatter is laid on all three of the world's planes and
+    // mixed by how much a surface faces each, so there is nothing to flip and a decal crosses
+    // a curve unbroken. Spacing and the two Scales are therefore metres in the world.
+    // ─────────────────────────────────────────────────────────────
+
+    // The built sheet, and how its cells are laid out. Hidden from the tuner's own run of
+    // sliders: the tuner draws them itself, above the numbers, where the folder they came from
+    // can be named and a sheet that has fallen behind that folder can be said so.
+    [HideInInspector] public Texture2D decalSheet;
+    [HideInInspector] public int       decalSheetColumns;
+    [HideInInspector] public int       decalSheetRows;
+    [HideInInspector] public int       decalSheetHeld;
+    [HideInInspector] public int       decalSheetCellPixels;
+
+    [Header("Decals — every piece")]
+    [Tooltip("How many of the scatter's places actually hold a decal, 0 to 1. It thins the " +
+             "scatter out without moving what is left, so turning it down opens gaps rather " +
+             "than pulling the decals closer together. 0 draws none at all.")]
+    [Range(0f, 1f)] public float decalAmount = 0f;
+
+    [Tooltip("How much of the stone each decal hides, 0 to 1. A different question from " +
+             "Amount: that is how MANY marks there are, this is how far each of them sinks " +
+             "into the stone. Turned down, every decal stays exactly where it was and the " +
+             "size it was — the stone simply shows through it. 0 draws none.")]
+    [Range(0f, 1f)] public float decalOpacity = 1f;
+
+    [Tooltip("How far apart the places a decal can stand are, in metres. One candidate place " +
+             "every this far across the surface, with each decal standing anywhere inside its " +
+             "own square of that, so the grid they were picked on never shows as a grid.")]
+    [Min(0f)] public float decalSpacing = 0.15f;
+
+    [Tooltip("The smallest a decal is drawn, in metres across its longest side — whatever " +
+             "shape it was drawn, the long way of it comes out this big.")]
+    [Min(0f)] public float decalScaleMin = 0.04f;
+
+    [Tooltip("The largest a decal is drawn, in metres across its longest side. Every place " +
+             "draws its own size somewhere between the two. Past about six times the " +
+             "spacing the biggest decals start being cut off square, because each pixel " +
+             "only looks so far out for a decal that might be reaching it.")]
+    [Min(0f)] public float decalScaleMax = 0.09f;
+
+    // ─────────────────────────────────────────────────────────────
     // THE LIGHT
     //
     // There is no real light out here, so the stone is shaped by one made up: a POINT standing
@@ -254,6 +316,25 @@ public class RiverRunShadingSettings
     [Tooltip("The feet the arch stands on.")]
     public StoneFaceKind archwayFeet = StoneFaceKind.Auto;
 
+    [Header("Arena Doors — needs rebuild")]
+    [Tooltip("The sheet filling the archway behind the door, with the soul opening cut out of it.")]
+    public StoneFaceKind doorSheet = StoneFaceKind.Auto;
+
+    [Tooltip("The face of the frame running round the keyhole.")]
+    public StoneFaceKind doorFrame = StoneFaceKind.Auto;
+
+    [Tooltip("The panel filling the keyhole inside the frame, which the soul opening is cut out of.")]
+    public StoneFaceKind doorPanel = StoneFaceKind.Auto;
+
+    [Tooltip("The face of the rim running round the soul opening.")]
+    public StoneFaceKind doorFlapRim = StoneFaceKind.Auto;
+
+    [Tooltip("The face of the round disc on the bulb, which the arena's numeral is drawn on.")]
+    public StoneFaceKind doorDisc = StoneFaceKind.Auto;
+
+    [Tooltip("The sides of both rims and of the disc, where they stand off the sheet.")]
+    public StoneFaceKind doorEdges = StoneFaceKind.Auto;
+
     // ─────────────────────────────────────────────────────────────
     // PUSHING
     // ─────────────────────────────────────────────────────────────
@@ -293,6 +374,14 @@ public class RiverRunShadingSettings
     private static readonly int WaterExtentId     = Shader.PropertyToID("_RiverRunWaterlineExtent");
     private static readonly int WaterDepthId      = Shader.PropertyToID("_RiverRunWaterDepth");
     private static readonly int LightStrengthId   = Shader.PropertyToID("_RiverRunLightStrength");
+
+    private static readonly int DecalSheetId    = Shader.PropertyToID("_RiverRunDecalSheet");
+    private static readonly int DecalLayoutId   = Shader.PropertyToID("_RiverRunDecalLayout");
+    private static readonly int DecalSpacingId  = Shader.PropertyToID("_RiverRunDecalSpacing");
+    private static readonly int DecalScaleMinId = Shader.PropertyToID("_RiverRunDecalScaleMin");
+    private static readonly int DecalScaleMaxId = Shader.PropertyToID("_RiverRunDecalScaleMax");
+    private static readonly int DecalAmountId   = Shader.PropertyToID("_RiverRunDecalAmount");
+    private static readonly int DecalOpacityId  = Shader.PropertyToID("_RiverRunDecalOpacity");
 
     /// <summary>
     /// Publishes one set of shading numbers to the shaders — the tuner's if it is driving, this
@@ -352,6 +441,36 @@ public class RiverRunShadingSettings
         Shader.SetGlobalFloat(WaterExtentId,   waterlineExtent);
 
         Shader.SetGlobalFloat(LightStrengthId,  lightStrength);
+
+        ApplyDecals();
+    }
+
+    /// <summary>
+    /// The decal sheet and the scatter it is stamped with.
+    ///
+    /// The sheet's HELD count is the only thing standing between an unpushed global and a stone
+    /// covered in marks: there is no transparent default texture for a texture global to fall
+    /// back on, so an unbound sampler reads as whatever Unity last had in that slot. A count of
+    /// nothing is read in the shader before the sheet is ever sampled, so a preset carrying no
+    /// sheet, or one whose sheet has been deleted from under it, draws nothing rather than
+    /// something arbitrary. The sheet still goes over black in that case, so nothing is left
+    /// holding on to a texture that is no longer wanted.
+    /// </summary>
+    private void ApplyDecals()
+    {
+        bool  ready = decalSheet != null && decalSheetHeld > 0
+                   && decalSheetColumns > 0 && decalSheetRows > 0 && decalSheetCellPixels > 0;
+
+        Shader.SetGlobalTexture(DecalSheetId, ready ? decalSheet : Texture2D.blackTexture);
+        Shader.SetGlobalVector(DecalLayoutId, ready
+            ? new Vector4(decalSheetColumns, decalSheetRows, decalSheetHeld, decalSheetCellPixels)
+            : Vector4.zero);
+
+        Shader.SetGlobalFloat(DecalSpacingId,  decalSpacing);
+        Shader.SetGlobalFloat(DecalScaleMinId, decalScaleMin);
+        Shader.SetGlobalFloat(DecalScaleMaxId, decalScaleMax);
+        Shader.SetGlobalFloat(DecalAmountId,   decalAmount);
+        Shader.SetGlobalFloat(DecalOpacityId,  decalOpacity);
     }
 
     /// <summary>
@@ -392,6 +511,17 @@ public class RiverRunShadingSettings
 
         lightStrength     = other.lightStrength;
 
+        decalSheet           = other.decalSheet;
+        decalSheetColumns    = other.decalSheetColumns;
+        decalSheetRows       = other.decalSheetRows;
+        decalSheetHeld       = other.decalSheetHeld;
+        decalSheetCellPixels = other.decalSheetCellPixels;
+        decalAmount          = other.decalAmount;
+        decalOpacity         = other.decalOpacity;
+        decalSpacing         = other.decalSpacing;
+        decalScaleMin        = other.decalScaleMin;
+        decalScaleMax        = other.decalScaleMax;
+
         outpostOutsideWalls = other.outpostOutsideWalls;
         outpostWallTop      = other.outpostWallTop;
         outpostInsideWalls  = other.outpostInsideWalls;
@@ -410,5 +540,12 @@ public class RiverRunShadingSettings
         archwayOutside    = other.archwayOutside;
         archwayFaces      = other.archwayFaces;
         archwayFeet       = other.archwayFeet;
+
+        doorSheet         = other.doorSheet;
+        doorFrame         = other.doorFrame;
+        doorPanel         = other.doorPanel;
+        doorFlapRim       = other.doorFlapRim;
+        doorDisc          = other.doorDisc;
+        doorEdges         = other.doorEdges;
     }
 }

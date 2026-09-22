@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eafaea92649ccfb499200b4f7366dcd9, type: 3}
+  m_Name: NewArenaDoorPreset
+  m_EditorClassIdentifier: Assembly-CSharp::ArenaDoorPreset
+  door:
+    height: 2
+    baseWidth: 1
+    bulbRadius: 0.5
+    waistWidth: 0.6
+    waistHeight: 1
+    baseCurve: 0.4
+    frameWidth: 0.1
+    frameDepth: 0.3
+    flapRimWidth: 0.1
+    panelDepth: 0.3
+    flapWidth: 0.3
+    flapLegHeight: 0.3
+    flapCrownHeight: 0.2
+    flapCurve: 0.1
+    discRadius: 0
+    discDepth: 0.01
+    discRise: 0
+    discSideSteps: 3
+    numeralSize: 0.71
+    numeralRise: -0.025
+    numeralLift: 0.004

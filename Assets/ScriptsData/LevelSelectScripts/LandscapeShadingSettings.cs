@@ -10,7 +10,10 @@ public enum LandscapeVariant
 
 /// <summary>
 /// How the level select's landscape hills are shaded: three stone variants, each a colour with its
-/// own grain, and four parts of the landscape — Ground, Tops, Cliffs and Holes — each wearing one.
+/// own grain, and three parts of the landscape — Holes, NoiseUp and NoiseDown — each wearing one.
+///
+/// Nothing is judged by steepness or height above the base any more: away from Holes, the hills
+/// are coloured purely by which way their rocky noise leans.
 ///
 /// The same arrangement as <see cref="RiverRunShadingSettings"/> and entirely separate from it.
 /// Bare $Globals read by LandscapeShading.hlsl, so nothing on disk remembers them: they are pushed
@@ -46,25 +49,22 @@ public class LandscapeShadingSettings
     [Range(0f, 1f)] public float grainStrengthC = 0.3f;
 
     [Header("Parts")]
-    [Tooltip("Flat ground at the tile base.")]
-    public LandscapeVariant ground = LandscapeVariant.A;
-    [Tooltip("Flat ground raised on hills and plateaus, above Top Height.")]
-    public LandscapeVariant tops   = LandscapeVariant.A;
-    [Tooltip("Faces steeper than Cliff Angle.")]
-    public LandscapeVariant cliffs = LandscapeVariant.B;
     [Tooltip("Everything deeper than Hole Depth below the tile base.")]
     public LandscapeVariant holes  = LandscapeVariant.C;
+    [Tooltip("The ups of the rocky noise — everything the noise pushes up.")]
+    public LandscapeVariant noiseUp   = LandscapeVariant.A;
+    [Tooltip("The downs of the rocky noise, and ground flat enough to lean neither way.")]
+    public LandscapeVariant noiseDown = LandscapeVariant.B;
 
     [Header("Where The Parts Split")]
-    [Tooltip("Degrees off flat past which a face counts as Cliffs.")]
-    [Range(0f, 90f)] public float cliffAngle = 45f;
-    [Tooltip("Metres above the tile base past which flat ground counts as Tops.")]
-    [Min(0f)] public float topHeight = 2f;
     [Tooltip("Metres below the tile base past which everything counts as Holes.")]
     [Min(0f)] public float holeDepth = 0.5f;
-    [Tooltip("How wide each blend between parts is, as a fraction of its own threshold. 0 is a " +
-             "hard line.")]
+    [Tooltip("How wide the blend into Holes is, as a fraction of Hole Depth. 0 is a hard line.")]
     [Range(0f, 1f)] public float softness = 0.2f;
+    [Tooltip("How wide the blend between NoiseUp and NoiseDown is, as a fraction of the noise's " +
+             "own lean. 0 is a hard line down the middle of the noise, 1 blends across the whole " +
+             "of it.")]
+    [Range(0f, 1f)] public float noiseSoftness = 0.2f;
 
     [Header("Light")]
     [Tooltip("How hard the hills are turned against the world's light (its position is in the " +
@@ -87,7 +87,7 @@ public class LandscapeShadingSettings
         new LandscapeShadingSettings
         {
             grainStrengthA = 0f, grainStrengthB = 0f, grainStrengthC = 0f,
-            cliffs = LandscapeVariant.A, holes = LandscapeVariant.A, lightStrength = 0f,
+            holes = LandscapeVariant.A, noiseDown = LandscapeVariant.A, lightStrength = 0f,
         };
 
     private static readonly int ColourAId        = Shader.PropertyToID("_LandscapeColourA");
@@ -96,10 +96,9 @@ public class LandscapeShadingSettings
     private static readonly int GrainSizeId      = Shader.PropertyToID("_LandscapeGrainSizes");
     private static readonly int GrainStrengthId  = Shader.PropertyToID("_LandscapeGrainStrengths");
     private static readonly int PartVariantsId   = Shader.PropertyToID("_LandscapePartVariants");
-    private static readonly int CliffAngleId     = Shader.PropertyToID("_LandscapeCliffAngle");
-    private static readonly int TopHeightId      = Shader.PropertyToID("_LandscapeTopHeight");
     private static readonly int HoleDepthId      = Shader.PropertyToID("_LandscapeHoleDepth");
     private static readonly int SoftnessId       = Shader.PropertyToID("_LandscapeSoftness");
+    private static readonly int NoiseSoftnessId  = Shader.PropertyToID("_LandscapeNoiseSoftness");
     private static readonly int LightStrengthId  = Shader.PropertyToID("_LandscapeLightStrength");
     private static readonly int BaseYId          = Shader.PropertyToID("_LandscapeBaseY");
 
@@ -127,14 +126,13 @@ public class LandscapeShadingSettings
         Shader.SetGlobalVector(GrainSizeId,     new Vector4(grainSizeA,     grainSizeB,     grainSizeC,     0f));
         Shader.SetGlobalVector(GrainStrengthId, new Vector4(grainStrengthA, grainStrengthB, grainStrengthC, 0f));
 
-        // x Ground, y Tops, z Cliffs, w Holes.
+        // x Holes, y NoiseUp, z NoiseDown.
         Shader.SetGlobalVector(PartVariantsId,
-            new Vector4((float)ground, (float)tops, (float)cliffs, (float)holes));
+            new Vector4((float)holes, (float)noiseUp, (float)noiseDown, 0f));
 
-        Shader.SetGlobalFloat(CliffAngleId,    cliffAngle);
-        Shader.SetGlobalFloat(TopHeightId,     topHeight);
         Shader.SetGlobalFloat(HoleDepthId,     holeDepth);
         Shader.SetGlobalFloat(SoftnessId,      softness);
+        Shader.SetGlobalFloat(NoiseSoftnessId, noiseSoftness);
         Shader.SetGlobalFloat(LightStrengthId, lightStrength);
     }
 
@@ -147,15 +145,13 @@ public class LandscapeShadingSettings
         colourB = other.colourB; grainSizeB = other.grainSizeB; grainStrengthB = other.grainStrengthB;
         colourC = other.colourC; grainSizeC = other.grainSizeC; grainStrengthC = other.grainStrengthC;
 
-        ground = other.ground;
-        tops   = other.tops;
-        cliffs = other.cliffs;
-        holes  = other.holes;
+        holes     = other.holes;
+        noiseUp   = other.noiseUp;
+        noiseDown = other.noiseDown;
 
-        cliffAngle    = other.cliffAngle;
-        topHeight     = other.topHeight;
         holeDepth     = other.holeDepth;
         softness      = other.softness;
+        noiseSoftness = other.noiseSoftness;
         lightStrength = other.lightStrength;
     }
 }

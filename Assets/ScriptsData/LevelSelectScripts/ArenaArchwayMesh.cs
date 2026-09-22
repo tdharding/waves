@@ -109,83 +109,6 @@ public static class ArenaArchwayMesh
         return b.ToMesh("ArenaArchway");
     }
 
-    /// <summary>
-    /// The door: a flat sheet filling the arch's opening, from <paramref name="floor"/> below the
-    /// rim top (the channel floor) up to the underside of the crown, standing
-    /// <paramref name="along"/> back from the front face. Built in the same frame as
-    /// <see cref="Build"/>, and its curved edge walks the very stations the arch's inner edge
-    /// does, so the two meet exactly rather than nearly.
-    ///
-    /// Faces both ways — it is seen from the river on the way in and from the arena on the way
-    /// out. UV0 runs 0 to 1 across the opening and from the floor to the crown.
-    /// </summary>
-    public static Mesh BuildDoor(ArenaArchwayProfile profile, float floor, float along, float edge)
-    {
-        var mesh = new Mesh { name = "ArenaDoor" };
-        if (profile == null) return mesh;
-
-        edge = Mathf.Max(edge, 0.005f);
-
-        float half  = Mathf.Max(0.005f, profile.openingWidth * 0.5f);
-        float thick = Mathf.Max(0.005f, profile.thickness);
-        float leg   = Mathf.Max(0f,     profile.legHeight);
-        float crown = Mathf.Max(0.005f, profile.archHeight);
-        floor = Mathf.Max(0f, floor);
-
-        // Stations counted exactly as Build counts them, so the door's edge is the arch's.
-        int legSteps = leg <= 0.0001f ? 0 : Mathf.Max(1, Mathf.CeilToInt(leg / edge));
-        int crownSeg = CrownSegments(half + thick, crown + thick, edge);
-
-        // The opening's outline: down at the floor on the left, up the arch's inner edge and
-        // over, and down to the floor on the right. Rectangle plus half-ellipse — convex, so a
-        // fan from inside it covers it.
-        var rim = new List<Vector2> { new Vector2(-half, -floor) };
-        rim.AddRange(Outline(half, leg, crown, legSteps, crownSeg));
-        rim.Add(new Vector2(half, -floor));
-
-        float   bottom = -floor, top = leg + crown;
-        Vector2 centre = new Vector2(0f, (bottom + leg) * 0.5f);
-
-        var verts = new List<Vector3>();
-        var norms = new List<Vector3>();
-        var uvs   = new List<Vector2>();
-        var tris  = new List<int>();
-
-        // One side each: the arena side faces -z, the river side +z.
-        for (int side = 0; side < 2; side++)
-        {
-            Vector3 n    = side == 0 ? Vector3.back : Vector3.forward;
-            int     hub  = verts.Count;
-            AddDoorVert(centre, n);
-
-            for (int i = 0; i < rim.Count; i++) AddDoorVert(rim[i], n);
-
-            // Closing the fan back to the start runs along the floor, left to right.
-            for (int i = 0; i < rim.Count; i++)
-            {
-                int a = hub + 1 + i;
-                int b = hub + 1 + (i + 1) % rim.Count;
-                if (side == 0) { tris.Add(hub); tris.Add(a); tris.Add(b); }
-                else           { tris.Add(hub); tris.Add(b); tris.Add(a); }
-            }
-        }
-
-        mesh.SetVertices(verts);
-        mesh.SetNormals(norms);
-        mesh.SetUVs(0, uvs);
-        mesh.SetTriangles(tris, 0);
-        mesh.RecalculateBounds();
-        return mesh;
-
-        void AddDoorVert(Vector2 p, Vector3 n)
-        {
-            verts.Add(new Vector3(p.x, p.y, along));
-            norms.Add(n);
-            uvs.Add(new Vector2(Mathf.InverseLerp(-half, half, p.x),
-                                Mathf.InverseLerp(bottom, top, p.y)));
-        }
-    }
-
     private static Vector3 At(Vector2 p) => new Vector3(p.x, p.y, 0f);
 
     private static void Foot(MeshBuild b, Vector2 inner, Vector2 outer, Vector3 back,
@@ -204,11 +127,13 @@ public static class ArenaArchwayMesh
     }
 
     /// <summary>
-    /// How many segments to break the crown into. Off the longer of its two axes, so neither a
+    /// How many segments to break the crown into. Public because the door built into the arch
+    /// counts its own stations the same way, and the two have to agree or the door's edge and
+    /// the arch's inner edge nearly meet instead of exactly meeting. Off the longer of its two axes, so neither a
     /// wide flat arch nor a tall narrow one comes out coarse. Always even, so a station lands
     /// exactly on the apex.
     /// </summary>
-    private static int CrownSegments(float half, float crown, float edge)
+    public static int CrownSegments(float half, float crown, float edge)
     {
         float span = Mathf.PI * 0.5f * Mathf.Max(half, crown);
         int   n    = Mathf.Max(MinCrownSegments, Mathf.CeilToInt(2f * span / edge));

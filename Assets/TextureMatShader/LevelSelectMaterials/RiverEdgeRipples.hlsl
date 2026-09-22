@@ -24,7 +24,12 @@
 //   * a line is a WINDOW cut out of its cycle, not a sine, so widening one lights more of the
 //     cycle without also brightening it;
 //   * the phase is SUBTRACTED, which is what drifts the lines rather than pulsing them;
-//   * the wander is ONE gradient noise field, a strength and a scale, like _RockRingDistort*;
+//   * the wander is a gradient noise field, a strength and a scale, like _RockRingDistort* —
+//     each water has a SECOND one laid over the first, off its own strength, scale and speed,
+//     which is dead at 0 and leaves the water as the one field made it;
+//   * the WINDOW a line is cut with is each water's own: Width and Softness are the river lines',
+//     Pool Width and Pool Softness the rings'. Strength alone is shared, so however differently
+//     the two are cut they cannot drift apart in brightness;
 //   * the output is white by construction and floored at zero, so whatever it feeds, an Add can
 //     only ever brighten. Turning Strength to 0 returns the water exactly to what it was.
 // The top is deliberately left open: Strength above 1 keeps its overbright headroom for bloom.
@@ -49,10 +54,11 @@
 // The numbers themselves are authored in the Level Select River Tuner and kept on a
 // LevelSelectRiverPreset, which the designer holds one of per world.
 
-// Shared by rivers and pools, so the two read as one body of water.
+// Strength is shared by rivers and pools, so the two waters cannot drift apart in brightness.
+// Width and Softness are the RIVER lines' — a pool's rings carry their own pair below.
 float _RiverEdgeRippleStrength;   // peak whiteness of a line; 0 = the effect is gone
-float _RiverEdgeRippleWidth;      // fraction of its cycle a line fills
-float _RiverEdgeRippleSoftness;   // 0 = a hard-edged line; 1 = falls away from its centre
+float _RiverEdgeRippleWidth;      // fraction of its cycle a river line fills
+float _RiverEdgeRippleSoftness;   // 0 = a hard-edged river line; 1 = falls away from its centre
 
 // Rivers.
 float _RiverEdgeRippleSpacing;         // metres between one line and the next
@@ -63,6 +69,9 @@ float _RiverEdgeRippleDistortStrength; // in line-widths: 0.1 shifts a line by a
 float _RiverEdgeRippleDistortScale;    // frequency of that noise field
 float _RiverEdgeRippleDistortSpeed;    // metres per second the distortion travels down a channel
 float _RiverEdgeRippleFlowSpace;       // 1 = the field travels along the lines; 0 = pinned to world
+float _RiverEdgeRippleSecondDistortStrength; // a SECOND wander over the first, also in line-widths; 0 = off
+float _RiverEdgeRippleSecondDistortScale;    // frequency of that second field
+float _RiverEdgeRippleSecondDistortSpeed;    // metres per second the second wander travels down a channel
 float _RiverEdgeRippleBranchMouthFade;  // metres past the joined river's bank a branch's lines take on its reach; 0 = off
 float _RiverEdgeRippleBranchMouthInset; // metres out into the branch that change-over starts
 
@@ -73,6 +82,11 @@ float _RiverEdgeRipplePoolSpeed;           // metres per second the rings travel
 float _RiverEdgeRipplePoolDistortStrength; // in ring-widths
 float _RiverEdgeRipplePoolDistortScale;    // world-space frequency of that noise field
 float _RiverEdgeRipplePoolDistortSpeed;    // turns per second the field spins round the centre
+float _RiverEdgeRipplePoolWidth;           // fraction of its cycle a ring fills — the rings' own
+float _RiverEdgeRipplePoolSoftness;        // 0 = a hard-edged ring; 1 = falls away from its centre
+float _RiverEdgeRipplePoolSecondDistortStrength; // a SECOND wander over the first, also in ring-widths; 0 = off
+float _RiverEdgeRipplePoolSecondDistortScale;    // world-space frequency of that second field
+float _RiverEdgeRipplePoolSecondDistortSpeed;    // turns per second the second field spins round the centre
 float _RiverEdgeRipplePoolMouthFade;       // metres past the pool circle the rings take on a river's reach; 0 = off
 float _RiverEdgeRipplePoolMouthReachOverlap; // metres inside the pool circle that change-over starts
 float _RiverEdgeRipplePoolMouthExtent;     // metres past the waterline the rings fade out over; 0 = no end
@@ -250,12 +264,33 @@ void RiverEdgeRipples_float(
                     * _RiverEdgeRipplePoolDistortStrength;
         }
 
+        // The second wander, laid over the first: the two are ADDED into the one push, so what
+        // this moves is the ring the spacing and the first field have already made. Its own turn
+        // about the centre, at its own speed, so it can turn slower, faster or the other way
+        // rather than being carried round with the first. Its field is offset far enough to be a
+        // different patch of noise — at a matching scale the two would otherwise land on top of
+        // each other and only ever read as one stronger wander. Its own guard, so it draws with
+        // the first at 0 as readily as over it. The river's second wander is the same idea in the
+        // channel's frame.
+        if (abs(_RiverEdgeRipplePoolSecondDistortStrength) > 0.0001)
+        {
+            float  turn2 = _Time.y * _RiverEdgeRipplePoolSecondDistortSpeed * RIVER_RIPPLE_TWO_PI;
+            float  c2 = cos(turn2), sn2 = sin(turn2);
+            float2 spun2 = float2(offset.x * c2 - offset.y * sn2, offset.x * sn2 + offset.y * c2);
+
+            distort += RiverEdgeGradientNoise((centre.xz + spun2) * _RiverEdgeRipplePoolSecondDistortScale
+                                              + float2(37.1, 17.3))
+                     * _RiverEdgeRipplePoolSecondDistortStrength;
+        }
+
+        // Strength is the shared one — the two waters keep the same brightness. The window is the
+        // rings' own, so a pool can carry fatter or softer lines than the rivers running out of it.
         PoolRings(radius, distort, _Time.y,
                   poolSpacing,
                   _RiverEdgeRippleStrength,
                   _RiverEdgeRipplePoolSpeed,
-                  _RiverEdgeRippleWidth,
-                  _RiverEdgeRippleSoftness,
+                  _RiverEdgeRipplePoolWidth,
+                  _RiverEdgeRipplePoolSoftness,
                   Ripples, Mask);
 
         // Pool Reach: the rings belong to the waterline, strongest there and gone Reach metres
@@ -377,6 +412,10 @@ void RiverEdgeRipples_float(
     // How far the distortion has been carried along the lines by now, in metres down the channel.
     float travelled = along - _Time.y * _RiverEdgeRippleDistortSpeed;
 
+    // And the second wander's own travel down the same channel, on its own speed, so it can run
+    // slower, faster or upstream against the first rather than being carried along with it.
+    float travelled2 = along - _Time.y * _RiverEdgeRippleSecondDistortSpeed;
+
     // ── Debug ────────────────────────────────────────────────────────────────
     // Which way is the generated frame lying. Read off the frame BEFORE the distortion goes on, so
     // a wrong axis is not hidden behind a wobble.
@@ -414,6 +453,22 @@ void RiverEdgeRipples_float(
             : WorldPos.xz;
 
         s += RiverEdgeGradientNoise(p * _RiverEdgeRippleDistortScale) * _RiverEdgeRippleDistortStrength;
+    }
+
+    // The second wander, laid over the first: it pushes the ALREADY-PUSHED line rather than
+    // sharing the work with it, so whatever the spacing and the first distortion have made of a
+    // line is what this moves. Its field is the same frame, offset far enough that it is a
+    // different patch of noise — at a matching scale the two would otherwise land on top of each
+    // other and only ever read as one stronger wander. Its own guard, so it draws with the first
+    // at 0 as readily as over it.
+    if (abs(_RiverEdgeRippleSecondDistortStrength) > 0.0001)
+    {
+        float2 p2 = (framed && _RiverEdgeRippleFlowSpace > 0.5)
+            ? float2(travelled2, side)
+            : WorldPos.xz;
+
+        s += RiverEdgeGradientNoise(p2 * _RiverEdgeRippleSecondDistortScale + float2(37.1, 17.3))
+           * _RiverEdgeRippleSecondDistortStrength;
     }
 
     // SUBTRACTING the phase is what carries the LINES themselves: a crest sits where the cycle

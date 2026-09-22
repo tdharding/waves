@@ -62,11 +62,24 @@ float CalculateHillHeight(float3 WorldPos, int count, float GlobalHeight)
     return totalY;
 }
 
-// Rocky noise height, kept separate so it can go into the geometry (OffsetPos)
-// WITHOUT contaminating the smooth Normal. Fades with each hill's falloff.
-float CalculateHillNoise(float3 WorldPos, int count, float GlobalHeight)
+// The rocky noise at WorldPos, told in three numbers rather than one:
+//   x  the height it pushes the geometry, in metres
+//   y  which way it leans here, -1 fully down to +1 fully up
+//   z  how much noise there is here at all, 0 where the hills carry none
+//
+// Kept separate from the smooth height so x can go into the geometry (OffsetPos) WITHOUT
+// contaminating the Normal, and fades with each hill's falloff like everything else.
+//
+// The lean is the push measured against how far it COULD have pushed at this point, so it reads
+// the same on a tall hill and a shallow one. The amount is what tells ground with no noise in it
+// from ground that merely happens to lie level — without it, flat ground would sit exactly on the
+// line between up and down.
+float3 CalculateHillNoise(float3 WorldPos, int count, float GlobalHeight)
 {
-    float total = 0.0;
+    float push      = 0.0;
+    float potential = 0.0;
+    float amount    = 0.0;
+
     for (int i = 0; i < count; i++)
     {
         if (_HillNoise[i] <= 0.0) continue;
@@ -79,20 +92,31 @@ float CalculateHillNoise(float3 WorldPos, int count, float GlobalHeight)
         float edge0   = min(saturate(_HillSharpness[i]), 0.999);
         float falloff = 1.0 - smoothstep(edge0, 1.0, t);
 
-        float n = _HillGradientNoise(WorldPos.xz * _HillNoiseScale) * 2.0 - 1.0;
-        total += falloff * n * _HillNoise[i] * hillCenter.y * GlobalHeight;
+        float n    = _HillGradientNoise(WorldPos.xz * _HillNoiseScale) * 2.0 - 1.0;
+        float lift = falloff * _HillNoise[i] * hillCenter.y * GlobalHeight;
+
+        push      += n * lift;
+        potential += abs(lift);            // abs: a hole's height is negative
+        amount    += falloff * _HillNoise[i];
     }
-    return total;
+
+    return float3(push, push / max(potential, 1e-5), saturate(amount));
 }
 
+// Noise : how the rocky noise leans here (x) and how much of it there is (y) — see
+//         CalculateHillNoise. Feeds Landscape Shading, which wears one variant on the ups and
+//         another on the downs.
 void CalculateHills_float(float3 WorldPos, float PointCount, float GlobalHeight,
-                          out float3 OffsetPos, out float3 Normal)
+                          out float3 OffsetPos, out float3 Normal, out float2 Noise)
 {
     int count = (int)PointCount;
 
-    float h0 = CalculateHillHeight(WorldPos, count, GlobalHeight);
+    float  h0    = CalculateHillHeight(WorldPos, count, GlobalHeight);
+    float3 noise = CalculateHillNoise(WorldPos, count, GlobalHeight);
+
     OffsetPos   = WorldPos;
-    OffsetPos.y += h0 + CalculateHillNoise(WorldPos, count, GlobalHeight);   // noise in geometry only
+    OffsetPos.y += h0 + noise.x;   // noise in geometry only
+    Noise       = noise.yz;
 
     // Finite differences for surface normal — uses the SMOOTH height (no noise).
     float epsilon = 0.5;

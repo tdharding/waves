@@ -86,6 +86,57 @@
 // and the underside are all built exactly vertical or facing down, so they take none of it; the
 // channel, which is the only thing with water in it, takes all of it.
 //
+// ── The decals ─────────────────────────────────────────────────────
+// Hand-drawn marks stamped over the stone — scattered rather than placed, because there is far
+// more generated stone out here than anybody is going to put a decal on by hand.
+//
+// They are scattered on a GRID of candidate places, one every Spacing metres across the surface,
+// with each place given a position anywhere inside its own cell so the grid it was picked on
+// never shows as a grid. Amount is how many of those places are actually taken: it thins the
+// scatter out without moving what is left, so turning it down leaves gaps rather than shrinking
+// the marks. Scale is drawn between a smallest and a largest for each place, and is the metres
+// across the LONGEST side of the decal, whatever shape it was drawn. Opacity is how far each
+// mark sinks into the stone, which is a separate question from how many of them there are.
+//
+// Every decal in the folder is carried on one sheet, side by side in equal cells — one texture
+// and one read per stamp rather than one sampler per drawing, which is what lets the number of
+// decals grow without the shader growing with it. The sheet is built from
+// Assets/TextureMatShader/LevelSelectMaterials/RiverRunDecals by the Run Shading Tuner; the
+// shader is told only how the cells are laid out, so it neither knows nor cares what is in them.
+//
+// They are scattered on the WORLD, not on a UV. The grid is laid across world space in metres
+// and read off the world position of each pixel, so a decal keeps its size and nothing about
+// where it falls is decided per triangle.
+//
+// That last part is the whole reason for it. UV0 — which the grain still uses — is not an
+// unwrap: the builder flattens each triangle's corners onto whichever axis plane the triangle
+// most nearly faces, and the triangle NEXT DOOR asks the same question on its own and can get
+// a different answer. A noise at two centimetres does not care; a recognisable drawing laid
+// across the join is cut clean along the facet edge. The faceted channel of a run, a tower's
+// orb, a pool bowl and an archway's curve all cut for that reason.
+//
+// World space has no such decision in it, but a position is three numbers and a decal wants
+// two, so the grid still has to be laid on a plane. Picking the nearest one per pixel only
+// moves the cut off the facet edges and onto a smoother line somewhere else. So all THREE are
+// laid — across the world's floor, and up each of its two walls — and a pixel takes them mixed
+// by how much its own surface faces each. Nothing is ever picked, so there is nothing to flip,
+// and a decal crosses a curve unbroken.
+//
+// What that costs is nearly nothing on most of this stone, because most of it faces squarely
+// along one axis — the rim lip is flat, the outer walls and end caps are built exactly
+// vertical, the underside faces straight down — and a plane a surface does not face at all is
+// dropped before it is scattered rather than scattered and multiplied by nothing. Only the
+// faces genuinely angled between two axes pay for two, and those are exactly the faces that
+// were being cut.
+//
+// The cost of mixing rather than picking is that a surface halfway between two planes carries
+// a little of both scatters at once, which can read as one decal faintly through another. The
+// mix is sharpened to hold that to as narrow a band of angles as it can without the mix
+// becoming a choice again.
+//
+// The decal goes UNDER the light, the seams and the grain: it is a mark ON the stone, so the
+// stone's light falls across it, a corner's ink line cuts over it, and the grain runs through it.
+//
 // ── Globals ──────────────────────────────────────────────────────────────────
 // Bare $Globals, exactly like RiverEdgeRipples.hlsl and WaterlineBlackGradient.hlsl: one set of
 // numbers shared by every generated piece in the world, so the look is authored once rather than
@@ -99,9 +150,11 @@
 // Tools > Waves > Level Select Run Shading Tuner.
 //
 // ── Everything here is inert at zero ─────────────────────────────────────────
-// Strength at 0, or Extent at 0, returns the run to exactly what it was, and a face colour
+// Strength at 0, Extent at 0, or a decal Amount or Opacity of 0, returns the run to exactly
+// what it was,
+// and a face colour
 // arriving with nothing in its alpha is one nobody has pushed yet, so the stone keeps the colour
-// the graph handed in. Nothing here is on unless it is asked for — which is also what a world
+// the graph handed in. A decal sheet holding nothing draws nothing. Nothing here is on unless it is asked for — which is also what a world
 // with no preset assigned gets, and what the one tick after a reimport gets.
 
 #ifndef RIVER_RUN_SHADING_INCLUDED
@@ -131,6 +184,32 @@ float4 _RiverRunInnerColour;
 // One grain per part of the stone — x outer, y rim, z inner, the same order as the face kinds.
 float4 _RiverRunGrainSizes;
 float4 _RiverRunGrainStrengths;
+
+// The hand-drawn decals, all of them on one sheet: equal cells side by side, filled left to right
+// and bottom to top, each holding one drawing fitted to it with a little transparent padding
+// round the edge so the sheet's mips cannot bleed one cell into the next.
+TEXTURE2D(_RiverRunDecalSheet);
+SAMPLER(sampler_RiverRunDecalSheet);
+
+// How that sheet is laid out: x columns, y rows, z how many of the cells actually hold a drawing,
+// w how many pixels down one cell. z at zero is what makes the decals inert before anything has
+// pushed a sheet — there is no such thing as a transparent default texture to fall back on, so a
+// count of nothing is the only thing standing between an unpushed global and a stone covered in
+// whatever Unity happened to bind.
+float4 _RiverRunDecalLayout;
+
+// One candidate place every Spacing metres; Amount is how many of those places are taken, 0 to 1.
+// Scale is the metres across the longest side of a decal, drawn between the two for each place.
+float _RiverRunDecalSpacing;
+float _RiverRunDecalScaleMin;
+float _RiverRunDecalScaleMax;
+float _RiverRunDecalAmount;
+
+// How much of the stone underneath a decal hides, 0 to 1. A different thing from Amount:
+// that decides how MANY marks there are, this how far each of the ones there are sinks into
+// the stone. Turned down, every decal is still where it was and still the size it was —
+// the stone simply shows through it.
+float _RiverRunDecalOpacity;
 
 // How far the water lies beneath the rim top — the world's Water Level, pushed alongside the rest
 // rather than authored a second time.
@@ -213,6 +292,172 @@ float RiverRunGrain(float2 uv, float4 faceData)
     return max(0.0, 1.0 + noise * 2.0 * strength);
 }
 
+// Four independent numbers from one grid cell, by arithmetic alone — no sine, for the same
+// reason the grain's noise avoids one: every machine that draws this river has to agree about
+// which places are taken and what is standing in them, or the decals move from machine to machine.
+//
+// x decides whether the place is taken at all, yz where in its cell the decal stands, w how big
+// it is. Which drawing it is comes from a second call, so the pick cannot drift with the size.
+float4 RiverRunDecalHash(float2 c)
+{
+    float4 p = frac(c.xyxy * float4(0.1031, 0.1030, 0.0973, 0.1099));
+    p += dot(p, p.wzxy + 33.33);
+    return frac((p.xxyz + p.yzzw) * p.zywx);
+}
+
+// What the decals lay over the stone at one point on ONE of the three planes: rgb already
+// multiplied by its own coverage, a the coverage — ready to be laid straight over whatever is
+// underneath, or mixed with the other two planes' answers.
+//
+// uv is the world position flattened onto this plane, in metres. footprint is how much of that
+// plane one screen pixel covers, and is handed IN rather than taken here: it comes of a
+// derivative, and this function is called inside the test that drops a plane the surface does
+// not face, where a derivative would be undefined. RiverRunDecalsOnStone takes all three
+// before it decides anything.
+//
+// Nothing here runs at all until a sheet has been pushed, a spacing and a scale given, and
+// Amount turned up off zero, so a preset that has never heard of decals draws none.
+float4 RiverRunDecals(float2 uv, float footprint)
+{
+    float4 nothing = float4(0.0, 0.0, 0.0, 0.0);
+
+    float2 grid    = _RiverRunDecalLayout.xy;
+    int    held    = (int)(_RiverRunDecalLayout.z + 0.5);
+    float  cellPix = _RiverRunDecalLayout.w;
+
+    float spacing = _RiverRunDecalSpacing;
+    float amount  = _RiverRunDecalAmount;
+    float largest = max(_RiverRunDecalScaleMin, _RiverRunDecalScaleMax);
+    float small   = min(_RiverRunDecalScaleMin, _RiverRunDecalScaleMax);
+
+    if (held <= 0 || grid.x < 1.0 || grid.y < 1.0 || cellPix < 1.0) return nothing;
+    if (spacing <= 0.0 || amount <= 0.0 || largest <= 0.0)          return nothing;
+
+    // How many rings of neighbouring cells could be holding a decal that reaches this pixel. A
+    // decal stands somewhere inside its own cell and reaches half its own width past it, so
+    // the ring next door always counts and a further ring only once a decal is wider than two
+    // cells. Held to three rings: past six times the spacing the biggest decals are cut off
+    // square rather than every pixel in the world paying for a search that wide.
+    //
+    // Worked out from the uniforms rather than from anything about this pixel, so every pixel
+    // in the world takes the same number of turns round the loop and none of them diverges.
+    int rings = clamp(1 + (int)floor(largest / (2.0 * spacing)), 1, 3);
+
+    // Which cell this pixel is standing in.
+    float2 home = floor(uv / spacing);
+
+    float4 over = nothing;
+
+    for (int y = -rings; y <= rings; y++)
+    {
+        for (int x = -rings; x <= rings; x++)
+        {
+            float2 c = home + float2(x, y);
+            float4 h = RiverRunDecalHash(c);
+
+            // A place that loses the draw holds nothing, and its neighbours do not close over
+            // the gap. That is what makes Amount thin the scatter rather than tighten it.
+            if (h.x > amount) continue;
+
+            float size = lerp(small, largest, h.w);
+            if (size <= 1e-5) continue;
+
+            // Anywhere inside its own cell.
+            float2 centre = (c + h.yz) * spacing;
+
+            // Where this pixel falls across the decal, 0 to 1 either way. Outside that the decal
+            // is not here, and the cell is dropped before it is ever read.
+            float2 local = (uv - centre) / size + 0.5;
+            if (any(local < 0.0) || any(local > 1.0)) continue;
+
+            // Which of the sheet's drawings this place drew, and where that cell sits on it.
+            float pick = RiverRunDecalHash(c + 19.19).x;
+            float slot = min(floor(pick * (float)held), (float)held - 1.0);
+            float2 cell = float2(fmod(slot, grid.x), floor(slot / grid.x));
+
+            // The mip to read: how many of the decal's own pixels one screen pixel covers. An
+            // EXPLICIT level is what makes a read inside all the skipping above legal at all —
+            // there is no derivative left for the hardware to want. Held short of the level where
+            // a cell has shrunk to nothing, which is where the sheet's cells would run together.
+            float lod = log2(max(footprint * cellPix / size, 1e-5));
+            lod = clamp(lod, 0.0, log2(cellPix) - 1.0);
+
+            float2 sheetUV = (cell + local) / grid;
+            float4 mark = SAMPLE_TEXTURE2D_LOD(_RiverRunDecalSheet, sampler_RiverRunDecalSheet,
+                                               sheetUV, lod);
+
+            // Laid over what has gathered so far, so two decals crossing stack one on the other
+            // rather than adding up into something brighter than either of them.
+            over.rgb = mark.rgb * mark.a + over.rgb * (1.0 - mark.a);
+            over.a   = mark.a           + over.a   * (1.0 - mark.a);
+        }
+    }
+
+    return over;
+}
+
+// How hard the mix between the three planes is pulled toward whichever the surface faces most.
+// Fixed rather than offered as a setting, because it is not a look — it is the one number that
+// trades the two faults of this arrangement against each other, and there is a right answer.
+//
+// At 1 the mix is gentle and a slanted face carries a broad band of two scatters at once, which
+// reads as one decal showing faintly through another. Pulled up, that band narrows; pulled up far
+// enough the mix stops being a mix and becomes a choice again, and the cut it exists to remove
+// comes back. Four holds the crossing to a narrow enough range of angles to pass for a hard
+// surface while never actually snapping to one plane.
+#define RIVER_RUN_DECAL_SHARPEN 4.0
+
+// Under this share of a pixel, a plane is dropped rather than scattered and multiplied away to
+// nothing. It is what keeps the flat rim, the vertical walls and the underside — which is most of
+// this stone — scattering exactly once, as they did before there were three planes at all.
+#define RIVER_RUN_DECAL_PLANE_FLOOR 0.02
+
+// The decals over the stone at this pixel, laid on all three of the world's planes and mixed by
+// how much this surface faces each — rgb already multiplied by its own coverage.
+//
+// The three are the world's floor and each of its two walls, flattened the same way the builder
+// flattens UV0 so the two describe the same space: a face looking up reads the world's x and z, a
+// face looking along x reads z and y, a face looking along z reads x and y.
+float4 RiverRunDecalsOnStone(float3 worldPos, float3 n)
+{
+    // Every derivative taken up here, unconditionally, before a single plane has been weighed.
+    // Below this line the code skips planes, and a derivative asked for inside a skip is
+    // undefined — the mip it chooses would be whatever the pixels beside it happened to be doing.
+    float3 dx = ddx(worldPos);
+    float3 dy = ddy(worldPos);
+
+    float footXZ = max(length(float2(dx.x, dx.z)), length(float2(dy.x, dy.z)));
+    float footZY = max(length(float2(dx.z, dx.y)), length(float2(dy.z, dy.y)));
+    float footXY = max(length(float2(dx.x, dx.y)), length(float2(dy.x, dy.y)));
+
+    // How much this surface faces each of the three. Squared up hard, so a face that is nearly
+    // flat is nearly all one plane and only a genuinely slanted one carries two.
+    // Held off exactly zero: a component of nothing raised to a power is a thing different
+    // compilers answer differently, and it costs nothing to never ask.
+    float3 w = pow(max(abs(n), 1e-4), RIVER_RUN_DECAL_SHARPEN);
+    w /= max(w.x + w.y + w.z, 1e-5);
+
+    // Drop the planes this surface barely faces, and share their little out among the rest, so
+    // dropping them takes nothing off the decals rather than thinning them by a few percent.
+    w  = step(RIVER_RUN_DECAL_PLANE_FLOOR, w) * w;
+    w /= max(w.x + w.y + w.z, 1e-5);
+
+    float4 mixed = float4(0.0, 0.0, 0.0, 0.0);
+
+    // Premultiplied answers, so mixing them is a weighted sum and nothing has to be unwound
+    // first. The weights add to one, so a pixel wholly covered on every plane it faces stays
+    // wholly covered.
+    if (w.y > 0.0) mixed += w.y * RiverRunDecals(float2(worldPos.x, worldPos.z), footXZ);
+    if (w.x > 0.0) mixed += w.x * RiverRunDecals(float2(worldPos.z, worldPos.y), footZY);
+    if (w.z > 0.0) mixed += w.z * RiverRunDecals(float2(worldPos.x, worldPos.y), footXY);
+
+    // Opacity spent once, on the finished mix rather than per plane, so a slanted face fades
+    // by exactly as much as a flat one. Both the colour and the coverage are scaled, because
+    // the colour is already multiplied by that coverage — scaling one without the other would
+    // darken the mark as it faded instead of letting the stone through it.
+    return mixed * saturate(_RiverRunDecalOpacity);
+}
+
 // The colour this part of the run is drawn in. A face carrying no kind at all — a mesh built
 // before the builder was baking one — keeps whatever the graph handed in, and so does one whose
 // colour nobody has pushed yet.
@@ -282,6 +527,19 @@ void RiverRunShading_float(
     // any real extent is not much of it.
     float3 stone = RiverRunStone(FaceData, BaseColour);
     float  grain = RiverRunGrain(GrainUV, FaceData);
+
+    // The hand-drawn marks, laid on the bare stone before any of the rest of it. Under the light
+    // so the stone's own shaping falls across them, under the seams so a corner's ink line cuts
+    // over them, and under the grain so the surface runs through them — a mark ON the stone,
+    // rather than something floating in front of it.
+    //
+    // Off the world position and the normal rather than off GrainUV, which the grain still
+    // uses: UV0 is flattened per triangle, and a drawing laid across two triangles that
+    // flattened onto different planes is cut along the edge between them.
+    float4 decals = RiverRunDecalsOnStone(WorldPos, n);
+    // rgb comes back already multiplied by its own coverage, so it is added rather than
+    // weighted again — what the stone loses to the marks is all that has to be taken off it.
+    stone = decals.rgb + stone * (1.0 - decals.a);
 
     Colour    = stone * Light * grain;
     Tint      = _RiverRunSeamColour.rgb;

@@ -13,21 +13,19 @@ MonoBehaviour:
   m_Name: LandscapingPreset1
   m_EditorClassIdentifier: Assembly-CSharp::LevelSelectLandscapePreset
   landscapeShading:
-    colourA: {r: 0.5377358, g: 0.5377358, b: 0.5377358, a: 1}
-    grainSizeA: 0.4
-    grainStrengthA: 0.329
-    colourB: {r: 0.24528301, g: 0.24528301, b: 0.24528301, a: 1}
-    grainSizeB: 0.54
-    grainStrengthB: 0.169
+    colourA: {r: 0.14150941, g: 0.14150941, b: 0.14150941, a: 1}
+    grainSizeA: 0.18
+    grainStrengthA: 0.261
+    colourB: {r: 0.084905684, g: 0.084905684, b: 0.084905684, a: 1}
+    grainSizeB: 0.36
+    grainStrengthB: 0.36
     colourC: {r: 0.3, g: 0.3, b: 0.3, a: 1}
     grainSizeC: 0.2
-    grainStrengthC: 0.285
-    ground: 0
-    tops: 0
-    cliffs: 1
+    grainStrengthC: 0.142
     holes: 2
-    cliffAngle: 70
-    topHeight: 2
-    holeDepth: 0.5
-    softness: 0.053
-    lightStrength: 0.6
+    noiseUp: 0
+    noiseDown: 1
+    holeDepth: 0
+    softness: 0.143
+    noiseSoftness: 0.112
+    lightStrength: 2.02

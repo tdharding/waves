@@ -2,8 +2,8 @@ using UnityEngine;
 
 /// <summary>
 /// How the STRUCTURES of one world's level select rivers look — the generated stone itself: the
-/// colour of each part of a run, its grain, the dark gathered along every seam, and the white
-/// rising off the waterline up the inside of the channel.
+/// colour of each part of a run, its grain, the dark gathered along every seam, the white rising
+/// off the waterline up the inside of the channel, and the hand-drawn decals scattered over it.
 ///
 /// Separate from <see cref="LevelSelectRiverWaterPreset"/> on purpose. The stone and the water
 /// are two materials on two pieces of geometry, authored in two tuners against two quite
@@ -22,6 +22,7 @@ using UnityEngine;
 public class LevelSelectRiverStructurePreset : ScriptableObject
 {
     [Tooltip("How the stone itself is shaded — the colour of each part of a run, dark along its " +
-             "seams, and white rising off the waterline up the inside of the channel.")]
+             "seams, white rising off the waterline up the inside of the channel, and the " +
+             "hand-drawn decals scattered over it.")]
     public RiverRunShadingSettings runShading = new RiverRunShadingSettings();
 }

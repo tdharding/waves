@@ -14,9 +14,14 @@ using UnityEngine;
 /// A run records every node of its path (<see cref="RiverRunMesh.pathNodes"/>), so a rim node can
 /// be added, resized or taken away live — only the rim node piece and the banks are rebuilt.
 ///
-/// Something can stand in the middle of its top (<see cref="LevelSelectDesignerData.RimNodeTopper"/>):
+/// Something can stand on it (<see cref="LevelSelectDesignerData.RimNodeTopper"/>) — on the
+/// river-side circle, on the plinth when it has one:
 /// a lollipop tower, or the vert display point prefab placed off its PrefabBaselineAlignment —
 /// its disc on the top, its forward facing into the river. Both are rebuilt with the piece.
+///
+/// A display point can also carry an interaction: stand the boat near it, press the key, and the
+/// poster it names comes up on screen — see DrawInteractBlock, in the Interact part of this
+/// window.
 /// </summary>
 public partial class LevelSelectDesignerWindow
 {
@@ -86,8 +91,11 @@ public partial class LevelSelectDesignerWindow
             current, new[] { new GUIContent("None"), new GUIContent("Left"),
                           new GUIContent("Right"), new GUIContent("Both") });
 
-        float radius = rim?.radius ?? 0.1f;
-        float height = rim?.height ?? 0.01f;
+        float radius       = rim?.radius ?? 0.1f;
+        float height       = rim?.height ?? 0.01f;
+        float width        = rim?.width ?? 0f;
+        float plinthRadius = rim?.plinthRadius ?? 0f;
+        float plinthHeight = rim?.plinthHeight ?? 0.01f;
         var   toppings = new List<(int side, LevelSelectDesignerData.RimNodeTopping topping)>();
         if (rim != null)
         {
@@ -97,6 +105,25 @@ public partial class LevelSelectDesignerWindow
                 RiverMeshBuilder.RimNodeMaxRadius(profile));
             height = Mathf.Max(RiverMeshBuilder.RimNodeMinHeight, EditorGUILayout.FloatField(
                 new GUIContent("Height", "How far its top stands above the rim."), height));
+            width = EditorGUILayout.Slider(
+                new GUIContent("Width", "How far apart its two circles stand, across the rim — " +
+                                        "one pushed out past the run's outer edge, one in " +
+                                        "towards the river. Zero is one plain circle. Nothing " +
+                                        "holds it back: wide enough and the river-side circle " +
+                                        "stands out in the water."),
+                width, 0f, RiverMeshBuilder.RimNodeMaxWidth(profile));
+
+            plinthRadius = EditorGUILayout.Slider(
+                new GUIContent("Plinth Radius", "An extra round plinth standing on the top, " +
+                                                "centred on the river-side circle — what stands " +
+                                                "on the rim node stands on it. Zero for none."),
+                plinthRadius, 0f, radius);
+            if (plinthRadius > RiverMeshBuilder.RimNodePlinthMinRadius)
+                plinthHeight = Mathf.Max(RiverMeshBuilder.RimNodeMinHeight,
+                    EditorGUILayout.FloatField(
+                        new GUIContent("Plinth Height",
+                                       "How far the plinth's top stands above the platform's."),
+                        plinthHeight));
 
             if (rim.side == LevelSelectDesignerData.RimNodeSide.Both)
             {
@@ -130,14 +157,19 @@ public partial class LevelSelectDesignerWindow
                                          RiverMeshBuilder.RimNodeMaxRadius(profile)),
                     height = height,
                 };
+                width        = 0f;
+                plinthRadius = 0f;
                 _data.rimNodes.Add(rim);
             }
             // Written back against the side they were drawn for, before the side can change.
             foreach (var (side, topping) in toppings) rim.SetToppingOn(side, topping);
 
-            rim.side   = (LevelSelectDesignerData.RimNodeSide)(picked - 1);
-            rim.radius = radius;
-            rim.height = height;
+            rim.side         = (LevelSelectDesignerData.RimNodeSide)(picked - 1);
+            rim.radius       = radius;
+            rim.height       = height;
+            rim.width        = width;
+            rim.plinthRadius = Mathf.Min(plinthRadius, radius);
+            rim.plinthHeight = plinthHeight;
         }
 
         MarkDirty();
@@ -149,7 +181,10 @@ public partial class LevelSelectDesignerWindow
     // CANVAS
     // ─────────────────────────────────────────────
 
-    /// <summary>Each rim node as a solid disc where it stands on the rim.</summary>
+    /// <summary>
+    /// Each rim node where it stands on the rim: its two circles and the straight sides joining
+    /// them — one circle when it has no width — with its plinth marked on the river-side one.
+    /// </summary>
     private void DrawRimNodes()
     {
         if (Event.current.type != EventType.Repaint || _data.rimNodes == null) return;
@@ -173,14 +208,70 @@ public partial class LevelSelectDesignerWindow
             float   radius = Mathf.Clamp(rim.radius, RiverMeshBuilder.RimNodeMinRadius(profile),
                                          RiverMeshBuilder.RimNodeMaxRadius(profile));
 
+            float   halfWidth = Mathf.Max(rim.width, 0f) * 0.5f;
+            float   plinth    = Mathf.Min(Mathf.Max(rim.plinthRadius, 0f), radius);
+            float   drawn     = Mathf.Max(2f, radius * _zoom);
+            Vector3 along     = Vector3.Cross(Vector3.up, right);
+
             bool selected = rim.nodeId == _selectedNodeId;
-            Handles.color = selected ? new Color(1f, 1f, 1f, 0.85f)
+            var  shade    = selected ? new Color(1f, 1f, 1f, 0.85f)
                                      : new Color(0.85f, 0.75f, 0.55f, 0.8f);
 
             foreach (int side in RimSides(rim.side))
-                Handles.DrawSolidDisc(WorldToCanvas(here + right * (side * across)),
-                                      Vector3.forward, Mathf.Max(2f, radius * _zoom));
+            {
+                Vector3 axis   = right * side;
+                Vector3 centre = here + axis * across;
+                Vector3 near   = centre - axis * halfWidth;   // the circle towards the river
+                Vector3 far    = centre + axis * halfWidth;
+
+                Handles.color = shade;
+                Handles.DrawSolidDisc(WorldToCanvas(near), Vector3.forward, drawn);
+                Handles.DrawSolidDisc(WorldToCanvas(far),  Vector3.forward, drawn);
+
+                // The straight sides joining them, filled in as the platform really is.
+                if (halfWidth > 0f)
+                {
+                    Vector3 out3 = along * radius;
+                    Handles.DrawAAConvexPolygon(
+                        (Vector3)WorldToCanvas(near + out3), (Vector3)WorldToCanvas(far + out3),
+                        (Vector3)WorldToCanvas(far - out3),  (Vector3)WorldToCanvas(near - out3));
+                }
+
+                // The plinth, on the river-side circle — where whatever stands on it stands.
+                if (plinth > RiverMeshBuilder.RimNodePlinthMinRadius)
+                {
+                    Handles.color = new Color(0.25f, 0.22f, 0.18f, 0.9f);
+                    Handles.DrawSolidDisc(WorldToCanvas(near), Vector3.forward,
+                                          Mathf.Max(1.5f, plinth * _zoom));
+                }
+
+                // How near the boat has to come, while this node is the one being edited —
+                // the same circle the point itself draws in the scene, seen from above.
+                if (selected) DrawInteractReach(rim.ToppingOn(side), near);
+            }
         }
+    }
+
+    /// <summary>
+    /// The reach of whatever stands on a platform, as a ring around it on the canvas — drawn
+    /// where the topper stands, on the river-side circle, and only while its node is selected.
+    /// </summary>
+    private void DrawInteractReach(LevelSelectDesignerData.RimNodeTopping topping, Vector3 at)
+    {
+        if (topping == null || topping.topper != LevelSelectDesignerData.RimNodeTopper.VertDisplayPoint)
+            return;
+
+        var interact = topping.interact;
+        if (interact == null || !interact.enabled || interact.radius <= 0f) return;
+
+        Vector3 centre = WorldToCanvas(at);
+        float   reach  = interact.radius * _zoom;
+
+        Handles.color = new Color(1f, 0.85f, 0.3f, 0.12f);
+        Handles.DrawSolidDisc(centre, Vector3.forward, reach);
+
+        Handles.color = new Color(1f, 0.85f, 0.3f, 0.9f);
+        Handles.DrawWireDisc(centre, Vector3.forward, reach);
     }
 
     private static IEnumerable<int> RimSides(LevelSelectDesignerData.RimNodeSide side)
@@ -227,10 +318,13 @@ public partial class LevelSelectDesignerWindow
             {
                 rims.Add(new RiverMeshBuilder.RimNode
                 {
-                    at     = node.position,
-                    side   = side,
-                    radius = rim.radius,
-                    height = rim.height,
+                    at           = node.position,
+                    side         = side,
+                    radius       = rim.radius,
+                    height       = rim.height,
+                    width        = rim.width,
+                    plinthRadius = rim.plinthRadius,
+                    plinthHeight = rim.plinthHeight,
                 });
                 sources?.Add(rim);
             }
@@ -311,7 +405,7 @@ public partial class LevelSelectDesignerWindow
         var edited = rim.ToppingOn(side);
 
         edited.topper = (LevelSelectDesignerData.RimNodeTopper)EditorGUILayout.Popup(
-            new GUIContent(label, "What stands in the middle of this platform's top."),
+            new GUIContent(label, "What stands on this platform, on its plinth when it has one."),
             (int)edited.topper, RimNodeTopperLabels);
 
         EditorGUI.indentLevel++;
@@ -332,6 +426,7 @@ public partial class LevelSelectDesignerWindow
             edited.displayHeight = Mathf.Max(0.001f, EditorGUILayout.FloatField(
                 new GUIContent("Display Height", "How tall it stands, from the node floor to " +
                                                  "the top marker on its prefab."), edited.displayHeight));
+            edited.interact = DrawInteractBlock(edited.interact);
         }
         EditorGUI.indentLevel--;
 
@@ -387,9 +482,13 @@ public partial class LevelSelectDesignerWindow
                 }
 
                 case LevelSelectDesignerData.RimNodeTopper.VertDisplayPoint:
-                    PlaceOffAligner(VertDisplayPointPrefabPath, container.transform,
-                                    $"VertDisplayPoint_{label}", at, toRiver, topping.displayHeight);
+                {
+                    var display = PlaceOffAligner(VertDisplayPointPrefabPath, container.transform,
+                                                  $"VertDisplayPoint_{label}", at, toRiver,
+                                                  topping.displayHeight);
+                    ApplyInteract(display, topping.interact);
                     break;
+                }
             }
         }
     }
@@ -399,14 +498,14 @@ public partial class LevelSelectDesignerWindow
     /// forward override faces <paramref name="face"/>, scaled so the aligner's top marker stands
     /// <paramref name="height"/> above the disc — or at the prefab's own size when it has none.
     /// </summary>
-    private static void PlaceOffAligner(string prefabPath, Transform parent, string name,
-                                        Vector3 at, Vector3 face, float height)
+    private static GameObject PlaceOffAligner(string prefabPath, Transform parent, string name,
+                                              Vector3 at, Vector3 face, float height)
     {
         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
         if (prefab == null)
         {
             Debug.LogWarning($"[LevelSelectDesigner] No prefab at {prefabPath} — nothing placed for {name}.");
-            return;
+            return null;
         }
 
         // What the prefab's aligner says, in the prefab root's own frame.
@@ -444,6 +543,8 @@ public partial class LevelSelectDesignerWindow
         go.transform.localScale = root.localScale * scale;
         go.transform.rotation   = rot;
         go.transform.position   = at - rot * (contact * scale);
+
+        return go;
     }
 
     /// <summary>

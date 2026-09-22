@@ -13,23 +13,32 @@ MonoBehaviour:
   m_Name: LevelSelectStructurePreset
   m_EditorClassIdentifier: Assembly-CSharp::LevelSelectRiverStructurePreset
   runShading:
-    outerColour: {r: 0.103773594, g: 0.103773594, b: 0.103773594, a: 1}
-    outerGrainSize: 0.09
+    outerColour: {r: 0.05660379, g: 0.05660379, b: 0.05660379, a: 1}
+    outerGrainSize: 0.36
     outerGrainStrength: 0.241
-    rimColour: {r: 0.2924528, g: 0.2924528, b: 0.2924528, a: 1}
-    rimGrainSize: 0.17
+    rimColour: {r: 0.33962262, g: 0.33962262, b: 0.33962262, a: 1}
+    rimGrainSize: 0.59
     rimGrainStrength: 0.241
     innerColour: {r: 0.7735849, g: 0.7735849, b: 0.7735849, a: 1}
     innerGrainSize: 0.09
-    innerGrainStrength: 0.241
-    seamColour: {r: 0.03773582, g: 0.03773582, b: 0.03773582, a: 1}
-    seamStrength: 0.97
-    seamExtentPercent: 14.4
+    innerGrainStrength: 0.103
+    seamColour: {r: 0, g: 0, b: 0, a: 1}
+    seamStrength: 0.77
+    seamExtentPercent: 12.7
     waterlineColour: {r: 1, g: 1, b: 1, a: 1}
     waterlineStrength: 1.1
     waterlineExtent: 0.06
-    lightPosition: {x: 362.3, y: 259.8, z: -3.2}
-    lightStrength: 1
+    decalSheet: {fileID: 2800000, guid: d4684965c7f28464c81e40a4fad0cd3d, type: 2}
+    decalSheetColumns: 2
+    decalSheetRows: 2
+    decalSheetHeld: 3
+    decalSheetCellPixels: 256
+    decalAmount: 1
+    decalOpacity: 0.463
+    decalSpacing: 2.51
+    decalScaleMin: 1.11
+    decalScaleMax: 6.14
+    lightStrength: 0.93
     outpostOutsideWalls: 0
     outpostWallTop: 3
     outpostInsideWalls: 0

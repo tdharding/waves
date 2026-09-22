@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.Serialization;
 
 /// <summary>
@@ -41,17 +41,21 @@ public enum RiverRippleDebugView
 [System.Serializable]
 public class RiverEdgeRippleSettings
 {
-    [Header("Lines — rivers and pools")]
+    [Header("Lines")]
 
-    [Tooltip("How white a line gets at its brightest. 0 turns the effect off entirely and gives " +
-             "the water back exactly as it was. Above 1 is real overbright, for bloom to find.")]
+    [Tooltip("How white a line gets at its brightest, on rivers and pools alike — the one thing " +
+             "about a line the two waters still share, so they cannot drift apart in brightness. " +
+             "0 turns the effect off entirely and gives the water back exactly as it was. Above " +
+             "1 is real overbright, for bloom to find.")]
     [Min(0f)] public float strength = 0.6f;
 
-    [Tooltip("How much of its cycle a line fills. The line is a window rather than a sine, so " +
-             "widening one lights more of the cycle without also brightening it.")]
+    [Tooltip("How much of its cycle a RIVER line fills. The line is a window rather than a sine, " +
+             "so widening one lights more of the cycle without also brightening it. A pool's " +
+             "rings have their own, below.")]
     [Range(0.01f, 0.98f)] public float width = 0.35f;
 
-    [Tooltip("0 gives a hard-edged line; 1 has it fall away from its middle.")]
+    [Tooltip("0 gives a hard-edged RIVER line; 1 has it fall away from its middle. A pool's " +
+             "rings have their own, below.")]
     [Range(0f, 1f)] public float softness = 0.6f;
 
     [Header("Rivers")]
@@ -88,6 +92,25 @@ public class RiverEdgeRippleSettings
              "lines and follows a channel round its bends. Off pins it to the world instead.")]
     public bool driftAlongLines = true;
 
+    [Header("Rivers — second distortion")]
+
+    [Tooltip("A SECOND wander, laid over everything above: the lines are already spaced, already " +
+             "pushed about by the first noise, and this pushes what is left of them again. Its " +
+             "own field, offset from the first, so the two never line up and repeat. In " +
+             "line-widths, like the first. 0 leaves the water exactly as the sliders above " +
+             "left it.")]
+    public float secondDistortStrength = 0f;
+
+    [Tooltip("How fine the second wander's noise is. Set it well away from the first Distort " +
+             "Scale — much coarser for a slow drift under the first, much finer for a chop on " +
+             "top of it.")]
+    public float secondDistortScale = 6f;
+
+    [Tooltip("How fast the second wander travels down a river's channel, in metres per second. " +
+             "Negative runs it upstream — against the first, the two beat against each other " +
+             "instead of travelling together.")]
+    public float secondDistortionSpeed = 0f;
+
     [Tooltip("Where a branch's water runs back over the river it leaves, its lines take on that " +
              "river's Reach (and Bevel) — held along its banks, gone from its middle — easing over " +
              "across this many metres past that river's waterline. Needs Rebuild Runs once. 0 " +
@@ -102,6 +125,15 @@ public class RiverEdgeRippleSettings
 
     [Tooltip("Metres between one pool ring and the next.")]
     [Min(0.001f)] public float poolSpacing = 0.09f;
+
+    [Tooltip("How much of its cycle a pool RING fills — the rings' own, separate from the river " +
+             "lines' Width, so a pool can carry fatter or thinner lines than the rivers running " +
+             "out of it.")]
+    [Range(0.01f, 0.98f)] public float poolWidth = 0.35f;
+
+    [Tooltip("0 gives a hard-edged ring; 1 has it fall away from its middle. The rings' own, " +
+             "separate from the river lines' Softness.")]
+    [Range(0f, 1f)] public float poolSoftness = 0.6f;
 
     [Tooltip("How far in from the pool's waterline (and its island's) the rings carry, in " +
              "metres. Past this there are none. Set it past the pool's radius to fill the pool.")]
@@ -122,6 +154,23 @@ public class RiverEdgeRippleSettings
     [Tooltip("How fast a pool's distortion spins round the pool's centre, in turns per second, " +
              "while the rings themselves stand still. Negative spins it the other way.")]
     public float poolDistortionSpeed = 0.02f;
+
+    [Tooltip("A SECOND wander on the rings, laid over the one above: the rings are already " +
+             "spaced and already pushed about, and this pushes what is left of them again. Its " +
+             "own field, offset from the first, so the two never line up and repeat. In " +
+             "ring-widths, like the first. 0 leaves the pools exactly as the sliders above " +
+             "left them.")]
+    public float poolSecondDistortStrength = 0f;
+
+    [Tooltip("How fine the second wander's noise is, in world space. Set it well away from Pool " +
+             "Distort Scale — much coarser for a slow drift under the first, much finer for a " +
+             "chop on top of it.")]
+    public float poolSecondDistortScale = 6f;
+
+    [Tooltip("How fast the second wander spins round the pool's centre, in turns per second. " +
+             "Negative spins it the other way — against the first, the two beat against each " +
+             "other instead of turning together.")]
+    public float poolSecondDistortionSpeed = 0f;
 
     [Tooltip("Where a pool's water runs out down a river, its rings take on that river's Reach " +
              "(and Bevel) — held along the banks, gone from the middle — easing over across this " +
@@ -195,6 +244,9 @@ public class RiverEdgeRippleSettings
     private static readonly int DistortScaleId        = Shader.PropertyToID("_RiverEdgeRippleDistortScale");
     private static readonly int DistortSpeedId        = Shader.PropertyToID("_RiverEdgeRippleDistortSpeed");
     private static readonly int FlowSpaceId           = Shader.PropertyToID("_RiverEdgeRippleFlowSpace");
+    private static readonly int SecondDistortStrengthId = Shader.PropertyToID("_RiverEdgeRippleSecondDistortStrength");
+    private static readonly int SecondDistortScaleId    = Shader.PropertyToID("_RiverEdgeRippleSecondDistortScale");
+    private static readonly int SecondDistortSpeedId    = Shader.PropertyToID("_RiverEdgeRippleSecondDistortSpeed");
     private static readonly int BranchMouthFadeId     = Shader.PropertyToID("_RiverEdgeRippleBranchMouthFade");
     private static readonly int BranchMouthInsetId    = Shader.PropertyToID("_RiverEdgeRippleBranchMouthInset");
     private static readonly int PoolSpacingId         = Shader.PropertyToID("_RiverEdgeRipplePoolSpacing");
@@ -203,6 +255,11 @@ public class RiverEdgeRippleSettings
     private static readonly int PoolDistortStrengthId = Shader.PropertyToID("_RiverEdgeRipplePoolDistortStrength");
     private static readonly int PoolDistortScaleId    = Shader.PropertyToID("_RiverEdgeRipplePoolDistortScale");
     private static readonly int PoolDistortSpeedId    = Shader.PropertyToID("_RiverEdgeRipplePoolDistortSpeed");
+    private static readonly int PoolWidthId           = Shader.PropertyToID("_RiverEdgeRipplePoolWidth");
+    private static readonly int PoolSoftnessId        = Shader.PropertyToID("_RiverEdgeRipplePoolSoftness");
+    private static readonly int PoolSecondDistortStrengthId = Shader.PropertyToID("_RiverEdgeRipplePoolSecondDistortStrength");
+    private static readonly int PoolSecondDistortScaleId    = Shader.PropertyToID("_RiverEdgeRipplePoolSecondDistortScale");
+    private static readonly int PoolSecondDistortSpeedId    = Shader.PropertyToID("_RiverEdgeRipplePoolSecondDistortSpeed");
     private static readonly int PoolMouthFadeId       = Shader.PropertyToID("_RiverEdgeRipplePoolMouthFade");
     private static readonly int PoolMouthReachOverlapId = Shader.PropertyToID("_RiverEdgeRipplePoolMouthReachOverlap");
     private static readonly int PoolMouthExtentId     = Shader.PropertyToID("_RiverEdgeRipplePoolMouthExtent");
@@ -258,6 +315,10 @@ public class RiverEdgeRippleSettings
         // The switch goes over as 1 and 0. There is no bool global to set, and a float is what
         // the shader compares against a half anyway.
         Shader.SetGlobalFloat(FlowSpaceId,           driftAlongLines ? 1f : 0f);
+
+        Shader.SetGlobalFloat(SecondDistortStrengthId, secondDistortStrength);
+        Shader.SetGlobalFloat(SecondDistortScaleId,    secondDistortScale);
+        Shader.SetGlobalFloat(SecondDistortSpeedId,    secondDistortionSpeed);
         Shader.SetGlobalFloat(BranchMouthFadeId,     branchMouthFade);
         Shader.SetGlobalFloat(BranchMouthInsetId,    branchMouthInset);
 
@@ -267,6 +328,11 @@ public class RiverEdgeRippleSettings
         Shader.SetGlobalFloat(PoolDistortStrengthId, poolDistortStrength);
         Shader.SetGlobalFloat(PoolDistortScaleId,    poolDistortScale);
         Shader.SetGlobalFloat(PoolDistortSpeedId,    poolDistortionSpeed);
+        Shader.SetGlobalFloat(PoolWidthId,           poolWidth);
+        Shader.SetGlobalFloat(PoolSoftnessId,        poolSoftness);
+        Shader.SetGlobalFloat(PoolSecondDistortStrengthId, poolSecondDistortStrength);
+        Shader.SetGlobalFloat(PoolSecondDistortScaleId,    poolSecondDistortScale);
+        Shader.SetGlobalFloat(PoolSecondDistortSpeedId,    poolSecondDistortionSpeed);
         Shader.SetGlobalFloat(PoolMouthFadeId,       poolMouthFade);
         Shader.SetGlobalFloat(PoolMouthReachOverlapId, poolMouthReachOverlap);
         Shader.SetGlobalFloat(PoolMouthExtentId,     poolMouthExtent);
@@ -296,6 +362,10 @@ public class RiverEdgeRippleSettings
         distortScale    = other.distortScale;
         distortionSpeed = other.distortionSpeed;
         driftAlongLines = other.driftAlongLines;
+
+        secondDistortStrength = other.secondDistortStrength;
+        secondDistortScale    = other.secondDistortScale;
+        secondDistortionSpeed = other.secondDistortionSpeed;
         branchMouthFade  = other.branchMouthFade;
         branchMouthInset = other.branchMouthInset;
 
@@ -305,6 +375,11 @@ public class RiverEdgeRippleSettings
         poolDistortStrength = other.poolDistortStrength;
         poolDistortScale    = other.poolDistortScale;
         poolDistortionSpeed = other.poolDistortionSpeed;
+        poolWidth           = other.poolWidth;
+        poolSoftness        = other.poolSoftness;
+        poolSecondDistortStrength = other.poolSecondDistortStrength;
+        poolSecondDistortScale    = other.poolSecondDistortScale;
+        poolSecondDistortionSpeed = other.poolSecondDistortionSpeed;
         poolMouthFade       = other.poolMouthFade;
         poolMouthReachOverlap = other.poolMouthReachOverlap;
         poolMouthExtent     = other.poolMouthExtent;

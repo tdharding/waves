@@ -154,6 +154,17 @@ public class LevelSelectDesignerData : ScriptableObject
         [Tooltip("This arena's own archway shape, used when Override Archway is on.")]
         public ArenaArchwayProfile archwayProfile = new ArenaArchwayProfile();
 
+        [Tooltip("Tick to give this arena's doors their own shape. Left off, they take the " +
+                 "default in Procedural Generation.")]
+        public bool overrideDoor;
+
+        [Tooltip("This arena's own door shape, used when Override Door is on.")]
+        public ArenaDoorProfile doorProfile = new ArenaDoorProfile();
+
+        [Tooltip("The door preset last loaded onto this arena or saved from it. Its settings " +
+                 "are copied, not shared, so editing them here does not touch the preset.")]
+        public ArenaDoorPreset doorPreset;
+
         [Tooltip("This arena's own wall shape, used when Override Wall is on. Its radius is the " +
                  "arena boundary, and is what the ring display and entrance nodes follow.")]
         public ArenaWallProfile wallProfile = new ArenaWallProfile();
@@ -336,6 +347,32 @@ public class LevelSelectDesignerData : ScriptableObject
         public OutpostObserver Clone() => (OutpostObserver)MemberwiseClone();
     }
 
+    /// <summary>
+    /// What happens when the boat stands near something the designer places and the player
+    /// presses the interact key: a prompt comes up, and pressing it shows a poster.
+    ///
+    /// Held apart from the thing it is on, so a rim node display, an outpost's characters and
+    /// whatever comes later all carry the same block and read the same way in the panel.
+    /// </summary>
+    [Serializable]
+    public class DesignerInteract
+    {
+        [Tooltip("Whether this one can be interacted with at all.")]
+        public bool enabled = false;
+
+        [Tooltip("What the prompt reads. The key is added by the prompt itself, so this is " +
+                 "just the doing — \"Look at the poster\".")]
+        public string prompt = "Look";
+
+        [Tooltip("How near the boat has to be, measured flat across the water.")]
+        [Min(0f)] public float radius = 3f;
+
+        [Tooltip("Which poster in the map's poster library it shows, by name.")]
+        public string posterName;
+
+        public DesignerInteract Clone() => (DesignerInteract)MemberwiseClone();
+    }
+
     public enum RimNodeSide { Left, Right, Both }
 
     /// <summary>
@@ -343,6 +380,10 @@ public class LevelSelectDesignerData : ScriptableObject
     /// centred on the middle of the rim, bulging out past the outer edge and into the channel,
     /// its top a little above the rim and its wall running down to the drop. One side of the
     /// river or both, the same size either side.
+    ///
+    /// A width pushes its circle apart into two across the rim, joined by straight sides, and an
+    /// optional plinth is a smaller platform on top of that, on the river-side circle — the spot
+    /// whatever stands on it stands on.
     /// </summary>
     [Serializable]
     public class DesignerRimNode
@@ -359,7 +400,20 @@ public class LevelSelectDesignerData : ScriptableObject
         [Tooltip("How far its top stands above the rim.")]
         public float height = 0.01f;
 
-        [Tooltip("What stands on top of it, in the middle — on each side when it is on both.")]
+        [Tooltip("How far apart the platform's two circles stand, across the rim — one pushed " +
+                 "out past the run's outer edge, one in towards the river. Zero is one plain " +
+                 "circle, as it always was.")]
+        [Min(0f)] public float width = 0f;
+
+        [Tooltip("An extra round plinth standing on the platform's top, centred on the " +
+                 "river-side circle. Zero for none.")]
+        [Min(0f)] public float plinthRadius = 0f;
+
+        [Tooltip("How far the plinth's top stands above the platform's top.")]
+        [Min(0f)] public float plinthHeight = 0.01f;
+
+        [Tooltip("What stands on top of it, on the river-side circle — on each side when it is " +
+                 "on both.")]
         public RimNodeTopper topper = RimNodeTopper.None;
 
         [Tooltip("The lollipop tower standing on it, when Topper is Lollipop Tower.")]
@@ -372,6 +426,10 @@ public class LevelSelectDesignerData : ScriptableObject
         [Tooltip("How tall the vert display point stands, from the node floor to the top marker " +
                  "on its prefab, when Topper is Vert Display Point.")]
         [Min(0.001f)] public float displayHeight = 0.15f;
+
+        [Tooltip("What the display point does when the boat comes near it, when Topper is " +
+                 "Vert Display Point.")]
+        public DesignerInteract interact = new DesignerInteract();
 
         [Tooltip("What stands on the Left platform when Side is Both. The Topper, Tower and " +
                  "Display Height fields above are then the Right platform's.")]
@@ -392,6 +450,7 @@ public class LevelSelectDesignerData : ScriptableObject
                 tower         = tower?.Clone(),
                 towerPreset   = towerPreset,
                 displayHeight = displayHeight,
+                interact      = interact?.Clone(),
             };
         }
 
@@ -407,6 +466,7 @@ public class LevelSelectDesignerData : ScriptableObject
             tower         = topping.tower?.Clone();
             towerPreset   = topping.towerPreset;
             displayHeight = topping.displayHeight;
+            interact      = topping.interact?.Clone();
         }
     }
 
@@ -417,7 +477,7 @@ public class LevelSelectDesignerData : ScriptableObject
     [Serializable]
     public class RimNodeTopping
     {
-        [Tooltip("What stands in the middle of the platform's top.")]
+        [Tooltip("What stands on the platform, on the plinth when it has one.")]
         public RimNodeTopper topper = RimNodeTopper.None;
 
         [Tooltip("The lollipop tower standing on it, when Topper is Lollipop Tower.")]
@@ -431,10 +491,14 @@ public class LevelSelectDesignerData : ScriptableObject
                  "on its prefab, when Topper is Vert Display Point.")]
         [Min(0.001f)] public float displayHeight = 0.15f;
 
+        [Tooltip("What it does when the boat comes near it.")]
+        public DesignerInteract interact = new DesignerInteract();
+
         public RimNodeTopping Clone()
         {
             var copy = (RimNodeTopping)MemberwiseClone();
-            copy.tower = tower?.Clone();
+            copy.tower    = tower?.Clone();
+            copy.interact = interact?.Clone();
             return copy;
         }
     }
@@ -526,6 +590,15 @@ public class LevelSelectDesignerData : ScriptableObject
              "material when left empty.")]
     public Material           arenaDoorMaterial;
 
+    [Tooltip("The material every arena's numeral is shown on. Each numeral gets its own variant " +
+             "of it carrying that drawing, so this one holds the look and nothing else. Left " +
+             "empty, the discs are left blank.")]
+    public Material           arenaNumeralMaterial;
+
+    [Tooltip("Every poster the map's display points can show. One asset, so art is swapped " +
+             "or added there rather than on each display in turn.")]
+    public LevelSelectPosterLibrary posterLibrary;
+
     [Tooltip("Water is generated as permanent mesh sitting in every river channel. Untick to " +
              "go back to the SplineExtrude water that unfolds ahead of the boat.")]
     public bool               waterFilled = true;
@@ -580,6 +653,13 @@ public class LevelSelectDesignerData : ScriptableObject
 
     [Tooltip("Shape every entrance archway takes unless its arena overrides it.")]
     public ArenaArchwayProfile defaultArchway     = new ArenaArchwayProfile();
+
+    [Tooltip("Shape every archway's door takes unless its arena overrides it.")]
+    public ArenaDoorProfile    defaultDoor        = new ArenaDoorProfile();
+
+    [Tooltip("The door preset last loaded onto the default shape or saved from it. Its settings " +
+             "are copied, not shared, so editing them here does not touch the preset.")]
+    public ArenaDoorPreset     defaultDoorPreset;
 
     [Tooltip("Where every entrance prefab stands inside its archway, unless that entrance " +
              "overrides it. Measured in the archway's own frame.")]
@@ -1123,6 +1203,19 @@ public float canvasOriginX      = 0f;
     {
         if (arena == null) return defaultArchway;
         return (arena.overrideArchway ? arena.archwayProfile : defaultArchway) ?? defaultArchway;
+    }
+
+    /// <summary>
+    /// Door shape for an arena, falling back to the default when it does not override it.
+    ///
+    /// Still unresolved — the height and base width it inherits from the arch it stands in are
+    /// settled by <see cref="ArenaDoorProfile.Resolve"/> at the point of building, where the
+    /// arch at that particular entrance is known.
+    /// </summary>
+    public ArenaDoorProfile DoorFor(DesignerArena arena)
+    {
+        if (arena == null) return defaultDoor;
+        return (arena.overrideDoor ? arena.doorProfile : defaultDoor) ?? defaultDoor;
     }
 
     /// <summary>

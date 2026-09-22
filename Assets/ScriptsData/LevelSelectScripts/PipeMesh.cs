@@ -177,6 +177,68 @@ public class PipeMesh : MonoBehaviour
         return RiverMeshBuilder.ShadeAsStone(mesh, 0f, 0f, null, parts);
     }
 
+    /// <summary>
+    /// One straight piece of a pipe's collision: a capsule of this radius running from
+    /// <see cref="from"/> to <see cref="to"/>, in the same frame the mesh is built in.
+    /// </summary>
+    public struct Rod
+    {
+        public Vector3 from;
+        public Vector3 to;
+        public float   radius;
+    }
+
+    /// <summary>
+    /// The pipe as a handful of capsules rather than its mesh: one down each leg, one down
+    /// each support stem. Takes the same arguments <see cref="Build"/> does, so a pipe and
+    /// its collision always come out of the same numbers.
+    ///
+    /// The legs are taken straight from the nodes, not from the rounded centre line, so a
+    /// bend is covered by the two capsules meeting at the node rather than cut into pieces.
+    /// It reaches a little past the outside of a sharp bend, which is what wanting few
+    /// capsules costs.
+    /// </summary>
+    public static List<Rod> CollisionRods(IList<Vector3> nodes, IList<Support> supports,
+                                          float pipeThickness, float supportThickness,
+                                          float bottomY)
+    {
+        var rods = new List<Rod>();
+        if (nodes == null || nodes.Count < 2) return rods;
+
+        float outer = Mathf.Max(0.005f, pipeThickness * 0.5f);
+        float stemR = Mathf.Max(0.0025f, supportThickness * 0.5f);
+
+        for (int i = 0; i < nodes.Count - 1; i++)
+        {
+            if ((nodes[i + 1] - nodes[i]).sqrMagnitude < 1e-8f) continue;
+            rods.Add(new Rod { from = nodes[i], to = nodes[i + 1], radius = outer });
+        }
+
+        if (supports == null) return rods;
+
+        var line = CentreLine(nodes, outer * 2f);
+        if (line.Count < 2) return rods;
+
+        foreach (var support in supports)
+        {
+            SupportOnLine(nodes, line, support, out Vector3 at, out Vector3 along);
+
+            // The same reach up to the pipe's underside the stem itself is built with.
+            float level = Mathf.Max(0.2f, new Vector2(along.x, along.z).magnitude);
+            float top   = at.y - outer / level;
+            if (top <= bottomY) continue;
+
+            rods.Add(new Rod
+            {
+                from   = new Vector3(at.x, bottomY, at.z),
+                to     = new Vector3(at.x, top,     at.z),
+                radius = stemR,
+            });
+        }
+
+        return rods;
+    }
+
     // ── The pipe: an outside, an inside, and a flat ring closing each open end ──
     static void AppendTube(List<Vector3> verts, List<Vector3> norms, List<int> tris,
                            List<Vector3> line, float outer, float inner)

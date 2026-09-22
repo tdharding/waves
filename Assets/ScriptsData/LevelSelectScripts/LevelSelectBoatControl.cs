@@ -66,6 +66,8 @@ public class LevelSelectBoatControl : MonoBehaviour
     private bool  _hasSurface;
 
     private bool _anchored;
+    private bool _keyLocked;
+    private bool _lookLocked;
 
     private int  _waterMask;
     private bool _waterMaskFound;
@@ -100,6 +102,43 @@ public class LevelSelectBoatControl : MonoBehaviour
     /// about the boat rather than following along behind it.
     /// </summary>
     public bool HeldByPlayer => _anchored && !IntroMode && !ControlsFrozen;
+
+    /// <summary>
+    /// Whether the camera may be turned about the boat. Anchoring to look around offers it;
+    /// standing at a display point takes it away again, so while a poster is up the boat is
+    /// still and the view is still with it — one shot, held, rather than a scene you can swing
+    /// the camera around behind.
+    /// </summary>
+    public bool CanLookAround => HeldByPlayer && !_lookLocked;
+
+    /// <summary>True while the boat is being held still, whoever asked for it.</summary>
+    public bool IsAnchored => _anchored;
+
+    /// <summary>
+    /// Drops or lifts the anchor from something other than the key — an interact point holding
+    /// the boat still while a poster is up, say. The mode is the same one the key sets, so the
+    /// camera behaves the same way either way.
+    /// </summary>
+    public void SetAnchored(bool anchored) => _anchored = anchored;
+
+    /// <summary>
+    /// Withholds the key while something else owns the anchor — the boat cannot be sailed out
+    /// from under whatever is on screen. What set the anchor can still lift it; only the
+    /// player's key is held back.
+    /// </summary>
+    public void SetKeyLocked(bool locked) => _keyLocked = locked;
+
+    /// <summary>True while something else owns the anchor and the player's key is held back.</summary>
+    public bool KeyLocked => _keyLocked;
+
+    /// <summary>
+    /// Holds the view where it is as well as the boat — what a display point asks for, so the
+    /// mouse is not off turning the camera while what it opened is on screen.
+    /// </summary>
+    public void SetLookLocked(bool locked) => _lookLocked = locked;
+
+    /// <summary>True while the camera is being held facing as well as the boat held still.</summary>
+    public bool LookLocked => _lookLocked;
 
     public Transform BoatTransform => _boatTransform;
     public Transform MeshTransform => _meshTransform;
@@ -171,11 +210,12 @@ public class LevelSelectBoatControl : MonoBehaviour
         // Polled here rather than in the step: a press lasts one frame, and a fixed step
         // either misses it or sees it twice. A paused game still runs this, so the key is
         // only read while the map is actually being played.
-        if (!PauseManager.IsPaused && Input.GetKeyDown(anchorKey)) _anchored = !_anchored;
+        if (!PauseManager.IsPaused && !_keyLocked && Input.GetKeyDown(anchorKey))
+            _anchored = !_anchored;
 
         // The intro and the menus take the boat away entirely, so an anchor cannot be left
         // set behind them and found still on when they hand it back.
-        if (IntroMode || ControlsFrozen) _anchored = false;
+        if (IntroMode || ControlsFrozen) { _anchored = false; _keyLocked = false; _lookLocked = false; }
     }
 
     private void FixedUpdate()

@@ -53,6 +53,12 @@ public static partial class RiverMeshBuilder
     // very bottom of a finely cut channel are not mistaken for it.
     private const float LevelFace = 0.9999f;
 
+    // How much nearer a seam has to be before it beats another one outright. Two seams meeting
+    // at a corner are both at nothing from it and the arithmetic that placed them took different
+    // routes, so they answer a hair apart; inside this they count as level and the face is free
+    // to keep whichever of them it has the better use for.
+    private const float SeamTie = 1e-5f;
+
     // Stands in for "this side of the face is not a seam" in the shading data. Far enough out
     // that no authored extent reaches it, and a plain number rather than infinity so it
     // interpolates across a face like any other distance — the same trick NoEdge plays on the
@@ -536,7 +542,7 @@ public static partial class RiverMeshBuilder
 
         // Resolved exactly as the rim nodes' own piece resolves them, so one that was left out
         // has no bank round it either. Quiet, because the piece has already said why.
-        var discs = ResolveRimDiscs(profile, rims, grid, true);
+        var rimShapes = ResolveRimShapes(profile, rims, grid, true);
 
         float topY = 0f;                      // the rim top
         float botY = -profile.riverDepth;     // the deepest the channel is cut
@@ -566,9 +572,9 @@ public static partial class RiverMeshBuilder
                 }
             }
 
-            foreach (var disc in discs)
-                if ((disc.side > 0) == (side == 0))
-                    RimBank(b, grid, disc, x, botY, topY, edge, gaps);
+            foreach (var shape in rimShapes)
+                if ((shape.side > 0) == (side == 0))
+                    RimBank(b, grid, shape, x, botY, topY, edge, gaps);
 
             for (int j = 0; j < grid.Rings - 1; j++)
             {
@@ -3569,16 +3575,26 @@ public static partial class RiverMeshBuilder
                 // tell from the bowl's own faceting — and that edge is exactly the line a pool is
                 // drawn along.
                 //
+                // Level means level WITH THE WORLD, so it is only asked of a piece whose lip
+                // really is flat in the world — a pool, a tower, an outpost. A run's lip rides
+                // its sweep: where the river climbs, the lip climbs with it and tilts off flat
+                // by however steeply it is rising. The rise is never even, so along any run the
+                // tilt wanders back and forth across the threshold, and every crossing put a
+                // line straight across the rim in the middle of a stretch with no corner in it.
+                // A run has no need of the test either — its channel is cut to a width, so it
+                // leaves the lip at a real corner the turn test sees.
+                //
                 // A CHANGE OF PART — the two faces were built as different parts of the piece (a
                 // tower's base, ramp and second base). A steep ramp turns off the tier below by
                 // less than SeamAngle, but the join is still a corner the piece was built with.
                 float cosLimit = Mathf.Cos(SeamAngle * Mathf.Deg2Rad);
+                bool  flatLip  = b._rimLine == null || b._rimLine.Count == 0;
                 Folds          = new Dictionary<long, SideFold>(b._tris.Count);
 
                 for (int t = 0; t < Faces; t++)
                 {
                     Vector3 n     = b._norms[b._tris[t * 3]];
-                    bool    level = n.y > LevelFace;
+                    bool    level = flatLip && n.y > LevelFace;
                     for (int e = 0; e < 3; e++)
                     {
                         long key = SideKey(Id[b._tris[t * 3 + e]],
@@ -3633,13 +3649,18 @@ public static partial class RiverMeshBuilder
         /// corner were answering about that corner from different lists and drawing two
         /// different answers on the one point.
         /// </summary>
-        private static List<SeamEdge> Seams(Topology mesh)
+        /// <param name="seamOf">Which seam runs along a side, for the sides that are seams.
+        /// A face looks its own three sides up in here, so that a fold is always shaded from
+        /// the seam lying along it — see <see cref="SeamShading"/>.</param>
+        private static List<SeamEdge> Seams(Topology mesh, out Dictionary<long, int> seamOf)
         {
             var seam = new List<SeamEdge>(mesh.Folds.Count);
+            seamOf   = new Dictionary<long, int>(mesh.Folds.Count);
             foreach (var pair in mesh.Folds)
             {
                 SideFold fold = pair.Value;
                 if (fold.count > 1 && !fold.sharp) continue;
+                seamOf.Add(pair.Key, seam.Count);
                 seam.Add(new SeamEdge
                 {
                     on1 = mesh.Point[(int)(pair.Key >> 32)],
@@ -3672,7 +3693,9 @@ public static partial class RiverMeshBuilder
             }
         }
 
-        private List<Vector4> SeamShading(Topology mesh, List<SeamEdge> seam, int[] closest)
+        private List<Vector4> SeamShading(Topology mesh, List<SeamEdge> seam,
+                                          Dictionary<long, int> seamOf,
+                                          int[] closest, float[] distance)
         {
             int faces   = mesh.Faces;
             var shading = new List<Vector4>(_verts.Count);
@@ -3683,23 +3706,67 @@ public static partial class RiverMeshBuilder
             float[] offRim = mesh.OffRim;
 
             var keep = new int[3];
+            var own  = new int[3];
 
             for (int t = 0; t < faces; t++)
             {
                 int     ia = _tris[t * 3], ib = _tris[t * 3 + 1], ic = _tris[t * 3 + 2];
                 Vector3 a  = _verts[ia], b = _verts[ib], c = _verts[ic];
 
+                // Which of the face's own three SIDES are seams. A fold has to be shaded from
+                // the seam lying along it, and that is not something the corners can be trusted
+                // to bring on their own — see below.
+                int owned = 0;
+                for (int e = 0; e < 3; e++)
+                {
+                    long side = SideKey(id[_tris[t * 3 + e]],
+                                        id[_tris[t * 3 + (e + 1) % 3]]);
+                    if (seamOf.TryGetValue(side, out int s)) own[owned++] = s;
+                }
+
                 // A face carries the seam nearest each of its own three corners. Three corners,
                 // three slots — and because a corner's own nearest seam is always among them,
                 // no other slot can ever undercut it, which is exactly why the two faces either
                 // side of a fold cannot disagree about the corners they share.
+                //
+                // Where a corner stands on a side of its own face that is a seam, THAT is the
+                // seam it carries. A seam is a stretch between two points, so a line of them
+                // runs end to end and a corner along it lies on two at once — nothing at all
+                // from either, and nothing to choose between them. Left to pick, the two
+                // corners of a side would as readily take the seam butting onto each end as the
+                // one running along between them, and a side shaded from its two neighbours
+                // instead of from itself is measured out from its ends rather than along its
+                // length: the dark runs in from both corners and gives out half a side's length
+                // in, leaving the line broken in the middle of a fold that is dead straight.
+                // Swapping in the side's own seam costs the corner nothing — it is at the same
+                // nothing from it — and hands the face the one seam it certainly has to draw.
                 int n = 0;
                 for (int e = 0; e < 3; e++)
                 {
-                    int k = closest[id[_tris[t * 3 + e]]];
+                    int   point = id[_tris[t * 3 + e]];
+                    int   k     = closest[point];
+                    float near  = distance[point] + SeamTie;
+                    for (int i = 0; i < owned; i++)
+                        if (SeamDistance(seam[own[i]], _verts[_tris[t * 3 + e]]) <= near)
+                        {
+                            k = own[i];
+                            break;
+                        }
+
                     bool held = false;
                     for (int i = 0; i < n && !held; i++) held = keep[i] == k;
                     if (!held) keep[n++] = k;
+                }
+
+                // Any side of the face still without a slot takes one before anything further
+                // off does. A sliver with a seam down all three of its sides has corners at
+                // nothing from more seams than it has slots for, and the ones it has to draw
+                // are its own.
+                for (int i = 0; i < owned && n < 3; i++)
+                {
+                    bool held = false;
+                    for (int j = 0; j < n && !held; j++) held = keep[j] == own[i];
+                    if (!held) keep[n++] = own[i];
                 }
 
                 // Corners sharing a nearest seam leave slots going spare. Fill them with the
@@ -4035,12 +4102,13 @@ public static partial class RiverMeshBuilder
             // stay hard. Water asks for none of it — it has its own use for both spare channels.
             var stone = _shadeSeams && !_hasEdges && _tris.Count > 0 ? new Topology(this) : null;
 
-            List<SeamEdge> seams    = null;
-            int[]          surfaces = null, closest = null;
-            float[]        toSeam   = null;
+            List<SeamEdge>        seams    = null;
+            Dictionary<long, int> seamOf   = null;
+            int[]                 surfaces = null, closest = null;
+            float[]               toSeam   = null;
             if (stone != null)
             {
-                seams    = Seams(stone);
+                seams    = Seams(stone, out seamOf);
                 surfaces = Surfaces(stone);
                 NearestSeams(stone, seams, out closest, out toSeam);
             }
@@ -4048,7 +4116,8 @@ public static partial class RiverMeshBuilder
             mesh.SetNormals(stone != null ? SmoothedNormals(stone, surfaces) : _norms);
             mesh.SetUVs(0, _uvs);
             if      (_hasEdges)   mesh.SetUVs(1, _edges);
-            else if (stone != null) mesh.SetUVs(1, SeamShading(stone, seams, closest));
+            else if (stone != null)
+                mesh.SetUVs(1, SeamShading(stone, seams, seamOf, closest, toSeam));
             if      (_hasFlows)   mesh.SetUVs(2, _flows);
             else if (stone != null)
                 mesh.SetUVs(2, FaceKinds(stone, SurfaceWidths(stone, surfaces, seams, toSeam)));

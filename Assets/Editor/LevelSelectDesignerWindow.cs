@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Unity.Mathematics;
@@ -928,15 +928,26 @@ public partial class LevelSelectDesignerWindow : EditorWindow
 
         _leftScroll = EditorGUILayout.BeginScrollView(_leftScroll);
 
-        DrawSelectedNodeActions();
         DrawSelectedPathProps();
-        DrawSelectedRimNodeProps();
+
+        // Everything that stands on a node is drawn inside that node's row in the Nodes list
+        // above. These are the same sections for the times one is picked on the canvas or in a
+        // list with no river of its own selected.
+        if (!DrawnUnderOpenNode(_selectedNodeId))
+        {
+            DrawSelectedNodeActions();
+            DrawSelectedRimNodeProps();
+        }
+        if (!DrawnUnderOpenNode(_selectedArenaNodeId)) DrawSelectedArenaProps();
+        if (!DrawnUnderOpenNode(_selectedPoolNodeId))  DrawSelectedPoolProps();
+        if (!DrawnUnderOpenNode(_selectedShopNodeId))  DrawSelectedShopProps();
+
+        var openOutpost = _data.outposts.Find(o => o.outpostId == _selectedOutpostId);
+        if (openOutpost == null || !DrawnUnderOpenNode(OutpostNodeId(openOutpost)))
+            DrawSelectedOutpostProps();
+
         DrawSelectedObstacleProps();
-        DrawSelectedOutpostProps();
         DrawSelectedPipeProps();
-        DrawSelectedArenaProps();
-        DrawSelectedPoolProps();
-        DrawSelectedShopProps();
         DrawCanvasSettingsSection();
 
         if (_mode == DesignerMode.Landscape)
@@ -978,7 +989,7 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             if (GUILayout.Button(label, EditorStyles.miniButton))
             {
                 _selectedPathId = selected ? null : path.pathId;
-                _selectedNodeId = null;
+                ClearNodeSelection();
             }
             GUI.backgroundColor = prevBg;
 
@@ -1096,14 +1107,44 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             MarkDirty();
         }
 
-        // ── Nodes: height, what sits on each, add before/after ────
+        // ── Arena end ─────────────────────────────────────────────
+        // Which end of the river the arena stands on — the arena itself is edited inside that
+        // node's row below.
+        EditorGUILayout.Space(4);
+        EditorGUILayout.BeginHorizontal();
+        GUI.enabled = path.nodeIds.Count > 0;
+        var startBg = GUI.backgroundColor;
+        GUI.backgroundColor = !path.arenaIsAtEnd ? new Color(0.3f, 0.7f, 1f) : Color.gray;
+        if (GUILayout.Button("Arena at Start", EditorStyles.miniButtonLeft) && path.arenaIsAtEnd)
+        {
+            Undo.RecordObject(_data, "Move Arena to Start");
+            MoveArenaToEnd(path, atEnd: false);
+        }
+        GUI.backgroundColor = path.arenaIsAtEnd ? new Color(0.3f, 0.7f, 1f) : Color.gray;
+        if (GUILayout.Button("Arena at End", EditorStyles.miniButtonRight) && !path.arenaIsAtEnd)
+        {
+            Undo.RecordObject(_data, "Move Arena to End");
+            MoveArenaToEnd(path, atEnd: true);
+        }
+        GUI.backgroundColor = startBg;
+        GUI.enabled = true;
+        EditorGUILayout.EndHorizontal();
+
+        // ── Nodes: one row each, in river order ───────────────────
+        // Open a row and it shows everything standing on that node — its pool, rim node,
+        // arena, shop and outposts. Only one row is open at a time: the node that is selected.
         EditorGUILayout.Space(4);
         EditorGUILayout.LabelField("Nodes", EditorStyles.boldLabel);
         EditorGUILayout.BeginHorizontal();
-        EditorGUILayout.LabelField("",        GUILayout.Width(36));
+        EditorGUILayout.LabelField("",        GUILayout.Width(50));
         EditorGUILayout.LabelField("Height",  EditorStyles.miniLabel, GUILayout.Width(52));
         EditorGUILayout.LabelField("On node", EditorStyles.miniLabel);
         EditorGUILayout.EndHorizontal();
+
+        // The end the arena stands on, whether or not there is one there yet.
+        string arenaEndNodeId = path.nodeIds.Count > 0
+            ? (path.arenaIsAtEnd ? path.nodeIds[path.nodeIds.Count - 1] : path.nodeIds[0])
+            : null;
 
         int insertAt = -1;   // index in path.nodeIds the new node takes
         for (int i = 0; i < path.nodeIds.Count; i++)
@@ -1119,12 +1160,23 @@ public partial class LevelSelectDesignerWindow : EditorWindow
                 _                                              => "●"
             };
 
-            bool isSelected = node.id == _selectedNodeId;
+            bool isOpen = node.id == _selectedNodeId;
             var prevBg = GUI.backgroundColor;
-            if (isSelected) GUI.backgroundColor = new Color(0.3f, 0.7f, 1f);
+            if (isOpen) GUI.backgroundColor = new Color(0.3f, 0.7f, 1f);
 
-            EditorGUILayout.BeginHorizontal(EditorStyles.helpBox);
-            EditorGUILayout.LabelField($"{typeLabel} {i}", GUILayout.Width(36));
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            GUI.backgroundColor = prevBg;
+
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button($"{(isOpen ? "▼" : "▶")} {typeLabel} {i}",
+                                 EditorStyles.label, GUILayout.Width(50)))
+            {
+                if (isOpen) ClearNodeSelection();
+                else        SelectNodeInList(node.id);
+                GUI.FocusControl(null);
+                Repaint();
+            }
+
             EditorGUI.BeginChangeCheck();
             // Lead-ins and compass entrances take their pool's or arena's height — edited there.
             GUI.enabled = !IsLockedNode(node.id);
@@ -1150,111 +1202,174 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             GUI.enabled = true;
 
             EditorGUILayout.EndHorizontal();
-            GUI.backgroundColor = prevBg;
+
+            if (isOpen)
+            {
+                EditorGUI.indentLevel++;
+                DrawNodeContents(path, node, arenaEndNodeId);
+                EditorGUI.indentLevel--;
+            }
+
+            EditorGUILayout.EndVertical();
+        }
+
+        // Adding a pool or an outpost adds nodes of its own, so both wait until the list has
+        // finished drawing rather than changing it half way down.
+        if (_pendingPoolToggleNodeId != null)
+        {
+            TogglePoolAt(_pendingPoolToggleNodeId);
+            _pendingPoolToggleNodeId = null;
+        }
+        if (_pendingOutpostNodeId != null)
+        {
+            AddOutpostAt(path, _pendingOutpostNodeId);
+            _pendingOutpostNodeId = null;
         }
 
         if (insertAt >= 0)
         {
             Undo.RecordObject(_data, "Add Node");
             var added = InsertNodeInPath(path, insertAt);
-            _selectedNodeId = added.id;
+            SelectNodeInList(added.id);
             MarkDirty();
             Repaint();
         }
+    }
 
-        // ── Arena info ────────────────────────────────────────────
-        EditorGUILayout.Space(4);
+    // Set by a node's row, carried out once the Nodes list has finished drawing.
+    private string _pendingPoolToggleNodeId;
+    private string _pendingOutpostNodeId;
 
-        // End toggle — synced with arenaIsAtEnd checkbox above
+    /// <summary>
+    /// Everything standing on one node, drawn inside its open row in the Nodes list: what can
+    /// be put here, then the arena, rim node, pool, shop and outposts that already are.
+    /// </summary>
+    private void DrawNodeContents(LevelSelectDesignerData.DesignerPath path,
+                                  LevelSelectDesignerData.DesignerNode node,
+                                  string arenaEndNodeId)
+    {
+        string nodeId = node.id;
+
         EditorGUILayout.BeginHorizontal();
-        GUI.enabled = path.nodeIds.Count > 0;
-        var startBg = GUI.backgroundColor;
-        GUI.backgroundColor = !path.arenaIsAtEnd ? new Color(0.3f, 0.7f, 1f) : Color.gray;
-        if (GUILayout.Button("Start", EditorStyles.miniButtonLeft) && path.arenaIsAtEnd)
-        {
-            Undo.RecordObject(_data, "Move Arena to Start");
-            MoveArenaToEnd(path, atEnd: false);
-        }
-        GUI.backgroundColor = path.arenaIsAtEnd ? new Color(0.3f, 0.7f, 1f) : Color.gray;
-        if (GUILayout.Button("End", EditorStyles.miniButtonRight) && !path.arenaIsAtEnd)
-        {
-            Undo.RecordObject(_data, "Move Arena to End");
-            MoveArenaToEnd(path, atEnd: true);
-        }
-        GUI.backgroundColor = startBg;
+        bool hasPool = _data.PoolAt(nodeId) != null;
+        if (GUILayout.Button(hasPool ? "Remove Pool" : "Add Pool"))
+            _pendingPoolToggleNodeId = nodeId;
+        GUI.enabled = path.nodeIds.Count >= 2;
+        if (GUILayout.Button("Add Outpost"))
+            _pendingOutpostNodeId = nodeId;
         GUI.enabled = true;
         EditorGUILayout.EndHorizontal();
 
-        if (!path.leadsToArena || path.nodeIds.Count == 0)
+        // The arena only ever stands on the end node the river runs into.
+        if (nodeId == arenaEndNodeId)
         {
-            GUI.enabled = path.nodeIds.Count > 0;
-            var prevBg = GUI.backgroundColor;
-            GUI.backgroundColor = new Color(0.4f, 1f, 0.5f);
-            if (GUILayout.Button("Add Arena", GUILayout.Height(22)))
+            if (!path.leadsToArena)
             {
-                Undo.RecordObject(_data, "Add Arena");
-                string targetNodeId = path.arenaIsAtEnd
-                    ? path.nodeIds[path.nodeIds.Count - 1]
-                    : path.nodeIds[0];
-                var targetNode = _data.nodes.Find(n => n.id == targetNodeId);
-                if (targetNode != null)
+                var prevBg = GUI.backgroundColor;
+                GUI.backgroundColor = new Color(0.4f, 1f, 0.5f);
+                if (GUILayout.Button("Add Arena", GUILayout.Height(22)))
                 {
-                    targetNode.type = LevelSelectDesignerData.NodeType.ArenaEnd;
-                    if (!_data.arenas.Exists(a => a.nodeId == targetNodeId))
-                        _data.arenas.Add(new LevelSelectDesignerData.DesignerArena { nodeId = targetNodeId });
-                    path.leadsToArena = true;
-                    _selectedArenaNodeId = targetNodeId;
+                    Undo.RecordObject(_data, "Add Arena");
+                    node.type = LevelSelectDesignerData.NodeType.ArenaEnd;
+                    if (!_data.arenas.Exists(a => a.nodeId == nodeId))
+                        _data.arenas.Add(new LevelSelectDesignerData.DesignerArena { nodeId = nodeId });
+                    path.leadsToArena    = true;
+                    _selectedArenaNodeId = nodeId;
                     EditorUtility.SetDirty(_data);
                 }
+                GUI.backgroundColor = prevBg;
             }
-            GUI.backgroundColor = prevBg;
-            GUI.enabled = true;
-        }
-
-        if (path.leadsToArena && path.nodeIds.Count > 0)
-        {
-            string arenaNodeId = path.arenaIsAtEnd
-                ? path.nodeIds[path.nodeIds.Count - 1]
-                : path.nodeIds[0];
-            var arena = _data.arenas.Find(a => a.nodeId == arenaNodeId);
-
-            EditorGUILayout.Space(6);
-            EditorGUILayout.LabelField("Arena", EditorStyles.boldLabel);
-
-            if (arena == null)
+            else if (!_data.arenas.Exists(a => a.nodeId == nodeId))
             {
                 EditorGUILayout.HelpBox("No arena assigned at path endpoint.", MessageType.Warning);
             }
-            else
+        }
+
+        if (_selectedArenaNodeId == nodeId) DrawSelectedArenaProps();
+        DrawSelectedRimNodeProps();
+        if (_selectedPoolNodeId == nodeId) DrawSelectedPoolProps();
+        if (_selectedShopNodeId == nodeId) DrawSelectedShopProps();
+        DrawNodeOutposts(path, nodeId);
+    }
+
+    /// <summary>
+    /// The outposts standing at this node. An outpost keeps a free fraction along the river
+    /// rather than a node, so each shows under the node it stands nearest — slide it past
+    /// halfway with Along Path and it moves to the next node's row.
+    /// </summary>
+    private void DrawNodeOutposts(LevelSelectDesignerData.DesignerPath path, string nodeId)
+    {
+        var here = _data.outposts
+            .Where(o => o.pathId == path.pathId && OutpostNodeId(o) == nodeId)
+            .OrderBy(o => o.pathT)
+            .ToList();
+        if (here.Count == 0) return;
+
+        EditorGUILayout.Space(4);
+        EditorGUILayout.LabelField("Outposts", EditorStyles.boldLabel);
+
+        foreach (var outpost in here)
+        {
+            bool isOpen = outpost.outpostId == _selectedOutpostId;
+            if (GUILayout.Button($"{(isOpen ? "▼" : "▶")} Outpost — {outpost.side} bank",
+                                 EditorStyles.miniButton))
             {
-                if (arena.gridData != null)
-                {
-                    EditorGUILayout.LabelField(arena.gridData.displayName, EditorStyles.whiteBoldLabel);
-                    EditorGUILayout.LabelField($"Entrances: {arena.gridData.entrances?.Count ?? 0}  |  Profile: {GetArenaPresetName(arena)}", EditorStyles.miniLabel);
-                }
-                else
-                {
-                    EditorGUILayout.HelpBox("Arena has no GridData assigned.", MessageType.Info);
-                }
+                _selectedOutpostId = isOpen ? null : outpost.outpostId;
+                GUI.FocusControl(null);
+                Repaint();
+            }
 
-                EditorGUI.BeginChangeCheck();
-                arena.gridData = DrawGridDataPopup("GridData", arena.gridData);
-                arena.arenaPrefabOverride = (GameObject)EditorGUILayout.ObjectField(
-                    "Prefab Override", arena.arenaPrefabOverride, typeof(GameObject), false);
-                if (EditorGUI.EndChangeCheck())
-                {
-                    Undo.RecordObject(_data, "Edit Arena");
-                    SyncEntranceNodes(arena);
-                    EditorUtility.SetDirty(_data);
-                }
-
-                if (GUILayout.Button("Select Arena in List"))
-                {
-                    _selectedArenaNodeId = arena.nodeId;
-                    _foldArenas = true;
-                }
+            if (isOpen)
+            {
+                EditorGUI.indentLevel++;
+                DrawSelectedOutpostProps();
+                EditorGUI.indentLevel--;
             }
         }
+    }
+
+    /// The node an outpost stands nearest along its river, or null if it has no river.
+    private string OutpostNodeId(LevelSelectDesignerData.DesignerOutpost outpost)
+    {
+        var path = _data.paths.Find(p => p.pathId == outpost.pathId);
+        int stretches = (path?.nodeIds.Count ?? 0) - 1;
+        if (stretches < 1) return null;
+        return path.nodeIds[Mathf.RoundToInt(Mathf.Clamp01(outpost.pathT) * stretches)];
+    }
+
+    /// <summary>
+    /// Picking a node in the list opens it, and only it. Whatever stands on that node comes
+    /// with it, so the panel shows that node's pool, arena or shop rather than another's.
+    /// </summary>
+    private void SelectNodeInList(string nodeId)
+    {
+        var node = _data.nodes.Find(n => n.id == nodeId);
+        _selectedNodeId      = nodeId;
+        _selectedObstacleId  = null;
+        _selectedOutpostId   = null;
+        _selectedArenaNodeId = node?.type == LevelSelectDesignerData.NodeType.ArenaEnd ? nodeId : null;
+        _selectedShopNodeId  = node?.type == LevelSelectDesignerData.NodeType.ShopEnd  ? nodeId : null;
+        _selectedPoolNodeId  = _data.PoolAt(nodeId) != null ? nodeId : null;
+        _selectedEntranceIdx = -1;
+    }
+
+    /// Closes the open node row, letting go of everything that came with it.
+    private void ClearNodeSelection()
+    {
+        _selectedNodeId      = null;
+        _selectedOutpostId   = null;
+        _selectedArenaNodeId = null;
+        _selectedShopNodeId  = null;
+        _selectedPoolNodeId  = null;
+        _selectedEntranceIdx = -1;
+    }
+
+    /// Whether this node's things are already drawn inside its open row in the Nodes list.
+    private bool DrawnUnderOpenNode(string nodeId)
+    {
+        if (string.IsNullOrEmpty(nodeId) || nodeId != _selectedNodeId) return false;
+        var path = _data.paths.Find(p => p.pathId == _selectedPathId);
+        return path != null && path.nodeIds.Contains(nodeId);
     }
 
     private void DrawSelectedObstacleProps()
@@ -2111,6 +2226,7 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             EditorGUI.indentLevel--;
         }
 
+        DrawDoorShapes();
         DrawEntranceAlignments();
 
         EditorGUILayout.Space(2);
@@ -2328,6 +2444,306 @@ public partial class LevelSelectDesignerWindow : EditorWindow
         return remove;
     }
 
+    /// <summary>
+    /// Where the door presets live. A folder of their own, as the outpost and tower presets
+    /// have, so the picker is not wading through every preset in the project.
+    /// </summary>
+    private const string DoorPresetFolder = "Assets/ScriptsData/DataScripts/ArenaDoorPresets";
+
+    /// <summary>
+    /// The door standing in every archway — the keyhole and the soul opening at its foot.
+    ///
+    /// Height and base width are inherited from the arch it stands in, so the default shape only
+    /// has to say what the keyhole looks like. That is why the default is usually the only one
+    /// anybody edits, and an arena that wants a door of its own is ticked off it.
+    /// </summary>
+    private void DrawDoorShapes()
+    {
+        EditorGUILayout.Space(6);
+        EditorGUILayout.LabelField("The door in the archway", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            "A door is a sheet filling the arch's opening with a keyhole frame standing proud " +
+            "on it. The sheet is solid but for the soul opening at its foot, which is cut clean " +
+            "through — that hole is the only way to see the river beyond.",
+            MessageType.None);
+
+        DrawDoorPresetRow(ref _data.defaultDoorPreset, _data.defaultDoor);
+        DrawDoor("Default (all doors)", _data.defaultDoor);
+
+        foreach (var arena in _data.arenas)
+        {
+            if (arena == null || string.IsNullOrEmpty(arena.nodeId)) continue;
+            if (!arena.archwayOnEntrances) continue;   // no arch to stand a door in
+
+            // The number leads, because it is what is about to be carved on this arena's door
+            // and there is nowhere else in the designer to read it off.
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField($"{ArenaNumber(arena)}.  {ArenaLabel(arena)}",
+                                       EditorStyles.miniLabel);
+            if (!arena.overrideDoor)
+            {
+                if (GUILayout.Button("Override shape", EditorStyles.miniButton, GUILayout.Width(110)))
+                {
+                    Undo.RecordObject(_data, "Add Door Shape");
+                    arena.doorProfile  = _data.DoorFor(arena).Clone();
+                    arena.overrideDoor = true;
+                    MarkDirty();
+                }
+            }
+            else
+            {
+                GUILayout.Label("own shape", EditorStyles.miniLabel, GUILayout.Width(110));
+            }
+            EditorGUILayout.EndHorizontal();
+
+            if (!arena.overrideDoor) continue;
+
+            EditorGUI.indentLevel++;
+            DrawDoorPresetRow(ref arena.doorPreset, arena.doorProfile);
+            if (DrawDoor(ArenaLabel(arena), arena.doorProfile, removable: true))
+            {
+                Undo.RecordObject(_data, "Remove Door Shape");
+                arena.overrideDoor = false;
+                MarkDirty();
+                RebuildArchwayMeshes();
+                EditorGUI.indentLevel--;
+                break;
+            }
+            EditorGUI.indentLevel--;
+        }
+    }
+
+    /// <summary>
+    /// Pick a door preset, save over it, or save a new one — the same row the outposts and the
+    /// lollipop towers have. The shape is copied into the profile that is already there rather
+    /// than swapped for the preset's own, so editing it afterwards never touches the asset.
+    /// </summary>
+    private void DrawDoorPresetRow(ref ArenaDoorPreset preset, ArenaDoorProfile profile)
+    {
+        if (profile == null) return;
+
+        var picked = LevelSelectRiverPresetLibrary.DrawPicker(
+            new GUIContent("Preset", "The door presets kept in " + DoorPresetFolder +
+                                     ". Picking one puts its shape on this door."),
+            preset, DoorPresetFolder);
+
+        if (picked != preset)
+        {
+            Undo.RecordObject(_data, "Load Door Preset");
+            preset = picked;
+            if (picked != null) profile.CopyFrom(picked.ToProfile());
+            MarkDirty();
+            RebuildArchwayMeshes();
+            GUI.FocusControl(null);
+        }
+
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            using (new EditorGUI.DisabledScope(preset == null))
+            {
+                if (GUILayout.Button(new GUIContent("Save", "Overwrite the preset with this door's " +
+                                                            "shape, and rebuild the doors so you " +
+                                                            "can see it.")) &&
+                    EditorUtility.DisplayDialog("Save Door Preset",
+                        $"Overwrite '{preset.name}' with this door's shape?", "Save", "Cancel"))
+                {
+                    Undo.RecordObject(preset, "Save Door Preset");
+                    preset.CopyFrom(profile);
+                    EditorUtility.SetDirty(preset);
+                    AssetDatabase.SaveAssetIfDirty(preset);
+                    RebuildDoorsFromShapes();
+                }
+            }
+
+            if (GUILayout.Button(new GUIContent("Save as New", "Make a new preset from this door's " +
+                                                                "shape, and rebuild the doors so " +
+                                                                "you can see it.")))
+            {
+                string assetPath = EditorUtility.SaveFilePanelInProject(
+                    "Save Door Preset", "NewArenaDoorPreset", "asset", "Choose save location",
+                    LevelSelectRiverPresetLibrary.EnsureFolder(DoorPresetFolder));
+                if (!string.IsNullOrEmpty(assetPath))
+                {
+                    var made = CreateInstance<ArenaDoorPreset>();
+                    made.CopyFrom(profile);
+                    AssetDatabase.CreateAsset(made, assetPath);
+                    AssetDatabase.SaveAssets();
+
+                    Undo.RecordObject(_data, "Save Door Preset");
+                    preset = made;
+                    MarkDirty();
+                    RebuildDoorsFromShapes();
+                }
+                GUIUtility.ExitGUI();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Rebuilds every door in the open scene against the shapes as they stand now, and writes
+    /// the meshes to disk.
+    ///
+    /// This is what Save is for as much as the preset is: the sliders above only mark the data
+    /// dirty, so saving is the moment you get to see what you have been typing. It goes through
+    /// <see cref="RebuildArchwayMeshes"/>, which rebuilds each archway and its door together,
+    /// because a door is built in its arch's frame and against its resolved shape.
+    /// </summary>
+    private void RebuildDoorsFromShapes()
+    {
+        int n = RebuildArchwayMeshes();
+        AssetDatabase.SaveAssets();
+        _consoleStatusMsg = $"Saved, and rebuilt {n} door(s).";
+        Debug.Log($"[LevelSelectDesigner] Rebuilt {n} archway(s) and door(s) from the current shapes.");
+    }
+
+    // Returns true when the designer asked to drop this arena back to the default shape.
+    private bool DrawDoor(string header, ArenaDoorProfile profile, bool removable = false)
+    {
+        bool remove = false;
+
+        EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+        EditorGUILayout.BeginHorizontal();
+        EditorGUILayout.LabelField(header, EditorStyles.boldLabel);
+        if (removable && GUILayout.Button("Use default", EditorStyles.miniButton, GUILayout.Width(90)))
+            remove = true;
+        EditorGUILayout.EndHorizontal();
+
+        EditorGUI.BeginChangeCheck();
+
+        EditorGUILayout.LabelField("The keyhole", EditorStyles.miniBoldLabel);
+        float height      = EditorGUILayout.FloatField(
+            new GUIContent("Height", "Top of the bulb, up from the water. 0 takes the arch " +
+                                     "opening's own height, so the door fills it."), profile.height);
+        float baseWidth   = EditorGUILayout.FloatField(
+            new GUIContent("Base Width", "Width across the foot. 0 takes the arch's opening " +
+                                         "width, so the door spans it."), profile.baseWidth);
+        float bulbRadius  = EditorGUILayout.FloatField(
+            new GUIContent("Bulb Radius", "The round bulb at the top."), profile.bulbRadius);
+        float waistWidth  = EditorGUILayout.FloatField(
+            new GUIContent("Waist Width", "Width across the narrowest part, under the bulb."),
+            profile.waistWidth);
+        float waistHeight = EditorGUILayout.FloatField(
+            new GUIContent("Waist Height", "How far up the waist sits. Below it the sides run " +
+                                           "straight out to the foot; above it they curve into " +
+                                           "the bulb."), profile.waistHeight);
+
+        float baseCurve   = EditorGUILayout.FloatField(
+            new GUIContent("Base Curve", "How far the bottom edge sags below the two base " +
+                                         "corners, which sit on the water. 0 cuts the door off " +
+                                         "flat at the water; more closes it underneath with a " +
+                                         "curve and the soul opening sits inside it."),
+            profile.baseCurve);
+
+        EditorGUILayout.LabelField("Rims", EditorStyles.miniBoldLabel);
+        float frameWidth   = EditorGUILayout.FloatField(
+            new GUIContent("Frame Width", "Width of the band running round the keyhole."),
+            profile.frameWidth);
+        float frameDepth   = EditorGUILayout.FloatField(
+            new GUIContent("Stand Proud", "How far both rims stand off the sheet, toward the river."),
+            profile.frameDepth);
+        float flapRimWidth = EditorGUILayout.FloatField(
+            new GUIContent("Flap Rim Width", "Width of the band running round the soul opening."),
+            profile.flapRimWidth);
+        float panelDepth   = EditorGUILayout.FloatField(
+            new GUIContent("Panel Stand Proud", "How far the panel inside the frame stands off " +
+                                                "the sheet — the leaf of the door, with the soul " +
+                                                "opening left out of it. Less than Stand Proud " +
+                                                "sits it in the frame; 0 builds no panel."),
+            profile.panelDepth);
+
+        EditorGUILayout.LabelField("The soul opening", EditorStyles.miniBoldLabel);
+        float flapWidth = EditorGUILayout.FloatField(
+            new GUIContent("Flap Width", "Width of the opening cut clean through the sheet."),
+            profile.flapWidth);
+        float flapLeg   = EditorGUILayout.FloatField(
+            new GUIContent("Flap Leg Height", "The straight part of its sides, up from the water."),
+            profile.flapLegHeight);
+        float flapCrown = EditorGUILayout.FloatField(
+            new GUIContent("Flap Arch Height", "The curved part above them. Half the flap width " +
+                                               "gives a plain semicircle; more gives a taller " +
+                                               "opening."), profile.flapCrownHeight);
+        float flapCurve = EditorGUILayout.FloatField(
+            new GUIContent("Flap Curve", "How far the opening's bottom edge sags below the " +
+                                         "water, the way the door's own Base Curve does. 0 " +
+                                         "stands it flat on the water."), profile.flapCurve);
+
+        EditorGUILayout.LabelField("The numeral disc", EditorStyles.miniBoldLabel);
+        float discRadius  = EditorGUILayout.FloatField(
+            new GUIContent("Disc Radius", "The round disc on the bulb carrying this arena's " +
+                                          "number. 0 leaves the bulb plain and draws the numeral " +
+                                          "straight on it, spanning the bulb and lifted off the " +
+                                          "panel."),
+            profile.discRadius);
+        float discDepth   = EditorGUILayout.FloatField(
+            new GUIContent("Disc Stand Proud", "How far the disc stands off the sheet. Its own, " +
+                                               "so it can sit shallower than the frame round it."),
+            profile.discDepth);
+        float discRise    = EditorGUILayout.FloatField(
+            new GUIContent("Disc Rise", "How far the disc sits above the middle of the bulb. 0 " +
+                                        "centres it there; negative drops it toward the waist."),
+            profile.discRise);
+        int discSideSteps = EditorGUILayout.IntField(
+            new GUIContent("Disc Side Steps", "How many rings the disc's side is built in, from " +
+                                              "the sheet out to its face. 1 takes it in a single " +
+                                              "step; more breaks the wall up without changing " +
+                                              "its shape."),
+            profile.discSideSteps);
+        float numeralSize = EditorGUILayout.FloatField(
+            new GUIContent("Numeral Size", "How much of the disc's width the drawing spans — " +
+                                           "or the bulb's, with no disc. 1 fills it; 0.7 leaves " +
+                                           "a margin of stone. Over 1 spills it over the edge."),
+            profile.numeralSize);
+        float numeralRise = EditorGUILayout.FloatField(
+            new GUIContent("Numeral Rise", "How far the numeral sits above the middle of the " +
+                                           "disc. 0 centres it, negative drops it. Separate " +
+                                           "from Disc Rise, so the drawing moves on the disc " +
+                                           "without the disc moving on the door."),
+            profile.numeralRise);
+        float numeralLift = EditorGUILayout.FloatField(
+            new GUIContent("Numeral Lift", "How far the drawing floats off the disc's face. " +
+                                           "Only enough to settle which is in front."),
+            profile.numeralLift);
+
+        if (EditorGUI.EndChangeCheck())
+        {
+            Undo.RecordObject(_data, "Edit Door Shape");
+            profile.discRadius      = Mathf.Max(0f,     discRadius);
+            profile.discDepth       = Mathf.Max(0f,     discDepth);
+            profile.discRise        = discRise;
+            profile.discSideSteps   = Mathf.Max(1,      discSideSteps);
+            profile.numeralSize     = Mathf.Max(0f,     numeralSize);
+            profile.numeralRise     = numeralRise;
+            profile.numeralLift     = Mathf.Max(0f,     numeralLift);
+            profile.height          = Mathf.Max(0f,     height);
+            profile.baseWidth       = Mathf.Max(0f,     baseWidth);
+            profile.bulbRadius      = Mathf.Max(0.001f, bulbRadius);
+            profile.waistWidth      = Mathf.Max(0.001f, waistWidth);
+            profile.waistHeight     = Mathf.Max(0f,     waistHeight);
+            profile.baseCurve       = Mathf.Max(0f,     baseCurve);
+            profile.frameWidth      = Mathf.Max(0.001f, frameWidth);
+            profile.frameDepth      = Mathf.Max(0f,     frameDepth);
+            profile.flapRimWidth    = Mathf.Max(0.001f, flapRimWidth);
+            profile.panelDepth      = Mathf.Max(0f,     panelDepth);
+            profile.flapWidth       = Mathf.Max(0.001f, flapWidth);
+            profile.flapLegHeight   = Mathf.Max(0f,     flapLeg);
+            profile.flapCrownHeight = Mathf.Max(0.001f, flapCrown);
+            profile.flapCurve       = Mathf.Max(0f,     flapCurve);
+            MarkDirty();
+        }
+
+        var inherited = new List<string>();
+        if (profile.height    <= 0.0001f) inherited.Add("height");
+        if (profile.baseWidth <= 0.0001f) inherited.Add("base width");
+        EditorGUILayout.LabelField(
+            inherited.Count > 0
+                ? $"Taking {string.Join(", ", inherited)} from the arch it stands in"
+                : "Every number set here - nothing inherited",
+            EditorStyles.miniLabel);
+        EditorGUILayout.EndVertical();
+
+        return remove;
+    }
+
     // Returns true when the designer asked to drop this arena back to the default shape.
     private bool DrawArenaWall(string header, ArenaWallProfile profile, bool removable = false)
     {
@@ -2423,6 +2839,10 @@ public partial class LevelSelectDesignerWindow : EditorWindow
         _data.arenaEntrancePrefab = (GameObject)EditorGUILayout.ObjectField("Arena Entrance", _data.arenaEntrancePrefab, typeof(GameObject), false);
         _data.arenaWallMaterial   = (Material)EditorGUILayout.ObjectField("Wall Material",    _data.arenaWallMaterial,   typeof(Material), false);
         _data.arenaDoorMaterial   = (Material)EditorGUILayout.ObjectField("Door Material",    _data.arenaDoorMaterial,   typeof(Material), false);
+        _data.arenaNumeralMaterial = (Material)EditorGUILayout.ObjectField(
+            new GUIContent("Numeral Material", "What every arena's numeral is shown on. Each " +
+                           "numeral gets its own variant of it carrying that drawing."),
+            _data.arenaNumeralMaterial, typeof(Material), false);
         if (EditorGUI.EndChangeCheck()) MarkDirty();
 
         EditorGUILayout.LabelField("Wall shape is authored under Procedural Generation.",
@@ -4876,6 +5296,29 @@ public partial class LevelSelectDesignerWindow : EditorWindow
         MarkDirty();
     }
 
+    /// <summary>
+    /// Moves an arena to another place in the list, which is the same thing as giving it another
+    /// number: the numeral carved on an arena's door is where it sits here, counting from 1.
+    ///
+    /// The doors are rebuilt on the spot, because two of them are now carrying the wrong number
+    /// and the list would be telling you one thing while the scene showed another.
+    /// </summary>
+    private void MoveArena(int from, int to)
+    {
+        if (_data == null) return;
+        if (from < 0 || from >= _data.arenas.Count) return;
+        if (to   < 0 || to   >= _data.arenas.Count || to == from) return;
+
+        Undo.RecordObject(_data, "Reorder Arenas");
+        var arena = _data.arenas[from];
+        _data.arenas.RemoveAt(from);
+        _data.arenas.Insert(to, arena);
+        MarkDirty();
+
+        RebuildArchwayMeshes();
+        Repaint();
+    }
+
     private void RemoveArena(string nodeId)
     {
         var node = _data.nodes.Find(n => n.id == nodeId);
@@ -5995,7 +6438,16 @@ public partial class LevelSelectDesignerWindow : EditorWindow
             return;
         }
 
-        for (int i = _data.arenas.Count - 1; i >= 0; i--)
+        // A move is noted and acted on once the list has finished drawing, rather than the moment
+        // the arrow is pressed — reordering under a loop that is still walking the list would
+        // draw the rest of it against an order that no longer holds.
+        int moveFrom = -1, moveTo = -1;
+
+        // Read in numbering order, 1 at the top, because that order is the numbering: it is what
+        // allocates the numeral carved on each arena's door, and a list that shows it backwards
+        // cannot be reordered by eye. Walked forwards for the same reason — a row acts on the
+        // list and then stops, so there is nothing here that needs the safe-delete direction.
+        for (int i = 0; i < _data.arenas.Count; i++)
         {
             var arena = _data.arenas[i];
             var node = _data.nodes.Find(n => n.id == arena.nodeId);
@@ -6010,13 +6462,35 @@ public partial class LevelSelectDesignerWindow : EditorWindow
                 ? arena.gridData.displayName
                 : $"({(node != null ? $"{node.worldPosition.x:F0},{node.worldPosition.z:F0}" : "no node")})";
 
-            if (GUILayout.Button((selected ? "● " : "  ") + label, EditorStyles.miniButton))
+            // The arena's number leads — it is what is carved on its door, and this list's own
+            // order is what allocates it.
+            var row = new GUIContent(
+                $"{(selected ? "● " : "  ")}{i + 1}.  {label}",
+                $"Arena {i + 1}. Its door carries that numeral. Move it up or down the list to " +
+                $"give it a different one.");
+
+            if (GUILayout.Button(row, EditorStyles.miniButton))
             {
                 _selectedArenaNodeId = selected ? null : arena.nodeId;
                 _selectedEntranceIdx = -1;
                 _foldPathProps       = true;
                 Repaint();
             }
+
+            GUI.backgroundColor = prevBg;
+
+            // Up and down the list is up and down the numbering, so an arena is given the
+            // number you want by moving it to that place. Nothing else about an arena changes:
+            // only where it sits in the list, which is the whole of what a number is.
+            using (new EditorGUI.DisabledScope(i == 0))
+                if (GUILayout.Button(new GUIContent("▲", $"Make this arena {i}"),
+                                     EditorStyles.miniButton, GUILayout.Width(20)))
+                    { moveFrom = i; moveTo = i - 1; }
+
+            using (new EditorGUI.DisabledScope(i == _data.arenas.Count - 1))
+                if (GUILayout.Button(new GUIContent("▼", $"Make this arena {i + 2}"),
+                                     EditorStyles.miniButton, GUILayout.Width(20)))
+                    { moveFrom = i; moveTo = i + 1; }
 
             GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
             if (GUILayout.Button("✕", EditorStyles.miniButton, GUILayout.Width(20)))
@@ -6042,6 +6516,8 @@ public partial class LevelSelectDesignerWindow : EditorWindow
                 MarkDirty();
             }
         }
+
+        if (moveFrom >= 0) MoveArena(moveFrom, moveTo);
     }
 
     private void RepairJunction(LevelSelectDesignerData.DesignerJunction junc)
@@ -8778,6 +9254,26 @@ public partial class LevelSelectDesignerWindow : EditorWindow
         return RiverMeshBuilder.ShadeAsStone(arch, 0f, null, kinds);
     }
 
+    // A door standing in an archway, carrying the stone shading with each part coloured as the
+    // Run Shading Tuner's Arena Doors section says. Both profiles come in already resolved.
+    private Mesh BuildArenaDoorMesh(ArenaArchwayProfile arch, ArenaDoorProfile door,
+                                    float floor, float waterY, float along)
+    {
+        var parts = new List<ArenaDoorMesh.Part>();
+        var mesh  = ArenaDoorMesh.Build(arch, door, floor, waterY, along, MeshEdge, parts);
+
+        var shading = StoneShadingForBuild;
+        var kinds   = parts.ConvertAll(p => (float)(shading == null ? StoneFaceKind.Auto
+            : p == ArenaDoorMesh.Part.Sheet   ? shading.doorSheet
+            : p == ArenaDoorMesh.Part.Frame   ? shading.doorFrame
+            : p == ArenaDoorMesh.Part.Panel   ? shading.doorPanel
+            : p == ArenaDoorMesh.Part.FlapRim ? shading.doorFlapRim
+            : p == ArenaDoorMesh.Part.Disc    ? shading.doorDisc
+                                              : shading.doorEdges));
+
+        return RiverMeshBuilder.ShadeAsStone(mesh, 0f, null, kinds);
+    }
+
     /// <summary>
     /// The stone shading settings a piece being generated takes its part colours from — the Run
     /// Shading Tuner's while it is driving, the world's structure preset otherwise.
@@ -9017,9 +9513,13 @@ public partial class LevelSelectDesignerWindow : EditorWindow
         float floor = river != null ? river.riverDepth : 0.16f;
         float along = DoorAlong(arena, site.nodeId, site.entranceIndex);
 
+        // The door stands on the water, which sits below the arch's rim-top origin.
+        float waterY = -BoatSplineDrop;
+        var   shape  = _data.DoorFor(arena).Resolve(settled, waterY);
+
         string doorName = archName.Replace("ArenaArchway_", "ArenaDoor_");
         var    mesh     = SaveGeneratedMesh(doorName,
-                              ArenaArchwayMesh.BuildDoor(settled, floor, along, MeshEdge));
+                              BuildArenaDoorMesh(settled, shape, floor, waterY, along));
         if (mesh == null) return;
 
         Transform door = arch.transform.Find(ArchwayDoorChild);
@@ -9045,9 +9545,111 @@ public partial class LevelSelectDesignerWindow : EditorWindow
                                 : _data.arenaWallMaterial != null ? _data.arenaWallMaterial
                                 : _data.riverMaterial;
         EditorUtility.SetDirty(renderer);
+
+        ApplyDoorNumeral(door.gameObject, arena, shape, floor, waterY, along);
     }
 
-    private const string ArchwayDoorChild = "Door";
+    private const string ArchwayDoorChild    = "Door";
+    private const string ArchwayNumeralChild = "Numeral";
+    private const string NumeralQuadMeshName = "ArenaNumeralQuad";
+
+    /// <summary>
+    /// Which arena this is, as the number shown on its door: where it sits in the designer
+    /// data's own list of arenas, counting from 1. Reordering that list renumbers the doors,
+    /// which is the point — the list is the running order of the world.
+    /// </summary>
+    private int ArenaNumber(LevelSelectDesignerData.DesignerArena arena)
+    {
+        if (_data == null || arena == null) return 0;
+        return _data.arenas.IndexOf(arena) + 1;
+    }
+
+    /// <summary>
+    /// The arena's numeral, standing on the disc on its door as a flat sheet of its own — a
+    /// "Numeral" child of the Door.
+    ///
+    /// Its own object rather than part of the door mesh, because it is a DRAWING and the door is
+    /// stone: it needs its own material, and the door carries one for the whole of it. Standing
+    /// it separately also means its size can be moved without rebuilding the door, and a numeral
+    /// nobody has drawn yet simply leaves the disc blank instead of leaving a hole in the stone.
+    ///
+    /// <paramref name="door"/> is the door object, so the numeral lands in the archway's frame,
+    /// which is what <see cref="ArenaDoorMesh.TryNumeralFace"/> answers in.
+    /// </summary>
+    private void ApplyDoorNumeral(GameObject door, LevelSelectDesignerData.DesignerArena arena,
+                                  ArenaDoorProfile shape, float floor, float waterY, float along)
+    {
+        Transform existing = door.transform.Find(ArchwayNumeralChild);
+
+        var mat = ArenaNumeralLibrary.MaterialFor(ArenaNumber(arena), _data.arenaNumeralMaterial,
+                                                  out Texture2D drawing);
+
+        // No disc to draw on, no drawing for this arena, or nothing to show it on: the disc is
+        // left blank, and any numeral standing there from a previous generate is taken away.
+        if (mat == null ||
+            !ArenaDoorMesh.TryNumeralFace(shape, floor, waterY, along,
+                                          out Vector3 centre, out float span))
+        {
+            if (existing != null) Undo.DestroyObjectImmediate(existing.gameObject);
+            return;
+        }
+
+        // The drawing's longest side spans what the shape asked for and the other follows its
+        // own proportions, so a tall numeral comes out tall rather than stretched square.
+        float w = drawing.width, h = drawing.height;
+        float wide = w >= h ? span : span * w / Mathf.Max(1f, h);
+        float tall = h >= w ? span : span * h / Mathf.Max(1f, w);
+
+        if (existing == null)
+        {
+            var go = new GameObject(ArchwayNumeralChild);
+            Undo.RegisterCreatedObjectUndo(go, "Generate Door Numeral");
+            go.transform.SetParent(door.transform, false);
+            existing = go.transform;
+        }
+        existing.localPosition = centre;
+        existing.localRotation = Quaternion.identity;
+        existing.localScale    = new Vector3(wide, tall, 1f);
+
+        var filter = existing.GetComponent<MeshFilter>();
+        if (filter == null) filter = existing.gameObject.AddComponent<MeshFilter>();
+        filter.sharedMesh = SaveGeneratedMesh(NumeralQuadMeshName, UnitNumeralQuad());
+        EditorUtility.SetDirty(filter);
+
+        var numeral = existing.GetComponent<MeshRenderer>();
+        if (numeral == null) numeral = existing.gameObject.AddComponent<MeshRenderer>();
+        numeral.sharedMaterial = mat;
+        EditorUtility.SetDirty(numeral);
+    }
+
+    /// <summary>
+    /// The sheet every numeral is drawn on: one unit square facing the river, scaled to the
+    /// drawing it carries. One mesh for all of them, because the only thing that differs between
+    /// two numerals is how big they are, and that is what a scale is for.
+    /// </summary>
+    private static Mesh UnitNumeralQuad()
+    {
+        var mesh = new Mesh { name = NumeralQuadMeshName };
+        mesh.SetVertices(new List<Vector3>
+        {
+            new Vector3(-0.5f, -0.5f, 0f), new Vector3(-0.5f, 0.5f, 0f),
+            new Vector3( 0.5f,  0.5f, 0f), new Vector3( 0.5f, -0.5f, 0f),
+        });
+        mesh.SetNormals(new List<Vector3>
+        {
+            Vector3.forward, Vector3.forward, Vector3.forward, Vector3.forward,
+        });
+        mesh.SetUVs(0, new List<Vector2>
+        {
+            new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(1f, 0f),
+        });
+        // Wound so the face looks out along +z, the way the door's disc does — toward the river
+        // and the boat coming in. From inside the arena it is culled, which is right: the number
+        // is for whoever is arriving.
+        mesh.SetTriangles(new[] { 0, 2, 1, 0, 3, 2 }, 0);
+        mesh.RecalculateBounds();
+        return mesh;
+    }
 
     /// <summary>
     /// Where an entrance prefab stands when its arena has archways, and which way it faces. False

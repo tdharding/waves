@@ -1,15 +1,17 @@
 // How the level select's landscape hills are shaded.
 //
 // The same idea as the river runs' stone, kept entirely separate from it: three stone VARIANTS
-// (A, B, C), each a colour with its own grain, and four PARTS of the landscape that each wear one
-// of them — Ground, Tops, Cliffs and Holes.
+// (A, B, C), each a colour with its own grain, and three PARTS of the landscape that each wear one
+// of them — Holes, NoiseUp and NoiseDown.
 //
 // A run's parts are baked into its mesh as it is built. The hills are not built — they are raised
 // in the vertex shader by CalculateHills — so which part a pixel belongs to is worked out here,
 // from two things only:
-//   * how steep it is, off the smooth hill normal (Cliffs past the Cliff Angle), and
-//   * how high it sits off the tile base (Tops above Top Height, Holes below Hole Depth).
-// Holes win over everything, Cliffs win over Tops and Ground, and whatever is left is Ground.
+//   * how deep it sits below the tile base (Holes below Hole Depth), and
+//   * which way the rocky noise leans (NoiseUp on the ups, NoiseDown on the downs).
+// Holes win; everything else is one side of the noise or the other. Ground level carries no lean
+// either way, so it lands wherever Noise Softness puts the middle — on the NoiseDown side when
+// the split is hard, halfway between the two when it is not.
 //
 // Every setting is a bare $Global pushed each frame by LandscapeShadingSettings — there is no
 // property block behind any of them, so nothing here has a material value to fall back on.
@@ -27,17 +29,19 @@ float4 _LandscapeColourC;
 float4 _LandscapeGrainSizes;
 float4 _LandscapeGrainStrengths;
 
-// Which variant each part wears: 0 A, 1 B, 2 C. x Ground, y Tops, z Cliffs, w Holes.
+// Which variant each part wears: 0 A, 1 B, 2 C. x Holes, y NoiseUp, z NoiseDown.
 float4 _LandscapePartVariants;
 
-// Where the parts split. Cliff Angle is degrees off flat, Top Height and Hole Depth are metres off
-// the tile base, and Softness is how wide each blend is as a fraction of its own threshold.
-float  _LandscapeCliffAngle;
-float  _LandscapeTopHeight;
+// Where Holes split off. Hole Depth is metres below the tile base, and Softness is how wide the
+// blend is as a fraction of it.
 float  _LandscapeHoleDepth;
 float  _LandscapeSoftness;
 
-// The tile surface's world height — the level Tops and Holes are measured from. Pushed from the
+// How wide the blend between NoiseUp and NoiseDown is, as a fraction of the noise's own lean.
+// 0 is a hard line down the middle of the noise, 1 blends across the whole of it.
+float  _LandscapeNoiseSoftness;
+
+// The tile surface's world height — the level Holes are measured down from. Pushed from the
 // designer's landscape World Y + Height Offset, not tuned.
 float  _LandscapeBaseY;
 
@@ -99,6 +103,15 @@ float LandscapeSplit(float value, float threshold)
     return smoothstep(threshold - band, threshold + band, value);
 }
 
+// How much of a pixel one part hands to each of the three variants — all of its weight to the one
+// it wears, nothing to the other two. Parts are added up this way before any colour is worked out,
+// so a variant's grain costs the same whether one part wears it or all three do.
+float3 LandscapeShare(float variant, float weight)
+{
+    int v = (int)(variant + 0.5);
+    return float3(v == 0 ? weight : 0.0, v == 1 ? weight : 0.0, v == 2 ? weight : 0.0);
+}
+
 // The grained colour of variant 0 (A), 1 (B) or 2 (C).
 float3 LandscapeVariant(float variant, float3 worldPos, float3 n)
 {
@@ -111,30 +124,44 @@ float3 LandscapeVariant(float variant, float3 worldPos, float3 n)
     return colour.rgb * LandscapeGrain(worldPos, n, size, strength);
 }
 
+// Which side of the rocky noise this pixel is on: 1 fully up, 0 fully down, blended across
+// Noise Softness either side of the middle. At 0 softness it is the bare sign of the lean.
+float LandscapeNoiseUp(float lean)
+{
+    float band = max(_LandscapeNoiseSoftness, 0.0);
+    if (band <= 1e-5) return lean > 0.0 ? 1.0 : 0.0;
+    return smoothstep(-band, band, lean);
+}
+
 // Normal : the smooth hill normal, from CalculateHills' Normal output. The mesh's own normal is
-//          flat — the hills are raised in the shader — so it has to come in from there.
+//          flat — the hills are raised in the shader — so it has to come in from there. Nothing
+//          is judged by steepness any more, but the grain is still laid along it.
+// Noise  : CalculateHills' Noise output — x which way the rocky noise leans here (-1 down to
+//          +1 up). The y, how much noise there is here at all, is left on the wire but unused:
+//          with no Ground or Tops behind it there is nothing for unnoisy ground to fall back to.
 // Colour : the landscape, each part in its variant, grained and lit.
-void LandscapeShading_float(float3 Normal, float3 WorldPos, out float3 Colour)
+void LandscapeShading_float(float3 Normal, float3 WorldPos, float2 Noise, out float3 Colour)
 {
     float3 n = normalize(Normal);
 
     // Which part this pixel is.
-    float angle  = degrees(acos(saturate(n.y)));
     float height = WorldPos.y - _LandscapeBaseY;
 
-    float hole  = LandscapeSplit(-height, _LandscapeHoleDepth);
-    float cliff = LandscapeSplit(angle,   _LandscapeCliffAngle);
-    float top   = LandscapeSplit(height,  _LandscapeTopHeight);
+    float hole = LandscapeSplit(-height, _LandscapeHoleDepth);
+    float up   = LandscapeNoiseUp(Noise.x);
 
-    float wHole   = hole;
-    float wCliff  = (1.0 - hole) * cliff;
-    float wTop    = (1.0 - hole) * (1.0 - cliff) * top;
-    float wGround = (1.0 - hole) * (1.0 - cliff) * (1.0 - top);
+    // Holes take the pixel first; all the rest is one side of the noise or the other.
+    float wHole = hole;
+    float wUp   = (1.0 - hole) * up;
+    float wDown = (1.0 - hole) * (1.0 - up);
 
-    float3 stone = LandscapeVariant(_LandscapePartVariants.x, WorldPos, n) * wGround
-                 + LandscapeVariant(_LandscapePartVariants.y, WorldPos, n) * wTop
-                 + LandscapeVariant(_LandscapePartVariants.z, WorldPos, n) * wCliff
-                 + LandscapeVariant(_LandscapePartVariants.w, WorldPos, n) * wHole;
+    float3 share = LandscapeShare(_LandscapePartVariants.x, wHole)
+                 + LandscapeShare(_LandscapePartVariants.y, wUp)
+                 + LandscapeShare(_LandscapePartVariants.z, wDown);
+
+    float3 stone = LandscapeVariant(0.0, WorldPos, n) * share.x
+                 + LandscapeVariant(1.0, WorldPos, n) * share.y
+                 + LandscapeVariant(2.0, WorldPos, n) * share.z;
 
     // Half lambert toward the world's light. Strength lerps out of it, so 0 is flat and unlit;
     // past 1 the lit result is multiplied, up to 10x brighter.
@@ -148,10 +175,10 @@ void LandscapeShading_float(float3 Normal, float3 WorldPos, out float3 Colour)
     Colour = stone * light;
 }
 
-void LandscapeShading_half(half3 Normal, half3 WorldPos, out half3 Colour)
+void LandscapeShading_half(half3 Normal, half3 WorldPos, half2 Noise, out half3 Colour)
 {
     float3 colour;
-    LandscapeShading_float(Normal, WorldPos, colour);
+    LandscapeShading_float(Normal, WorldPos, Noise, colour);
     Colour = colour;
 }
 

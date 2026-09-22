@@ -31,12 +31,6 @@ MonoBehaviour:
     height: 6.9
     smoothness: 1
     noise: 0
-  - id: 287d9bb7-99dc-4fe7-9108-640a6742e4f3
-    positionXZ: {x: 74.20417, y: -8.933358}
-    scale: 13.8
-    height: 48.7
-    smoothness: 1
-    noise: 0
   - id: ad947181-5f49-43ee-b116-5c64ff556f72
     positionXZ: {x: 72.6007, y: -39.059017}
     scale: 7.8
@@ -50,11 +44,11 @@ MonoBehaviour:
     smoothness: 1
     noise: 0
   - id: 4d317da8-59b2-41f7-8f77-34530b2f8871
-    positionXZ: {x: 100.07792, y: -3.8443806}
-    scale: 19.2
-    height: -15
-    smoothness: 1
-    noise: 0
+    positionXZ: {x: 83.08221, y: -14.082023}
+    scale: 50
+    height: 39.5
+    smoothness: 0.111
+    noise: 0.083
   - id: 521c1ca6-70c7-47da-854f-15a8bc60d246
     positionXZ: {x: 104.374405, y: 8.758636}
     scale: 19.2
@@ -64,7 +58,7 @@ MonoBehaviour:
   - id: c1d2c02f-86b8-4ed5-a166-64ad2d931b20
     positionXZ: {x: 86.12777, y: 13.246971}
     scale: 13.9
-    height: 42.8
+    height: -2
     smoothness: 0.676
     noise: 0.171
   - id: 65a6e1b8-fc75-4df3-be19-1455a7358016
@@ -158,15 +152,15 @@ MonoBehaviour:
     smoothness: 1
     noise: 0
   - id: 1f472ed0-d5de-4028-8230-24039689db10
-    positionXZ: {x: 92.548164, y: -33.587692}
-    scale: 18.8
-    height: 47.8
+    positionXZ: {x: 91.06042, y: -33.182346}
+    scale: 6.5
+    height: 9.9
     smoothness: 0.849
-    noise: 0.156
+    noise: 0.356
   - id: 5ab2b4ba-43c0-4a2f-8ddb-11586901d588
-    positionXZ: {x: 76.556175, y: 5.334454}
+    positionXZ: {x: 71.3702, y: 18.007244}
     scale: 8.3
-    height: 50
+    height: -2
     smoothness: 1
     noise: 0
   nodes:
@@ -177,13 +171,13 @@ MonoBehaviour:
     worldPosition: {x: 55.501385, y: 0, z: -16.445084}
     type: 2
   - id: b120236e-0200-44b0-a8dc-f6f9940c46d6
-    worldPosition: {x: 75.26848, y: 0, z: -16.307352}
+    worldPosition: {x: 74.349236, y: 0, z: -16.231432}
     type: 0
   - id: fdd41757-67b3-4add-89dc-85b6fed6be9b
     worldPosition: {x: 70.680374, y: 0, z: -16.395206}
     type: 1
   - id: db7d413b-45c1-4245-8ed4-960f13707658
-    worldPosition: {x: 76.162575, y: 0, z: -26.68103}
+    worldPosition: {x: 76.162575, y: 0, z: -26.950674}
     type: 0
   - id: b2e5db0b-7bc0-4af6-ab70-c3e42776e421
     worldPosition: {x: 88.003975, y: 0, z: -26.809046}
@@ -222,10 +216,10 @@ MonoBehaviour:
     worldPosition: {x: 81.40626, y: 0, z: -26.714182}
     type: 0
   - id: 0342c7d0-6045-4291-827e-982a0d16420d
-    worldPosition: {x: 81.47521, y: 2, z: -16.301846}
+    worldPosition: {x: 82.086624, y: 2, z: -16.301846}
     type: 0
   - id: 5e03aaba-f7bf-4158-bb7a-7003c42a4dd4
-    worldPosition: {x: 70.96825, y: 0, z: -25.334036}
+    worldPosition: {x: 70.69861, y: 0, z: -25.199215}
     type: 0
   - id: a58ee8b5-98eb-4b11-8809-c253ca889e25
     worldPosition: {x: 66.88144, y: 0, z: -16.374634}
@@ -288,10 +282,10 @@ MonoBehaviour:
     worldPosition: {x: -2.2397432, y: 0, z: -16.427258}
     type: 0
   - id: 11897299-3fb7-4e2a-a953-09d3299025e9
-    worldPosition: {x: 73.03683, y: 0, z: -26.68103}
+    worldPosition: {x: 72.732574, y: 0, z: -26.950674}
     type: 0
   - id: 4c74a89d-411b-4bda-ad02-e39cf0adb8dc
-    worldPosition: {x: 79.28832, y: 0, z: -26.68103}
+    worldPosition: {x: 79.592575, y: 0, z: -26.950674}
     type: 0
   - id: 3640a78a-cdef-45de-a712-ff8e882580c9
     worldPosition: {x: 75.86306, y: 0, z: -34.136063}
@@ -300,7 +294,10 @@ MonoBehaviour:
     worldPosition: {x: 65.17544, y: 0, z: -34.881714}
     type: 0
   - id: be02d845-96f7-4575-a069-dc9d17810310
-    worldPosition: {x: 76.162575, y: 0, z: -29.806776}
+    worldPosition: {x: 76.162575, y: 0, z: -30.380674}
+    type: 0
+  - id: d8fc67c2-d72c-4496-af01-adfeb3bfa25e
+    worldPosition: {x: 77.71235, y: 0, z: -16.26664}
     type: 0
   paths:
   - pathId: cb512902-99c4-4aa3-973b-d4a908cef861
@@ -309,6 +306,7 @@ MonoBehaviour:
     - 6c2c0bb8-0ed6-4a0c-a0c7-31ed04a6984b
     - 5dd7daf7-1839-46fb-8b5f-d6f4b9c0f05c
     - 0342c7d0-6045-4291-827e-982a0d16420d
+    - d8fc67c2-d72c-4496-af01-adfeb3bfa25e
     - b120236e-0200-44b0-a8dc-f6f9940c46d6
     - fdd41757-67b3-4add-89dc-85b6fed6be9b
     - a58ee8b5-98eb-4b11-8809-c253ca889e25
@@ -500,36 +498,6 @@ MonoBehaviour:
     - {fileID: 3016354063737027754, guid: b9892903f4bfc8d4bb553edfb66480d0, type: 3}
   obstacles: []
   arenas:
-  - nodeId: edfdd305-ee3a-4542-ba2e-05f1dc9a9fb9
-    gridData: {fileID: 0}
-    entranceIndex: 0
-    arenaPrefabOverride: {fileID: 0}
-    arenaRadius: 10.47
-    overrideWall: 1
-    archwayOnEntrances: 0
-    overrideArchway: 0
-    archwayProfile:
-      openingWidth: 0
-      thickness: 0
-      legHeight: 0.35
-      archHeight: 0.4
-      depth: 0
-    wallProfile:
-      radius: 10.47
-      thickness: 1
-      height: 4
-      drop: 42.5
-    overrideRunOverlap: 0
-    runOverlap: 0
-    overrideEntranceAlignment: 0
-    entranceAlignment:
-      across: 0
-      up: 0
-      along: 0
-    secondaryEntrances: []
-    compassEntrances: 0
-    compass: 2
-    leadIns: []
   - nodeId: e1f05638-ddfe-4bb2-9b7b-68de9e60a628
     gridData: {fileID: 11400000, guid: ea7758a3ab37a344380b917f95a35a13, type: 2}
     entranceIndex: 0
@@ -544,6 +512,30 @@ MonoBehaviour:
       legHeight: 0.35
       archHeight: 0.4
       depth: 0
+    overrideDoor: 1
+    doorProfile:
+      height: 2
+      baseWidth: 1
+      bulbRadius: 0.5
+      waistWidth: 0.6
+      waistHeight: 1
+      baseCurve: 0.4
+      frameWidth: 0.1
+      frameDepth: 0.3
+      flapRimWidth: 0.1
+      panelDepth: 0.3
+      flapWidth: 0.3
+      flapLegHeight: 0.3
+      flapCrownHeight: 0.2
+      flapCurve: 0.1
+      discRadius: 0
+      discDepth: 0.01
+      discRise: 0
+      discSideSteps: 3
+      numeralSize: 0.71
+      numeralRise: -0.025
+      numeralLift: 0.004
+    doorPreset: {fileID: 11400000, guid: 6b7325486d0e83b4c8a13303177b0117, type: 2}
     wallProfile:
       radius: 7.71
       thickness: 1
@@ -588,6 +580,30 @@ MonoBehaviour:
       legHeight: 0.35
       archHeight: 0.4
       depth: 0
+    overrideDoor: 0
+    doorProfile:
+      height: 0
+      baseWidth: 0
+      bulbRadius: 0.12
+      waistWidth: 0.1
+      waistHeight: 0.12
+      baseCurve: 0.3
+      frameWidth: 0.03
+      frameDepth: 0.02
+      flapRimWidth: 0.015
+      panelDepth: 0.15
+      flapWidth: 0.09
+      flapLegHeight: 0.03
+      flapCrownHeight: 0.05
+      flapCurve: 0.1
+      discRadius: 0.45
+      discDepth: 0.06
+      discRise: 0
+      discSideSteps: 1
+      numeralSize: 0.7
+      numeralRise: 0
+      numeralLift: 0.004
+    doorPreset: {fileID: 0}
     wallProfile:
       radius: 0
       thickness: 1
@@ -618,6 +634,60 @@ MonoBehaviour:
       entranceNodeId: 23885b89-514e-4831-8e52-baa25f4c2085
     - nodeId: e91713d5-bbd1-4f04-9445-a5f55b880ec5
       entranceNodeId: 10aaff99-cd7f-4c2a-b7bc-4106c47e94b6
+  - nodeId: edfdd305-ee3a-4542-ba2e-05f1dc9a9fb9
+    gridData: {fileID: 0}
+    entranceIndex: 0
+    arenaPrefabOverride: {fileID: 0}
+    arenaRadius: 10.47
+    overrideWall: 1
+    archwayOnEntrances: 0
+    overrideArchway: 0
+    archwayProfile:
+      openingWidth: 0
+      thickness: 0
+      legHeight: 0.35
+      archHeight: 0.4
+      depth: 0
+    overrideDoor: 0
+    doorProfile:
+      height: 0
+      baseWidth: 0
+      bulbRadius: 0.12
+      waistWidth: 0.1
+      waistHeight: 0.12
+      baseCurve: 0.3
+      frameWidth: 0.03
+      frameDepth: 0.02
+      flapRimWidth: 0.015
+      panelDepth: 0.15
+      flapWidth: 0.09
+      flapLegHeight: 0.03
+      flapCrownHeight: 0.05
+      flapCurve: 0.1
+      discRadius: 0.45
+      discDepth: 0.06
+      discRise: 0
+      discSideSteps: 1
+      numeralSize: 0.7
+      numeralRise: 0
+      numeralLift: 0.004
+    doorPreset: {fileID: 0}
+    wallProfile:
+      radius: 10.47
+      thickness: 1
+      height: 4
+      drop: 42.5
+    overrideRunOverlap: 0
+    runOverlap: 0
+    overrideEntranceAlignment: 0
+    entranceAlignment:
+      across: 0
+      up: 0
+      along: 0
+    secondaryEntrances: []
+    compassEntrances: 0
+    compass: 2
+    leadIns: []
   pools:
   - nodeId: b2e5db0b-7bc0-4af6-ab70-c3e42776e421
     overrideShape: 1
@@ -638,6 +708,7 @@ MonoBehaviour:
       rampHeight: 0
       base2Radius: 0.03
       base2Height: 0
+    towerPreset: {fileID: 0}
   - nodeId: 6c2c0bb8-0ed6-4a0c-a0c7-31ed04a6984b
     overrideShape: 1
     poolRadius: 3
@@ -659,6 +730,7 @@ MonoBehaviour:
       rampHeight: 0
       base2Radius: 0.03
       base2Height: 0
+    towerPreset: {fileID: 0}
   - nodeId: d9194d90-8bf7-477e-9462-c545c38e4ae0
     overrideShape: 1
     poolRadius: 4.58
@@ -684,10 +756,11 @@ MonoBehaviour:
       rampHeight: 0
       base2Radius: 0.03
       base2Height: 0
+    towerPreset: {fileID: 0}
   - nodeId: db7d413b-45c1-4245-8ed4-960f13707658
     overrideShape: 1
-    poolRadius: 1.65
-    islandRadius: 0.19
+    poolRadius: 2
+    islandRadius: 0
     floorDepth: 0
     editorColor: {r: 0.35, g: 0.75, b: 1, a: 1}
     leadIns:
@@ -707,15 +780,16 @@ MonoBehaviour:
       rampHeight: 0
       base2Radius: 0.03
       base2Height: 0
+    towerPreset: {fileID: 0}
   outposts:
   - outpostId: 54e0ec99-d17c-49c7-9afe-d338173ef8be
     pathId: cb512902-99c4-4aa3-973b-d4a908cef861
-    pathT: 0.2857143
+    pathT: 0.25
     side: 1
     width: 3.24
     depth: 2.54
     height: 0.32
-    wallThickness: 0.15
+    wallThickness: 0.44
     wallHeight: 0.22
     tower:
       stemRadius: 0.15
@@ -729,14 +803,97 @@ MonoBehaviour:
     towerOffset: {x: 0.62, y: 0}
     observers:
     - offsetAlong: -0.84
-      offsetAway: -0.6
+      offsetAway: -0.59
       facing: 11.75
       height: 0.6
-    - offsetAlong: 1.06
-      offsetAway: -0.68
+    - offsetAlong: 0.94
+      offsetAway: -0.59
       facing: 0
       height: 0.6
     preset: {fileID: 11400000, guid: 13dce602f9f6a514485f0086fe1284e7, type: 2}
+    towerPreset: {fileID: 11400000, guid: 16e422adff10b2d4290d628d4c2350f5, type: 2}
+  rimNodes:
+  - nodeId: b120236e-0200-44b0-a8dc-f6f9940c46d6
+    side: 0
+    radius: 0.435
+    height: 0.12
+    width: 1.59
+    plinthRadius: 0.284
+    plinthHeight: 0.18
+    topper: 2
+    tower:
+      stemRadius: 0.02
+      stemHeight: 0.35
+      orbRadius: 0.1
+      baseRadius: 0.05
+      baseHeight: 0.03
+      rampHeight: 0
+      base2Radius: 0.03
+      base2Height: 0
+    towerPreset: {fileID: 0}
+    displayHeight: 1.2
+    interact:
+      enabled: 1
+      prompt: Look
+      radius: 2.18
+      posterName: 1stPoster
+    bothLeft:
+      topper: 2
+      tower:
+        stemRadius: 0.02
+        stemHeight: 0.35
+        orbRadius: 0.1
+        baseRadius: 0.05
+        baseHeight: 0.03
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      towerPreset: {fileID: 0}
+      displayHeight: 0.84
+      interact:
+        enabled: 0
+        prompt: Look
+        radius: 3
+        posterName: 
+  pipes:
+  - pipeId: fa8bf69f-ccaa-47ee-a557-4d537bd9eeaf
+    nodes:
+    - positionXZ: {x: 82.38574, y: -38.481228}
+      overrideHeight: 1
+      height: 2.68
+    - positionXZ: {x: 81.44073, y: -21.370863}
+      overrideHeight: 0
+      height: 0.5
+    - positionXZ: {x: 79.06234, y: -11.143803}
+      overrideHeight: 0
+      height: 0.5
+    - positionXZ: {x: 82.47136, y: 3.443629}
+      overrideHeight: 0
+      height: 0.5
+    - positionXZ: {x: 90.39931, y: 15.731955}
+      overrideHeight: 0
+      height: 0.5
+    - positionXZ: {x: 86.35606, y: 23.659906}
+      overrideHeight: 0
+      height: 0.5
+    supports:
+    - leg: 2
+      along: 0.34546983
+    - leg: 0
+      along: 0.81976444
+    - leg: 0
+      along: 0.20823368
+    - leg: 3
+      along: 0.2404115
+    - leg: 3
+      along: 0.79735506
+    - leg: 1
+      along: 0.10946872
+    height: 6.43
+    pipeThickness: 1.2
+    wallThickness: 0.03
+    supportThickness: 0.7
+    ringOverhang: 0.38
   junctionScriptObject: {fileID: 3543737601092306643, guid: cdc03d5a67a4c8a4ca447c17a1a65a6b, type: 3}
   arenaPrefab: {fileID: 6685816687890925279, guid: 1f8a1bc0973719f48851a1d2efa25504, type: 3}
   arenaEntrancePrefab: {fileID: 3190444306040296516, guid: fb37ce94a14f8f24a9a64d50b2d45a57, type: 3}
@@ -746,6 +903,8 @@ MonoBehaviour:
   waterMaterial: {fileID: 2100000, guid: 23355fb4d7f054041b2040aaa843e46d, type: 2}
   arenaWallMaterial: {fileID: 2100000, guid: df48e831018dc444dbc6635b9fe63f5c, type: 2}
   arenaDoorMaterial: {fileID: 0}
+  arenaNumeralMaterial: {fileID: 2100000, guid: e959b24ea75b7b341ab2eb10b2379272, type: 2}
+  posterLibrary: {fileID: 11400000, guid: 88679f7c1c224b544ac2e67fd09d49c1, type: 2}
   waterFilled: 1
   waterLevel: 0.48
   waterPoolOverlap: 4
@@ -761,7 +920,7 @@ MonoBehaviour:
   - riverName: MainRiver
     innerWidth: 3
     rimWidth: 0.86
-    riverDepth: 0.81
+    riverDepth: 1
     depth: 42.98
     jointGroove: 0
   - riverName: Branch_04
@@ -787,6 +946,29 @@ MonoBehaviour:
     legHeight: 0.97
     archHeight: 0.97
     depth: 3.25
+  defaultDoor:
+    height: 2
+    baseWidth: 1
+    bulbRadius: 0.5
+    waistWidth: 0.6
+    waistHeight: 2.3
+    baseCurve: 0.5
+    frameWidth: 0.1
+    frameDepth: 0.3
+    flapRimWidth: 0.1
+    panelDepth: 0.15
+    flapWidth: 0.3
+    flapLegHeight: 0.3
+    flapCrownHeight: 0.2
+    flapCurve: 0.1
+    discRadius: 0.45
+    discDepth: 0.06
+    discRise: 0
+    discSideSteps: 1
+    numeralSize: 0.7
+    numeralRise: 0
+    numeralLift: 0.004
+  defaultDoorPreset: {fileID: 11400000, guid: 6b7325486d0e83b4c8a13303177b0117, type: 2}
   defaultEntranceAlignment:
     across: 0
     up: -0.5
@@ -803,7 +985,7 @@ MonoBehaviour:
   landscapeTileSubdivisions: 34
   landscapeOffset: {x: -43.9, y: -130.9}
   landscapeWorldY: 0
-  landscapeHeightOffset: -43.1
+  landscapeHeightOffset: -44.1
   landscapeNoiseScale: 0.25
   fogEnabled: 1
   fogMap: {fileID: 11400000, guid: 4062942389ca8354dbda8fa65eabcd24, type: 2}

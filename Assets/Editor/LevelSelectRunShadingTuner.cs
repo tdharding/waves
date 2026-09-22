@@ -116,14 +116,19 @@ public class LevelSelectRunShadingTuner : EditorWindow
         DrawSeamDataRow();
 
         EditorGUILayout.Space();
+        DrawDecalRow();
+
+        EditorGUILayout.Space();
         EditorGUILayout.LabelField("Run Shading", EditorStyles.boldLabel);
         EditorGUILayout.LabelField(
-            "Four things, all off the same numbers. The stone itself — a colour each for the " +
+            "Five things, all off the same numbers. The stone itself — a colour each for the " +
             "outer faces, the rim lip and the inside of the channel, each with its own noise " +
             "grain. Dark gathered along every seam of it — the rim's two edges, the foot of the " +
             "outer wall, the joints between pieces. White rising off the waterline up the inside " +
-            "of the channel. And the made-up light the stone is shaped by, which is what replaced " +
-            "Simulated Lighting Basic on the run shader. Grain size and the waterline extent are " +
+            "of the channel. Hand-drawn decals scattered over the lot. And the made-up " +
+            "light the stone is shaped by, which is what replaced " +
+            "Simulated Lighting Basic on the run shader. Grain size, the decal spacing " +
+            "and scales, and the waterline extent are " +
             "metres; the seam extent is a percentage of the width of each surface, so every piece " +
             "is shaded in proportion to its own size. The sections below choose which of the three " +
             "stone colours each part of an outpost, tower, arena wall and archway takes — those " +
@@ -234,6 +239,153 @@ public class LevelSelectRunShadingTuner : EditorWindow
             EditorGUILayout.HelpBox(
                 $"All {runs} runs carry their seams and their face kinds.", MessageType.None);
         }
+    }
+
+    /// <summary>
+    /// The hand-drawn decals: what is in their folder, what the sheet built from it holds, and
+    /// whether the two still agree.
+    ///
+    /// Here rather than among the sliders because it is not a number. The scatter's spacing,
+    /// scales and amount are below with everything else; this is the drawings themselves — which
+    /// arrive by being dropped into a folder, not by being typed — and the one sheet they are
+    /// gathered onto for the shader to read.
+    ///
+    /// The sheet is not rebuilt on its own, for the reason in
+    /// <see cref="RiverRunDecalLibrary.Behind"/>: a window that writes assets while it is being
+    /// drawn writes them on every repaint, and a sheet that rebuilt itself would move every decal
+    /// in the world the moment a drawing was added to the folder. So it is counted, said, and
+    /// left to a button.
+    /// </summary>
+    private void DrawDecalRow()
+    {
+        EditorGUILayout.LabelField("Decals", EditorStyles.boldLabel);
+
+        var decals = RiverRunDecalLibrary.All();
+
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            EditorGUILayout.LabelField(
+                new GUIContent(
+                    "Folder",
+                    "Every drawing dropped in here joins the scatter once the sheet is rebuilt."),
+                new GUIContent(RiverRunDecalLibrary.Folder));
+
+            if (GUILayout.Button("Show", GUILayout.Width(50f)))
+            {
+                var folder = AssetDatabase.LoadAssetAtPath<Object>(
+                    LevelSelectRiverPresetLibrary.EnsureFolder(RiverRunDecalLibrary.Folder));
+
+                if (folder != null)
+                {
+                    Selection.activeObject = folder;
+                    EditorGUIUtility.PingObject(folder);
+                }
+            }
+        }
+
+        // The drawings themselves, in the order they are gathered — which is the order they are
+        // laid onto the sheet, and so which cell each of them ends up in.
+        if (decals.Count > 0) DrawDecalStrip(decals);
+
+        using (new EditorGUI.DisabledScope(true))
+        {
+            EditorGUILayout.ObjectField(
+                new GUIContent("Sheet",
+                               "All of the drawings on one texture, in equal cells. Built from " +
+                               "the folder, held by these settings, and read by the shader one " +
+                               "cell at a time."),
+                runShading.decalSheet, typeof(Texture2D), false);
+        }
+
+        string behind = RiverRunDecalLibrary.Behind(runShading);
+
+        if (behind != null)
+        {
+            EditorGUILayout.HelpBox(
+                behind + " Rebuild the sheet, then Save, so the world keeps it — the sheet is " +
+                "held on the preset like every other setting here.",
+                MessageType.Warning);
+        }
+        else if (decals.Count == 0)
+        {
+            EditorGUILayout.HelpBox(
+                "No drawings in the folder yet, so nothing is stamped on the stone. Drop one in " +
+                "— anything drawn on transparency, any size, any shape — and rebuild the sheet.",
+                MessageType.None);
+        }
+        else if (runShading.decalAmount <= 0f)
+        {
+            EditorGUILayout.HelpBox(
+                "The sheet holds " + runShading.decalSheetHeld + " of the folder's " +
+                decals.Count + ", and Amount is 0, so none of them is drawn. Turn Amount up, " +
+                "below.",
+                MessageType.None);
+        }
+        else
+        {
+            EditorGUILayout.HelpBox(
+                "The sheet holds all " + decals.Count + " of the folder's drawings, " +
+                runShading.decalSheetColumns + "x" + runShading.decalSheetRows + " cells of " +
+                runShading.decalSheetCellPixels + "px.",
+                MessageType.None);
+        }
+
+        if (GUILayout.Button("Rebuild Sheet")) RebuildDecalSheet();
+    }
+
+    /// <summary>
+    /// The folder's drawings across the window, wrapping, each over a chequer rather than over
+    /// the window, so a drawing made of pale strokes is no more invisible than one made of dark.
+    /// </summary>
+    private void DrawDecalStrip(System.Collections.Generic.List<Texture2D> decals)
+    {
+        const float Tile = 48f;
+
+        float usable = Mathf.Max(EditorGUIUtility.currentViewWidth - 30f, Tile);
+        int   perRow = Mathf.Max(1, Mathf.FloorToInt(usable / (Tile + 4f)));
+
+        for (int i = 0; i < decals.Count; i += perRow)
+        {
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                for (int j = i; j < Mathf.Min(i + perRow, decals.Count); j++)
+                {
+                    Rect tile = GUILayoutUtility.GetRect(Tile, Tile,
+                                                         GUILayout.Width(Tile),
+                                                         GUILayout.Height(Tile));
+
+                    EditorGUI.DrawTextureTransparent(tile, decals[j], ScaleMode.ScaleToFit);
+
+                    if (GUI.Button(tile, new GUIContent(string.Empty, decals[j].name),
+                                   GUIStyle.none))
+                    {
+                        Selection.activeObject = decals[j];
+                        EditorGUIUtility.PingObject(decals[j]);
+                    }
+                }
+
+                GUILayout.FlexibleSpace();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gathers the folder onto the sheet and takes what it laid out into this window's numbers,
+    /// so the scene shows the new drawings straight away. Saving is still separate: the sheet and
+    /// its cells are held on the preset with everything else, and until Save they are only here.
+    /// </summary>
+    private void RebuildDecalSheet()
+    {
+        bool built = RiverRunDecalLibrary.Build(runShading, out string said);
+
+        // The window's own copy of the numbers changed underneath its SerializedObject, which
+        // would otherwise draw the old ones back over them on the next repaint.
+        _window = new SerializedObject(this);
+        TakeOver();
+        Repaint();
+
+        if (built) Debug.Log("[LevelSelectRunShadingTuner] " + said);
+        else       Debug.LogWarning("[LevelSelectRunShadingTuner] " + said);
     }
 
     private void DrawPresetRow()

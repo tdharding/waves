@@ -37,6 +37,15 @@ public class LevelSelectCameraControllerEditor : Editor
 
         EditorGUILayout.Space();
 
+        // 1c. Interact Lean — the glance the camera gives a point it is passing
+        EditorGUILayout.LabelField("Interact Lean Settings", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("interactLean"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("maxInteractLeanAngle"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("interactLeanTime"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("interactLeanZoom"));
+
+        EditorGUILayout.Space();
+
         // 2. Transition Section
         EditorGUILayout.LabelField("Transition Target Settings", EditorStyles.boldLabel);
         EditorGUI.BeginChangeCheck();

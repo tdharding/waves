@@ -8,7 +8,8 @@ using UnityEngine;
 
 /// <summary>
 /// Pipes: hollow pipes standing over the map on support stems, with a ring round the pipe at
-/// every support. Only for looks — nothing travels along them and they have no collider.
+/// every support. Only for looks — nothing travels along them, but they carry capsule
+/// colliders so the camera and the glows can tell when a pipe is in front of something.
 ///
 /// Pipe mode draws them. Click empty space to start a pipe and keep clicking to lay its nodes;
 /// Enter, Esc or a double-click finishes it. Shift-click on a pipe puts a support there. Drag a
@@ -650,6 +651,62 @@ public partial class LevelSelectDesignerWindow
         record.pipeId        = pipe.pipeId;
         record.meshAssetName = name;
         EditorUtility.SetDirty(record);
+
+        EnsurePipeColliders(pipe, go);
+    }
+
+    private const string PipeColliderName = "PipeCollider";
+
+    /// <summary>
+    /// Gives a pipe something to be hit by: a capsule down each leg and each support stem,
+    /// rather than a collider shaped like the mesh. What wants them is the camera and the
+    /// glows, which cast rays to find out what is standing in front of what, so a shape
+    /// roughly the size of the pipe is all they ask for and a cheap one is worth having.
+    ///
+    /// Each capsule is a child of its own, because a capsule can only run along one of its
+    /// object's axes and a pipe's legs run every which way. They are laid out again from
+    /// scratch on every rebuild, since a pipe redrawn has a different number of them.
+    /// </summary>
+    private void EnsurePipeColliders(LevelSelectDesignerData.DesignerPipe pipe, GameObject go)
+    {
+        for (int i = go.transform.childCount - 1; i >= 0; i--)
+        {
+            var child = go.transform.GetChild(i);
+            if (child.name.StartsWith(PipeColliderName))
+                Undo.DestroyObjectImmediate(child.gameObject);
+        }
+
+        var rods = PipeMesh.CollisionRods(
+            PipeNodePoints(pipe), pipe.supports.Select(ToMeshSupport).ToList(),
+            pipe.pipeThickness, pipe.supportThickness, -_data.RunDepth);
+
+        for (int i = 0; i < rods.Count; i++)
+        {
+            var     rod    = rods[i];
+            Vector3 along  = rod.to - rod.from;
+            float   length = along.magnitude;
+            if (length < 1e-4f) continue;
+
+            var child = new GameObject($"{PipeColliderName}_{i}");
+            Undo.RegisterCreatedObjectUndo(child, "Generate Pipe");
+            child.transform.SetParent(go.transform, false);
+            child.layer = go.layer;
+
+            // The pipe sits unrotated at the rim top, so a rod's points are already the
+            // child's local ones. The capsule runs up its own y, turned onto the rod.
+            child.transform.localPosition = (rod.from + rod.to) * 0.5f;
+            child.transform.localRotation = Quaternion.FromToRotation(Vector3.up, along / length);
+            child.transform.localScale    = Vector3.one;
+
+            var col       = child.AddComponent<CapsuleCollider>();
+            col.direction = 1;
+            col.radius    = rod.radius;
+
+            // Height counts the two rounded ends in, so the straight part is the rod itself
+            // and the ends round off past it the way the pipe does at a bend.
+            col.height    = length + rod.radius * 2f;
+            EditorUtility.SetDirty(col);
+        }
     }
 
     // Named off the pipe's id, which survives every regenerate — so the mesh asset is reused.

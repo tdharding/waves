@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 62a877791e9312444a218bdc460321c9, type: 3}
   m_Name: LevelSelectFogMap1
   m_EditorClassIdentifier: Assembly-CSharp::FogMap
-  obstacleRange: 63.33
+  obstacleRange: 30
   repelLimit: 64
   maskLimit: 128
   properties:
@@ -41,18 +41,18 @@ MonoBehaviour:
   blobScaleMin: 5.8
   blobScaleMax: 7.2
   fogOpacity: 1
-  maskRadius: 35.1
+  maskRadius: 26.7
   maskFeather: 0.75
   windAngle: 20
   windSpeed: 0.4
-  unitsPerTexel: 0.053
-  maxGridResolution: 256
+  unitsPerTexel: 0.3
+  maxGridResolution: 128
   heightMapQuality: 0
   heaviness: 0.98
-  blurRadius: 0.213
+  blurRadius: 0.002
   heightBlurRadius: 2
-  spawnRadius: 32.8
-  cullRadius: 35.4
+  spawnRadius: 25.9
+  cullRadius: 27.2
   globalRepelStrength: 1
   rockRepelRadius: 0.7
   rockRepelStrength: 1
@@ -66,7 +66,7 @@ MonoBehaviour:
   lampMaskFeather: 0.2
   runsRepel: 1
   runChainSpacing: 3.1
-  runRepelRadius: 2.14
+  runRepelRadius: 1.04
   runRepelStrength: 0.5
   runMaskRadius: 1.18
   runMaskFeather: 0.6
@@ -94,10 +94,10 @@ MonoBehaviour:
   lipLighting: 1.92
   lipCurvature: 0.55
   heightScale: 1.6
-  fogColour: {r: 0.10062885, g: 0.10062885, b: 0.10062885, a: 1}
+  fogColour: {r: 0.4433962, g: 0.4433962, b: 0.4433962, a: 1}
   litColour: {r: 1, g: 1, b: 1, a: 1}
-  ambient: 0.341
+  ambient: 0.609
   interiorFill: 1
   transparencyFalloff: 0.57
-  grainAmount: 0.33
-  grainScale: 10
+  grainAmount: 0.15
+  grainScale: 4
