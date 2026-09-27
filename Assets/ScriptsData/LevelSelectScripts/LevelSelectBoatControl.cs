@@ -354,7 +354,7 @@ public class LevelSelectBoatControl : MonoBehaviour
     /// The height of the water at a place: looked for from above, so a boat that has slipped
     /// a little under the surface still finds it rather than searching the sky.
     /// </summary>
-    private bool TrySampleSurface(Vector3 at, out float y)
+    public bool TrySampleSurface(Vector3 at, out float y)
     {
         y = 0f;
         if (WaterMask == 0) return false;

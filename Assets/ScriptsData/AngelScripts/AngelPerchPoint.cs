@@ -42,6 +42,19 @@ public class AngelPerchPoint : MonoBehaviour
     [TextArea(1, 4)]
     [SerializeField] string talkText = "";
 
+    [Tooltip("She starts the scene stood here, rather than flying. She holds it however far off " +
+             "the boat is, and only joins the flight once the boat has been inside the perch " +
+             "radius once — so the opening is the same wherever the boat happens to start.")]
+    [SerializeField] bool startPerch;
+
+    [Tooltip("What the prompt reads where a scene prompts for its interactions, such as the level " +
+             "select map. The key is added by the prompt itself, so this is just the doing.")]
+    [SerializeField] string talkPrompt = "Talk";
+
+    [Tooltip("How far her talk camera sits from her while she talks here, along its own view. " +
+             "0 = the distance authored on the angel prefab's camera.")]
+    [SerializeField] float talkCameraDistance;
+
     // Every perch in the level. LevelSpawner builds the whole maze in one pass before the boat
     // moves, so this is complete by the time the angel asks. Domain-reload-safe, matching
     // CreepClimbingArea — with "Reload Domain" off the list would otherwise carry over.
@@ -55,8 +68,12 @@ public class AngelPerchPoint : MonoBehaviour
 
     /// <summary>Called by ProceduralSpike once the mesh is built. Tip is in this object's local space.</summary>
     public void Configure(Vector3 tipLocal, float perch, float talk, bool isPriority,
-                          bool canTalk, string say, float curveSize)
+                          bool canTalk, string say, float curveSize,
+                          bool isStart = false, string prompt = null, float cameraDistance = 0f)
     {
+        talkCameraDistance = Mathf.Max(0f, cameraDistance);
+        startPerch  = isStart;
+        if (prompt != null) talkPrompt = prompt;
         landingCurveSize = Mathf.Max(0f, curveSize);
         tipOffset   = tipLocal;
         perchRadius = Mathf.Max(0f, perch);
@@ -112,6 +129,30 @@ public class AngelPerchPoint : MonoBehaviour
     /// <summary>What she says when talked to here, as authored — slashes and all.</summary>
     public string TalkText => talkText;
 
+    /// <summary>She opens the scene stood here. Only one perch in a scene should say yes.</summary>
+    public bool IsStartPerch => startPerch;
+
+    /// <summary>What a scene's own prompt reads for talking to her here.</summary>
+    public string TalkPrompt => talkPrompt;
+
+    /// <summary>Her talk camera's distance while she talks here. 0 = the prefab's own.</summary>
+    public float TalkCameraDistance => talkCameraDistance;
+
+    /// <summary>
+    /// The perch a scene opens on, or none. The first one found wins: two start perches is an
+    /// authoring mistake, not an arrangement worth honouring, and picking one quietly beats
+    /// having her flicker between them.
+    /// </summary>
+    public static AngelPerchPoint FindStartPerch()
+    {
+        for (int i = 0; i < All.Count; i++)
+        {
+            var p = All[i];
+            if (p != null && p.isActiveAndEnabled && p.startPerch) return p;
+        }
+        return null;
+    }
+
     /// <summary>
     /// What she says, one line at a time, already split on "/". Empty when there is nothing to say.
     /// Rebuilt on demand in the editor so a line typed into the Inspector shows without a respawn.
@@ -142,9 +183,25 @@ public class AngelPerchPoint : MonoBehaviour
     void OnDrawGizmos()
     {
         Vector3 tip = PerchWorld;
-        Gizmos.color = priority ? new Color(1f, 0.85f, 0.2f, 0.95f) : new Color(1f, 0.95f, 0.6f, 0.9f);
-        Gizmos.DrawSphere(tip, 0.03f);
-        Gizmos.DrawLine(tip, tip + Vector3.up * 0.25f);
+
+        // Exactly where she stands: the tip plus the angel's own foot offset, the same sum
+        // AngelCompanion lands her on. Kept a fixed size on screen and drawn through whatever it
+        // sits on, so it reads as a clear dot at any zoom rather than half-buried in the rock.
+        if (_gizmoAngel == null) _gizmoAngel = FindFirstObjectByType<AngelCompanion>();
+        Vector3 feet = tip + Vector3.up * (_gizmoAngel != null ? _gizmoAngel.PerchFootOffset : 0f);
+
+        var dotColor = priority ? new Color(1f, 0.85f, 0.2f, 1f) : new Color(1f, 0.95f, 0.6f, 1f);
+        var zTest    = Handles.zTest;
+        Handles.zTest = UnityEngine.Rendering.CompareFunction.Always;
+        Handles.color = dotColor;
+        Handles.SphereHandleCap(0, feet, Quaternion.identity,
+                                HandleUtility.GetHandleSize(feet) * (startPerch ? 0.12f : 0.08f),
+                                EventType.Repaint);
+        Handles.zTest = zTest;
+
+        Gizmos.color = dotColor;
+        Gizmos.DrawLine(feet, feet + Vector3.up * 0.25f);
+        if (startPerch) Handles.Label(feet + Vector3.up * 0.28f, "start");
 
         // The two ranges, drawn at the waterline where the boat actually crosses them rather than
         // up at the tip. Same convention as CreepClimbingArea's rings.
@@ -162,5 +219,8 @@ public class AngelPerchPoint : MonoBehaviour
             Handles.Label(atWater + Vector3.right * talkRadius, $"talk r={talkRadius:0.#}");
         }
     }
+
+    // Looked up once and held, rather than searched for by every perch on every redraw.
+    static AngelCompanion _gizmoAngel;
 #endif
 }

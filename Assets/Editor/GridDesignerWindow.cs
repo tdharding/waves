@@ -10384,8 +10384,12 @@ public class GridDesignerWindow : EditorWindow
                     using (new EditorGUI.DisabledScope(s.preset == null))
                         if (GUILayout.Button("Select preset asset"))
                             EditorGUIUtility.PingObject(s.preset);
-                    if (GUILayout.Button("Edit in Spike Studio"))
-                        EditorApplication.ExecuteMenuItem("Tools/Waves/Spike Studio");
+                    // The studio's stage in the level's look, on this rock's own shape and size.
+                    if (GUILayout.Button(new GUIContent("Edit Shape",
+                            "Opens this rock's preset in the Spike Studio, on a stage of its own in " +
+                            "the level's look. Saving the preset restyles every rock using it.")))
+                        SpikeStudio.OpenForSpike(s.preset, s.EffectiveScale, SpikeStage.Look.Waves,
+                                                 Vector3.zero, null);
                 }
             }
 

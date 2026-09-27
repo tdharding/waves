@@ -133,6 +133,19 @@ float LandscapeNoiseUp(float lean)
     return smoothstep(-band, band, lean);
 }
 
+// Half lambert toward the world's light. Strength lerps out of it, so 0 is flat and unlit;
+// past 1 the lit result is multiplied, up to 10x brighter. Shared with the spikes, which stand
+// in the landscape and so are lit the same way.
+float LandscapeLight(float3 n, float3 worldPos)
+{
+    float3 toLight = _LevelSelectLightPosition.xyz - worldPos;
+    toLight = dot(toLight, toLight) > 1e-8 ? normalize(toLight) : float3(0.0, 1.0, 0.0);
+
+    float ndl = dot(n, toLight) * 0.5 + 0.5;
+    return lerp(1.0, saturate(ndl), saturate(_LandscapeLightStrength))
+         * max(_LandscapeLightStrength, 1.0);
+}
+
 // Normal : the smooth hill normal, from CalculateHills' Normal output. The mesh's own normal is
 //          flat — the hills are raised in the shader — so it has to come in from there. Nothing
 //          is judged by steepness any more, but the grain is still laid along it.
@@ -163,16 +176,7 @@ void LandscapeShading_float(float3 Normal, float3 WorldPos, float2 Noise, out fl
                  + LandscapeVariant(1.0, WorldPos, n) * share.y
                  + LandscapeVariant(2.0, WorldPos, n) * share.z;
 
-    // Half lambert toward the world's light. Strength lerps out of it, so 0 is flat and unlit;
-    // past 1 the lit result is multiplied, up to 10x brighter.
-    float3 toLight = _LevelSelectLightPosition.xyz - WorldPos;
-    toLight = dot(toLight, toLight) > 1e-8 ? normalize(toLight) : float3(0.0, 1.0, 0.0);
-
-    float ndl   = dot(n, toLight) * 0.5 + 0.5;
-    float light = lerp(1.0, saturate(ndl), saturate(_LandscapeLightStrength))
-                * max(_LandscapeLightStrength, 1.0);
-
-    Colour = stone * light;
+    Colour = stone * LandscapeLight(n, WorldPos);
 }
 
 void LandscapeShading_half(half3 Normal, half3 WorldPos, half2 Noise, out half3 Colour)

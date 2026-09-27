@@ -58,6 +58,10 @@ public class RiverRunMesh : MonoBehaviour
     [Tooltip("River whose Run Shape this run is built from.")]
     public string riverName;
 
+    [Tooltip("The designer path this run was built from. A path cut into legs at a pool carries " +
+             "a '#pool' suffix on each leg. Empty on runs generated before it was recorded.")]
+    public string pathId;
+
     [Tooltip("Name of the generated mesh asset this run writes to.")]
     public string meshAssetName;
 

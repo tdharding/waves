@@ -136,6 +136,9 @@ public class LevelSelectLandscapeTuner : EditorWindow
             TakeOver();
         }
 
+        EditorGUILayout.Space();
+        WhiteFadeTunerSection.Draw();
+
         EditorGUILayout.EndScrollView();
         _window.ApplyModifiedProperties();
     }

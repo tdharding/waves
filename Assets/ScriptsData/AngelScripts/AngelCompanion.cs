@@ -16,10 +16,20 @@ using UnityEngine;
 //                  three again. AngelTalking.
 //   taking off ... You left the radius, so she climbs back to the flight position. AngelFlying1.
 //
-// Perches are the procedural spikes the Grid Designer marked as angel perch points; each one gets
-// an AngelPerchPoint at spawn holding the tip of the rock it was built to, its two radii, and
-// whether it is a PRIORITY perch (always come down for it) or one she is merely WATCHING (settle
-// there only when she happens to be looking for somewhere to land).
+// A perch is anything carrying an AngelPerchPoint: in a level, the procedural spikes the Grid
+// Designer marked, each given one at spawn holding the tip of the rock it was built to; on the
+// level select map, the towers and markers the Level Select Designer put one on. Either way it
+// holds the tip, the two radii, and whether it is a PRIORITY perch (always come down for it) or
+// one she is merely WATCHING (settle there only when she happens to be looking for somewhere).
+//
+// She can also OPEN a scene already stood on one — a perch marked start. She holds it however far
+// off the boat is, and joins the flight only once the boat has sailed inside its radius, so the
+// first sight of her is the same every time.
+//
+// The map runs its conversations through its own interact system rather than her talk key, since
+// it already owns a key, a prompt and the anchoring for everything else on it — see
+// BeginSceneTalk and LevelSelectAngelTalk. A level has no such system, so there she does all of
+// it herself.
 //
 // Animation is driven BY STATE NAME (CrossFadeInFixedTime), because AngelAnimation has no
 // parameters or transitions authored — the states sit disconnected in the graph on purpose, the
@@ -31,6 +41,10 @@ public class AngelCompanion : MonoBehaviour
     [Header("References")]
     [Tooltip("Animator holding AngelFlying1 / AngelLanding / AngelPerched. Found in children if unset.")]
     [SerializeField] Animator animator;
+
+    [Tooltip("The boat she follows. Left empty she finds it herself — the level's own boat first, " +
+             "then the level select map's. Only needed for a scene that has neither.")]
+    [SerializeField] Transform boatOverride;
 
     [Header("Animation states")]
     [SerializeField] string flyingState  = "AngelFlying1";
@@ -64,6 +78,19 @@ public class AngelCompanion : MonoBehaviour
     [Tooltip("Below this speed there is no travel direction to read, so she holds the heading she has.")]
     [SerializeField] float minTurnSpeed = 0.15f;
 
+    [Tooltip("A bone in her armature that turns about its own Y axis to face the boat while she is " +
+             "perched or talking, instead of the whole prefab turning. Left empty, the whole prefab " +
+             "turns as before. In flight her whole body still faces the way she is going.")]
+    [SerializeField] Transform faceBoatBone;
+
+    [Tooltip("Which way the bone's front points, in degrees round its own Y axis from its Z. This is " +
+             "the side that turns to face the boat. Drag the dot on the arrow in the Scene view to set it.")]
+    [SerializeField] float faceBoatBoneForward = 0f;
+
+    [Tooltip("Furthest the bone turns either way to face the boat, in degrees off its animated pose. " +
+             "Past it she holds at the limit. 180 = no limit.")]
+    [Range(0f, 180f)] [SerializeField] float faceBoatBoneMaxTurn = 180f;
+
     [Header("Swooping down")]
     [Tooltip("Shortest time flying before she starts looking for somewhere to land.")]
     [SerializeField] float flightTimeMin = 20f;
@@ -87,6 +114,9 @@ public class AngelCompanion : MonoBehaviour
              "the soles of her feet.")]
     [SerializeField] float perchFootOffset = 0f;
 
+    /// <summary>How far above a perch's tip she actually stands.</summary>
+    public float PerchFootOffset => perchFootOffset;
+
     [Header("Perched")]
     [Tooltip("How long the climb back up to the flight takes.")]
     [SerializeField] float takeOffDuration = 2f;
@@ -108,6 +138,13 @@ public class AngelCompanion : MonoBehaviour
              "one is in the scene.")]
     [SerializeField] CinemachineBrain brain;
 
+    [Tooltip("Where the level select camera glances as the boat passes her perch — her face, " +
+             "usually. Left empty, it glances at the perch she stands on.")]
+    [SerializeField] Transform lookAtPoint;
+
+    /// <summary>What the map camera glances at when passing her; null if none is set.</summary>
+    public Transform LookAtPoint => lookAtPoint;
+
     /// <summary>True while a conversation is running.</summary>
     public bool IsTalking => _mood == Mood.Talking;
 
@@ -122,12 +159,37 @@ public class AngelCompanion : MonoBehaviour
     Transform       _boat;
     bool            _placed;    // has she been put on her flight line yet?
 
+    // The face-the-boat bone, turned on top of whatever the animation posed it at this frame.
+    float      _boneYaw;         // degrees it is turned now
+    float      _boneYawWanted;   // degrees it is heading for; 0 = back to the animation's pose
+    bool       _boneLooking;     // perched or talking asked it to face the boat this frame
+    Vector3    _boneLookAt;      // flat direction to the boat when it did
+    bool       _boneTurned;      // has a turn been written to it yet?
+    Quaternion _boneBase;        // its local rotation before this frame's turn
+    Quaternion _boneWritten;     // its local rotation after this frame's turn
+
+    // She opened the scene on a start perch and the boat has not reached her yet, so the usual
+    // "outside the radius means leave" rule is held off. Without this she would lift off on her
+    // first frame, since a boat starting anywhere else is by definition outside.
+    bool _holdingStart;
+
+    // A conversation the SCENE is running rather than her own talk key — the level select map,
+    // where the interact system owns the key, the prompt and the anchoring. She plays her part
+    // and nothing else.
+    bool               _externalTalk;
+    AnimatorUpdateMode _animatorModeBeforeTalk;
+
     // Conversation bookkeeping — everything a talk borrows and has to hand back.
     bool                      _anchorBeforeTalk;
     int                       _camPriorityBeforeTalk;
     CinemachineBlendDefinition _blendBeforeTalk;
     bool                      _blendBorrowed;
     int                       _talkLine;   // which of this perch's lines is on screen
+
+    // Her talk camera as authored on the prefab — what a perch's camera distance is measured off.
+    Vector3    _talkCamLocalPos;
+    Quaternion _talkCamLocalRot;
+    bool       _talkCamPoseKept;
 
     // The landing curve, worked out once when she commits to a descent.
     Vector3 _arcCentre;      // what she circles on the way in
@@ -138,16 +200,27 @@ public class AngelCompanion : MonoBehaviour
     float   _joinSplit;      // how much of the descent is spent flying to the join
 
     // Resolved lazily: LevelDataController builds the level — boat included — after she may
-    // already be sitting in the scene, so asking once in Start would find nothing.
+    // already be sitting in the scene, so asking once in Start would find nothing. The level
+    // select map has no LevelDataController at all and wires its boat into LevelSelectBoatControl
+    // instead, so that is asked next — she flies over whichever boat the scene turns out to have.
     Transform Boat
     {
         get
         {
+            if (boatOverride != null) return boatOverride;
+
             if (_boat == null)
             {
                 var ldc = LevelDataController.Instance;
                 if (ldc != null) _boat = ldc.GetBoatRoot();
             }
+
+            if (_boat == null)
+            {
+                var mapBoat = FindFirstObjectByType<LevelSelectBoatControl>();
+                if (mapBoat != null) _boat = mapBoat.BoatTransform;
+            }
+
             return _boat;
         }
     }
@@ -156,6 +229,15 @@ public class AngelCompanion : MonoBehaviour
     {
         if (animator == null) animator = GetComponentInChildren<Animator>(true);
         if (talkCamera == null) talkCamera = GetComponentInChildren<CinemachineCamera>(true);
+
+        // Its authored place, kept before anything moves it: a perch with its own camera distance
+        // slides it along its view, and every conversation starts again from here.
+        if (talkCamera != null)
+        {
+            _talkCamLocalPos = talkCamera.transform.localPosition;
+            _talkCamLocalRot = talkCamera.transform.localRotation;
+            _talkCamPoseKept = true;
+        }
 
         // Held on standby. A Cinemachine camera registers itself the moment it is enabled and then
         // competes on priority, and ties are broken by whichever was enabled most recently — so an
@@ -184,12 +266,36 @@ public class AngelCompanion : MonoBehaviour
         // round for the first second. Snapped, not eased, and before anything renders.
         if (!_placed)
         {
-            _placed            = true;
-            transform.position = FlightPoint(boat);
-            SnapFacing(boat.forward);
+            _placed = true;
+
+            // A scene can open with her already stood somewhere — the level select map does, so
+            // she is part of the view before the boat has gone anywhere. Taken here rather than in
+            // Start because the perches are put in place by the scene loading around her, and on
+            // the map they are generated geometry she cannot ask about any earlier.
+            var start = AngelPerchPoint.FindStartPerch();
+            if (start != null)
+            {
+                _perch        = start;
+                _holdingStart = true;
+                _mood         = Mood.Perched;
+                StandOn(start, boat);
+                PlayState(perchedState);
+            }
+            else
+            {
+                transform.position = FlightPoint(boat);
+                SnapFacing(boat.forward);
+            }
         }
 
-        float dt = Time.deltaTime;
+        // Unscaled while a conversation the scene is running is up: the level select map stops the
+        // clock for as long as anything is on screen, and a scaled delta would leave her frozen
+        // mid-sentence with her head turned wherever it happened to be.
+        float dt = _externalTalk ? Time.unscaledDeltaTime : Time.deltaTime;
+
+        // Back to the animation's own pose unless perched or talking asks for a turn this frame.
+        _boneYawWanted = 0f;
+        _boneLooking   = false;
 
         switch (_mood)
         {
@@ -199,6 +305,8 @@ public class AngelCompanion : MonoBehaviour
             case Mood.Talking:   UpdateTalking(boat, dt);   break;
             case Mood.TakingOff: UpdateTakingOff(boat, dt); break;
         }
+
+        TurnBone(dt);
     }
 
     // ── Flying ──
@@ -385,6 +493,24 @@ public class AngelCompanion : MonoBehaviour
     // post-spawn Y180, still has her feet on its point.
     Vector3 PerchPoint(AngelPerchPoint perch) => perch.PerchWorld + Vector3.up * perchFootOffset;
 
+    /// <summary>
+    /// Stands her on a perch, turned to face the boat — how a scene opens with her on a start
+    /// perch. The Level Select Designer calls it too on Generate, so the map in the editor shows
+    /// her where the first frame of play will. No boat = she keeps the heading she has.
+    /// </summary>
+    public void StandOn(AngelPerchPoint perch, Transform boat)
+    {
+        if (perch == null) return;
+        transform.position = PerchPoint(perch);
+        if (boat != null) SnapFacing(boat.position - transform.position);
+    }
+
+    /// <summary>The animator her states play on — the one assigned, else the first in her children.</summary>
+    public Animator BodyAnimator => animator != null ? animator : GetComponentInChildren<Animator>(true);
+
+    /// <summary>The state she stands in on a perch.</summary>
+    public string PerchedState => perchedState;
+
     // ── Perched ──
 
     void UpdatePerched(Transform boat, float dt)
@@ -392,11 +518,20 @@ public class AngelCompanion : MonoBehaviour
         if (_perch == null) { ReturnToFlight(); return; }
 
         transform.position = PerchPoint(_perch);
-        FaceHorizontal(boat.position - transform.position, dt);
+        FaceBoat(boat, dt);
 
         float distance = _perch.FlatDistanceTo(boat.position);
 
         if (_perch.TalkEnabled && TalkPressed() && distance <= _perch.TalkRadius) { BeginTalking(); return; }
+
+        // Opened the scene here: she holds it however far off the boat is, and only starts
+        // behaving like an ordinary perch once you have actually sailed in. That makes the first
+        // sight of her the same every time, wherever the boat happens to start.
+        if (_holdingStart)
+        {
+            if (distance > _perch.PerchRadius) return;
+            _holdingStart = false;
+        }
 
         // She stays for as long as you are here. The margin is measured OUTSIDE the radius that
         // brought her down, so drifting on the line cannot make her land and leave repeatedly.
@@ -416,7 +551,14 @@ public class AngelCompanion : MonoBehaviour
         }
     }
 
-    bool TalkPressed() => !PauseManager.IsPaused && Input.GetKeyDown(talkKey);
+    bool TalkPressed() => !PauseManager.IsPaused && !_externalTalk && !SceneOwnsTalk(_perch) &&
+                          Input.GetKeyDown(talkKey);
+
+    // A perch the map talks through (a LevelSelectAngelTalk beside it) is never hers to open off
+    // her own key. Both keys are E: on the frame the map closes a conversation she is back to
+    // Perched with the key still down, and her own key would start the whole thing over again.
+    static bool SceneOwnsTalk(AngelPerchPoint perch) =>
+        perch != null && perch.GetComponent<LevelSelectAngelTalk>() != null;
 
     void BeginTalking()
     {
@@ -470,7 +612,11 @@ public class AngelCompanion : MonoBehaviour
         // Held on the point and facing you. The boat is anchored, so there is no leaving to check
         // for — the conversation ends on the key and nothing else.
         transform.position = PerchPoint(_perch);
-        FaceHorizontal(boat.position - transform.position, dt);
+        FaceBoat(boat, dt);
+
+        // The scene's own conversation: it owns the key, the lines and the closing, so there is
+        // nothing here but standing still and talking.
+        if (_externalTalk) return;
 
         if (!TalkPressed()) return;
 
@@ -500,6 +646,62 @@ public class AngelCompanion : MonoBehaviour
         _mood = Mood.Perched;
     }
 
+    // ── A conversation the scene runs ──
+
+    /// <summary>Is she stood on this perch right now, settled and ready to be spoken to?</summary>
+    public bool IsPerchedOn(AngelPerchPoint perch) =>
+        perch != null && _perch == perch && (_mood == Mood.Perched || _mood == Mood.Talking);
+
+    /// <summary>
+    /// Start a conversation the SCENE is running — the level select map, where the interact
+    /// system owns the key, the prompt, the anchoring and the lines. She cuts to her own camera
+    /// and plays her talking animation; everything her own talk key would borrow is left alone,
+    /// because the caller has already borrowed it.
+    ///
+    /// False when she is not actually stood on that perch, so a prompt cannot open a conversation
+    /// with an angel who is still on her way down.
+    /// </summary>
+    public bool BeginSceneTalk(AngelPerchPoint perch)
+    {
+        if (!IsPerchedOn(perch) || _externalTalk) return false;
+
+        _externalTalk = true;
+        _mood         = Mood.Talking;
+
+        // The map stops the clock while anything is on screen, and an animator on scaled time
+        // stops with it — she would stand frozen for the whole conversation.
+        if (animator != null)
+        {
+            _animatorModeBeforeTalk = animator.updateMode;
+            animator.updateMode     = AnimatorUpdateMode.UnscaledTime;
+        }
+
+        CutToTalkCamera(true);
+        PlayState(talkingState);
+        return true;
+    }
+
+    /// <summary>Ends a conversation the scene started, and puts back what it took.</summary>
+    public void EndSceneTalk()
+    {
+        if (!_externalTalk) return;
+
+        _externalTalk = false;
+
+        if (animator != null) animator.updateMode = _animatorModeBeforeTalk;
+
+        CutToTalkCamera(false);
+
+        // Back to the rock if she still has one — a perch taken away mid-conversation (a rebuild
+        // in the editor, say) leaves nothing to stand on, so she flies.
+        if (_perch != null)
+        {
+            PlayState(perchedState);
+            _mood = Mood.Perched;
+        }
+        else ReturnToFlight();
+    }
+
     // ── Her camera ──
 
     // A straight cut both ways. Cinemachine decides the transition from the brain's default blend
@@ -522,6 +724,7 @@ public class AngelCompanion : MonoBehaviour
         {
             if (toAngel)
             {
+                PlaceTalkCamera(_perch != null ? _perch.TalkCameraDistance : 0f);
                 _camPriorityBeforeTalk = talkCamera.Priority.Value;
                 talkCamera.Priority    = talkCameraPriority;
                 talkCamera.gameObject.SetActive(true);
@@ -533,10 +736,59 @@ public class AngelCompanion : MonoBehaviour
                 // The brain falls back to the boat's camera, and the forced Cut makes that a cut.
                 talkCamera.gameObject.SetActive(false);
                 talkCamera.Priority = _camPriorityBeforeTalk;
+                PlaceTalkCamera(0f);
             }
         }
 
         if (!toAngel && _blendBorrowed && isActiveAndEnabled) StartCoroutine(GiveBackBlend());
+    }
+
+    /// <summary>
+    /// How far her talk camera sits from her as authored on the prefab, measured along its own
+    /// view. What a perch's Camera Distance of 0 means, and what the designer shows as the default.
+    /// </summary>
+    public float DefaultTalkCameraDistance
+    {
+        get
+        {
+            if (talkCamera == null) talkCamera = GetComponentInChildren<CinemachineCamera>(true);
+            if (talkCamera == null) return 0f;
+
+            var t = talkCamera.transform;
+            Vector3    pos = _talkCamPoseKept ? _talkCamLocalPos : t.localPosition;
+            Quaternion rot = _talkCamPoseKept ? _talkCamLocalRot : t.localRotation;
+            return TalkCameraAlongView(t.parent, pos, rot, out _);
+        }
+    }
+
+    // How far she is in front of the camera along its view, with that view in world space. Along
+    // the view rather than straight-line, so sliding by the difference keeps her where she was
+    // in the frame and changes only how close up she is.
+    float TalkCameraAlongView(Transform parent, Vector3 localPos, Quaternion localRot, out Vector3 forward)
+    {
+        Vector3 camera = parent != null ? parent.TransformPoint(localPos) : localPos;
+        forward = (parent != null ? parent.rotation * localRot : localRot) * Vector3.forward;
+        return Vector3.Dot(transform.position - camera, forward);
+    }
+
+    /// <summary>
+    /// Puts her talk camera back where the prefab has it, then slides it along its own view to
+    /// <paramref name="distance"/> from her. 0 leaves it where it was authored.
+    /// </summary>
+    void PlaceTalkCamera(float distance)
+    {
+        if (talkCamera == null || !_talkCamPoseKept) return;
+
+        var t = talkCamera.transform;
+        t.localPosition = _talkCamLocalPos;
+        t.localRotation = _talkCamLocalRot;
+
+        if (distance <= 0f) return;
+
+        float authored = TalkCameraAlongView(t.parent, _talkCamLocalPos, _talkCamLocalRot, out Vector3 forward);
+        if (authored <= 0.0001f) return;   // not looking at her at all — nothing to slide along
+
+        t.position += forward * (authored - distance);
     }
 
     IEnumerator GiveBackBlend()
@@ -590,6 +842,7 @@ public class AngelCompanion : MonoBehaviour
     void ReturnToFlight()
     {
         _perch          = null;
+        _holdingStart   = false;
         _followVelocity = Vector3.zero;   // the tween's speed is not the follow's — let it build again
         _timer          = RandomBetween(flightTimeMin, flightTimeMax);
         _mood           = Mood.Flying;
@@ -612,6 +865,81 @@ public class AngelCompanion : MonoBehaviour
     {
         if (!TryHeading(direction, out Quaternion want)) return;
         transform.rotation = Quaternion.RotateTowards(transform.rotation, want, turnSpeed * dt);
+    }
+
+    // Perched or talking: the face-the-boat bone turns if one is set, otherwise her whole body.
+    void FaceBoat(Transform boat, float dt)
+    {
+        Vector3 toBoat = boat.position - transform.position;
+        if (faceBoatBone == null) { FaceHorizontal(toBoat, dt); return; }
+
+        // The angle itself is worked out in TurnBone, once this frame's animated pose is known.
+        _boneLooking = true;
+        _boneLookAt  = new Vector3(toBoat.x, 0f, toBoat.z);
+    }
+
+    /// <summary>The face-the-boat bone, if one is set.</summary>
+    public Transform FaceBoatBone => faceBoatBone;
+
+    /// <summary>
+    /// The bone's world rotation as the animation posed it, without the turn toward the boat laid
+    /// on top — so the Scene view arrow is set against the pose, not against where she happens to
+    /// be looking.
+    /// </summary>
+    public Quaternion FaceBoatBoneRestRotation
+    {
+        get
+        {
+            if (faceBoatBone == null) return Quaternion.identity;
+            if (!Application.isPlaying || !_boneTurned) return faceBoatBone.rotation;
+            Transform parent = faceBoatBone.parent;
+            return (parent != null ? parent.rotation : Quaternion.identity) * _boneBase;
+        }
+    }
+
+    /// <summary>Which way the bone's front points in world space, given its rotation.</summary>
+    public Vector3 FaceBoatBoneFront(Quaternion boneRotation) =>
+        boneRotation * Quaternion.Euler(0f, faceBoatBoneForward, 0f) * Vector3.forward;
+
+    // Laid over the animated pose every frame — LateUpdate runs after the Animator has written the
+    // bone, so the turn is added to this frame's pose rather than fighting it. A bone the animation
+    // does not key is left holding last frame's turn, so that is taken back off first, or it
+    // would keep adding up.
+    void TurnBone(float dt)
+    {
+        if (faceBoatBone == null) return;
+
+        if (_boneTurned && faceBoatBone.localRotation == _boneWritten)
+            faceBoatBone.localRotation = _boneBase;
+
+        _boneBase = faceBoatBone.localRotation;
+
+        // Measured off the bone's own front as posed this frame, so the turn only makes up the
+        // difference between where the animation points it and the boat.
+        if (_boneLooking)
+        {
+            Vector3 front = FaceBoatBoneFront(faceBoatBone.rotation);
+            front.y = 0f;
+            _boneYawWanted = front.sqrMagnitude < 1e-6f || _boneLookAt.sqrMagnitude < 1e-6f
+                ? _boneYaw   // nothing to measure — hold
+                : Vector3.SignedAngle(front, _boneLookAt, Vector3.up);
+
+            _boneYawWanted = Mathf.Clamp(_boneYawWanted, -faceBoatBoneMaxTurn, faceBoatBoneMaxTurn);
+        }
+
+        // With a limit set she swings back round through her front. The shortest way could cut
+        // across behind her, through the angles the limits rule out.
+        bool limited = faceBoatBoneMaxTurn < 180f;
+        _boneYaw = limited
+            ? Mathf.MoveTowards(_boneYaw, _boneYawWanted, turnSpeed * dt)
+            : Mathf.MoveTowardsAngle(_boneYaw, _boneYawWanted, turnSpeed * dt);
+
+        // Its own Y, signed so a bone whose Y points down still turns her toward the boat.
+        float sign = Vector3.Dot(faceBoatBone.up, Vector3.up) < 0f ? -1f : 1f;
+        faceBoatBone.localRotation = _boneBase * Quaternion.Euler(0f, _boneYaw * sign, 0f);
+
+        _boneWritten = faceBoatBone.localRotation;
+        _boneTurned  = true;
     }
 
     void SnapFacing(Vector3 direction)

@@ -13,11 +13,26 @@ public class LandscapeTool : MonoBehaviour
              "Select Designer.")]
     public float noiseScale = 0.25f;
 
+    /// <summary>Most river edge points the shader holds — RIVER_EDGE_MAX in CalculateHills.hlsl.</summary>
+    public const int MaxRiverEdgePoints = 256;
+
+    // Where the river runs and pools stand, traced by the Level Select Designer whenever they are
+    // built. Every run and pool is here, as long as at least one path has Landscape Influence on:
+    // the landscape is cut away inside all of them, and lifted round the ones whose path asks.
+    //   xyz  a point on a run's centreline, at its rim top (a pool: its centre)
+    //   w    half the outer width (a pool: its outer radius); NEGATIVE where the line ends here,
+    //        so the next point starts a new one. A point on its own is a disc.
+    // Reach, one per point: the path's Influence Distance, or negative for cut-only.
+    [HideInInspector] public List<Vector4> riverEdgePoints = new();
+    [HideInInspector] public List<float>   riverEdgeReach  = new();
+
     private readonly List<Transform> _hillHandles = new();
     private readonly List<Renderer>  _renderers   = new();
     private Vector4[] _shaderData = new Vector4[100];
     private float[]   _sharpData  = new float[100];   // 1 - smoothness: the shader wants sharpness
     private float[]   _noiseData  = new float[100];
+    private Vector4[] _edgePoints = new Vector4[MaxRiverEdgePoints];
+    private float[]   _edgeReach  = new float[MaxRiverEdgePoints];
     private MaterialPropertyBlock _propBlock;
 
     // Set when something the tiles are drawn from has changed. The renderers are only written to
@@ -35,7 +50,8 @@ public class LandscapeTool : MonoBehaviour
     {
         RefreshHandlesFromParent();
 
-        if (_hillHandles.Count == 0) return;
+        // With no hills there is still the river edges to send when they change.
+        if (_hillHandles.Count == 0 && !_dirty) return;
         if (_renderers.Count == 0) { RefreshRenderers(); _dirty = true; }
         if (_renderers.Count == 0) return;
 
@@ -76,12 +92,41 @@ public class LandscapeTool : MonoBehaviour
         _propBlock.SetFloat("_PointCount",   (float)count);
         _propBlock.SetFloat("_GlobalHeight", heightMultiplier);
 
+        int edges = FillRiverEdges();
+        _propBlock.SetVectorArray("_RiverEdgePoints", _edgePoints);
+        _propBlock.SetFloatArray("_RiverEdgeReach",   _edgeReach);
+        _propBlock.SetFloat("_RiverEdgeCount", edges);
+
         foreach (var r in _renderers)
         {
             if (r == null) continue;
             r.SetPropertyBlock(_propBlock);
-            FitBoundsToHills(r, count);
+            FitBoundsToHills(r, count, edges);
         }
+    }
+
+    /// <summary>
+    /// Replaces the river edges the landscape is lifted to and cut round. Called by the Level
+    /// Select Designer when runs or pools are built, or a path's Landscape Influence changes.
+    /// </summary>
+    public void SetRiverEdges(IList<Vector4> points, IList<float> reach)
+    {
+        riverEdgePoints = points != null ? new List<Vector4>(points) : new List<Vector4>();
+        riverEdgeReach  = reach  != null ? new List<float>(reach)    : new List<float>();
+        _dirty = true;
+    }
+
+    // The arrays are always sent full length: a property block locks an array's size the first
+    // time it is set.
+    int FillRiverEdges()
+    {
+        int count = Mathf.Min(riverEdgePoints.Count, riverEdgeReach.Count, MaxRiverEdgePoints);
+        for (int i = 0; i < MaxRiverEdgePoints; i++)
+        {
+            _edgePoints[i] = i < count ? riverEdgePoints[i] : Vector4.zero;
+            _edgeReach[i]  = i < count ? riverEdgeReach[i]  : -1f;
+        }
+        return count;
     }
 
     // The hills are raised in the shader, after Unity has already decided from the tile's box
@@ -93,7 +138,7 @@ public class LandscapeTool : MonoBehaviour
     // hills together — never too small, only ever a little too tall. Rocky noise can push a hill
     // up to (1 + noise) of its height, so that is what is counted. Assumes tiles are not rotated,
     // which the designer never does.
-    void FitBoundsToHills(Renderer r, int count)
+    void FitBoundsToHills(Renderer r, int count, int edges)
     {
         var filter = r.GetComponent<MeshFilter>();
         if (filter == null || filter.sharedMesh == null) return;
@@ -123,6 +168,10 @@ public class LandscapeTool : MonoBehaviour
             if (height > 0f) rise += height; else sink += height;
         }
 
+        // Ground lifted to a river's rim replaces the hills there rather than adding to them, so
+        // the box only has to reach the highest rim whose influence touches the tile.
+        rise = Mathf.Max(rise, RiverEdgeRise(minX, maxX, minZ, maxZ, a.y, edges));
+
         float scaleY = Mathf.Abs(t.lossyScale.y);
         if (scaleY < 1e-5f) scaleY = 1f;
 
@@ -132,6 +181,28 @@ public class LandscapeTool : MonoBehaviour
         r.localBounds = new Bounds(
             new Vector3(flat.center.x, (bottom + top) * 0.5f, flat.center.z),
             new Vector3(flat.size.x,   top - bottom,          flat.size.z));
+    }
+
+    // How far above the tile base the highest rim reaching this tile stands. Each line is
+    // checked by its box, grown by its half width and reach, so it is never too small.
+    float RiverEdgeRise(float minX, float maxX, float minZ, float maxZ, float baseY, int edges)
+    {
+        float rise = 0f;
+        for (int i = 0; i < edges; i++)
+        {
+            float reach = _edgeReach[i];
+            if (reach < 0f) continue;
+
+            Vector4 p = _edgePoints[i];
+            Vector4 q = p.w > 0f && i + 1 < edges ? _edgePoints[i + 1] : p;
+            float   grow = Mathf.Max(Mathf.Abs(p.w), Mathf.Abs(q.w)) + reach;
+
+            if (Mathf.Max(p.x, q.x) + grow < minX || Mathf.Min(p.x, q.x) - grow > maxX) continue;
+            if (Mathf.Max(p.z, q.z) + grow < minZ || Mathf.Min(p.z, q.z) - grow > maxZ) continue;
+
+            rise = Mathf.Max(rise, Mathf.Max(p.y, q.y) - baseY);
+        }
+        return rise;
     }
 
     void RefreshRenderers()

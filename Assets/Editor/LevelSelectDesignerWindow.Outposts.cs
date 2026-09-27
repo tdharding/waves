@@ -311,7 +311,7 @@ public partial class LevelSelectDesignerWindow
         EditorGUILayout.LabelField("Installation Outpost", EditorStyles.boldLabel);
 
         var path = _data.paths.Find(p => p.pathId == outpost.pathId);
-        EditorGUILayout.LabelField($"On {(path != null ? path.segmentId : "(missing path)")}",
+        EditorGUILayout.LabelField($"On {(path != null ? PathDisplayName(path) : "(missing path)")}",
                                    EditorStyles.miniLabel);
 
         DrawOutpostPresetRow(outpost);
@@ -349,6 +349,7 @@ public partial class LevelSelectDesignerWindow
         DrawLollipopPresetRow(outpost.towerPreset, outpost.tower,
                               p => outpost.towerPreset = p, t => outpost.tower = t);
         var tower = DrawLollipopTowerFields(outpost.tower);
+        var perch = DrawPerchBlock(outpost.towerPerch);
 
         EditorGUILayout.Space(2);
         EditorGUILayout.LabelField("Observers", EditorStyles.miniBoldLabel);
@@ -369,6 +370,7 @@ public partial class LevelSelectDesignerWindow
             outpost.wallHeight    = Mathf.Max(0f, wallHeight);
             outpost.towerOffset   = new Vector2(offsetAlong, offsetAway);
             outpost.tower         = tower;
+            outpost.towerPerch    = perch;
             outpost.observers     = observers;
             foreach (var o in outpost.observers) ClampObserverToFloor(outpost, o);
             MarkDirty();
@@ -577,6 +579,15 @@ public partial class LevelSelectDesignerWindow
         record.outpostId     = outpost.outpostId;
         record.meshAssetName = name;
         EditorUtility.SetDirty(record);
+
+        // The outpost's tower is part of this very mesh rather than an object of its own, so the
+        // perch goes on the block and reaches up to the orb from where the tower was appended —
+        // the same base the mesh used, plus the tower's own height.
+        Vector2 towerAt = TowerOffsetInMesh(outpost, go.transform, forward);
+        ApplyPerch(go, outpost.towerPerch,
+                   new Vector3(towerAt.x,
+                               Mathf.Max(0f, outpost.height) + outpost.tower.TopY,
+                               outpost.depth * 0.5f + towerAt.y));
 
         SpawnObservers(outpost, go, forward, away);
     }

@@ -66,6 +66,18 @@ public class LandscapeShadingSettings
              "of it.")]
     [Range(0f, 1f)] public float noiseSoftness = 0.2f;
 
+    [Header("Spikes")]
+    [Tooltip("Which variant the level select's procedural spikes wear — its colour and its grain.")]
+    public LandscapeVariant spikes = LandscapeVariant.A;
+    [Tooltip("How wide the dark band along each spiral groove is. 0 hugs the groove itself; 1 " +
+             "spreads most of the way to the next one.")]
+    [Range(0f, 1f)] public float spikeGrooveSoftness = 0.5f;
+    [Tooltip("How dark the spiral grooves go. 1 = no change, 0 = black.")]
+    [Range(0f, 1f)] public float spikeGrooveDarkness = 0.35f;
+    [Tooltip("Texels across, as if the groove shading were painted into a sheet this size and " +
+             "wrapped on. 0 = smooth.")]
+    [Min(0f)] public float spikeGrooveResolution = 256f;
+
     [Header("Light")]
     [Tooltip("How hard the hills are turned against the world's light (its position is in the " +
              "designer's Aesthetics). 0 leaves them flat and unlit; past 1 the lit result is " +
@@ -100,6 +112,8 @@ public class LandscapeShadingSettings
     private static readonly int SoftnessId       = Shader.PropertyToID("_LandscapeSoftness");
     private static readonly int NoiseSoftnessId  = Shader.PropertyToID("_LandscapeNoiseSoftness");
     private static readonly int LightStrengthId  = Shader.PropertyToID("_LandscapeLightStrength");
+    private static readonly int SpikeVariantId   = Shader.PropertyToID("_LandscapeSpikeVariant");
+    private static readonly int SpikeGrooveId    = Shader.PropertyToID("_LandscapeSpikeGroove");
     private static readonly int BaseYId          = Shader.PropertyToID("_LandscapeBaseY");
 
     /// <summary>The tuner's numbers if it is driving, this world's otherwise, none without a preset.</summary>
@@ -134,6 +148,11 @@ public class LandscapeShadingSettings
         Shader.SetGlobalFloat(SoftnessId,      softness);
         Shader.SetGlobalFloat(NoiseSoftnessId, noiseSoftness);
         Shader.SetGlobalFloat(LightStrengthId, lightStrength);
+
+        Shader.SetGlobalFloat(SpikeVariantId, (float)spikes);
+        // x Softness, y Darkness, z Resolution.
+        Shader.SetGlobalVector(SpikeGrooveId,
+            new Vector4(spikeGrooveSoftness, spikeGrooveDarkness, spikeGrooveResolution, 0f));
     }
 
     /// <summary>Field-by-field copy, so the tuner can load a preset without holding on to it.</summary>
@@ -153,5 +172,10 @@ public class LandscapeShadingSettings
         softness      = other.softness;
         noiseSoftness = other.noiseSoftness;
         lightStrength = other.lightStrength;
+
+        spikes                = other.spikes;
+        spikeGrooveSoftness   = other.spikeGrooveSoftness;
+        spikeGrooveDarkness   = other.spikeGrooveDarkness;
+        spikeGrooveResolution = other.spikeGrooveResolution;
     }
 }

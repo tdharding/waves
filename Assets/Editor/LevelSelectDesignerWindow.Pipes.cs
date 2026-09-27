@@ -467,6 +467,59 @@ public partial class LevelSelectDesignerWindow
         }
     }
 
+    /// <summary>
+    /// Adds a node at `at` (0 = off the start, Count = off the end, else between at-1 and at):
+    /// halfway between the two nodes either side, or off an end by half the end leg's length.
+    /// Supports keep where they stand — a leg split in half hands its supports to whichever half
+    /// they are on, and the legs after it are renumbered.
+    /// </summary>
+    private static void InsertPipeNode(LevelSelectDesignerData.DesignerPipe pipe, int at)
+    {
+        var nodes = pipe.nodes;
+        int count = nodes.Count;
+        LevelSelectDesignerData.PipeNode fresh;
+
+        if (at > 0 && at < count)
+        {
+            int prev = at - 1;
+            fresh = new LevelSelectDesignerData.PipeNode
+                { positionXZ = (nodes[prev].positionXZ + nodes[at].positionXZ) * 0.5f };
+
+            // A new node between two with their own heights sits between those heights.
+            if (nodes[prev].overrideHeight || nodes[at].overrideHeight)
+            {
+                fresh.overrideHeight = true;
+                fresh.height         = (pipe.HeightAt(prev) + pipe.HeightAt(at)) * 0.5f;
+            }
+
+            foreach (var s in pipe.supports)
+            {
+                if (s.leg > prev) s.leg++;
+                else if (s.leg == prev)
+                {
+                    if (s.along < 0.5f) s.along *= 2f;
+                    else { s.leg++; s.along = s.along * 2f - 1f; }
+                }
+            }
+        }
+        else
+        {
+            bool    atStart = at <= 0;
+            var     endNode = nodes[atStart ? 0 : count - 1];
+            Vector2 inner   = nodes[atStart ? 1 : count - 2].positionXZ;
+            fresh = new LevelSelectDesignerData.PipeNode
+            {
+                positionXZ     = endNode.positionXZ + (endNode.positionXZ - inner) * 0.5f,
+                overrideHeight = endNode.overrideHeight,
+                height         = endNode.height,
+            };
+            if (atStart) foreach (var s in pipe.supports) s.leg++;
+            at = atStart ? 0 : count;
+        }
+
+        nodes.Insert(at, fresh);
+    }
+
     private static Vector2 SupportFlat(LevelSelectDesignerData.DesignerPipe pipe, LevelSelectDesignerData.PipeSupport s)
     {
         int leg = Mathf.Clamp(s.leg, 0, Mathf.Max(0, pipe.nodes.Count - 2));
@@ -491,7 +544,7 @@ public partial class LevelSelectDesignerWindow
 
     private void DrawSelectedPipeProps()
     {
-        if (_mode != DesignerMode.Pipe) return;
+        if (_mode != DesignerMode.Pipe && _mode != DesignerMode.Select) return;
         var pipe = SelectedPipe;
         if (pipe == null) return;
 
@@ -552,6 +605,28 @@ public partial class LevelSelectDesignerWindow
             }
             MarkDirty();
             RebuildPipe(pipe);
+        }
+
+        if (hasNode)
+        {
+            int insertAt = -1;
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button(new GUIContent("+ Before", "Add a node between this one and the one before it."),
+                                     EditorStyles.miniButtonLeft))
+                    insertAt = _selectedPipeNode;
+                if (GUILayout.Button(new GUIContent("+ After", "Add a node between this one and the one after it."),
+                                     EditorStyles.miniButtonRight))
+                    insertAt = _selectedPipeNode + 1;
+            }
+            if (insertAt >= 0 && pipe.nodes.Count >= 2)
+            {
+                Undo.RecordObject(_data, "Add Pipe Node");
+                InsertPipeNode(pipe, insertAt);
+                SelectPipe(pipe.pipeId, insertAt, -1);
+                MarkDirty();
+                RebuildPipe(pipe);
+            }
         }
 
         EditorGUILayout.Space(2);

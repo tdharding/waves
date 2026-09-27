@@ -117,7 +117,8 @@ public static class SpikeSilhouetteGUI
         EditorGUI.DrawRect(box, new Color(0.13f, 0.13f, 0.16f, 1f));
 
         var   p      = SpikeProfile.From(cfg, scale);
-        float widest = Mathf.Max(p.RadiusAt(0f), Mathf.Max(p.RadiusAt(p.midY), p.RadiusAt(p.topY)));
+        float widest = Mathf.Max(Mathf.Max(p.RadiusAt(0f), p.headRadius),
+                                 Mathf.Max(p.RadiusAt(p.midY), p.RadiusAt(p.topY)));
 
         // The rock that stands out of the water gets most of the box; the rest is the stub
         // sinking away below. Scaling to the full depth would leave the shape being tuned as a

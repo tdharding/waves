@@ -23,7 +23,8 @@ public class LevelSelectBoatToShaders : MonoBehaviour
     [Tooltip("The boat on the map. Left empty, it is found at load.")]
     [SerializeField] private LevelSelectBoatControl boatControl;
 
-    static readonly int BoatCentreId = Shader.PropertyToID("_BoatWorldCenter");
+    static readonly int BoatCentreId      = Shader.PropertyToID("_BoatWorldCenter");
+    static readonly int WhiteFadeCentreId = Shader.PropertyToID("_WhiteFadeCentre");
 
     private bool _warned;
 
@@ -63,5 +64,9 @@ public class LevelSelectBoatToShaders : MonoBehaviour
         if (visual == null) return;
 
         Shader.SetGlobalVector(BoatCentreId, visual.position);
+
+        // The same position again for WhiteFade.hlsl, which can't declare _BoatWorldCenter
+        // itself: RiverRunShader already declares it as a graph property, and the two would clash.
+        Shader.SetGlobalVector(WhiteFadeCentreId, visual.position);
     }
 }

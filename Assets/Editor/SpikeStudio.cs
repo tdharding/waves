@@ -1,10 +1,15 @@
 using UnityEditor;
 using UnityEngine;
 
-// Authoring front-end for spike rocks. Spawns a throwaway preview rock in the open scene, lets
-// you shape it live, and saves the result as a reusable SpikeShapePreset asset. The mesh is
-// built by ProceduralSpikeMesh — the same code the level spawner runs — so what you see here
-// is what ships.
+// Authoring front-end for spike rocks. Shows the rock in a stage of its own (SpikeStage — an empty
+// scene, like Prefab Mode), lets you shape it live, and saves the result as a reusable
+// SpikeShapePreset asset. The mesh is built by ProceduralSpikeMesh — the same code the level
+// spawner runs — so what you see here is what ships.
+//
+// The stage wears one of two looks: Waves (a level's rock material, standing in water) or Level
+// Select (the map's spike material, standing on the landscape). Opened from a spike in the Grid
+// Designer or the Level Select Designer, it comes up on that spike's preset, at that spike's size,
+// in that designer's look.
 //
 // Presets save into Resources/Spikes, which is where the Grid Designer lists them from: save one
 // here and it turns up in the spike tool's preset picker with no wiring.
@@ -12,20 +17,51 @@ using UnityEngine;
 // Tools ▸ Waves ▸ Spike Studio. Modelled on SteppedBuildingStudio.
 public class SpikeStudio : EditorWindow
 {
-    const string PreviewName = "— Spike Preview —";
-
     [SerializeField] SpikeShapeConfig cfg = new SpikeShapeConfig();
     [SerializeField] SpikeShapePreset loaded;
     [SerializeField] float previewScale = 1f;
     [SerializeField] bool  showWaterline = true;
     [SerializeField] bool  showRidgeGizmo = true;
 
-    GameObject preview;
-    Vector2    scroll;
-    int        _previewVerts;
+    // The stage's look, and where its rock stands — the origin, unless it was opened from a spike
+    // on the map, which stands it on that spike's own spot so the map's light falls on it the same.
+    [SerializeField] SpikeStage.Look look = SpikeStage.Look.Waves;
+    [SerializeField] Vector3         standAt;
+    [SerializeField] Material        levelSelectMaterial;
+
+    Vector2 scroll;
+    int     _previewVerts;
+
+    /// <summary>
+    /// Raised when a preset is overwritten, so anything built from it can rebuild — the Level
+    /// Select Designer's spikes are saved meshes and would otherwise keep the old shape.
+    /// </summary>
+    public static event System.Action<SpikeShapePreset> PresetSaved;
 
     [MenuItem("Tools/Waves/Spike Studio")]
     static void Open() => GetWindow<SpikeStudio>("Spike Studio");
+
+    /// <summary>
+    /// Opens the studio on a placed spike: its preset loaded, the preview at its size, and the
+    /// stage in the look of the designer it came from, standing where <paramref name="at"/> says.
+    /// <paramref name="material"/> is the Level Select Designer's spike material (null otherwise).
+    /// </summary>
+    public static void OpenForSpike(SpikeShapePreset preset, float scale, SpikeStage.Look look,
+                                    Vector3 at, Material material)
+    {
+        var w = GetWindow<SpikeStudio>("Spike Studio");
+        w.loaded              = preset;
+        w.cfg                 = preset != null ? preset.config.Copy() : new SpikeShapeConfig();
+        w.previewScale        = Mathf.Max(0.01f, scale);
+        w.look                = look;
+        w.standAt             = at;
+        w.levelSelectMaterial = material;
+        w.Repaint();
+
+        // Called from a designer's button, i.e. partway through that window's GUI pass — switching
+        // the Scene views over there and then would pull the ground from under the rest of it.
+        EditorApplication.delayCall += () => { if (w != null) w.OpenStage(); };
+    }
 
     void OnEnable()  { SceneView.duringSceneGui += OnSceneGUI; }
     void OnDisable() { SceneView.duringSceneGui -= OnSceneGUI; }
@@ -39,11 +75,12 @@ public class SpikeStudio : EditorWindow
     // exactly where the geometry has one.
     void OnSceneGUI(SceneView sv)
     {
-        if (!showRidgeGizmo || preview == null) return;
+        var stage = SpikeStage.Current;
+        if (!showRidgeGizmo || stage == null || stage.Rock == null) return;
 
         var profile = SpikeProfile.From(cfg, previewScale);
         var ridge   = SpikeRidge.From(cfg, previewScale);
-        Transform t = preview.transform;
+        Transform t = stage.Rock.transform;
 
         var prevZ = Handles.zTest;
         Handles.zTest = UnityEngine.Rendering.CompareFunction.LessEqual;
@@ -123,6 +160,15 @@ public class SpikeStudio : EditorWindow
             EditorGUILayout.HelpBox("Top is already a point, so there's no plateau for the cap to blend. " +
                                     "Widen Top to see the curve.", MessageType.Info);
 
+        cfg.headSize = EditorGUILayout.Slider(
+            new GUIContent("Head size", "A ball on top, as a multiple of the Top width. 1 = off. Above 1 " +
+                                        "the ball swells out wider than the neck it sits on, with a notch " +
+                                        "where they meet. Replaces the curved cap while it's on."),
+            cfg.headSize, 1f, 4f);
+        if (cfg.headSize > 1.001f && cfg.radiusTop <= 0.01f)
+            EditorGUILayout.HelpBox("The head is sized off the Top width, and Top is a point. " +
+                                    "Widen Top to grow a head.", MessageType.Info);
+
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Spiral", EditorStyles.boldLabel);
         cfg.twistTurns = EditorGUILayout.FloatField(
@@ -196,6 +242,18 @@ public class SpikeStudio : EditorWindow
 
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Preview", EditorStyles.boldLabel);
+
+        var stage = SpikeStage.Current;
+
+        EditorGUI.BeginChangeCheck();
+        look = (SpikeStage.Look)EditorGUILayout.EnumPopup(
+            new GUIContent("Look", "What the stage dresses the rock as. Waves: a level's rock material, " +
+                                   "standing in water. Level Select: the map's spike material, standing " +
+                                   "on the landscape."),
+            look);
+        if (EditorGUI.EndChangeCheck() && stage != null)
+            stage.Dress(look, standAt, levelSelectMaterial);
+
         EditorGUI.BeginChangeCheck();
         previewScale  = Mathf.Max(0.01f, EditorGUILayout.FloatField(
             new GUIContent("Scale", "Previews what a placement's scale multiplier does. Not saved into the preset."),
@@ -214,11 +272,16 @@ public class SpikeStudio : EditorWindow
 
         using (new EditorGUILayout.HorizontalScope())
         {
-            if (GUILayout.Button(preview == null ? "Spawn Preview" : "Refresh Preview")) Refresh();
-            if (GUILayout.Button("Frame in Scene")) Frame();
-            if (GUILayout.Button("Remove Preview")) RemovePreview();
+            if (GUILayout.Button(stage == null ? "Open Stage" : "Refresh"))
+            {
+                if (stage == null) OpenStage();
+                else               Refresh();
+            }
+            if (GUILayout.Button("Frame")) Frame();
+            using (new EditorGUI.DisabledScope(stage == null))
+                if (GUILayout.Button("Close Stage")) SpikeStage.Close();
         }
-        if (changed && preview != null) Refresh();
+        if (changed && stage != null) Refresh();
 
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Preset", EditorStyles.boldLabel);
@@ -249,7 +312,8 @@ public class SpikeStudio : EditorWindow
         EditorGUILayout.LabelField(
             $"⌀{p.radiusWaterline * 2f:0.##} m at the water · {p.topY:0.##} m proud · " +
             $"{-p.bottomY:0.##} m under · " +
-            (p.CapHeight > 1e-5f ? $"curved cap ⌀{p.radiusTop * 2f:0.##} m, {p.CapHeight:0.##} m tall"
+            (p.HeadActive ? $"head ⌀{p.headRadius * 2f:0.##} m"
+             : p.CapHeight > 1e-5f ? $"curved cap ⌀{p.radiusTop * 2f:0.##} m, {p.CapHeight:0.##} m tall"
                                  : p.TipIsClosed ? "tip closed"
                                                  : $"flat top ⌀{p.radiusTop * 2f:0.##} m"),
             EditorStyles.miniLabel);
@@ -268,38 +332,48 @@ public class SpikeStudio : EditorWindow
         }
     }
 
+    // Opens the stage in the current look (or re-dresses the one open), builds the rock into it
+    // and frames it.
+    void OpenStage()
+    {
+        var stage = SpikeStage.Open(look, standAt, levelSelectMaterial);
+        if (stage == null) return;
+        Refresh();
+
+        // After the Scene views have finished switching over — framing during the switch is
+        // undone by the view state the switch restores.
+        EditorApplication.delayCall += () =>
+        {
+            if (SpikeStage.Current == stage) stage.Frame();
+        };
+    }
+
+    // Rebuilds the stage's rock from the fields. Nothing happens while the stage is closed.
     void Refresh()
     {
-        if (preview == null)
-        {
-            preview = GameObject.Find(PreviewName);
-            if (preview == null)
-            {
-                preview = new GameObject(PreviewName, typeof(MeshFilter), typeof(MeshRenderer), typeof(MeshCollider));
-                preview.GetComponent<MeshRenderer>().sharedMaterial = FindRockMaterial();
-            }
-        }
+        var stage = SpikeStage.Current;
+        if (stage == null || stage.Rock == null) return;
 
-        var mesh = ProceduralSpikeMesh.Build(SpikeProfile.From(cfg, previewScale),
-                                             cfg.sidesAround, cfg.heightSubdivisions,
-                                             SpikeRidge.From(cfg, previewScale), cfg.twistTurns);
+        var profile = SpikeProfile.From(cfg, previewScale);
+        var mesh    = ProceduralSpikeMesh.Build(profile, cfg.sidesAround, cfg.heightSubdivisions,
+                                                SpikeRidge.From(cfg, previewScale), cfg.twistTurns);
         mesh.name = "SpikeStudioPreview";
         _previewVerts = mesh.vertexCount;
-        preview.GetComponent<MeshFilter>().sharedMesh   = mesh;
-        preview.GetComponent<MeshCollider>().sharedMesh = mesh;
+        stage.SetMesh(mesh, profile.RadiusAt(0f));
 
         // Nothing to push onto the material: the mesh carries where its grooves are, so the
         // preview shades exactly as a spawned rock will.
-        UpdateWaterline();
-        Selection.activeObject = preview;
+        UpdateWaterline(stage);
+        Selection.activeObject = stage.Rock;
     }
 
     // A thin disc at y = 0 marking the waterline, so the split between what shows and what's
     // submerged is visible while shaping. Preview furniture only — never part of the preset.
-    void UpdateWaterline()
+    void UpdateWaterline(SpikeStage stage)
     {
         const string DiscName = "Waterline";
-        var existing = preview.transform.Find(DiscName);
+        var rock     = stage.Rock;
+        var existing = rock.transform.Find(DiscName);
 
         if (!showWaterline)
         {
@@ -314,7 +388,8 @@ public class SpikeStudio : EditorWindow
             disc = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             disc.name = DiscName;
             DestroyImmediate(disc.GetComponent<Collider>());
-            disc.transform.SetParent(preview.transform, false);
+            stage.Adopt(disc);
+            disc.transform.SetParent(rock.transform, false);
         }
 
         float r = Mathf.Max(cfg.WidestRadius * previewScale * 2.5f, 0.5f);
@@ -324,26 +399,9 @@ public class SpikeStudio : EditorWindow
 
     void Frame()
     {
-        if (preview == null) Refresh();
-        Selection.activeObject = preview;
-        if (SceneView.lastActiveSceneView != null) SceneView.lastActiveSceneView.FrameSelected();
-    }
-
-    void RemovePreview()
-    {
-        var go = preview != null ? preview : GameObject.Find(PreviewName);
-        if (go != null) DestroyImmediate(go);
-        preview = null;
-    }
-
-    static Material FindRockMaterial()
-    {
-        // The maze rock material, so the preview wears what the spikes actually wear.
-        foreach (var guid in AssetDatabase.FindAssets("MazeSpikeOpaque t:Material"))
-            return AssetDatabase.LoadAssetAtPath<Material>(AssetDatabase.GUIDToAssetPath(guid));
-        foreach (var guid in AssetDatabase.FindAssets("Spikesmat t:Material"))
-            return AssetDatabase.LoadAssetAtPath<Material>(AssetDatabase.GUIDToAssetPath(guid));
-        return null;
+        var stage = SpikeStage.Current;
+        if (stage == null) OpenStage();
+        else               stage.Frame();
     }
 
     // Creates the target folder (and any missing parents) so the save panel opens there.
@@ -384,5 +442,6 @@ public class SpikeStudio : EditorWindow
         EditorUtility.SetDirty(loaded);
         AssetDatabase.SaveAssets();
         EditorGUIUtility.PingObject(loaded);
+        PresetSaved?.Invoke(loaded);
     }
 }

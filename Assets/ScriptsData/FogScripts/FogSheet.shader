@@ -154,8 +154,7 @@ Shader "Waves/Fog/FogSheet"
 
                 // ── grain and alpha ──────────────────────────────────────────
                 float grain, thin;
-                FogGrain_float(wp, blobId, fill, _GrainAmount, _GrainScale,
-                               _Transparency, _Time.y * _GrainDrift, grain, thin);
+                FogGrain_float(wp, fill, _GrainAmount, _GrainScale, _Transparency, grain, thin);
                 col *= grain;
 
                 float alpha = body * thin * _Opacity;

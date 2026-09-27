@@ -514,7 +514,6 @@ public class FogFieldManager : MonoBehaviour
     static readonly int BlurStepId    = Shader.PropertyToID("_FogBlurStep");
     static readonly int HeavinessId   = Shader.PropertyToID("_FogHeaviness");
     static readonly int HistoryShiftId = Shader.PropertyToID("_FogHistoryShift");
-    static readonly int BlobCentresId = Shader.PropertyToID("_FogBlobCentres");
     static readonly int MaskRadiusId  = Shader.PropertyToID("_FogMaskRadius");
     static readonly int MaskFeatherId = Shader.PropertyToID("_FogMaskFeather");
     static readonly int OpacityId     = Shader.PropertyToID("_FogOpacity");
@@ -527,10 +526,14 @@ public class FogFieldManager : MonoBehaviour
     public const int FOG_OBSTACLE_SLOTS = 128;
     static readonly Vector4[] _obstacleBuf = new Vector4[FOG_OBSTACLE_SLOTS];
 
-    // Must match FOG_BLOB_SLOTS in FogGrain.hlsl. Also the wrap on blob ids, so an id is directly
-    // an index into the centres array rather than needing a second lookup.
+    // The wrap on blob ids. It used to size a centres array the grain was sampled around; the
+    // grain is world-space now (see FogGrain.hlsl), so the id only offsets the undulation.
     public const int FOG_BLOB_SLOTS = 64;
-    static readonly Vector4[] _centreBuf = new Vector4[FOG_BLOB_SLOTS];
+
+    // How far the wind has carried the grain, world XZ. Accumulated here rather than Time * wind in
+    // the shader, so a change of wind turns the drift instead of jumping the whole pattern.
+    static readonly int GrainDriftId = Shader.PropertyToID("_FogGrainDrift");
+    Vector2 _grainDrift;
     static readonly int BoatCentreId  = Shader.PropertyToID("_BoatWorldCenter");
     static readonly int BoatLightId   = Shader.PropertyToID("_FogBoatLight");
 
@@ -777,6 +780,7 @@ public class FogFieldManager : MonoBehaviour
         NearRepellerCount = _near.Count;
         using (s_MarkerPopulate.Auto())  Populate(dt);
         using (s_MarkerSimulate.Auto())  SimulateBlobs(dt, time);
+        _grainDrift += WindVector * dt;
         using (s_MarkerPaint.Auto())     Paint();
         using (s_MarkerGlobals.Auto())   PushGlobals();
 
@@ -1697,17 +1701,8 @@ public class FogFieldManager : MonoBehaviour
     {
         // Both the texture and its world mapping, every frame. A shader reimport that wipes these
         // self-heals on the next frame, same reasoning as the soul-fish masks.
-        // Where each live mass currently sits, so the grain can be sampled in its space and travel
-        // with it. A global array locks its size on first set, so the full slot count always goes
-        // out even when three masses are alive.
-        for (int i = 0; i < FOG_BLOB_SLOTS; i++) _centreBuf[i] = Vector4.zero;
-        for (int i = 0; i < _blobs.Count; i++)
-        {
-            var b = _blobs[i];
-            int slot = Mathf.Clamp(Mathf.RoundToInt(b.Id * FOG_BLOB_SLOTS), 0, FOG_BLOB_SLOTS - 1);
-            _centreBuf[slot] = new Vector4(b.Centre.x, b.Centre.y, 0f, 0f);
-        }
-        Shader.SetGlobalVectorArray(BlobCentresId, _centreBuf);
+        // The grain's wind drift. Masses move on the same wind, so the grain keeps pace with them.
+        Shader.SetGlobalVector(GrainDriftId, new Vector4(_grainDrift.x, _grainDrift.y, 0f, 0f));
 
         // The mask, straight to the material. Every frame, like everything else here, so a
         // shader reimport that wipes the globals self-heals on the next frame.

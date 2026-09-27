@@ -13,6 +13,13 @@ public struct SpikeProfile
     public float topY;         // the tip
     public float topRoundness; // 0 = straight up to a flat top, 1 = the upper span domes over
 
+    // The ball on top (Head Size above 1). Zero radius = no head. The ball's own top is the
+    // tip, and from its equator down it narrows until the body below is the wider of the two —
+    // that crossing is the notch, and everything above it is the ball.
+    public float headRadius;
+    public float headCentreY;
+    public float headJoinY;
+
     /// <summary>
     /// World-space profile for a shape preset, optionally scaled up or down as a whole.
     /// A null config falls back to the defaults, so a spike placed before any preset exists
@@ -23,7 +30,7 @@ public struct SpikeProfile
         if (c == null) c = new SpikeShapeConfig();
         float s = scale > 0.0001f ? scale : 1f;
 
-        return new SpikeProfile
+        var profile = new SpikeProfile
         {
             radiusBelowSurface = c.radiusBelowSurface * s,
             radiusWaterline    = c.radiusWaterline    * s,
@@ -34,6 +41,50 @@ public struct SpikeProfile
             topY               = Mathf.Max(0.02f, c.heightAboveWater  * s),
             topRoundness       = Mathf.Clamp01(c.topRoundness),
         };
+
+        // Sized off the top width, so Head Size reads as "how much wider than the neck". Kept
+        // to under half the height above water, so the whole ball stays out of the water.
+        if (c.headSize > 1.001f && profile.radiusTop > 1e-3f)
+        {
+            profile.headRadius  = Mathf.Min(profile.radiusTop * c.headSize, profile.topY * 0.45f);
+            profile.headCentreY = profile.topY - profile.headRadius;
+            profile.headJoinY   = profile.FindHeadJoin();
+        }
+        return profile;
+    }
+
+    public bool HeadActive => headRadius > 1e-4f;
+
+    float HeadRadiusAt(float y)
+    {
+        float d = y - headCentreY;
+        return Mathf.Sqrt(Mathf.Max(0f, headRadius * headRadius - d * d));
+    }
+
+    // Walks down the ball's lower half from its equator until the body is at least as wide as
+    // the ball — that's where the neck meets it. A body already wider than the ball at its
+    // equator swallows the lower half, so the join sits on the equator itself.
+    float FindHeadJoin()
+    {
+        float hi = headCentreY;
+        if (BodyRadiusAt(hi) >= headRadius) return hi;
+
+        const int Steps = 48;
+        for (int i = 1; i <= Steps; i++)
+        {
+            float lo = headCentreY - headRadius * (i / (float)Steps);
+            if (BodyRadiusAt(lo) >= HeadRadiusAt(lo))
+            {
+                for (int b = 0; b < 20; b++)
+                {
+                    float m = (lo + hi) * 0.5f;
+                    if (BodyRadiusAt(m) >= HeadRadiusAt(m)) lo = m; else hi = m;
+                }
+                return (lo + hi) * 0.5f;
+            }
+            hi = lo;
+        }
+        return headCentreY - headRadius;
     }
 
     public static SpikeProfile From(SpikeShapePreset p, float scale = 1f) =>
@@ -46,7 +97,7 @@ public struct SpikeProfile
     /// top width is already nothing, or because roundness has domed it over. Either way the
     /// mesh needs no flat cap up there.
     /// </summary>
-    public bool TipIsClosed => radiusTop <= 1e-3f || CapHeight > 1e-5f;
+    public bool TipIsClosed => radiusTop <= 1e-3f || CapHeight > 1e-5f || HeadActive;
 
     /// <summary>
     /// Radius of the rock at a height above the waterline. The four authored radii are
@@ -55,14 +106,22 @@ public struct SpikeProfile
     /// </summary>
     public float RadiusAt(float y)
     {
-        // Which of the three spans (base→waterline, waterline→mid, mid→tip) the height falls in.
         if (y <= bottomY) return Mathf.Max(0f, radiusBelowSurface);
+
+        if (HeadActive && y >= headJoinY) return y >= topY ? 0f : HeadRadiusAt(y);
 
         // At the very top the curved cap has already closed the rock to a point. Answering
         // radiusTop here regardless — as this did — flared the last ring straight back out to
         // the full top width and left the rock ending in a trumpet.
         if (y >= topY) return CapHeight > 1e-5f ? 0f : Mathf.Max(0f, radiusTop);
 
+        return BodyRadiusAt(y);
+    }
+
+    // The rock without its head: the curve through the four widths, plus the curved cap.
+    float BodyRadiusAt(float y)
+    {
+        // Which of the three spans (base→waterline, waterline→mid, mid→tip) the height falls in.
         int   span;
         float t;
         if (y < 0f)         { span = 0; t = Mathf.InverseLerp(bottomY, 0f,   y); }
@@ -96,7 +155,7 @@ public struct SpikeProfile
     /// to a full hemisphere over the top width — capping a plateau of diameter D costs D/2 of
     /// height, which is simply what a curved cap of that width is.
     /// </summary>
-    public float CapHeight => Mathf.Min(radiusTop * topRoundness, (topY - midY) * 0.9f);
+    public float CapHeight => HeadActive ? 0f : Mathf.Min(radiusTop * topRoundness, (topY - midY) * 0.9f);
 
     // Catmull-Rom through the four radii. The ends are duplicated so the curve actually
     // passes through the base and tip radii instead of drifting off them.
@@ -312,6 +371,33 @@ public static class ProceduralSpikeMesh
 
         var heights = new List<float>(subUnder + 3 * subOver + 8);
         AddSpan(heights, p.bottomY, 0f,     subUnder, first: true);
+
+        if (p.HeadActive)
+        {
+            // Body up to the notch, then the ball. The ball's rings are spaced by angle round
+            // it rather than evenly in height — even heights leave the top of a sphere, where
+            // it flattens off, with one or two rings and a visible point.
+            float join = p.headJoinY;
+            if (join > p.midY + 1e-4f)
+            {
+                AddSpan(heights, 0f,     p.midY, subOver, first: false);
+                AddSpan(heights, p.midY, join,   subOver, first: false);
+            }
+            else
+            {
+                AddSpan(heights, 0f, join, subOver, first: false);
+            }
+
+            int   headSteps = Mathf.Max(12, subOver * 2);
+            float fromAngle = Mathf.Asin(Mathf.Clamp((join - p.headCentreY) / p.headRadius, -1f, 1f));
+            for (int i = 1; i <= headSteps; i++)
+            {
+                float a = Mathf.Lerp(fromAngle, Mathf.PI * 0.5f, i / (float)headSteps);
+                heights.Add(i == headSteps ? p.topY : p.headCentreY + p.headRadius * Mathf.Sin(a));
+            }
+            return heights;
+        }
+
         AddSpan(heights, 0f,        p.midY, subOver,  first: false);
 
         if (capH > 1e-5f)

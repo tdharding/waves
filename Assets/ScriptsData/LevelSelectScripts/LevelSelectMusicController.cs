@@ -11,6 +11,13 @@ public class LevelSelectMusicController : MonoBehaviour
     public bool playOnStart = true;
     private AudioSource _source;
 
+    // Held while a camera sequence plays its own audio. Holds stack; the music comes back when the last one lets go.
+    private int  _holds;
+    private bool _playWhenReleased;
+    private bool _pausedByHold;
+
+    public bool IsHeld => _holds > 0;
+
     private void Awake()
     {
         Instance = this;
@@ -27,14 +34,55 @@ public class LevelSelectMusicController : MonoBehaviour
     {
         if (data == null) return;
         if (data.musicIntro == null && data.musicLoop == null) return;
+        if (IsHeld)
+        {
+            _playWhenReleased = true;
+            Debug.Log("[LevelSelectMusic] Play: held — starts when released.");
+            return;
+        }
         StopAllCoroutines();
+        _pausedByHold = false;
         StartCoroutine(PlaySequence());
     }
 
     public void FadeIn(float duration)
     {
         Play();
+        if (IsHeld) return;
         StartCoroutine(FadeInRoutine(duration));
+    }
+
+    /// <summary>Pause the music (or keep it from starting) until Release.</summary>
+    public void Hold()
+    {
+        _holds++;
+        if (_holds > 1) return;
+        if (_source.isPlaying)
+        {
+            _source.Pause();
+            _pausedByHold = true;
+        }
+        Debug.Log($"[LevelSelectMusic] Hold: {(_pausedByHold ? "paused" : "nothing playing")}.");
+    }
+
+    /// <summary>Let go of a Hold — the music picks up where it paused, or starts if it was waiting to.</summary>
+    public void Release()
+    {
+        if (_holds == 0) return;
+        if (--_holds > 0) return;
+
+        if (_playWhenReleased)
+        {
+            _playWhenReleased = false;
+            Debug.Log("[LevelSelectMusic] Release: starting.");
+            Play();
+        }
+        else if (_pausedByHold)
+        {
+            _pausedByHold = false;
+            _source.UnPause();
+            Debug.Log("[LevelSelectMusic] Release: resumed.");
+        }
     }
 
     private IEnumerator FadeInRoutine(float duration)
@@ -58,7 +106,8 @@ public class LevelSelectMusicController : MonoBehaviour
             _source.clip = data.musicIntro;
             _source.loop = false;
             _source.Play();
-            yield return new WaitForSeconds(data.musicIntro.length);
+            // Not a fixed wait — a Hold can pause the intro part way through.
+            yield return new WaitUntil(() => !_source.isPlaying && !IsHeld);
         }
 
         if (data.musicLoop != null)

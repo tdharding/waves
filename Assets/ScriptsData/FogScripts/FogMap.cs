@@ -389,7 +389,8 @@ public class FogMap : ScriptableObject
     [Range(0.02f, 1.5f)] public float transparencyFalloff = 0.25f;
 
     [Header("Grain")]
-    [Tooltip("How strongly the grain lightens and darkens the fog. Past 1 it starts cutting holes " +
+    [Tooltip("One gradient-noise grain across the whole fog plane, drifting with the wind; the fog " +
+             "shape masks it. How strongly the grain lightens and darkens the fog. Past 1 it starts cutting holes " +
              "rather than mottling, which is a look in itself — the shader floors it at black so " +
              "it never inverts.")]
     [Range(0f, 2f)] public float grainAmount = 0.18f;
@@ -398,6 +399,16 @@ public class FogMap : ScriptableObject
              "higher than they look — the same reason the wander scale wants a big value. Low " +
              "hundreds gives a fine tooth; under ten is broad cloudy blotching.")]
     [Range(0.5f, 400f)] public float grainScale = 12f;
+
+    [Header("Edge Shadow")]
+    [Tooltip("How far in from the fog's edge the shadow reaches. Small hugs the outline; large " +
+             "spreads it into the body.")]
+    [Range(0.01f, 1f)] public float edgeShadowWidth = 0.3f;
+
+    [Tooltip("How dark the shadow is at the very edge. 0 turns it off. It sits UNDER the lighting, " +
+             "so a lit rim and lamp glow still show over it. Above 1 the black spreads further in " +
+             "and the body darkens more.")]
+    [Range(0f, 4f)] public float edgeShadowStrength = 0.5f;
 
     /// <summary>
     /// The reverse of ApplyLook: read every Look value OFF the material and into this map.
@@ -423,6 +434,8 @@ public class FogMap : ScriptableObject
         transparencyFalloff = fogMaterial.GetFloat("_Transparency");
         grainAmount         = fogMaterial.GetFloat("_GrainAmount");
         grainScale          = fogMaterial.GetFloat("_GrainScale");
+        edgeShadowWidth     = fogMaterial.GetFloat("_EdgeShadowWidth");
+        edgeShadowStrength  = fogMaterial.GetFloat("_EdgeShadowStrength");
         fogColour           = fogMaterial.GetColor("_FogColor");
         litColour           = fogMaterial.GetColor("_LightColor");
     }
@@ -444,6 +457,8 @@ public class FogMap : ScriptableObject
         fogMaterial.SetFloat("_Transparency", transparencyFalloff);
         fogMaterial.SetFloat("_GrainAmount", grainAmount);
         fogMaterial.SetFloat("_GrainScale", grainScale);
+        fogMaterial.SetFloat("_EdgeShadowWidth", edgeShadowWidth);
+        fogMaterial.SetFloat("_EdgeShadowStrength", edgeShadowStrength);
         fogMaterial.SetColor("_FogColor", fogColour);
         fogMaterial.SetColor("_LightColor", litColour);
     }

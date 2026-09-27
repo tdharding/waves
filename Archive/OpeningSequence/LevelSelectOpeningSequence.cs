@@ -64,13 +64,14 @@ public class LevelSelectOpeningSequence : MonoBehaviour
                 var world = FindFirstObjectByType<LevelSelectDataController>()?.DesignerData;
                 if (world != null &&
                     world.TryGetBoatStart(out Vector3 poolPos, out Vector3 poolForward,
-                                          out bool poolStart) && poolStart)
+                                          out bool poolStart) &&
+                    (poolStart || world.HasBoatStartNode))
                 {
                     boatControl.PlaceAt(poolPos, Quaternion.LookRotation(poolForward, Vector3.up));
                     SplineRiverManager.Instance?.ForceJumpExtrudeToT(skipIntroExtrudeHeadstart);
                     LevelSelectSplineManager.Instance?.RefreshAdvance();
-                    Debug.Log($"[OpeningSequence] skipIntro: boat placed on the pool at the head " +
-                              $"of the main river, {poolPos}.");
+                    Debug.Log($"[OpeningSequence] skipIntro: boat placed at the start node " +
+                              $"'{world.boatStartNodeId}' (in pool: {poolStart}), {poolPos}.");
                     return;
                 }
 

@@ -165,6 +165,9 @@ public class LevelSelectRunShadingTuner : EditorWindow
             "water it is meant to be sitting on.",
             MessageType.None);
 
+        EditorGUILayout.Space();
+        WhiteFadeTunerSection.Draw();
+
         EditorGUILayout.EndScrollView();
         _window.ApplyModifiedProperties();
     }

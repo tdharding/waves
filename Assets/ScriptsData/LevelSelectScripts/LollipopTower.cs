@@ -47,6 +47,25 @@ public class LollipopTower
     [Tooltip("Height of the second base, on top of the ramp. 0 = no second base.")]
     [Min(0f)] public float base2Height = 0f;
 
+    /// <summary>
+    /// The very top of the orb, measured up from the tower's base. The angel lands here, so it is
+    /// worked out the same way the mesh is built: the tiers stacked bottom up, then the stem, then
+    /// the orb seated where the stem's top edge meets its surface.
+    /// </summary>
+    public float TopY
+    {
+        get
+        {
+            float r = Mathf.Max(0.001f, stemRadius);
+            float R = Mathf.Max(0.001f, orbRadius);
+
+            float tiers = Mathf.Max(0f, baseHeight) + Mathf.Max(0f, rampHeight) + Mathf.Max(0f, base2Height);
+            float seat  = Mathf.Sqrt(Mathf.Max(0f, R * R - r * r));
+
+            return tiers + Mathf.Max(0f, stemHeight) + seat + R;
+        }
+    }
+
     public LollipopTower Clone() => (LollipopTower)MemberwiseClone();
 
     const int Sides = 24;

@@ -130,7 +130,27 @@ MonoBehaviour:
   mapGridTiling: {x: 1, y: 1}
   mazeWallMarkerScale: 0.4
   entrancePrefabOverride: {fileID: 0}
-  splineWallPaths: []
+  splineWallPaths:
+  - nodes:
+    - {x: -0.47428405, y: -0.23055401}
+    - {x: -0.3857502, y: -0.0697476}
+    - {x: -0.24481873, y: 0.06757024}
+    - {x: -0.14002353, y: 0.11093377}
+    - {x: -0.19422795, y: 0.28619468}
+    - {x: -0.2267506, y: 0.45061472}
+    isClosed: 0
+    segmentCurved: 0101010101y
+    segmentGap: 0000000000y
+    segmentDestructible: 0000000000y
+    tileSpacing: 0.09
+    prefabOverride: {fileID: 7000000000000000001, guid: d287e903f8a075c418e3d937873ec0c7, type: 3}
+    destructiblePrefabOverride: {fileID: 0}
+    wallHeight: 1
+    depthBelowWater: 7
+    wallThickness: 0.09
+    nodeHeights: []
+    nodeSizeScale: 1.1
+    pathScale: 1
   cubeBuildings: []
   proceduralSpikes:
   - center: {x: 0.07614526, y: -0.28417397}

@@ -138,6 +138,7 @@ public partial class LevelSelectDesignerWindow
             pool.hasTower);
 
         LollipopTower tower = pool.tower;
+        var           perch = pool.towerPerch;
         if (hasTower)
         {
             if (island <= LevelSelectDesignerData.PoolTowerMinIsland)
@@ -149,13 +150,15 @@ public partial class LevelSelectDesignerWindow
             DrawLollipopPresetRow(pool.towerPreset, pool.tower,
                                   p => pool.towerPreset = p, t => pool.tower = t);
             tower = DrawLollipopTowerFields(pool.tower);
+            perch = DrawPerchBlock(pool.towerPerch);
         }
 
         if (EditorGUI.EndChangeCheck())
         {
             Undo.RecordObject(_data, "Edit Pool Tower");
-            pool.hasTower = hasTower;
-            pool.tower    = tower;
+            pool.hasTower   = hasTower;
+            pool.tower      = tower;
+            pool.towerPerch = perch;
             MarkDirty();
             RebuildPoolTower(pool);
         }
@@ -220,6 +223,10 @@ public partial class LevelSelectDesignerWindow
         if (renderer == null) renderer = go.AddComponent<MeshRenderer>();
         renderer.sharedMaterial = _data.riverMaterial;
         EditorUtility.SetDirty(renderer);
+
+        // A tower in the middle of an island is about the most inviting thing on the map to land
+        // on, so it carries its own perch block. The tip is the top of the orb.
+        ApplyPerch(go, pool.towerPerch, Vector3.up * pool.tower.TopY);
 
         AssetDatabase.SaveAssets();
     }

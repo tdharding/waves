@@ -53,9 +53,11 @@ Material:
     m_Floats:
     - _Ambient: 0.609
     - _Curvature: 0.55
+    - _EdgeShadowStrength: 2.05
+    - _EdgeShadowWidth: 0.687
     - _EdgeSoftness: 0.1434
-    - _GrainAmount: 0.15
-    - _GrainScale: 4
+    - _GrainAmount: 0.23
+    - _GrainScale: 1
     - _HeightScale: 1.6
     - _LipLight: 1.92
     - _LipWidth: 0.132

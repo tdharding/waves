@@ -42,6 +42,12 @@ public class LevelSelectInteractPoint : MonoBehaviour
              "empty, it is this object.")]
     public Transform measureFrom;
 
+    [Tooltip("What the camera's glance is aimed at, height and all, when it should be somewhere " +
+             "other than where the reach is measured — a face, the top of a sign. Left empty, " +
+             "the action beside it may name one (the angel names her perch), and failing that " +
+             "it is the point's own position.")]
+    public Transform lookAt;
+
     // ─────────────────────────────────────────────
     // LIFECYCLE
     // ─────────────────────────────────────────────
@@ -75,6 +81,18 @@ public class LevelSelectInteractPoint : MonoBehaviour
 
     public Vector3 Position => measureFrom != null ? measureFrom.position : transform.position;
 
+    /// <summary>Where the camera's glance is aimed: the look-at if one is set, then whatever the
+    /// action names, then the point itself.</summary>
+    public Vector3 LookAtPosition
+    {
+        get
+        {
+            if (lookAt != null) return lookAt.position;
+            if (Action != null && Action.TryGetLookAt(out Vector3 named)) return named;
+            return Position;
+        }
+    }
+
     /// <summary>How far the boat is, flat across the water.</summary>
     public float FlatDistanceTo(Vector3 worldPosition)
     {
@@ -86,7 +104,7 @@ public class LevelSelectInteractPoint : MonoBehaviour
 
     /// <summary>Whether this point can be interacted with from where the boat is standing.</summary>
     public bool InReach(Vector3 boatPosition) =>
-        Action != null && FlatDistanceTo(boatPosition) <= radius;
+        Action != null && Action.IsAvailable && FlatDistanceTo(boatPosition) <= radius;
 
 #if UNITY_EDITOR
     private void OnDrawGizmosSelected()

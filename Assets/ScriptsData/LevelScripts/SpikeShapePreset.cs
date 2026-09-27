@@ -44,6 +44,11 @@ public class SpikeShapeConfig
              "no plateau to blend.")]
     [Range(0f, 1f)] public float topRoundness = 0f;
 
+    [Tooltip("A ball on top, as a multiple of the Top width. 1 = off. Above 1 the ball swells out " +
+             "wider than the neck it sits on, with a notch where the two meet. Replaces the curved " +
+             "cap while it's on, and fits inside Above water rather than adding to it.")]
+    [Range(1f, 4f)] public float headSize = 1f;
+
     [Header("Spiral")]
     [Tooltip("Turns the rock's surface twists through, base to tip. This rotates each ring a little " +
              "further than the one below, so the mesh's own vertical edges wind up the rock as " +
@@ -86,6 +91,7 @@ public class SpikeShapeConfig
         depthBelowWater    = depthBelowWater,
         midHeightFraction  = midHeightFraction,
         topRoundness       = topRoundness,
+        headSize           = headSize,
         carveSpiralRidge   = carveSpiralRidge,
         ridgeDepth         = ridgeDepth,
         twistTurns         = twistTurns,
@@ -102,6 +108,7 @@ public class SpikeShapeConfig
         radiusMid == o.radiusMid && radiusTop == o.radiusTop &&
         heightAboveWater == o.heightAboveWater && depthBelowWater == o.depthBelowWater &&
         midHeightFraction == o.midHeightFraction && topRoundness == o.topRoundness &&
+        headSize == o.headSize &&
         carveSpiralRidge == o.carveSpiralRidge && ridgeDepth == o.ridgeDepth &&
         twistTurns == o.twistTurns && ridgeSpacing == o.ridgeSpacing &&
         ridgeSoftness == o.ridgeSoftness &&
@@ -109,7 +116,8 @@ public class SpikeShapeConfig
 
     /// <summary>Widest radius anywhere on the rock — what a map or designer sizes its drawing to.</summary>
     public float WidestRadius =>
-        Mathf.Max(Mathf.Max(radiusBelowSurface, radiusWaterline), Mathf.Max(radiusMid, radiusTop));
+        Mathf.Max(Mathf.Max(radiusBelowSurface, radiusWaterline),
+                  Mathf.Max(radiusMid, radiusTop * Mathf.Max(1f, headSize)));
 }
 
 // Folder under Resources that the Spike Studio saves into and the Grid Designer lists from.

@@ -420,6 +420,7 @@ public partial class LevelSelectDesignerWindow
             var fresh = rim.ToppingOn(side);
             edited.towerPreset = fresh.towerPreset;
             edited.tower       = DrawLollipopTowerFields(fresh.tower);
+            edited.perch       = DrawPerchBlock(edited.perch);
         }
         else if (edited.topper == LevelSelectDesignerData.RimNodeTopper.VertDisplayPoint)
         {
@@ -472,12 +473,17 @@ public partial class LevelSelectDesignerWindow
             {
                 case LevelSelectDesignerData.RimNodeTopper.LollipopTower:
                 {
-                    var mesh = SaveGeneratedMesh($"RimNodeTower_{label}",
-                        (topping.tower ?? new LollipopTower()).Build(StoneShadingForBuild));
+                    var tower = topping.tower ?? new LollipopTower();
+
+                    var mesh = SaveGeneratedMesh($"RimNodeTower_{label}", tower.Build(StoneShadingForBuild));
                     if (mesh == null) break;
 
                     var go = NewMeshChild(container, $"RimNodeTower_{label}", mesh);
                     go.transform.SetPositionAndRotation(at, Quaternion.LookRotation(toRiver, Vector3.up));
+
+                    // Her feet go on the top of the orb, which the tower works out from the sizes
+                    // this mesh was just built to — resize it and she moves with it.
+                    ApplyPerch(go, topping.perch, Vector3.up * tower.TopY);
                     break;
                 }
 

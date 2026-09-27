@@ -179,11 +179,12 @@ public class LevelSelectDataController : MonoBehaviour
         // a boat that has never been anywhere is put straight on it.
         if (designerData != null &&
             designerData.TryGetBoatStart(out Vector3 startPos, out Vector3 startForward,
-                                         out bool startInPool) && startInPool)
+                                         out bool startInPool) &&
+            (startInPool || designerData.HasBoatStartNode))
         {
             boatControl.PlaceAt(startPos, Quaternion.LookRotation(startForward, Vector3.up));
-            Debug.Log($"LevelSelectDataController: Nothing saved — boat placed on the pool at " +
-                      $"the head of the main river, {startPos}.");
+            Debug.Log($"LevelSelectDataController: Nothing saved — boat placed at the start " +
+                      $"node '{designerData.boatStartNodeId}' (in pool: {startInPool}), {startPos}.");
             return;
         }
 

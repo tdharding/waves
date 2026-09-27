@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UI;
 using TMPro;
 using System.Collections;
 using System.Collections.Generic;
@@ -19,7 +20,22 @@ public class DialogueTextController : MonoBehaviour
     [SerializeField] private CanvasGroup dialogueBackground;
     [SerializeField] private float backgroundFadeDuration = 1f;
 
+    [Header("Generated Fade Panel")]
+    [Tooltip("How far up the screen the black fade reaches, as a share of screen height.")]
+    [Range(0f, 1f)] [SerializeField] private float fadeHeight = 0.4f;
+    [Tooltip("How dark the fade is at the bottom of the screen.")]
+    [Range(0f, 1f)] [SerializeField] private float fadeBottomOpacity = 0.85f;
+    [Tooltip("How quickly the fade clears going up. X: 0 = bottom, 1 = top of the fade. Y: darkness (scaled by Bottom Opacity).")]
+    [SerializeField] private AnimationCurve fadeFalloff = AnimationCurve.EaseInOut(0f, 1f, 1f, 0f);
+
+    private const int FadeTextureHeight = 256;
+
     private Coroutine currentRoutine;
+
+    // The generated panel. Replaces the hand-built dialogueBackground, which is kept hidden.
+    private CanvasGroup fadePanelGroup;
+    private RectTransform fadePanelRect;
+    private Texture2D fadeTexture;
 
     // ---------------------------------------------------------
     // Lifecycle
@@ -42,8 +58,82 @@ public class DialogueTextController : MonoBehaviour
             dialogueText.gameObject.SetActive(true);
         }
 
+        // The old hand-built panel stays hidden; the generated one takes its place.
         if (dialogueBackground != null)
             dialogueBackground.alpha = 0f;
+
+        BuildFadePanel();
+    }
+
+    private void OnDestroy()
+    {
+        if (fadeTexture != null)
+            Destroy(fadeTexture);
+    }
+
+    // Lets the fade be tuned live in play mode.
+    private void OnValidate()
+    {
+        if (fadePanelRect != null)
+            RefreshFadePanel();
+    }
+
+    // ---------------------------------------------------------
+    // GENERATED FADE PANEL
+    // ---------------------------------------------------------
+    private void BuildFadePanel()
+    {
+        if (dialogueText == null) return;
+
+        Canvas canvas = dialogueText.canvas;
+        if (canvas == null)
+        {
+            Debug.LogWarning("DialogueTextController: dialogue text is not under a Canvas, no fade panel built.");
+            return;
+        }
+
+        var go = new GameObject("DialogueFadePanel (generated)", typeof(RectTransform), typeof(CanvasGroup), typeof(RawImage));
+        fadePanelRect = go.GetComponent<RectTransform>();
+        fadePanelRect.SetParent(canvas.transform, false);
+        fadePanelRect.SetAsFirstSibling(); // drawn first = behind the text
+
+        fadePanelGroup = go.GetComponent<CanvasGroup>();
+        fadePanelGroup.alpha = 0f;
+        fadePanelGroup.interactable = false;
+        fadePanelGroup.blocksRaycasts = false;
+
+        fadeTexture = new Texture2D(1, FadeTextureHeight, TextureFormat.RGBA32, false)
+        {
+            name = "DialogueFadeGradient",
+            wrapMode = TextureWrapMode.Clamp,
+            filterMode = FilterMode.Bilinear
+        };
+
+        RawImage image = go.GetComponent<RawImage>();
+        image.texture = fadeTexture;
+        image.raycastTarget = false;
+
+        RefreshFadePanel();
+    }
+
+    private void RefreshFadePanel()
+    {
+        // Full width, from the bottom edge up to fadeHeight of the screen.
+        fadePanelRect.anchorMin = Vector2.zero;
+        fadePanelRect.anchorMax = new Vector2(1f, fadeHeight);
+        fadePanelRect.offsetMin = Vector2.zero;
+        fadePanelRect.offsetMax = Vector2.zero;
+
+        // Row 0 is the bottom of the panel.
+        var pixels = new Color32[FadeTextureHeight];
+        for (int y = 0; y < FadeTextureHeight; y++)
+        {
+            float v = y / (float)(FadeTextureHeight - 1);
+            float a = Mathf.Clamp01(fadeFalloff.Evaluate(v)) * fadeBottomOpacity;
+            pixels[y] = new Color32(0, 0, 0, (byte)Mathf.RoundToInt(a * 255f));
+        }
+        fadeTexture.SetPixels32(pixels);
+        fadeTexture.Apply(false);
     }
 
     // ---------------------------------------------------------
@@ -135,7 +225,7 @@ public class DialogueTextController : MonoBehaviour
         // Only raise the panel if it is not already up. FadeInBackground lerps from a hardcoded 0,
         // so calling it on an open panel would drop it to transparent and bring it back — a flicker
         // between every line of a conversation that steps through several.
-        if (dialogueBackground == null || dialogueBackground.alpha < 0.999f)
+        if (fadePanelGroup == null || fadePanelGroup.alpha < 0.999f)
             yield return FadeInBackground(backgroundFadeDuration);
 
         yield return FadeInRoutine(message, defaultFadeIn);
@@ -238,34 +328,34 @@ public class DialogueTextController : MonoBehaviour
 
     private IEnumerator FadeInBackground(float duration)
     {
-        if (dialogueBackground == null) yield break;
+        if (fadePanelGroup == null) yield break;
 
         float t = 0f;
         while (t < duration)
         {
             t += Time.deltaTime;
-            dialogueBackground.alpha = Mathf.Lerp(0f, 1f, t / duration);
+            fadePanelGroup.alpha = Mathf.Lerp(0f, 1f, t / duration);
             yield return null;
         }
 
-        dialogueBackground.alpha = 1f;
+        fadePanelGroup.alpha = 1f;
     }
 
     private IEnumerator FadeOutBackground(float duration)
     {
-        if (dialogueBackground == null) yield break;
+        if (fadePanelGroup == null) yield break;
 
-        float start = dialogueBackground.alpha;
+        float start = fadePanelGroup.alpha;
         float t = 0f;
 
         while (t < duration)
         {
             t += Time.deltaTime;
-            dialogueBackground.alpha = Mathf.Lerp(start, 0f, t / duration);
+            fadePanelGroup.alpha = Mathf.Lerp(start, 0f, t / duration);
             yield return null;
         }
 
-        dialogueBackground.alpha = 0f;
+        fadePanelGroup.alpha = 0f;
     }
 
     private IEnumerator ShowForRoutine(string message, float fadeIn, float hold, float fadeOut)

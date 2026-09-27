@@ -14,6 +14,10 @@
 // street light both light terms are zero, so without a floor the body renders at exactly its base
 // colour with the height field multiplied by nothing, and there is no volume to see anywhere a
 // lamp is not. Set it to 0 for the old behaviour.
+//
+//   EDGE SHADOW darkens the base colour toward the outline, measured on Fill (0 at the edge, 1
+//   deep inside). It goes on UNDER the light: the lit rim and the lamp glow lerp over it, so a
+//   lit edge still reads bright and the shadow only shows where the light does not reach.
 
 #ifndef FOG_COMPOSE_INCLUDED
 #define FOG_COMPOSE_INCLUDED
@@ -32,6 +36,8 @@ void FogCompose_float(
     float  LipLight,
     float  Ambient,
     float  Opacity,
+    float  EdgeShadowWidth,      // how far in from the edge the shadow reaches, as a fraction of Fill
+    float  EdgeShadowStrength,   // 0 = no shadow, 1 = black at the very edge, >1 = black reaches further in
     out float3 Colour,
     out float  Alpha)
 {
@@ -45,18 +51,23 @@ void FogCompose_float(
 
     float lit = saturate(glow + rim + ambient);
 
-    Colour = lerp(FogColour, LitColour, lit) * Grain;
+    float edge  = 1.0 - smoothstep(0.0, max(EdgeShadowWidth, 1e-3), saturate(Fill));
+    float shade = 1.0 - saturate(max(EdgeShadowStrength, 0.0) * edge);
+
+    Colour = lerp(FogColour * shade, LitColour, lit) * Grain;
     Alpha  = saturate(Body * Thin * Opacity);
 }
 
 void FogCompose_half(
     half Body, half Lip, half Fill, half Light, half Proximity, half Grain, half Thin, half Slope,
     half3 FogColour, half3 LitColour, half LipLight, half Ambient, half Opacity,
+    half EdgeShadowWidth, half EdgeShadowStrength,
     out half3 Colour, out half Alpha)
 {
     float3 c; float a;
     FogCompose_float(Body, Lip, Fill, Light, Proximity, Grain, Thin, Slope,
-                     FogColour, LitColour, LipLight, Ambient, Opacity, c, a);
+                     FogColour, LitColour, LipLight, Ambient, Opacity,
+                     EdgeShadowWidth, EdgeShadowStrength, c, a);
     Colour = (half3)c; Alpha = (half)a;
 }
 

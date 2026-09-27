@@ -112,9 +112,6 @@
             "m_Id": "faa9f944c12c4baeb3bf84486a8a2b04"
         },
         {
-            "m_Id": "fa2902de03114fd7ab994acdf2deeb05"
-        },
-        {
             "m_Id": "faf66d0835ab4bb483073b2e23761506"
         },
         {
@@ -125,9 +122,6 @@
         },
         {
             "m_Id": "fab43747c3f9481bab27167cb3146409"
-        },
-        {
-            "m_Id": "fadcfc9be1294f1a96b98b8cfa31340a"
         },
         {
             "m_Id": "fa165db92c8f4e40b9140c65687a650b"
@@ -177,24 +171,6 @@
         "z": 0.0
     },
     "m_Labels": []
-}
-
-{
-    "m_SGVersion": 0,
-    "m_Type": "UnityEditor.ShaderGraph.Vector1MaterialSlot",
-    "m_ObjectId": "fa2902de03114fd7ab994acdf2deeb05",
-    "m_Id": 1,
-    "m_DisplayName": "BlobId",
-    "m_SlotType": 0,
-    "m_Hidden": false,
-    "m_HideConnector": false,
-    "m_ShaderOutputName": "BlobId",
-    "m_StageCapability": 3,
-    "m_CustomBinding": "",
-    "m_Value": 0.0,
-    "m_DefaultValue": 0.0,
-    "m_Labels": [],
-    "m_LiteralMode": false
 }
 
 {
@@ -261,24 +237,6 @@
     "m_Hidden": false,
     "m_HideConnector": false,
     "m_ShaderOutputName": "TransparencyFalloff",
-    "m_StageCapability": 3,
-    "m_CustomBinding": "",
-    "m_Value": 0.0,
-    "m_DefaultValue": 0.0,
-    "m_Labels": [],
-    "m_LiteralMode": false
-}
-
-{
-    "m_SGVersion": 0,
-    "m_Type": "UnityEditor.ShaderGraph.Vector1MaterialSlot",
-    "m_ObjectId": "fadcfc9be1294f1a96b98b8cfa31340a",
-    "m_Id": 6,
-    "m_DisplayName": "Time",
-    "m_SlotType": 0,
-    "m_Hidden": false,
-    "m_HideConnector": false,
-    "m_ShaderOutputName": "Time",
     "m_StageCapability": 3,
     "m_CustomBinding": "",
     "m_Value": 0.0,
@@ -395,3 +353,4 @@
     "m_Labels": [],
     "m_LiteralMode": false
 }
+

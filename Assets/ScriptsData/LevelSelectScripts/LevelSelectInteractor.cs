@@ -62,7 +62,7 @@ public class LevelSelectInteractor : MonoBehaviour
         {
             // Re-asserted every frame rather than set once: the pause menu puts the clock back
             // to 1 on its way out, and a poster that was up behind it is still up.
-            Time.timeScale = 0f;
+            if (PausesTime(_running)) Time.timeScale = 0f;
 
             StepRunning(pressed);
             return;
@@ -138,12 +138,16 @@ public class LevelSelectInteractor : MonoBehaviour
         boatControl.SetLookLocked(true);
 
         // The map holds its breath while you look: the water, the fish and everything else on
-        // it stop where they are rather than carrying on behind what is on screen.
-        Time.timeScale = 0f;
+        // it stop where they are rather than carrying on behind what is on screen. Only for
+        // what asks for it — a conversation has to keep its clock to fade its lines in.
+        if (PausesTime(point)) Time.timeScale = 0f;
 
         // The prompt is what brought you here; it has no business sitting over the poster.
         Prompt(null);
     }
+
+    private static bool PausesTime(LevelSelectInteractPoint point) =>
+        point != null && point.Action != null && point.Action.PausesTime;
 
     private void StepRunning(bool pressed)
     {

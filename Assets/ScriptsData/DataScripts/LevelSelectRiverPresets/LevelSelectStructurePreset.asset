@@ -34,10 +34,10 @@ MonoBehaviour:
     decalSheetHeld: 3
     decalSheetCellPixels: 256
     decalAmount: 1
-    decalOpacity: 0.463
-    decalSpacing: 2.51
-    decalScaleMin: 1.11
-    decalScaleMax: 6.14
+    decalOpacity: 1
+    decalSpacing: 4.76
+    decalScaleMin: 0.68
+    decalScaleMax: 7.89
     lightStrength: 0.93
     outpostOutsideWalls: 0
     outpostWallTop: 3
@@ -54,3 +54,9 @@ MonoBehaviour:
     archwayOutside: 0
     archwayFaces: 0
     archwayFeet: 0
+    doorSheet: 0
+    doorFrame: 0
+    doorPanel: 0
+    doorFlapRim: 0
+    doorDisc: 0
+    doorEdges: 0

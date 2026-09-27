@@ -30,6 +30,7 @@ public class LevelSelectCameraControllerEditor : Editor
         EditorGUI.BeginChangeCheck();
         EditorGUILayout.PropertyField(serializedObject.FindProperty("followDistance"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("followHeight"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("followTargetVerticalOffset"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("defaultZoom"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("followCatchUpTime"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("defaultVerticalFOV"));
@@ -39,10 +40,14 @@ public class LevelSelectCameraControllerEditor : Editor
 
         // 1c. Interact Lean — the glance the camera gives a point it is passing
         EditorGUILayout.LabelField("Interact Lean Settings", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("interactLeanEnabled"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("interactLean"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("maxInteractLeanAngle"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("interactLeanStayBehind"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("interactLeanTime"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("interactLeanZoom"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("interactLeanVertical"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("maxInteractLeanPitch"));
 
         EditorGUILayout.Space();
 

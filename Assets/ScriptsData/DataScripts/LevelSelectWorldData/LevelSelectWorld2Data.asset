@@ -13,24 +13,6 @@ MonoBehaviour:
   m_Name: LevelSelectWorld2Data
   m_EditorClassIdentifier: 
   hillPoints:
-  - id: 2ce12732-fe5f-4b7d-a23d-a36643212d5e
-    positionXZ: {x: 35.13688, y: -25.740664}
-    scale: 5
-    height: 1
-    smoothness: 1
-    noise: 0
-  - id: 252d0f7c-8d27-47ba-b486-c8781a1806d0
-    positionXZ: {x: 29.61201, y: -35.776073}
-    scale: 6.9
-    height: 6.9
-    smoothness: 1
-    noise: 0
-  - id: efd8a331-b64c-4498-b420-32089e30f954
-    positionXZ: {x: 32.536858, y: -50.21195}
-    scale: 1.4
-    height: 6.9
-    smoothness: 1
-    noise: 0
   - id: ad947181-5f49-43ee-b116-5c64ff556f72
     positionXZ: {x: 72.6007, y: -39.059017}
     scale: 7.8
@@ -38,14 +20,14 @@ MonoBehaviour:
     smoothness: 1
     noise: 0
   - id: 3bac5b98-b285-4e13-a01c-e39756b776c9
-    positionXZ: {x: 106.37943, y: -20.171017}
+    positionXZ: {x: 103.945526, y: -46.826683}
     scale: 19.2
-    height: -15
+    height: -1.8
     smoothness: 1
     noise: 0
   - id: 4d317da8-59b2-41f7-8f77-34530b2f8871
-    positionXZ: {x: 83.08221, y: -14.082023}
-    scale: 50
+    positionXZ: {x: 80.39063, y: -12.724364}
+    scale: 100
     height: 39.5
     smoothness: 0.111
     noise: 0.083
@@ -68,11 +50,11 @@ MonoBehaviour:
     smoothness: 1
     noise: 0
   - id: 69b3cec3-ee38-4a82-87bd-c0e581ea2c3f
-    positionXZ: {x: 16.820915, y: -26.188051}
-    scale: 12.7
-    height: 50
+    positionXZ: {x: 40.423027, y: -49.30663}
+    scale: 25.2
+    height: 26.1
     smoothness: 1
-    noise: 0
+    noise: 0.403
   - id: d67f3d4b-67ac-4ddb-84e3-f0d3bf55da1c
     positionXZ: {x: 105.806564, y: 27.376728}
     scale: 19.2
@@ -91,18 +73,36 @@ MonoBehaviour:
     height: -15
     smoothness: 1
     noise: 0
-  - id: 7d351179-171e-4ba9-980d-1f4206dc192a
-    positionXZ: {x: 107.525154, y: -34.206192}
-    scale: 19.2
-    height: -15
-    smoothness: 1
-    noise: 0
   - id: 1136dd83-1937-4637-b4ae-a3ea877cbc5b
-    positionXZ: {x: 106.37943, y: -75.166}
-    scale: 19.2
-    height: -15
+    positionXZ: {x: 113.79636, y: -51.306026}
+    scale: 10.4
+    height: -3.4
     smoothness: 1
-    noise: 0
+    noise: 0.178
+  - id: b158b27b-6663-4e50-9ed7-3821639a76ec
+    positionXZ: {x: 97.48683, y: -44.904156}
+    scale: 10.4
+    height: -3.4
+    smoothness: 1
+    noise: 0.178
+  - id: ad0999a7-4d21-4e50-973d-ee39158be948
+    positionXZ: {x: 124.85666, y: -56.959164}
+    scale: 10.4
+    height: -4.5
+    smoothness: 1
+    noise: 0.178
+  - id: 7492e713-91e1-4d1d-acd9-8d961de0dc83
+    positionXZ: {x: 121.98399, y: -56.48039}
+    scale: 10.4
+    height: 0
+    smoothness: 1
+    noise: 0.178
+  - id: 56529c54-6faa-4773-9ce0-2825da3da7ce
+    positionXZ: {x: 139.55586, y: -75.65284}
+    scale: 32
+    height: -10
+    smoothness: 1
+    noise: 0.178
   - id: 7ed3a08a-8a2d-4b14-9a24-c11e29f11913
     positionXZ: {x: 106.95229, y: -97.79414}
     scale: 19.2
@@ -115,48 +115,12 @@ MonoBehaviour:
     height: -15
     smoothness: 1
     noise: 0
-  - id: 38805fd0-22d2-463f-8995-7582cc1d39b0
-    positionXZ: {x: 104.374405, y: -54.82931}
-    scale: 19.2
-    height: -15
-    smoothness: 1
-    noise: 0
   - id: cb1a48e7-7b53-417b-bf4e-6ee013beb217
     positionXZ: {x: 102.942245, y: 60.602863}
     scale: 19.2
     height: -15
     smoothness: 1
     noise: 0
-  - id: 89e67cd8-3d8a-4da2-9143-07a4b9e7b2eb
-    positionXZ: {x: 20.985931, y: -55.84491}
-    scale: 6.9
-    height: 6.9
-    smoothness: 1
-    noise: 0
-  - id: 19537893-a375-45ba-b987-a87612d796b1
-    positionXZ: {x: 6.550452, y: -34.895863}
-    scale: 6.9
-    height: 6.9
-    smoothness: 1
-    noise: 0
-  - id: 3d59f699-9b33-4639-a8a1-57a06f91e036
-    positionXZ: {x: 7.9587917, y: -48.62717}
-    scale: 5.6
-    height: -9.4
-    smoothness: 1
-    noise: 0
-  - id: d4533877-dc25-4f43-a6f8-80c5de3095e3
-    positionXZ: {x: 37.357876, y: -60.598057}
-    scale: 5.6
-    height: -9.4
-    smoothness: 1
-    noise: 0
-  - id: 1f472ed0-d5de-4028-8230-24039689db10
-    positionXZ: {x: 91.06042, y: -33.182346}
-    scale: 6.5
-    height: 9.9
-    smoothness: 0.849
-    noise: 0.356
   - id: 5ab2b4ba-43c0-4a2f-8ddb-11586901d588
     positionXZ: {x: 71.3702, y: 18.007244}
     scale: 8.3
@@ -180,13 +144,13 @@ MonoBehaviour:
     worldPosition: {x: 76.162575, y: 0, z: -26.950674}
     type: 0
   - id: b2e5db0b-7bc0-4af6-ab70-c3e42776e421
-    worldPosition: {x: 88.003975, y: 0, z: -26.809046}
+    worldPosition: {x: 93.31871, y: -2, z: -27.030493}
     type: 0
   - id: 7b809514-9d66-45d4-ba5d-68ef656aa1a8
     worldPosition: {x: 70.73956, y: 0, z: -20.083752}
     type: 0
   - id: e179a491-5f75-445d-b2b3-b04178d9ba43
-    worldPosition: {x: 42.791386, y: 0, z: -16.445084}
+    worldPosition: {x: 43.501385, y: 0, z: -16.445084}
     type: 0
   - id: aeb22f6f-e051-4245-9d02-92afcf23088a
     worldPosition: {x: 33.043938, y: 0, z: -16.371576}
@@ -213,7 +177,7 @@ MonoBehaviour:
     worldPosition: {x: 14.425763, y: 0, z: -61.576195}
     type: 0
   - id: fbe762a1-75cd-477f-96d1-9369b4fb0eab
-    worldPosition: {x: 81.40626, y: 0, z: -26.714182}
+    worldPosition: {x: 82.292046, y: 0, z: -27.009445}
     type: 0
   - id: 0342c7d0-6045-4291-827e-982a0d16420d
     worldPosition: {x: 82.086624, y: 2, z: -16.301846}
@@ -249,7 +213,7 @@ MonoBehaviour:
     worldPosition: {x: 77.029106, y: -2, z: -1.8844259}
     type: 0
   - id: fcf4e930-5244-43d7-9352-29178364205a
-    worldPosition: {x: 84.613976, y: 0, z: -26.809046}
+    worldPosition: {x: 89.92871, y: -2, z: -27.030493}
     type: 0
   - id: d27d87d3-e1b5-495b-9c67-5416cb42e486
     worldPosition: {x: 66.91641, y: -2, z: -7.5101914}
@@ -273,7 +237,7 @@ MonoBehaviour:
     worldPosition: {x: 57.501385, y: 0, z: -16.445084}
     type: 0
   - id: c5135933-e600-4297-87c2-d3baed4813f4
-    worldPosition: {x: 40.791386, y: 0, z: -16.445084}
+    worldPosition: {x: 41.501385, y: 0, z: -16.445084}
     type: 0
   - id: 87f28ecb-cad1-4443-9ec7-c917e552e6f1
     worldPosition: {x: 13.140257, y: 0, z: -16.427258}
@@ -282,10 +246,10 @@ MonoBehaviour:
     worldPosition: {x: -2.2397432, y: 0, z: -16.427258}
     type: 0
   - id: 11897299-3fb7-4e2a-a953-09d3299025e9
-    worldPosition: {x: 72.732574, y: 0, z: -26.950674}
+    worldPosition: {x: 72.46258, y: 0, z: -26.950674}
     type: 0
   - id: 4c74a89d-411b-4bda-ad02-e39cf0adb8dc
-    worldPosition: {x: 79.592575, y: 0, z: -26.950674}
+    worldPosition: {x: 79.86257, y: 0, z: -26.950674}
     type: 0
   - id: 3640a78a-cdef-45de-a712-ff8e882580c9
     worldPosition: {x: 75.86306, y: 0, z: -34.136063}
@@ -294,14 +258,42 @@ MonoBehaviour:
     worldPosition: {x: 65.17544, y: 0, z: -34.881714}
     type: 0
   - id: be02d845-96f7-4575-a069-dc9d17810310
-    worldPosition: {x: 76.162575, y: 0, z: -30.380674}
+    worldPosition: {x: 76.162575, y: 0, z: -30.650675}
     type: 0
   - id: d8fc67c2-d72c-4496-af01-adfeb3bfa25e
     worldPosition: {x: 77.71235, y: 0, z: -16.26664}
     type: 0
+  - id: 790e0924-1a56-4d59-a2cb-2da151df4d7e
+    worldPosition: {x: 93.53153, y: -5, z: -39.641212}
+    type: 0
+  - id: cd43a64c-0bad-4584-8e26-74aa70256149
+    worldPosition: {x: 99.10605, y: -6, z: -45.65465}
+    type: 0
+  - id: c40a2ff8-a2af-4d0b-a743-0a277a479a7d
+    worldPosition: {x: 118.752335, y: -8, z: -54.321163}
+    type: 0
+  - id: ad0f4680-a479-4203-862c-f532ec88e3bc
+    worldPosition: {x: 106.26835, y: -7, z: -49.916424}
+    type: 0
+  - id: 72817e4b-2fc7-4c58-a856-a5bd1c90dd2b
+    worldPosition: {x: 93.31871, y: -2, z: -30.420492}
+    type: 0
+  - id: b0265fc9-851b-4e74-806c-7a603759acdd
+    worldPosition: {x: 137.60399, y: -10, z: -69.044266}
+    type: 0
+  - id: 0155b428-c1f1-46ef-8623-d662f6b12a54
+    worldPosition: {x: 129.3122, y: -10, z: -57.119946}
+    type: 0
+  - id: e5184da0-6eb1-4ab3-b422-325ae24a7769
+    worldPosition: {x: 137.60399, y: -10, z: -64.58427}
+    type: 0
+  - id: 9a15dec0-56b5-4099-9ba1-2f4e1658e78b
+    worldPosition: {x: 137.2661, y: -10, z: -61.16206}
+    type: 0
   paths:
   - pathId: cb512902-99c4-4aa3-973b-d4a908cef861
     segmentId: MainRiver
+    loreName: 
     nodeIds:
     - 6c2c0bb8-0ed6-4a0c-a0c7-31ed04a6984b
     - 5dd7daf7-1839-46fb-8b5f-d6f4b9c0f05c
@@ -324,8 +316,12 @@ MonoBehaviour:
     editorColor: {r: 0.27, g: 0.45396018, b: 0.9, a: 1}
     curveStrength: 0.1
     curveSubdivisions: 6
+    landscapeInfluence: 0
+    landscapeToOuterRim: 1
+    influenceDistance: 10
   - pathId: 9d03b668-69f2-44e9-bf9d-6b5f77785098
     segmentId: Branch_01
+    loreName: 
     nodeIds:
     - fdd41757-67b3-4add-89dc-85b6fed6be9b
     - 7b809514-9d66-45d4-ba5d-68ef656aa1a8
@@ -348,8 +344,12 @@ MonoBehaviour:
     editorColor: {r: 0.27, g: 0.4539601, b: 0.9, a: 1}
     curveStrength: 1
     curveSubdivisions: 2
+    landscapeInfluence: 0
+    landscapeToOuterRim: 1
+    influenceDistance: 10
   - pathId: 5b0a0255-7e55-4784-b96c-248b5958e1ee
     segmentId: Branch_02
+    loreName: 
     nodeIds:
     - e179a491-5f75-445d-b2b3-b04178d9ba43
     - c5135933-e600-4297-87c2-d3baed4813f4
@@ -369,8 +369,12 @@ MonoBehaviour:
     editorColor: {r: 0.6379202, g: 0.9, b: 0.27, a: 1}
     curveStrength: 1
     curveSubdivisions: 2
+    landscapeInfluence: 0
+    landscapeToOuterRim: 1
+    influenceDistance: 10
   - pathId: a98e74a7-1543-405a-b87e-925ffbd7ea7a
     segmentId: Branch_03
+    loreName: 
     nodeIds:
     - 10aaff99-cd7f-4c2a-b7bc-4106c47e94b6
     - e91713d5-bbd1-4f04-9445-a5f55b880ec5
@@ -390,8 +394,12 @@ MonoBehaviour:
     editorColor: {r: 0.9, g: 0.27, b: 0.8218803, a: 1}
     curveStrength: 1
     curveSubdivisions: 2
+    landscapeInfluence: 0
+    landscapeToOuterRim: 1
+    influenceDistance: 10
   - pathId: 5742468e-f8ad-487c-ad1b-620284208bea
     segmentId: Branch_04
+    loreName: 
     nodeIds:
     - a58ee8b5-98eb-4b11-8809-c253ca889e25
     - ea327af0-34ba-4737-8916-f61e478b6da6
@@ -412,8 +420,12 @@ MonoBehaviour:
     editorColor: {r: 0.27, g: 0.9, b: 0.79415953, a: 1}
     curveStrength: 1
     curveSubdivisions: 2
+    landscapeInfluence: 0
+    landscapeToOuterRim: 1
+    influenceDistance: 10
   - pathId: b121d03d-dc5f-4040-b6c3-84a562bb77c2
     segmentId: Branch_06
+    loreName: 
     nodeIds:
     - d9194d90-8bf7-477e-9462-c545c38e4ae0
     - 496fec47-c98c-44cb-b08e-a85d1d51653a
@@ -430,8 +442,12 @@ MonoBehaviour:
     editorColor: {r: 0.42623934, g: 0.27, b: 0.9, a: 1}
     curveStrength: 1
     curveSubdivisions: 2
+    landscapeInfluence: 0
+    landscapeToOuterRim: 1
+    influenceDistance: 10
   - pathId: 621befc7-fa46-46de-88d6-ae72d6010b90
     segmentId: Branch_07
+    loreName: 
     nodeIds:
     - 6c2c0bb8-0ed6-4a0c-a0c7-31ed04a6984b
     - f20a68f9-11d5-401c-950f-8d9067239df9
@@ -452,8 +468,12 @@ MonoBehaviour:
     editorColor: {r: 0.29772076, g: 0.9, b: 0.27, a: 1}
     curveStrength: 1
     curveSubdivisions: 2
+    landscapeInfluence: 0
+    landscapeToOuterRim: 1
+    influenceDistance: 10
   - pathId: feb08ca1-0c92-401e-a567-632ced7c3fda
     segmentId: Branch_08
+    loreName: 
     nodeIds:
     - db7d413b-45c1-4245-8ed4-960f13707658
     - be02d845-96f7-4575-a069-dc9d17810310
@@ -462,7 +482,7 @@ MonoBehaviour:
     isLeftPath: 0
     isRightPath: 0
     segmentType: 2
-    riverName: Branch_08
+    riverName: Branch08
     leadsToArena: 0
     arenaIsAtEnd: 0
     extrudeOnExit: 0
@@ -471,6 +491,38 @@ MonoBehaviour:
     editorColor: {r: 0.29772076, g: 0.9, b: 0.27, a: 1}
     curveStrength: 1
     curveSubdivisions: 2
+    landscapeInfluence: 0
+    landscapeToOuterRim: 1
+    influenceDistance: 10
+  - pathId: bff36f04-8fc4-44b7-8514-d5d5a953ee5e
+    segmentId: Branch_09
+    loreName: 
+    nodeIds:
+    - b2e5db0b-7bc0-4af6-ab70-c3e42776e421
+    - 72817e4b-2fc7-4c58-a856-a5bd1c90dd2b
+    - 790e0924-1a56-4d59-a2cb-2da151df4d7e
+    - cd43a64c-0bad-4584-8e26-74aa70256149
+    - ad0f4680-a479-4203-862c-f532ec88e3bc
+    - c40a2ff8-a2af-4d0b-a743-0a277a479a7d
+    - 0155b428-c1f1-46ef-8623-d662f6b12a54
+    - 9a15dec0-56b5-4099-9ba1-2f4e1658e78b
+    - e5184da0-6eb1-4ab3-b422-325ae24a7769
+    - b0265fc9-851b-4e74-806c-7a603759acdd
+    isLeftPath: 0
+    isRightPath: 0
+    segmentType: 2
+    riverName: starting river
+    leadsToArena: 0
+    arenaIsAtEnd: 0
+    extrudeOnExit: 0
+    tJunctionBidirectional: 0
+    arenaGridDataGuid: 
+    editorColor: {r: 0.9, g: 0.27, b: 0.48168087, a: 1}
+    curveStrength: 1
+    curveSubdivisions: 2
+    landscapeInfluence: 1
+    landscapeToOuterRim: 1
+    influenceDistance: 7.76
   junctions:
   - junctionId: 2b1e6d8e-a1f0-47ec-a245-a106ee8e225a
     nodeId: fdd41757-67b3-4add-89dc-85b6fed6be9b
@@ -502,7 +554,7 @@ MonoBehaviour:
     gridData: {fileID: 11400000, guid: ea7758a3ab37a344380b917f95a35a13, type: 2}
     entranceIndex: 0
     arenaPrefabOverride: {fileID: 0}
-    arenaRadius: 7.71
+    arenaRadius: 7
     overrideWall: 1
     archwayOnEntrances: 1
     overrideArchway: 0
@@ -537,9 +589,9 @@ MonoBehaviour:
       numeralLift: 0.004
     doorPreset: {fileID: 11400000, guid: 6b7325486d0e83b4c8a13303177b0117, type: 2}
     wallProfile:
-      radius: 7.71
-      thickness: 1
-      height: 5.8
+      radius: 7
+      thickness: 3
+      height: 15
       drop: 42.5
     overrideRunOverlap: 1
     runOverlap: 0
@@ -698,17 +750,30 @@ MonoBehaviour:
     leadIns:
     - nodeId: fcf4e930-5244-43d7-9352-29178364205a
       compass: 3
-    hasTower: 0
+    - nodeId: 72817e4b-2fc7-4c58-a856-a5bd1c90dd2b
+      compass: 2
+    hasTower: 1
     tower:
-      stemRadius: 0.05
-      stemHeight: 0.8
-      orbRadius: 0.25
-      baseRadius: 0.12
-      baseHeight: 0.08
-      rampHeight: 0
-      base2Radius: 0.03
-      base2Height: 0
-    towerPreset: {fileID: 0}
+      stemRadius: 0.15
+      stemHeight: 1.74
+      orbRadius: 0.5
+      baseRadius: 0.62
+      baseHeight: 0.3
+      rampHeight: 0.56
+      base2Radius: 0.29
+      base2Height: 0.17
+    towerPreset: {fileID: 11400000, guid: 16e422adff10b2d4290d628d4c2350f5, type: 2}
+    towerPerch:
+      enabled: 0
+      perchRadius: 12
+      priority: 0
+      startPerch: 0
+      landingCurveSize: 2
+      talkEnabled: 0
+      talkRadius: 4
+      talkPrompt: Talk
+      talkText: 
+      talkCameraDistance: 0
   - nodeId: 6c2c0bb8-0ed6-4a0c-a0c7-31ed04a6984b
     overrideShape: 1
     poolRadius: 3
@@ -731,6 +796,17 @@ MonoBehaviour:
       base2Radius: 0.03
       base2Height: 0
     towerPreset: {fileID: 0}
+    towerPerch:
+      enabled: 0
+      perchRadius: 12
+      priority: 0
+      startPerch: 0
+      landingCurveSize: 2
+      talkEnabled: 0
+      talkRadius: 4
+      talkPrompt: Talk
+      talkText: 
+      talkCameraDistance: 0
   - nodeId: d9194d90-8bf7-477e-9462-c545c38e4ae0
     overrideShape: 1
     poolRadius: 4.58
@@ -757,9 +833,20 @@ MonoBehaviour:
       base2Radius: 0.03
       base2Height: 0
     towerPreset: {fileID: 0}
+    towerPerch:
+      enabled: 0
+      perchRadius: 12
+      priority: 0
+      startPerch: 0
+      landingCurveSize: 2
+      talkEnabled: 0
+      talkRadius: 4
+      talkPrompt: Talk
+      talkText: 
+      talkCameraDistance: 0
   - nodeId: db7d413b-45c1-4245-8ed4-960f13707658
     overrideShape: 1
-    poolRadius: 2
+    poolRadius: 2.27
     islandRadius: 0
     floorDepth: 0
     editorColor: {r: 0.35, g: 0.75, b: 1, a: 1}
@@ -781,6 +868,48 @@ MonoBehaviour:
       base2Radius: 0.03
       base2Height: 0
     towerPreset: {fileID: 0}
+    towerPerch:
+      enabled: 0
+      perchRadius: 12
+      priority: 0
+      startPerch: 0
+      landingCurveSize: 2
+      talkEnabled: 0
+      talkRadius: 4
+      talkPrompt: Talk
+      talkText: 
+      talkCameraDistance: 0
+  - nodeId: b0265fc9-851b-4e74-806c-7a603759acdd
+    overrideShape: 1
+    poolRadius: 3.16
+    islandRadius: 0
+    floorDepth: 0
+    editorColor: {r: 0.35, g: 0.75, b: 1, a: 1}
+    leadIns:
+    - nodeId: e5184da0-6eb1-4ab3-b422-325ae24a7769
+      compass: 0
+    hasTower: 0
+    tower:
+      stemRadius: 0.05
+      stemHeight: 0.8
+      orbRadius: 0.25
+      baseRadius: 0.12
+      baseHeight: 0.08
+      rampHeight: 0
+      base2Radius: 0.03
+      base2Height: 0
+    towerPreset: {fileID: 0}
+    towerPerch:
+      enabled: 0
+      perchRadius: 12
+      priority: 0
+      startPerch: 0
+      landingCurveSize: 2
+      talkEnabled: 0
+      talkRadius: 4
+      talkPrompt: Talk
+      talkText: 
+      talkCameraDistance: 0
   outposts:
   - outpostId: 54e0ec99-d17c-49c7-9afe-d338173ef8be
     pathId: cb512902-99c4-4aa3-973b-d4a908cef861
@@ -812,6 +941,17 @@ MonoBehaviour:
       height: 0.6
     preset: {fileID: 11400000, guid: 13dce602f9f6a514485f0086fe1284e7, type: 2}
     towerPreset: {fileID: 11400000, guid: 16e422adff10b2d4290d628d4c2350f5, type: 2}
+    towerPerch:
+      enabled: 0
+      perchRadius: 12
+      priority: 0
+      startPerch: 0
+      landingCurveSize: 2
+      talkEnabled: 0
+      talkRadius: 4
+      talkPrompt: Talk
+      talkText: 
+      talkCameraDistance: 0
   rimNodes:
   - nodeId: b120236e-0200-44b0-a8dc-f6f9940c46d6
     side: 0
@@ -855,10 +995,30 @@ MonoBehaviour:
         prompt: Look
         radius: 3
         posterName: 
+      perch:
+        enabled: 0
+        perchRadius: 12
+        priority: 0
+        startPerch: 0
+        landingCurveSize: 2
+        talkEnabled: 0
+        talkRadius: 4
+        talkPrompt: Talk
+        talkText: 
+        talkCameraDistance: 0
   pipes:
   - pipeId: fa8bf69f-ccaa-47ee-a557-4d537bd9eeaf
     nodes:
-    - positionXZ: {x: 82.38574, y: -38.481228}
+    - positionXZ: {x: 119.54251, y: -105.644135}
+      overrideHeight: 1
+      height: 10
+    - positionXZ: {x: 87.97397, y: -63.990334}
+      overrideHeight: 1
+      height: 10
+    - positionXZ: {x: 79.390945, y: -50.88009}
+      overrideHeight: 1
+      height: 10
+    - positionXZ: {x: 82.27085, y: -38.59612}
       overrideHeight: 1
       height: 2.68
     - positionXZ: {x: 81.44073, y: -21.370863}
@@ -877,23 +1037,443 @@ MonoBehaviour:
       overrideHeight: 0
       height: 0.5
     supports:
-    - leg: 2
+    - leg: 5
       along: 0.34546983
-    - leg: 0
+    - leg: 3
       along: 0.81976444
-    - leg: 0
+    - leg: 3
       along: 0.20823368
-    - leg: 3
+    - leg: 6
       along: 0.2404115
-    - leg: 3
+    - leg: 6
       along: 0.79735506
-    - leg: 1
+    - leg: 4
       along: 0.10946872
+    - leg: 2
+      along: 0.505667
+    - leg: 0
+      along: 0.7134884
+    - leg: 1
+      along: 0.20900518
     height: 6.43
     pipeThickness: 1.2
     wallThickness: 0.03
     supportThickness: 0.7
     ringOverhang: 0.38
+  walls:
+  - wallId: e2ecc0d8-7741-4e54-9dd5-4ed3849e47db
+    nodes:
+    - positionXZ: {x: 115.22973, y: 25.683638}
+      overrideHeight: 0
+      height: 0.3
+      curvedToNext: 0
+      gapToNext: 0
+      hasColumn: 0
+      columnRadius: 0.08
+      columnHeight: 0.05
+      hasTower: 0
+      tower:
+        stemRadius: 0.02
+        stemHeight: 0.35
+        orbRadius: 0.1
+        baseRadius: 0.05
+        baseHeight: 0.03
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      towerPreset: {fileID: 0}
+      towerPerch:
+        enabled: 0
+        perchRadius: 12
+        priority: 0
+        startPerch: 0
+        landingCurveSize: 2
+        talkEnabled: 0
+        talkRadius: 4
+        talkPrompt: Talk
+        talkText: 
+        talkCameraDistance: 0
+      hasArchway: 0
+      archWidth: 0.1
+      archHeight: 0.2
+    - positionXZ: {x: 115.06115, y: -0.9518875}
+      overrideHeight: 0
+      height: 0.3
+      curvedToNext: 0
+      gapToNext: 0
+      hasColumn: 0
+      columnRadius: 0.08
+      columnHeight: 0.05
+      hasTower: 0
+      tower:
+        stemRadius: 0.02
+        stemHeight: 0.35
+        orbRadius: 0.1
+        baseRadius: 0.05
+        baseHeight: 0.03
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      towerPreset: {fileID: 0}
+      towerPerch:
+        enabled: 0
+        perchRadius: 12
+        priority: 0
+        startPerch: 0
+        landingCurveSize: 2
+        talkEnabled: 0
+        talkRadius: 4
+        talkPrompt: Talk
+        talkText: 
+        talkCameraDistance: 0
+      hasArchway: 0
+      archWidth: 0.1
+      archHeight: 0.2
+    - positionXZ: {x: 112.81329, y: -25.869547}
+      overrideHeight: 0
+      height: 0.3
+      curvedToNext: 0
+      gapToNext: 0
+      hasColumn: 0
+      columnRadius: 0.08
+      columnHeight: 0.05
+      hasTower: 0
+      tower:
+        stemRadius: 0.02
+        stemHeight: 0.35
+        orbRadius: 0.1
+        baseRadius: 0.05
+        baseHeight: 0.03
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      towerPreset: {fileID: 0}
+      towerPerch:
+        enabled: 0
+        perchRadius: 12
+        priority: 0
+        startPerch: 0
+        landingCurveSize: 2
+        talkEnabled: 0
+        talkRadius: 4
+        talkPrompt: Talk
+        talkText: 
+        talkCameraDistance: 0
+      hasArchway: 0
+      archWidth: 0.1
+      archHeight: 0.2
+    - positionXZ: {x: 108.598495, y: -33.64814}
+      overrideHeight: 0
+      height: 0.3
+      curvedToNext: 0
+      gapToNext: 0
+      hasColumn: 1
+      columnRadius: 3
+      columnHeight: 1.2
+      hasTower: 1
+      tower:
+        stemRadius: 1.4
+        stemHeight: 4
+        orbRadius: 3
+        baseRadius: 1
+        baseHeight: 0
+        rampHeight: 0
+        base2Radius: 1
+        base2Height: 0
+      towerPreset: {fileID: 11400000, guid: 2e5c40ef279790842a6cb79837018802, type: 2}
+      towerPerch:
+        enabled: 0
+        perchRadius: 12
+        priority: 0
+        startPerch: 0
+        landingCurveSize: 2
+        talkEnabled: 0
+        talkRadius: 4
+        talkPrompt: Talk
+        talkText: 
+        talkCameraDistance: 0
+      hasArchway: 0
+      archWidth: 0.1
+      archHeight: 0.2
+    - positionXZ: {x: 100.294334, y: -44.248444}
+      overrideHeight: 0
+      height: 0.3
+      curvedToNext: 0
+      gapToNext: 0
+      hasColumn: 0
+      columnRadius: 0.08
+      columnHeight: 0.05
+      hasTower: 0
+      tower:
+        stemRadius: 0.02
+        stemHeight: 0.35
+        orbRadius: 0.1
+        baseRadius: 0.05
+        baseHeight: 0.03
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      towerPreset: {fileID: 0}
+      towerPerch:
+        enabled: 0
+        perchRadius: 12
+        priority: 0
+        startPerch: 0
+        landingCurveSize: 2
+        talkEnabled: 0
+        talkRadius: 4
+        talkPrompt: Talk
+        talkText: 
+        talkCameraDistance: 0
+      hasArchway: 0
+      archWidth: 0.1
+      archHeight: 0.2
+    - positionXZ: {x: 99.090195, y: -45.72188}
+      overrideHeight: 0
+      height: 0.3
+      curvedToNext: 0
+      gapToNext: 0
+      hasColumn: 0
+      columnRadius: 0.08
+      columnHeight: 0.05
+      hasTower: 0
+      tower:
+        stemRadius: 0.02
+        stemHeight: 0.35
+        orbRadius: 0.1
+        baseRadius: 0.05
+        baseHeight: 0.03
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      towerPreset: {fileID: 0}
+      towerPerch:
+        enabled: 0
+        perchRadius: 12
+        priority: 0
+        startPerch: 0
+        landingCurveSize: 2
+        talkEnabled: 0
+        talkRadius: 4
+        talkPrompt: Talk
+        talkText: 
+        talkCameraDistance: 0
+      hasArchway: 1
+      archWidth: 3.23
+      archHeight: 39.1
+    - positionXZ: {x: 97.68458, y: -47.73523}
+      overrideHeight: 0
+      height: 0.3
+      curvedToNext: 1
+      gapToNext: 0
+      hasColumn: 0
+      columnRadius: 0.08
+      columnHeight: 0.05
+      hasTower: 0
+      tower:
+        stemRadius: 0.02
+        stemHeight: 0.35
+        orbRadius: 0.1
+        baseRadius: 0.05
+        baseHeight: 0.03
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      towerPreset: {fileID: 0}
+      towerPerch:
+        enabled: 0
+        perchRadius: 12
+        priority: 0
+        startPerch: 0
+        landingCurveSize: 2
+        talkEnabled: 0
+        talkRadius: 4
+        talkPrompt: Talk
+        talkText: 
+        talkCameraDistance: 0
+      hasArchway: 0
+      archWidth: 0.1
+      archHeight: 0.2
+    - positionXZ: {x: 89.3481, y: -54.727543}
+      overrideHeight: 0
+      height: 4
+      curvedToNext: 1
+      gapToNext: 0
+      hasColumn: 1
+      columnRadius: 3
+      columnHeight: 1.2
+      hasTower: 1
+      tower:
+        stemRadius: 1.4
+        stemHeight: 4
+        orbRadius: 3
+        baseRadius: 1
+        baseHeight: 0
+        rampHeight: 0
+        base2Radius: 1
+        base2Height: 0
+      towerPreset: {fileID: 11400000, guid: 2e5c40ef279790842a6cb79837018802, type: 2}
+      towerPerch:
+        enabled: 0
+        perchRadius: 12
+        priority: 0
+        startPerch: 0
+        landingCurveSize: 2
+        talkEnabled: 0
+        talkRadius: 4
+        talkPrompt: Talk
+        talkText: 
+        talkCameraDistance: 0
+      hasArchway: 0
+      archWidth: 0.1
+      archHeight: 0.2
+    - positionXZ: {x: 68.87042, y: -67.70928}
+      overrideHeight: 0
+      height: 8
+      curvedToNext: 1
+      gapToNext: 0
+      hasColumn: 0
+      columnRadius: 0.08
+      columnHeight: 0.05
+      hasTower: 0
+      tower:
+        stemRadius: 0.02
+        stemHeight: 0.35
+        orbRadius: 0.1
+        baseRadius: 0.05
+        baseHeight: 0.03
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      towerPreset: {fileID: 0}
+      towerPerch:
+        enabled: 0
+        perchRadius: 12
+        priority: 0
+        startPerch: 0
+        landingCurveSize: 2
+        talkEnabled: 0
+        talkRadius: 4
+        talkPrompt: Talk
+        talkText: 
+        talkCameraDistance: 0
+      hasArchway: 0
+      archWidth: 0.1
+      archHeight: 0.2
+    - positionXZ: {x: 37.0848, y: -91.781265}
+      overrideHeight: 0
+      height: 0.3
+      curvedToNext: 1
+      gapToNext: 0
+      hasColumn: 0
+      columnRadius: 0.08
+      columnHeight: 0.05
+      hasTower: 0
+      tower:
+        stemRadius: 0.02
+        stemHeight: 0.35
+        orbRadius: 0.1
+        baseRadius: 0.05
+        baseHeight: 0.03
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      towerPreset: {fileID: 0}
+      towerPerch:
+        enabled: 0
+        perchRadius: 12
+        priority: 0
+        startPerch: 0
+        landingCurveSize: 2
+        talkEnabled: 0
+        talkRadius: 4
+        talkPrompt: Talk
+        talkText: 
+        talkCameraDistance: 0
+      hasArchway: 0
+      archWidth: 0.1
+      archHeight: 0.2
+    closed: 0
+    height: 8.68
+    thickness: 4
+  perchMarkers: []
+  spikes:
+  - spikeId: e3473f80-9987-450c-9f79-f29ef5bb3fb1
+    positionXZ: {x: 131.58969, y: -63.952393}
+    preset: {fileID: 11400000, guid: f0c8644364ce011499b709ab71e70237, type: 2}
+    scale: 0.6
+    perch:
+      enabled: 1
+      perchRadius: 12
+      priority: 0
+      startPerch: 1
+      landingCurveSize: 2
+      talkEnabled: 0
+      talkRadius: 4
+      talkPrompt: Talk
+      talkText: 
+      talkCameraDistance: 0
+  - spikeId: 32407a52-d53b-489a-a274-bc3293975275
+    positionXZ: {x: 114.92204, y: -59.35305}
+    preset: {fileID: 11400000, guid: f0c8644364ce011499b709ab71e70237, type: 2}
+    scale: 1.86
+    perch:
+      enabled: 0
+      perchRadius: 12
+      priority: 0
+      startPerch: 0
+      landingCurveSize: 2
+      talkEnabled: 0
+      talkRadius: 4
+      talkPrompt: Talk
+      talkText: 
+      talkCameraDistance: 0
+  - spikeId: 57ff8d3b-7cf6-446f-b741-c6ee401dc793
+    positionXZ: {x: 119.07145, y: -69.806335}
+    preset: {fileID: 11400000, guid: f0c8644364ce011499b709ab71e70237, type: 2}
+    scale: 2.42
+    perch:
+      enabled: 0
+      perchRadius: 12
+      priority: 0
+      startPerch: 0
+      landingCurveSize: 2
+      talkEnabled: 0
+      talkRadius: 4
+      talkPrompt: Talk
+      talkText: 
+      talkCameraDistance: 0
+  - spikeId: f0f7a4cf-3278-4344-b981-c5464e704296
+    positionXZ: {x: 137.09676, y: -55.09756}
+    preset: {fileID: 11400000, guid: 78c2f18a4515c534e98b1827ed6f86a3, type: 2}
+    scale: 1.1
+    perch:
+      enabled: 0
+      perchRadius: 12
+      priority: 0
+      startPerch: 0
+      landingCurveSize: 2
+      talkEnabled: 0
+      talkRadius: 4
+      talkPrompt: Talk
+      talkText: 
+      talkCameraDistance: 0
+  - spikeId: 05c4ca7f-a0e5-4643-9f86-ee27da2a102d
+    positionXZ: {x: 120.914505, y: -50.415886}
+    preset: {fileID: 11400000, guid: f0c8644364ce011499b709ab71e70237, type: 2}
+    scale: 1.86
+    perch:
+      enabled: 0
+      perchRadius: 12
+      priority: 0
+      startPerch: 0
+      landingCurveSize: 2
+      talkEnabled: 0
+      talkRadius: 4
+      talkPrompt: Talk
+      talkText: 
+      talkCameraDistance: 0
+  spikeMaterial: {fileID: 0}
   junctionScriptObject: {fileID: 3543737601092306643, guid: cdc03d5a67a4c8a4ca447c17a1a65a6b, type: 3}
   arenaPrefab: {fileID: 6685816687890925279, guid: 1f8a1bc0973719f48851a1d2efa25504, type: 3}
   arenaEntrancePrefab: {fileID: 3190444306040296516, guid: fb37ce94a14f8f24a9a64d50b2d45a57, type: 3}
@@ -926,6 +1506,18 @@ MonoBehaviour:
   - riverName: Branch_04
     innerWidth: 1.69
     rimWidth: 0.43
+    riverDepth: 0.69
+    depth: 42.98
+    jointGroove: 0
+  - riverName: Branch_08
+    innerWidth: 1.02
+    rimWidth: 0.31
+    riverDepth: 0.69
+    depth: 42.98
+    jointGroove: 0
+  - riverName: starting river
+    innerWidth: 1.69
+    rimWidth: 0.3
     riverDepth: 0.69
     depth: 42.98
     jointGroove: 0
@@ -982,7 +1574,7 @@ MonoBehaviour:
   landscapeTileSize: 41.62
   landscapeTilesX: 5
   landscapeTilesZ: 5
-  landscapeTileSubdivisions: 34
+  landscapeTileSubdivisions: 33
   landscapeOffset: {x: -43.9, y: -130.9}
   landscapeWorldY: 0
   landscapeHeightOffset: -44.1
@@ -994,6 +1586,7 @@ MonoBehaviour:
   waterPreset: {fileID: 11400000, guid: 38955bea00a774b41909025653e8fef0, type: 2}
   structurePreset: {fileID: 11400000, guid: 4b84725422771dc429cc34f4a98d090d, type: 2}
   landscapePreset: {fileID: 11400000, guid: b31f14bcb0e114443bc560d80d52c44c, type: 2}
+  whiteFadePreset: {fileID: 11400000, guid: 1054e9b367bd4811b112a9fe177e8a07, type: 2}
   lightPosition: {x: 362.3, y: 259.8, z: -7.75}
   rippleDebugView: 0
   distanceFadeRadius: 105.15
@@ -1032,11 +1625,9 @@ MonoBehaviour:
   musicIntro: {fileID: 8300000, guid: 1ff10eeae8633404da517dacc2021e9e, type: 3}
   musicLoop: {fileID: 8300000, guid: 1ff10eeae8633404da517dacc2021e9e, type: 3}
   musicController: {fileID: 0}
-  openingSequence: {fileID: 0}
   targetScenePath: Assets/Scenes/LevelSelectWorlds/LevelSelectWorld2.unity
-  useOpeningSequence: 0
   openingSequenceStartPos: {x: 143.3325, y: 0, z: -12.623}
-  openingSequencePrefab: {fileID: 7575765240899787153, guid: ac17943291d2d9d42b50db647d5bfb47, type: 3}
+  boatStartNodeId: b0265fc9-851b-4e74-806c-7a603759acdd
   canvasOriginX: 0
   canvasOriginZ: 0
   canvasUnitsPerPixel: 0.1

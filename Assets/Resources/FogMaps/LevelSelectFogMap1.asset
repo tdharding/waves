@@ -99,5 +99,7 @@ MonoBehaviour:
   ambient: 0.609
   interiorFill: 1
   transparencyFalloff: 0.57
-  grainAmount: 0.15
-  grainScale: 4
+  grainAmount: 0.23
+  grainScale: 1
+  edgeShadowWidth: 0.687
+  edgeShadowStrength: 2.05

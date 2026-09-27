@@ -688,9 +688,16 @@ public class FogMapWindow : EditorWindow
             foreach (var name in new[] {
                 "threshold", "edgeSoftness", "undulationAmount", "undulationScale",
                 "lipWidth", "lipLighting", "lipCurvature", "heightScale",
-                "fogColour", "litColour", "ambient", "interiorFill", "transparencyFalloff",
-                "grainAmount", "grainScale" })
+                "fogColour", "litColour", "ambient", "interiorFill", "transparencyFalloff" })
                 Field(name);
+
+            EditorGUILayout.LabelField("Grain (world-space, drifts on the wind)", EditorStyles.miniBoldLabel);
+            Field("grainAmount", "Grain Amount");
+            Field("grainScale", "Grain Scale");
+
+            EditorGUILayout.LabelField("Edge Shadow (under the lighting)", EditorStyles.miniBoldLabel);
+            Field("edgeShadowWidth", "Edge Shadow Width");
+            Field("edgeShadowStrength", "Edge Shadow Strength");
 
             EditorGUILayout.HelpBox(
                 "Pushed to the material on Refresh Preview and at level start — not every frame, " +

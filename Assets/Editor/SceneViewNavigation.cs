@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.Overlays;
 using UnityEditor.Toolbars;
@@ -9,9 +10,13 @@ using UnityEngine.UIElements;
 // the Scene view, keeping the camera exactly where it is, so the zoom always has room to travel.
 // Alt + left-drag orbits around that same point. If the centre is looking at nothing, the pivot is
 // left alone.
+//
+// Focusing an object (F, Edit > Frame Selected, double-clicking it in the Hierarchy) wins: the
+// pivot stays on the focused object for zoom and orbit until the view is panned or flown away.
 [InitializeOnLoad]
-public static class SceneZoomToCentre
+public static class SceneViewNavigation
 {
+    // Pref keys kept from when this was Zoom To Centre, so existing toggles survive the rename.
     const string EnabledPref = "Waves.SceneZoomToCentre.Enabled";
     const string CrosshairPref = "Waves.SceneZoomToCentre.Crosshair";
 
@@ -20,6 +25,21 @@ public static class SceneZoomToCentre
 
     // Closer than this and the hit is effectively the camera itself; retargeting would stall zoom.
     const float MinHitDistance = 0.0001f;
+
+    // Pivot movement smaller than this is treated as no movement.
+    const float PivotMoveEpsilon = 0.00001f;
+
+    class ViewState
+    {
+        public Vector3 lastPivot;
+        public bool hasLastPivot;
+        public bool mouseHeld;
+        public bool arrowHeld;
+        // True after a focus: leave the pivot on the focused object.
+        public bool focusHold;
+    }
+
+    static readonly Dictionary<SceneView, ViewState> States = new Dictionary<SceneView, ViewState>();
 
     public static bool Enabled
     {
@@ -37,7 +57,7 @@ public static class SceneZoomToCentre
         }
     }
 
-    static SceneZoomToCentre()
+    static SceneViewNavigation()
     {
         // beforeSceneGui runs ahead of the Scene view's own zoom handling, so the new pivot is in
         // place by the time this same scroll event is turned into a zoom.
@@ -84,13 +104,71 @@ public static class SceneZoomToCentre
         return hitDistance >= MinHitDistance;
     }
 
+    static ViewState GetState(SceneView sceneView)
+    {
+        if (!States.TryGetValue(sceneView, out ViewState state))
+        {
+            state = new ViewState();
+            States[sceneView] = state;
+        }
+        return state;
+    }
+
+    static bool IsArrowKey(KeyCode key) =>
+        key == KeyCode.UpArrow || key == KeyCode.DownArrow || key == KeyCode.LeftArrow || key == KeyCode.RightArrow;
+
+    // Focus is spotted by its result rather than its key: the pivot moved while no mouse button or
+    // arrow key was driving the view. That catches F, the Frame Selected menu item and Hierarchy
+    // double-clicks alike, and follows the pivot through the focus animation.
+    static void TrackFocus(SceneView sceneView, Event e, ViewState state)
+    {
+        Vector3 pivot = sceneView.pivot;
+        bool pivotMoved = state.hasLastPivot && (pivot - state.lastPivot).sqrMagnitude > PivotMoveEpsilon * PivotMoveEpsilon;
+        if (pivotMoved && !state.mouseHeld && !state.arrowHeld)
+            state.focusHold = true;
+
+        state.lastPivot = pivot;
+        state.hasLastPivot = true;
+
+        switch (e.type)
+        {
+            case EventType.MouseDown:
+                state.mouseHeld = true;
+                // Panning (middle drag, or left drag with the Hand tool) and flying (right drag
+                // without Alt) move the view off the focused object, so the hold ends. Alt + left
+                // orbits and Alt + right drag-zooms; both keep the focused pivot.
+                bool pan = e.button == 2 || (e.button == 0 && !e.alt && Tools.current == Tool.View);
+                bool fly = e.button == 1 && !e.alt;
+                if (pan || fly)
+                    state.focusHold = false;
+                break;
+            case EventType.MouseUp:
+                state.mouseHeld = false;
+                break;
+            case EventType.KeyDown:
+                if (IsArrowKey(e.keyCode))
+                {
+                    state.arrowHeld = true;
+                    state.focusHold = false;
+                }
+                break;
+            case EventType.KeyUp:
+                if (IsArrowKey(e.keyCode))
+                    state.arrowHeld = false;
+                break;
+        }
+    }
+
     static void OnBeforeSceneGui(SceneView sceneView)
     {
-        if (!Enabled)
-            return;
-
         Event e = Event.current;
         if (e == null)
+            return;
+
+        ViewState state = GetState(sceneView);
+        TrackFocus(sceneView, e, state);
+
+        if (!Enabled || state.focusHold)
             return;
 
         // Scrolling during right-mouse flythrough changes fly speed, not zoom.
@@ -101,7 +179,11 @@ public static class SceneZoomToCentre
         bool altOrbit = e.type == EventType.MouseDown && e.button == 0 && e.alt;
 
         if (scrollZoom || altOrbit)
+        {
             MovePivotToCentreHit(sceneView);
+            // Our own retarget is not a focus.
+            state.lastPivot = sceneView.pivot;
+        }
     }
 
     static void MovePivotToCentreHit(SceneView sceneView)
@@ -129,36 +211,37 @@ public static class SceneZoomToCentre
     }
 }
 
-[Overlay(typeof(SceneView), "Waves/Zoom To Centre", "Zoom To Centre", true)]
-class SceneZoomToCentreOverlay : ToolbarOverlay
+[Overlay(typeof(SceneView), "Waves/Scene View Navigation", "Scene View Navigation", true)]
+class SceneViewNavigationOverlay : ToolbarOverlay
 {
-    SceneZoomToCentreOverlay() : base(SceneZoomToCentreToggle.Id, SceneZoomCrosshairToggle.Id) { }
+    SceneViewNavigationOverlay() : base(SceneViewNavigationZoomToggle.Id, SceneViewNavigationCrosshairToggle.Id) { }
 }
 
 [EditorToolbarElement(Id, typeof(SceneView))]
-class SceneZoomToCentreToggle : EditorToolbarToggle
+class SceneViewNavigationZoomToggle : EditorToolbarToggle
 {
-    public const string Id = "Waves/Zoom To Centre/Toggle";
+    public const string Id = "Waves/Scene View Navigation/Zoom To Centre";
 
-    public SceneZoomToCentreToggle()
+    public SceneViewNavigationZoomToggle()
     {
         text = "Zoom To Centre";
-        tooltip = "Scroll zoom and Alt-drag orbit use the surface at the centre of the Scene view as their pivot.";
-        SetValueWithoutNotify(SceneZoomToCentre.Enabled);
-        this.RegisterValueChangedCallback(evt => SceneZoomToCentre.Enabled = evt.newValue);
+        tooltip = "Scroll zoom and Alt-drag orbit use the surface at the centre of the Scene view as their pivot. " +
+                  "After focusing an object (F), the pivot stays on it until you pan or fly away.";
+        SetValueWithoutNotify(SceneViewNavigation.Enabled);
+        this.RegisterValueChangedCallback(evt => SceneViewNavigation.Enabled = evt.newValue);
     }
 }
 
 [EditorToolbarElement(Id, typeof(SceneView))]
-class SceneZoomCrosshairToggle : EditorToolbarToggle
+class SceneViewNavigationCrosshairToggle : EditorToolbarToggle
 {
-    public const string Id = "Waves/Zoom To Centre/Crosshair";
+    public const string Id = "Waves/Scene View Navigation/Crosshair";
 
-    public SceneZoomCrosshairToggle()
+    public SceneViewNavigationCrosshairToggle()
     {
         text = "Crosshair";
         tooltip = "Show a crosshair at the centre of the Scene view, where the zoom ray is cast.";
-        SetValueWithoutNotify(SceneZoomToCentre.ShowCrosshair);
-        this.RegisterValueChangedCallback(evt => SceneZoomToCentre.ShowCrosshair = evt.newValue);
+        SetValueWithoutNotify(SceneViewNavigation.ShowCrosshair);
+        this.RegisterValueChangedCallback(evt => SceneViewNavigation.ShowCrosshair = evt.newValue);
     }
 }

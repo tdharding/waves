@@ -52,7 +52,10 @@ public class LevelSelectDesignerData : ScriptableObject
     public class DesignerPath
     {
         public string pathId;
+        [Tooltip("System-assigned and unique — the designer generates it and it can't be typed.")]
         public string segmentId;
+        [Tooltip("The path's name in the world's lore. Free text, may repeat; shown beside the ID.")]
+        public string loreName;
         public List<string> nodeIds = new();
         [FormerlySerializedAs("isTopPath")]    public bool isLeftPath;
         [FormerlySerializedAs("isBottomPath")] public bool isRightPath;
@@ -68,6 +71,16 @@ public class LevelSelectDesignerData : ScriptableObject
         public float curveStrength = 1f;
         [Tooltip("Knots inserted per segment between nodes. Higher = spline follows path more closely.")]
         public int curveSubdivisions = 2;
+
+        [Tooltip("Lets this path's river run shape the landscape around it.")]
+        public bool landscapeInfluence;
+
+        [Tooltip("Brings the landscape up to the rim top along the run's outer edge.")]
+        public bool landscapeToOuterRim = true;
+
+        [Tooltip("How far out past the run's outer edge the landscape is shaped, before it eases " +
+                 "back to its own hills.")]
+        [Min(0f)] public float influenceDistance = 10f;
     }
 
     [Serializable]
@@ -259,6 +272,9 @@ public class LevelSelectDesignerData : ScriptableObject
         [Tooltip("The tower preset last loaded onto this pool's tower or saved from it. Copied, " +
                  "not linked — editing either one leaves the other as it was.")]
         public LollipopTowerPreset towerPreset;
+
+        [Tooltip("Whether the angel lands on top of the tower on this island.")]
+        public DesignerPerch towerPerch = new DesignerPerch();
     }
 
     /// <summary>A pool's island has to be wider than this for a tower to stand in its middle.</summary>
@@ -322,6 +338,9 @@ public class LevelSelectDesignerData : ScriptableObject
         [Tooltip("The tower preset last loaded onto this outpost's tower or saved from it. Copied, " +
                  "not linked — editing either one leaves the other as it was.")]
         public LollipopTowerPreset towerPreset;
+
+        [Tooltip("Whether the angel lands on top of this outpost's tower.")]
+        public DesignerPerch towerPerch = new DesignerPerch();
     }
 
     /// <summary>
@@ -371,6 +390,120 @@ public class LevelSelectDesignerData : ScriptableObject
         public string posterName;
 
         public DesignerInteract Clone() => (DesignerInteract)MemberwiseClone();
+    }
+
+    /// <summary>
+    /// Somewhere the angel can land, hung on whatever was just generated. She holds a flight
+    /// above the boat and comes down onto the nearest of these that the BOAT has sailed into —
+    /// so the radii here are measured from the thing she lands on, not from her.
+    ///
+    /// The same fields the Grid Designer puts on a marked spike, so a perch reads the same
+    /// wherever it is authored; the tip height is not among them, because the thing she stands
+    /// on knows its own — a tower hands over the top of its orb, a marker its own height.
+    /// </summary>
+    [Serializable]
+    public class DesignerPerch
+    {
+        [Tooltip("Whether the angel can land here at all.")]
+        public bool enabled = false;
+
+        [Tooltip("Sail inside this and she comes down here; back outside it and she leaves.")]
+        [Min(0f)] public float perchRadius = 12f;
+
+        [Tooltip("Always come down the moment the boat arrives, rather than only when she " +
+                 "happens to be looking for somewhere to land.")]
+        public bool priority = false;
+
+        [Tooltip("She starts the map stood here. Only one perch should have this — the first " +
+                 "one found wins. She holds it however far off the boat is, and only joins the " +
+                 "flight once you have sailed inside its radius.")]
+        public bool startPerch = false;
+
+        [Tooltip("Radius of the curve she lands along. 0 = straight at it.")]
+        [Min(0f)] public float landingCurveSize = 2f;
+
+        [Tooltip("Tick to let her be talked to here. The prompt and the key are the map's own, " +
+                 "the same ones a poster uses.")]
+        public bool talkEnabled = false;
+
+        [Tooltip("How near the boat has to be to talk to her here, measured flat. Kept inside " +
+                 "the perch radius — a talk range reaching further would arm the key for a boat " +
+                 "she is already leaving.")]
+        [Min(0f)] public float talkRadius = 4f;
+
+        [Tooltip("What the prompt reads. The key is added by the prompt itself.")]
+        public string talkPrompt = "Talk";
+
+        [Tooltip("What she says here. Split on \"/\" into one line per press.")]
+        [TextArea(1, 4)] public string talkText = "";
+
+        [Tooltip("How far her talk camera sits from her while she talks here, along its own view. " +
+                 "0 = the distance authored on the angel prefab's camera.")]
+        [Min(0f)] public float talkCameraDistance = 0f;
+
+        public DesignerPerch Clone() => (DesignerPerch)MemberwiseClone();
+    }
+
+    /// <summary>
+    /// A perch standing on nothing the designer generated — dropped where you like, at whatever
+    /// height you like. This is what covers everything that has no perch block of its own: park
+    /// one on top of a pipe, a wall or a hill and she lands there just the same.
+    /// </summary>
+    [Serializable]
+    public class DesignerPerchMarker
+    {
+        public string perchId;
+
+        [Tooltip("Where it stands on the map.")]
+        public Vector2 positionXZ;
+
+        [Tooltip("How far her feet stand above the water here.")]
+        public float height = 0.5f;
+
+        [Tooltip("The landing itself — radii, priority, and what she says.")]
+        public DesignerPerch perch = new DesignerPerch { enabled = true };
+
+        public DesignerPerchMarker Clone()
+        {
+            var copy = (DesignerPerchMarker)MemberwiseClone();
+            copy.perch = perch?.Clone();
+            return copy;
+        }
+    }
+
+    /// <summary>
+    /// A procedural spike standing in the landscape — the same generated rock the Grid Designer
+    /// puts in a level (shape from a Spike Studio preset, size by a multiplier), but here it is
+    /// part of the land rather than a rock in water: the preset's surface line (its y = 0) sits
+    /// on the landscape baseline, and everything the preset puts below it is buried.
+    ///
+    /// Shaded by the landscape (Level Select Landscape Tuner > Spikes), scenery only — no boat
+    /// collider.
+    /// </summary>
+    [Serializable]
+    public class DesignerSpike
+    {
+        public string spikeId;
+
+        [Tooltip("Where it stands on the map.")]
+        public Vector2 positionXZ;
+
+        [Tooltip("Shape this rock wears, authored in the Spike Studio. Presets live in " +
+                 "Resources/Spikes. Unset falls back to the default shape.")]
+        public SpikeShapePreset preset;
+
+        [Tooltip("Size multiplier on the whole preset. 1 = the preset's own size.")]
+        [Min(0.01f)] public float scale = 1f;
+
+        [Tooltip("Somewhere the angel can land — on the tip of this rock.")]
+        public DesignerPerch perch = new DesignerPerch();
+
+        public DesignerSpike Clone()
+        {
+            var copy = (DesignerSpike)MemberwiseClone();
+            copy.perch = perch?.Clone();
+            return copy;
+        }
     }
 
     public enum RimNodeSide { Left, Right, Both }
@@ -494,11 +627,15 @@ public class LevelSelectDesignerData : ScriptableObject
         [Tooltip("What it does when the boat comes near it.")]
         public DesignerInteract interact = new DesignerInteract();
 
+        [Tooltip("Whether the angel lands on top of the tower standing here.")]
+        public DesignerPerch perch = new DesignerPerch();
+
         public RimNodeTopping Clone()
         {
             var copy = (RimNodeTopping)MemberwiseClone();
             copy.tower    = tower?.Clone();
             copy.interact = interact?.Clone();
+            copy.perch    = perch?.Clone();
             return copy;
         }
     }
@@ -557,6 +694,86 @@ public class LevelSelectDesignerData : ScriptableObject
             nodes[node].overrideHeight ? nodes[node].height : height;
     }
 
+    /// <summary>
+    /// One node of a wall: where it is on the map, its own height if it has one, how the wall
+    /// runs on to the next node, and whether a lollipop tower stands on top of it.
+    /// </summary>
+    [Serializable]
+    public class WallNode
+    {
+        public Vector2 positionXZ;
+
+        [Tooltip("Tick to give this node its own height. Left off, it takes the wall's height.")]
+        public bool overrideHeight;
+
+        [Tooltip("How far the wall's top stands above the water here, when Override Height is on.")]
+        [Min(0f)] public float height = 0.3f;
+
+        [Tooltip("The wall from this node to the next one bends through its neighbours. Off, it " +
+                 "runs straight.")]
+        public bool curvedToNext = true;
+
+        [Tooltip("Leave out the wall from this node to the next one.")]
+        public bool gapToNext;
+
+        [Tooltip("Make this node a round column: a cylinder from the wall's base up past its " +
+                 "top. Anything standing on the node stands on the column's top.")]
+        public bool hasColumn;
+
+        [Tooltip("The column's radius.")]
+        [Min(0.001f)] public float columnRadius = 0.08f;
+
+        [Tooltip("How far the column's top stands above the wall's top at this node.")]
+        [Min(0f)] public float columnHeight = 0.05f;
+
+        [Tooltip("Stand a lollipop tower on top of the wall at this node.")]
+        public bool hasTower;
+
+        [Tooltip("The tower standing on this node — stem and orb sizes.")]
+        public LollipopTower tower = new LollipopTower();
+
+        [Tooltip("The tower preset last loaded onto this tower or saved from it. Copied, not " +
+                 "linked — editing either one leaves the other as it was.")]
+        public LollipopTowerPreset towerPreset;
+
+        [Tooltip("Whether the angel lands on top of the tower on this node.")]
+        public DesignerPerch towerPerch = new DesignerPerch();
+
+        [Tooltip("Cut an archway through the wall here, centred on this node.")]
+        public bool hasArchway;
+
+        [Tooltip("How wide the archway is, measured along the wall.")]
+        [Min(0f)] public float archWidth = 0.1f;
+
+        [Tooltip("How tall the archway is, from the wall's base up to the top of its round.")]
+        [Min(0f)] public float archHeight = 0.2f;
+    }
+
+    /// <summary>
+    /// A wall standing out of the water — a plain slab drawn node by node in Wall mode, built as
+    /// one mesh along its nodes, in the river material, with a collider of the same shape. Each
+    /// stretch between two nodes is curved or straight, or left out as a gap.
+    /// </summary>
+    [Serializable]
+    public class DesignerWall
+    {
+        public string wallId;
+        public List<WallNode> nodes = new();
+
+        [Tooltip("Join the last node back to the first.")]
+        public bool closed;
+
+        [Tooltip("How far the wall's top stands above the water, at every node that doesn't " +
+                 "override it.")]
+        [Min(0f)] public float height = 0.3f;
+
+        [Tooltip("The wall's thickness, across.")]
+        [Min(0.001f)] public float thickness = 0.09f;
+
+        public float HeightAt(int node) =>
+            nodes[node].overrideHeight ? nodes[node].height : height;
+    }
+
     public List<LandscapeHillPoint> hillPoints = new();
 
     public List<DesignerNode>     nodes     = new();
@@ -569,6 +786,17 @@ public class LevelSelectDesignerData : ScriptableObject
     public List<DesignerOutpost>  outposts  = new();
     public List<DesignerRimNode>  rimNodes  = new();
     public List<DesignerPipe>     pipes     = new();
+    public List<DesignerWall>     walls     = new();
+
+    [Tooltip("Perches standing on nothing generated — dropped where you like, for the angel to " +
+             "land on whatever has no perch block of its own.")]
+    public List<DesignerPerchMarker> perchMarkers = new();
+
+    [Tooltip("Procedural spikes standing in the landscape, on its baseline.")]
+    public List<DesignerSpike> spikes = new();
+
+    [Tooltip("What the spikes are drawn with — LevelSelectSpikeMat, shaded by the landscape tuner.")]
+    public Material spikeMaterial;
 
     // Tool settings
     // Retired with the on-rails boat. Kept so designer assets written before that still
@@ -788,6 +1016,11 @@ public class LevelSelectDesignerData : ScriptableObject
              "Landscape Tuner. No preset means plain unlit stone.")]
     public LevelSelectLandscapePreset landscapePreset;
 
+    [Tooltip("The white fade out from the boat, shared by the river runs, the landscape and the " +
+             "spikes through the WhiteFade subgraph. Tuned in the White Fade foldout of the Run " +
+             "Shading Tuner or the Landscape Tuner. No preset means no fade.")]
+    public LevelSelectWhiteFadePreset whiteFadePreset;
+
     // The default is the position the run shading preset carried when the light moved here, so a
     // world saved before then is lit from exactly where it was.
     [Tooltip("Where the world's made-up light stands, in world space — shared by the river runs " +
@@ -835,6 +1068,7 @@ public class LevelSelectDesignerData : ScriptableObject
         RiverEdgeRippleSettings.Push(waterPreset     != null ? waterPreset.edgeRipples    : null);
         RiverRunShadingSettings.Push(structurePreset != null ? structurePreset.runShading : null);
         LandscapeShadingSettings.Push(landscapePreset != null ? landscapePreset.landscapeShading : null);
+        WhiteFadeSettings.Push(whiteFadePreset != null ? whiteFadePreset.whiteFade : null);
 
         // The one light both the runs and the hills are turned against.
         Shader.SetGlobalVector(LightPositionId, lightPosition);
@@ -899,15 +1133,15 @@ public class LevelSelectDesignerData : ScriptableObject
 
     // Scene-level music reference
     public LevelSelectMusicController musicController;
-    public LevelSelectOpeningSequence openingSequence;
 
     // Linked scene
     public string targetScenePath = "";
 
-    // Opening sequence settings
-    public bool      useOpeningSequence        = false;
+    // Where a new world's main river is seeded from (kept under its old name so saved data still loads)
     public Vector3   openingSequenceStartPos   = Vector3.zero;
-    public GameObject openingSequencePrefab;
+
+    // Node the boat starts at on a save that has never seen the map. Empty → head of the main river.
+    public string boatStartNodeId = "";
 
     // Canvas state
 public float canvasOriginX      = 0f;
@@ -1165,20 +1399,19 @@ public float canvasOriginX      = 0f;
         forward  = Vector3.forward;
         inPool   = false;
 
-        var main = MainRiver();
-        if (main == null || main.nodeIds.Count < 2) return false;
+        if (!TryGetBoatStartNode(out string startId, out string aheadId)) return false;
 
-        var head = nodes.Find(n => n != null && n.id == main.nodeIds[0]);
+        var head = nodes.Find(n => n != null && n.id == startId);
         if (head == null) return false;
 
         position = head.worldPosition;
 
         // Facing the way the river runs from here, which is the way the boat sets off.
-        Vector3 dir = NodeWorldPosition(main.nodeIds[1]) - position;
+        Vector3 dir = NodeWorldPosition(aheadId) - position;
         dir.y = 0f;
         if (dir.sqrMagnitude > 1e-6f) forward = dir.normalized;
 
-        var pool = PoolAt(main.nodeIds[0]);
+        var pool = PoolAt(startId);
         if (pool == null) return true;
 
         inPool = true;
@@ -1189,6 +1422,44 @@ public float canvasOriginX      = 0f;
         float ring  = RiverMeshBuilder.PoolChannelRadius(shape.poolRadius, shape.islandRadius);
         if (ring > 0.001f) position += forward * ring;
 
+        return true;
+    }
+
+    /// <summary>Whether a start node has been set by hand and still stands on a river.</summary>
+    public bool HasBoatStartNode
+        => !string.IsNullOrEmpty(boatStartNodeId) &&
+           paths.Exists(p => p != null && p.nodeIds.Count >= 2 && p.nodeIds.Contains(boatStartNodeId));
+
+    /// <summary>
+    /// The node the boat starts on and the one it faces. The hand-set start node when there is
+    /// one, otherwise the head of the main river.
+    ///
+    /// A hand-set node faces the next node along the first river it stands on — the main river
+    /// if it is on it — or back along that river when it is the last node there.
+    /// </summary>
+    public bool TryGetBoatStartNode(out string startId, out string aheadId)
+    {
+        startId = null;
+        aheadId = null;
+
+        if (HasBoatStartNode)
+        {
+            var main = MainRiver();
+            var on   = main != null && main.nodeIds.Count >= 2 && main.nodeIds.Contains(boatStartNodeId)
+                ? main
+                : paths.Find(p => p != null && p.nodeIds.Count >= 2 && p.nodeIds.Contains(boatStartNodeId));
+
+            int i   = on.nodeIds.IndexOf(boatStartNodeId);
+            startId = boatStartNodeId;
+            aheadId = i < on.nodeIds.Count - 1 ? on.nodeIds[i + 1] : on.nodeIds[i - 1];
+            return true;
+        }
+
+        var river = MainRiver();
+        if (river == null || river.nodeIds.Count < 2) return false;
+
+        startId = river.nodeIds[0];
+        aheadId = river.nodeIds[1];
         return true;
     }
 
