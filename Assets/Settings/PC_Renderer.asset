@@ -245,6 +245,10 @@ MonoBehaviour:
   m_Active: 1
   injectionPoint: 550
   material: {fileID: 2100000, guid: f01e1856af3df9f4fbfb78f5f4d4970a, type: 2}
+  glowLayer:
+    serializedVersion: 0
+    m_Bits: 256
+  silhouetteShader: {fileID: 4800000, guid: 8e2ec42ab110f0446a6c1639f1eb9e09, type: 3}
 --- !u!114 &-1927081915486609398
 MonoBehaviour:
   m_ObjectHideFlags: 1

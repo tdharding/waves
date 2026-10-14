@@ -56,6 +56,12 @@ public class FogSheetMesh : MonoBehaviour
              "one.")]
     [SerializeField] bool matchWavePlaneCentre = true;
 
+    [Header("Baked")]
+    [Tooltip("A mesh baked in the editor and shown instead of the flat one this builds. The level " +
+             "select designer sets it on fog zone sheets, shaped by the Fog Map's Sheets " +
+             "settings. Leave empty for the plain flat sheet.")]
+    [SerializeField] Mesh bakedMesh;
+
 
 
     void OnEnable()
@@ -119,7 +125,10 @@ public class FogSheetMesh : MonoBehaviour
     {
         int subs = Mathf.Max(1, subdivisions);
         _builtSize = ResolvedSize();
-        GetComponent<MeshFilter>().sharedMesh = BuildMesh(subs, _builtSize);
+
+        // A baked sheet keeps its baked shape. Building the flat one here would flatten it again
+        // every time the sheet was enabled or the scene loaded.
+        GetComponent<MeshFilter>().sharedMesh = bakedMesh != null ? bakedMesh : BuildMesh(subs, _builtSize);
 
         // The sheet is transparent and lies flat on the water; casting or receiving shadows from
         // it is never wanted and costs a pass.
@@ -205,7 +214,12 @@ public class FogSheetMesh : MonoBehaviour
     }
 #endif
 
-    static Mesh BuildMesh(int subs, float size)
+    /// <summary>
+    /// The sheet as a grid of <paramref name="subs"/> squares a side. <paramref name="heights"/>,
+    /// when given, lifts each point that many metres (world up), row by row from the -Z edge —
+    /// (subs + 1)² of them. Left null the sheet is flat.
+    /// </summary>
+    public static Mesh BuildMesh(int subs, float size, float[] heights = null)
     {
         int rows = subs + 1;
         var verts = new Vector3[rows * rows];
@@ -219,7 +233,9 @@ public class FogSheetMesh : MonoBehaviour
         for (int x = 0; x < rows; x++)
         {
             int i = y * rows + x;
-            verts[i] = new Vector3(x * step - half, y * step - half, 0f);
+            // Local -Z is world up: the object is turned 90 degrees about X to lie flat.
+            float lift = heights != null ? heights[i] : 0f;
+            verts[i] = new Vector3(x * step - half, y * step - half, -lift);
             uvs[i]   = new Vector2(x / (float)subs, y / (float)subs);
         }
 

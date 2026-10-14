@@ -13,6 +13,291 @@ MonoBehaviour:
   m_Name: LevelSelectStructurePreset
   m_EditorClassIdentifier: Assembly-CSharp::LevelSelectRiverStructurePreset
   runShading:
+    stoneTypes:
+    - colour: {r: 0.05660379, g: 0.05660379, b: 0.05660379, a: 1}
+      grainSize: 0.36
+      grainStrength: 0.241
+      useGradient: 0
+      gradient:
+        serializedVersion: 2
+        key0: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+        key1: {r: 0.786, g: 0.786, b: 0.786, a: 1}
+        key2: {r: 0, g: 0, b: 0, a: 0}
+        key3: {r: 0, g: 0, b: 0, a: 0}
+        key4: {r: 0, g: 0, b: 0, a: 0}
+        key5: {r: 0, g: 0, b: 0, a: 0}
+        key6: {r: 0, g: 0, b: 0, a: 0}
+        key7: {r: 0, g: 0, b: 0, a: 0}
+        ctime0: 0
+        ctime1: 65535
+        ctime2: 0
+        ctime3: 0
+        ctime4: 0
+        ctime5: 0
+        ctime6: 0
+        ctime7: 0
+        atime0: 0
+        atime1: 65535
+        atime2: 0
+        atime3: 0
+        atime4: 0
+        atime5: 0
+        atime6: 0
+        atime7: 0
+        m_Mode: 0
+        m_ColorSpace: -1
+        m_NumColorKeys: 2
+        m_NumAlphaKeys: 2
+      gradientDirection: 0
+      seamColour: {r: 0, g: 0, b: 0, a: 1}
+      seamStrength: 0.77
+      seamExtentPercent: 12.7
+      seamsSet: 1
+      decalAmount: 1
+      decalOpacity: 0.659
+      decalSpacing: 4.76
+      decalScaleMin: 0.68
+      decalScaleMax: 7.89
+      decalRotate: 0
+      decalRotateAmount: 0.5
+      decalsSet: 1
+    - colour: {r: 0.33962262, g: 0.33962262, b: 0.33962262, a: 1}
+      grainSize: 0.59
+      grainStrength: 0.241
+      useGradient: 0
+      gradient:
+        serializedVersion: 2
+        key0: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+        key1: {r: 0.786, g: 0.786, b: 0.786, a: 1}
+        key2: {r: 0, g: 0, b: 0, a: 0}
+        key3: {r: 0, g: 0, b: 0, a: 0}
+        key4: {r: 0, g: 0, b: 0, a: 0}
+        key5: {r: 0, g: 0, b: 0, a: 0}
+        key6: {r: 0, g: 0, b: 0, a: 0}
+        key7: {r: 0, g: 0, b: 0, a: 0}
+        ctime0: 0
+        ctime1: 65535
+        ctime2: 0
+        ctime3: 0
+        ctime4: 0
+        ctime5: 0
+        ctime6: 0
+        ctime7: 0
+        atime0: 0
+        atime1: 65535
+        atime2: 0
+        atime3: 0
+        atime4: 0
+        atime5: 0
+        atime6: 0
+        atime7: 0
+        m_Mode: 0
+        m_ColorSpace: -1
+        m_NumColorKeys: 2
+        m_NumAlphaKeys: 2
+      gradientDirection: 0
+      seamColour: {r: 0, g: 0, b: 0, a: 1}
+      seamStrength: 0.77
+      seamExtentPercent: 12.7
+      seamsSet: 1
+      decalAmount: 1
+      decalOpacity: 0.659
+      decalSpacing: 4.76
+      decalScaleMin: 0.68
+      decalScaleMax: 7.89
+      decalRotate: 0
+      decalRotateAmount: 0.5
+      decalsSet: 1
+    - colour: {r: 0.49056602, g: 0.49056602, b: 0.49056602, a: 1}
+      grainSize: 0.13
+      grainStrength: 0.076
+      useGradient: 1
+      gradient:
+        serializedVersion: 2
+        key0: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+        key1: {r: 1, g: 1, b: 1, a: 1}
+        key2: {r: 0, g: 0, b: 0, a: 0}
+        key3: {r: 0, g: 0, b: 0, a: 0}
+        key4: {r: 0, g: 0, b: 0, a: 0}
+        key5: {r: 0, g: 0, b: 0, a: 0}
+        key6: {r: 0, g: 0, b: 0, a: 0}
+        key7: {r: 0, g: 0, b: 0, a: 0}
+        ctime0: 0
+        ctime1: 60315
+        ctime2: 0
+        ctime3: 0
+        ctime4: 0
+        ctime5: 0
+        ctime6: 0
+        ctime7: 0
+        atime0: 0
+        atime1: 65535
+        atime2: 0
+        atime3: 0
+        atime4: 0
+        atime5: 0
+        atime6: 0
+        atime7: 0
+        m_Mode: 0
+        m_ColorSpace: -1
+        m_NumColorKeys: 2
+        m_NumAlphaKeys: 2
+      gradientDirection: 0
+      seamColour: {r: 0, g: 0, b: 0, a: 1}
+      seamStrength: 0.94
+      seamExtentPercent: 15.4
+      seamsSet: 1
+      decalAmount: 1
+      decalOpacity: 0.633
+      decalSpacing: 1.03
+      decalScaleMin: 0.68
+      decalScaleMax: 1.49
+      decalRotate: 1
+      decalRotateAmount: 1
+      decalsSet: 1
+    - colour: {r: 0.786, g: 0.786, b: 0.786, a: 1}
+      grainSize: 2.31
+      grainStrength: 0.161
+      useGradient: 1
+      gradient:
+        serializedVersion: 2
+        key0: {r: 0.3584906, g: 0.3584906, b: 0.3584906, a: 1}
+        key1: {r: 0.3584906, g: 0.3584906, b: 0.3584906, a: 1}
+        key2: {r: 0.786, g: 0.786, b: 0.786, a: 0}
+        key3: {r: 0, g: 0, b: 0, a: 0}
+        key4: {r: 0, g: 0, b: 0, a: 0}
+        key5: {r: 0, g: 0, b: 0, a: 0}
+        key6: {r: 0, g: 0, b: 0, a: 0}
+        key7: {r: 0, g: 0, b: 0, a: 0}
+        ctime0: 34135
+        ctime1: 49131
+        ctime2: 65535
+        ctime3: 0
+        ctime4: 0
+        ctime5: 0
+        ctime6: 0
+        ctime7: 0
+        atime0: 0
+        atime1: 65535
+        atime2: 0
+        atime3: 0
+        atime4: 0
+        atime5: 0
+        atime6: 0
+        atime7: 0
+        m_Mode: 0
+        m_ColorSpace: -1
+        m_NumColorKeys: 3
+        m_NumAlphaKeys: 2
+      gradientDirection: 0
+      seamColour: {r: 0.20754719, g: 0.20754719, b: 0.20754719, a: 1}
+      seamStrength: 0.77
+      seamExtentPercent: 3.3
+      seamsSet: 1
+      decalAmount: 0.943
+      decalOpacity: 0.406
+      decalSpacing: 3.27
+      decalScaleMin: 0.68
+      decalScaleMax: 1.16
+      decalRotate: 0
+      decalRotateAmount: 0.5
+      decalsSet: 1
+    - colour: {r: 0.786, g: 0.786, b: 0.786, a: 1}
+      grainSize: 0.02
+      grainStrength: 0.3
+      useGradient: 0
+      gradient:
+        serializedVersion: 2
+        key0: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+        key1: {r: 0.786, g: 0.786, b: 0.786, a: 1}
+        key2: {r: 0, g: 0, b: 0, a: 0}
+        key3: {r: 0, g: 0, b: 0, a: 0}
+        key4: {r: 0, g: 0, b: 0, a: 0}
+        key5: {r: 0, g: 0, b: 0, a: 0}
+        key6: {r: 0, g: 0, b: 0, a: 0}
+        key7: {r: 0, g: 0, b: 0, a: 0}
+        ctime0: 0
+        ctime1: 65535
+        ctime2: 0
+        ctime3: 0
+        ctime4: 0
+        ctime5: 0
+        ctime6: 0
+        ctime7: 0
+        atime0: 0
+        atime1: 65535
+        atime2: 0
+        atime3: 0
+        atime4: 0
+        atime5: 0
+        atime6: 0
+        atime7: 0
+        m_Mode: 0
+        m_ColorSpace: -1
+        m_NumColorKeys: 2
+        m_NumAlphaKeys: 2
+      gradientDirection: 0
+      seamColour: {r: 0, g: 0, b: 0, a: 1}
+      seamStrength: 0.77
+      seamExtentPercent: 12.7
+      seamsSet: 1
+      decalAmount: 1
+      decalOpacity: 0.659
+      decalSpacing: 4.76
+      decalScaleMin: 0.68
+      decalScaleMax: 7.89
+      decalRotate: 0
+      decalRotateAmount: 0.5
+      decalsSet: 1
+    waterlineColour: {r: 1, g: 1, b: 1, a: 1}
+    waterlineStrength: 1.1
+    waterlineExtent: 0.06
+    decalSheet: {fileID: 2800000, guid: d4684965c7f28464c81e40a4fad0cd3d, type: 2}
+    decalSheetColumns: 2
+    decalSheetRows: 2
+    decalSheetHeld: 3
+    decalSheetCellPixels: 256
+    runOuterFaces: 4
+    runRim: 2
+    runInnerChannel: 3
+    outpostOutsideWalls: 4
+    outpostWallTop: 4
+    outpostInsideWalls: 4
+    outpostFloor: 4
+    structureSides: 0
+    structureWallTop: 0
+    structureInsideWalls: 0
+    structureTop: 0
+    walkwayTop: 0
+    walkwayOuterWall: 0
+    walkwayStep: 0
+    walkwayEnds: 0
+    towerOrb: 3
+    towerStem: 3
+    towerBaseSides: 2
+    towerBaseTop: 3
+    wallSides: 4
+    wallTop: 5
+    wallEnds: 0
+    wallOpenings: 4
+    wallColumnSides: 4
+    wallColumnTop: 5
+    wallLipTop: 0
+    wallLipSides: 0
+    wallLipUnderside: 4
+    arenaInnerFace: 0
+    arenaOuterFace: 4
+    arenaTop: 5
+    archwayInside: 4
+    archwayOutside: 4
+    archwayFaces: 4
+    archwayFeet: 4
+    doorSheet: 4
+    doorFrame: 4
+    doorPanel: 4
+    doorFlapRim: 4
+    doorDisc: 4
+    doorEdges: 4
     outerColour: {r: 0.05660379, g: 0.05660379, b: 0.05660379, a: 1}
     outerGrainSize: 0.36
     outerGrainStrength: 0.241
@@ -25,38 +310,8 @@ MonoBehaviour:
     seamColour: {r: 0, g: 0, b: 0, a: 1}
     seamStrength: 0.77
     seamExtentPercent: 12.7
-    waterlineColour: {r: 1, g: 1, b: 1, a: 1}
-    waterlineStrength: 1.1
-    waterlineExtent: 0.06
-    decalSheet: {fileID: 2800000, guid: d4684965c7f28464c81e40a4fad0cd3d, type: 2}
-    decalSheetColumns: 2
-    decalSheetRows: 2
-    decalSheetHeld: 3
-    decalSheetCellPixels: 256
     decalAmount: 1
-    decalOpacity: 1
+    decalOpacity: 0.659
     decalSpacing: 4.76
     decalScaleMin: 0.68
     decalScaleMax: 7.89
-    lightStrength: 0.93
-    outpostOutsideWalls: 0
-    outpostWallTop: 3
-    outpostInsideWalls: 0
-    outpostFloor: 2
-    towerOrb: 3
-    towerStem: 3
-    towerBaseSides: 2
-    towerBaseTop: 3
-    arenaInnerFace: 0
-    arenaOuterFace: 0
-    arenaTop: 0
-    archwayInside: 0
-    archwayOutside: 0
-    archwayFaces: 0
-    archwayFeet: 0
-    doorSheet: 0
-    doorFrame: 0
-    doorPanel: 0
-    doorFlapRim: 0
-    doorDisc: 0
-    doorEdges: 0

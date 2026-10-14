@@ -27,6 +27,7 @@ public partial class LevelSelectDesignerWindow
 {
     private const string WallsParent     = "WALLS";
     private const string WallTowersChild = "Towers";
+    private const string WallChunksChild = "Chunks";
 
     private string  _selectedWallId;
     private int     _selectedWallNode = -1;
@@ -34,7 +35,7 @@ public partial class LevelSelectDesignerWindow
     private bool    _isDraggingWall;
     private Vector2 _wallDragOffset;
 
-    private const float WallNodeRadius = 4.5f;
+    private static float WallNodeRadius => LevelSelectDesignerSettings.WallNodeSize;
     private const float WallHitReach   = 7f;
 
     private LevelSelectDesignerData.DesignerWall SelectedWall =>
@@ -63,13 +64,21 @@ public partial class LevelSelectDesignerWindow
                 archway      = n.hasArchway,
                 archWidth    = n.archWidth,
                 archHeight   = n.archHeight,
+                porthole       = n.hasPorthole,
+                portholeRadius = n.portholeRadius,
+                portholeHeight = n.portholeHeight,
                 column       = n.hasColumn,
                 columnRadius = n.columnRadius,
                 columnHeight = n.columnHeight,
+                lipHeight    = wall.LipHeight,
             });
         }
         return list;
     }
+
+    /// <summary>The wall's lip as the builder takes it — null when it has none.</summary>
+    private static WallLip WallLipFor(LevelSelectDesignerData.DesignerWall wall)
+        => wall.hasLip && wall.lip != null && wall.lip.height > 0f ? wall.lip : null;
 
     private static Vector3 WallNodeWorldFlat(LevelSelectDesignerData.WallNode node)
         => new Vector3(node.positionXZ.x, 0f, node.positionXZ.y);
@@ -87,7 +96,7 @@ public partial class LevelSelectDesignerWindow
             if (wall == null || wall.nodes.Count == 0) continue;
             bool selected = wall.wallId == _selectedWallId;
 
-            var body = selected ? new Color(0.92f, 0.92f, 0.92f, 0.95f) : new Color(0.72f, 0.66f, 0.58f, 0.9f);
+            var body = selected ? LevelSelectDesignerSettings.WallSelBodyColour : LevelSelectDesignerSettings.WallBodyColour;
 
             // The wall as a solid band its own thickness, curved where it will be curved.
             if (wall.nodes.Count >= 2)
@@ -98,7 +107,7 @@ public partial class LevelSelectDesignerWindow
                     var canvas = points.Select(p => (Vector3)WorldToCanvas(p)).ToList();
                     if (loop && canvas.Count > 0) canvas.Add(canvas[0]);
                     Handles.color = body;
-                    Handles.DrawAAPolyLine(width, canvas.ToArray());
+                    DrawSolidLine(width, canvas.ToArray());
                 }
             }
 
@@ -116,17 +125,18 @@ public partial class LevelSelectDesignerWindow
                     Handles.DrawSolidDisc(at, Vector3.forward, Mathf.Max(WallNodeRadius + 2f, node.columnRadius * _zoom));
                 }
 
-                if (node.hasTower && node.tower != null)
+                if (node.hasTower)
                 {
-                    float baseR = Mathf.Max(node.tower.baseRadius, node.tower.orbRadius);
-                    Handles.color = new Color(0.3f, 0.26f, 0.22f, 0.85f);
+                    float baseR = Mathf.Max(TowerBaseRadius(node.towerKind, node.tower, node.turret, node.towerScale),
+                                            TowerOrbRadius (node.towerKind, node.tower, node.turret, node.towerScale));
+                    Handles.color = LevelSelectDesignerSettings.WallTowerColour;
                     Handles.DrawSolidDisc(at, Vector3.forward, Mathf.Max(WallNodeRadius + 3f, baseR * _zoom));
                 }
 
-                Handles.color = new Color(0.1f, 0.1f, 0.1f, 0.9f);
+                Handles.color = LevelSelectDesignerSettings.WallOutlineColour;
                 Handles.DrawSolidDisc(at, Vector3.forward, WallNodeRadius + 1.5f);
-                Handles.color = selected && i == _selectedWallNode ? Color.yellow
-                              : node.overrideHeight               ? new Color(1f, 0.6f, 0.15f)
+                Handles.color = selected && i == _selectedWallNode ? LevelSelectDesignerSettings.WallSelColour
+                              : node.overrideHeight               ? LevelSelectDesignerSettings.WallOwnHeightColour
                               : body;
                 Handles.DrawSolidDisc(at, Vector3.forward, WallNodeRadius);
             }
@@ -136,7 +146,7 @@ public partial class LevelSelectDesignerWindow
         var drawing = _isDrawingWall ? SelectedWall : null;
         if (drawing != null && drawing.nodes.Count > 0 && _canvasRect.Contains(Event.current.mousePosition))
         {
-            Handles.color = new Color(1f, 1f, 1f, 0.3f);
+            Handles.color = LevelSelectDesignerSettings.WallGhostColour;
             Handles.DrawDottedLine(WorldToCanvas(WallNodeWorldFlat(drawing.nodes[drawing.nodes.Count - 1])),
                                    Event.current.mousePosition, 5f);
         }
@@ -366,20 +376,15 @@ public partial class LevelSelectDesignerWindow
         EditorGUILayout.Space(6);
         EditorGUILayout.LabelField("Wall", EditorStyles.boldLabel);
 
+        DrawWallSettings(wall);
+
         EditorGUI.BeginChangeCheck();
-        float height = EditorGUILayout.FloatField(
-            new GUIContent("Height", "How far the wall's top stands above the water, at every node " +
-                                     "that doesn't override it."), wall.height);
-        float thickness = EditorGUILayout.FloatField(
-            new GUIContent("Thickness", "The wall's thickness, across."), wall.thickness);
         bool closed = EditorGUILayout.Toggle(
             new GUIContent("Closed", "Join the last node back to the first."), wall.closed);
         if (EditorGUI.EndChangeCheck())
         {
             Undo.RecordObject(_data, "Edit Wall");
-            wall.height    = Mathf.Max(0f, height);
-            wall.thickness = Mathf.Max(0.001f, thickness);
-            wall.closed    = closed;
+            wall.closed = closed;
             MarkDirty();
             RebuildWall(wall);
         }
@@ -396,6 +401,96 @@ public partial class LevelSelectDesignerWindow
             MarkDirty();
         }
         GUI.backgroundColor = Color.white;
+    }
+
+    internal const string WallPresetFolder = "Assets/ScriptsData/DataScripts/WallPresets";
+
+    /// <summary>
+    /// The wall's preset and the settings it carries — height, thickness and lip. Pick a preset
+    /// from the dropdown to put its settings on this wall, Edit to open it in the preset editor
+    /// (every wall using it changes with it), or New to save this wall's settings as one. Linked,
+    /// the settings show here but are changed in the preset; with no preset they're edited here.
+    /// </summary>
+    private void DrawWallSettings(LevelSelectDesignerData.DesignerWall wall)
+    {
+        var picked = LevelSelectPresetEditorWindow.DrawPresetLink(
+            new GUIContent("Wall Preset", "The wall presets kept in " + WallPresetFolder +
+                                          ". Picking one puts its height, thickness and lip on this wall; Edit changes them."),
+            wall.wallPreset, WallPresetFolder, "Wall",
+            () =>
+            {
+                var made = CreateInstance<WallPreset>();
+                made.CopyFrom(WallSettings.Of(wall));
+                return made;
+            },
+            made =>
+            {
+                if (_data == null) return;
+                Undo.RecordObject(_data, "New Wall Preset");
+                wall.wallPreset = made;
+                MarkDirty();
+                Repaint();
+            });
+
+        if (picked != wall.wallPreset)
+        {
+            Undo.RecordObject(_data, "Load Wall Preset");
+            wall.wallPreset = picked;
+            if (picked != null) picked.Build().ApplyTo(wall);
+            MarkDirty();
+            GUI.FocusControl(null);
+            RebuildWall(wall);
+        }
+
+        if (wall.wallPreset != null)
+        {
+            using (new EditorGUI.DisabledScope(true))
+                DrawWallSettingsFields(WallSettings.Of(wall));
+            EditorGUILayout.LabelField("Set in the preset — Edit changes every wall using it.",
+                                       EditorStyles.wordWrappedMiniLabel);
+            return;
+        }
+
+        EditorGUI.BeginChangeCheck();
+        var edited = DrawWallSettingsFields(WallSettings.Of(wall));
+        if (EditorGUI.EndChangeCheck())
+        {
+            Undo.RecordObject(_data, "Edit Wall");
+            edited.ApplyTo(wall);
+            MarkDirty();
+            RebuildAfterEdit(wall, () => RebuildWall(wall));
+        }
+    }
+
+    /// <summary>
+    /// A wall's height, thickness and lip fields. Hands back an edited copy, so the caller writes
+    /// it only inside its own change check.
+    /// </summary>
+    internal static WallSettings DrawWallSettingsFields(WallSettings settings)
+    {
+        var edited = (settings ?? new WallSettings()).Clone();
+        edited.height = Mathf.Max(0f, EditorGUILayout.FloatField(
+            new GUIContent("Height", "How far the wall's top stands above the water, at every node " +
+                                     "that doesn't override it."), edited.height));
+        edited.thickness = Mathf.Max(0.001f, EditorGUILayout.FloatField(
+            new GUIContent("Thickness", "The wall's thickness, across."), edited.thickness));
+        edited.hasLip = EditorGUILayout.Toggle(
+            new GUIContent("Lip", "Stand a square lip on the wall's top all the way along, going round every column."),
+            edited.hasLip);
+        if (!edited.hasLip) return edited;
+
+        var lip = edited.lip;
+        EditorGUI.indentLevel++;
+        lip.height = Mathf.Max(0f, EditorGUILayout.FloatField(
+            new GUIContent("Height", "How far the lip stands above the wall's top."), lip.height));
+        lip.thickness = Mathf.Max(0.001f, EditorGUILayout.FloatField(
+            new GUIContent("Thickness", "The lip's thickness across, centred on the wall. Thicker than the " +
+                                        "wall overhangs it both sides."), lip.thickness));
+        lip.columnRing = Mathf.Max(0f, EditorGUILayout.FloatField(
+            new GUIContent("Column Ring", "How far the lip's ring round a column stands out from the column's " +
+                                          "side. 0 leaves columns without one."), lip.columnRing));
+        EditorGUI.indentLevel--;
+        return edited;
     }
 
     /// <summary>
@@ -431,6 +526,7 @@ public partial class LevelSelectDesignerWindow
                 string label = $"Node {i + 1}" + (node.hasColumn ? "  ▮ column" : "") +
                                (node.hasTower ? "  ● tower" : "") +
                                (node.hasArchway ? "  ∩ arch" : "") +
+                               (node.hasPorthole ? "  ◯ porthole" : "") +
                                (node.overrideHeight ? $"  h {node.height:0.##}" : "");
                 if (GUILayout.Button(label, EditorStyles.miniButton))
                     SelectWall(wall.wallId, i);
@@ -573,23 +669,39 @@ public partial class LevelSelectDesignerWindow
             columnRadius = EditorGUILayout.FloatField(
                 new GUIContent("Radius", "The column's radius."), node.columnRadius);
             columnHeight = EditorGUILayout.FloatField(
-                new GUIContent("Height", "How far the column's top stands above the wall's top here."),
+                new GUIContent("Height", "How far the column's top stands above the wall's top here — " +
+                                         "above the lip's top, when the wall has a lip."),
                 node.columnHeight);
             EditorGUI.indentLevel--;
         }
 
         bool hasTower = EditorGUILayout.Toggle(
-            new GUIContent("Lollipop Tower", "Stand a lollipop tower on top of the wall at this node."),
+            new GUIContent("Tower", "Stand a tower on top of the wall at this node — a lollipop or a turret."),
             node.hasTower);
 
-        LollipopTower tower = node.tower;
-        var           perch = node.towerPerch;
+        var           towerKind  = node.towerKind;
+        LollipopTower tower      = node.tower;
+        TurretTower   turret     = node.turret;
+        float         towerScale = node.towerScale;
+        var           perch      = node.towerPerch;
         if (hasTower)
         {
             EditorGUI.indentLevel++;
-            DrawLollipopPresetRow(node.towerPreset, node.tower,
-                                  p => node.towerPreset = p, t => node.tower = t);
-            tower = DrawLollipopTowerFields(node.tower);
+            towerKind = DrawTowerKindField(node.towerKind);
+            if (towerKind == LevelSelectDesignerData.TowerKind.Turret)
+            {
+                DrawTurretPresetRow(node.turretPreset, node.turret,
+                                    p => node.turretPreset = p, t => node.turret = t);
+                turret     = node.turret;   // read back: picking a preset just loaded it
+                towerScale = DrawLollipopScaleField(node.towerScale);
+            }
+            else
+            {
+                DrawLollipopPresetRow(node.towerPreset, node.tower,
+                                      p => node.towerPreset = p, t => node.tower = t);
+                tower      = node.tower;   // read back: picking a preset just loaded it
+                towerScale = DrawLollipopScaleField(node.towerScale);
+            }
             perch = DrawPerchBlock(node.towerPerch);
             EditorGUI.indentLevel--;
         }
@@ -609,6 +721,22 @@ public partial class LevelSelectDesignerWindow
             EditorGUI.indentLevel--;
         }
 
+        bool hasPorthole = EditorGUILayout.Toggle(
+            new GUIContent("Porthole", "Bore a round hole straight across the wall, centred on this node."),
+            node.hasPorthole);
+        float portholeRadius = node.portholeRadius, portholeHeight = node.portholeHeight;
+        if (hasPorthole)
+        {
+            EditorGUI.indentLevel++;
+            portholeRadius = EditorGUILayout.FloatField(
+                new GUIContent("Radius", "The porthole's radius."), node.portholeRadius);
+            portholeHeight = EditorGUILayout.FloatField(
+                new GUIContent("Height", "How high the porthole's centre is, from the wall's base. " +
+                                         "Reaching past the base or the top opens the wall there."),
+                node.portholeHeight);
+            EditorGUI.indentLevel--;
+        }
+
         if (EditorGUI.EndChangeCheck())
         {
             Undo.RecordObject(_data, "Edit Wall Node");
@@ -620,13 +748,19 @@ public partial class LevelSelectDesignerWindow
             node.columnRadius = Mathf.Max(0.001f, columnRadius);
             node.columnHeight = Mathf.Max(0f, columnHeight);
             node.hasTower   = hasTower;
+            node.towerKind  = towerKind;
             node.tower      = tower;
+            node.turret     = turret;
+            node.towerScale = towerScale;
             node.towerPerch = perch;
             node.hasArchway = hasArchway;
             node.archWidth  = Mathf.Max(0f, archWidth);
             node.archHeight = Mathf.Max(0f, archHeight);
+            node.hasPorthole    = hasPorthole;
+            node.portholeRadius = Mathf.Max(0f, portholeRadius);
+            node.portholeHeight = Mathf.Max(0f, portholeHeight);
             MarkDirty();
-            RebuildWall(wall);
+            RebuildAfterTowerEdit(wall, () => RebuildWall(wall));
         }
     }
 
@@ -696,26 +830,47 @@ public partial class LevelSelectDesignerWindow
         go.transform.rotation   = Quaternion.identity;
         go.transform.localScale = Vector3.one;
 
-        var nodes = WallNodes(wall);
-        var mesh  = SaveGeneratedMesh(name, WallMesh.Build(nodes, wall.closed, wall.thickness, -_data.RunDepth));
-        if (mesh == null) return;
+        var nodes  = WallNodes(wall);
+        var seams  = new WallMesh.SeamReport();
+        var meshes = WallMesh.BuildChunks(nodes, wall.closed, wall.thickness, -_data.RunDepth, StoneShadingForBuild,
+                                          wall.removedSeams, seams, wall.faceGroups, WallLipFor(wall));
+        KeepWallSeams(wall, seams);
 
-        var filter = go.GetComponent<MeshFilter>();
-        if (filter == null) filter = go.AddComponent<MeshFilter>();
-        filter.sharedMesh = mesh;
-        EditorUtility.SetDirty(filter);
+        // The wall's own mesh from when it was built as one piece — the chunks carry it now.
+        var oneCollider = go.GetComponent<MeshCollider>();
+        if (oneCollider != null) Undo.DestroyObjectImmediate(oneCollider);
+        var oneRenderer = go.GetComponent<MeshRenderer>();
+        if (oneRenderer != null) Undo.DestroyObjectImmediate(oneRenderer);
+        var oneFilter = go.GetComponent<MeshFilter>();
+        if (oneFilter != null) Undo.DestroyObjectImmediate(oneFilter);
 
-        var renderer = go.GetComponent<MeshRenderer>();
-        if (renderer == null) renderer = go.AddComponent<MeshRenderer>();
-        renderer.sharedMaterial = _data.riverMaterial;
-        EditorUtility.SetDirty(renderer);
+        // One child per chunk, cleared and built afresh each time; the mesh assets are reused by name.
+        var old = go.transform.Find(WallChunksChild);
+        if (old != null) Undo.DestroyObjectImmediate(old.gameObject);
 
-        // Collides as exactly the shape it is drawn.
-        var collider = go.GetComponent<MeshCollider>();
-        if (collider == null) collider = Undo.AddComponent<MeshCollider>(go);
-        collider.sharedMesh = null;   // cleared first so a mesh refilled in place is re-read
-        collider.sharedMesh = mesh;
-        EditorUtility.SetDirty(collider);
+        var container = new GameObject(WallChunksChild);
+        Undo.RegisterCreatedObjectUndo(container, "Generate Wall");
+        container.transform.SetParent(go.transform, false);
+
+        for (int k = 0; k < meshes.Count; k++)
+        {
+            string chunkName = WallChunkName(name, k);
+            var    mesh      = SaveGeneratedMesh(chunkName, meshes[k]);
+            if (mesh == null) continue;
+
+            var chunk = NewMeshChild(container, chunkName, mesh);
+
+            // Collides as exactly the shape it is drawn.
+            chunk.AddComponent<MeshCollider>().sharedMesh = mesh;
+        }
+
+        // Chunks left over from a wall that had more of them last time.
+        for (int k = meshes.Count; ; k++)
+        {
+            string stale = $"{GeneratedDir}/{WallChunkName(name, k)}.asset";
+            if (AssetDatabase.LoadAssetAtPath<Mesh>(stale) == null) break;
+            AssetDatabase.DeleteAsset(stale);
+        }
 
         var record = go.GetComponent<WallMesh>();
         record.wallId        = wall.wallId;
@@ -735,7 +890,10 @@ public partial class LevelSelectDesignerWindow
         var old = go.transform.Find(WallTowersChild);
         if (old != null) Undo.DestroyObjectImmediate(old.gameObject);
 
-        if (!wall.nodes.Exists(n => n.hasTower && n.tower != null)) return;
+        bool Builds(LevelSelectDesignerData.WallNode n) =>
+            n.hasTower && (n.towerKind == LevelSelectDesignerData.TowerKind.Turret ? n.turret != null : n.tower != null);
+
+        if (!wall.nodes.Exists(Builds)) return;
 
         var container = new GameObject(WallTowersChild);
         Undo.RegisterCreatedObjectUndo(container, "Generate Wall Towers");
@@ -744,10 +902,26 @@ public partial class LevelSelectDesignerWindow
         for (int i = 0; i < wall.nodes.Count; i++)
         {
             var node = wall.nodes[i];
-            if (!node.hasTower || node.tower == null) continue;
+            if (!Builds(node)) continue;
 
             string towerName = $"{WallMeshName(wall)}_Tower{i + 1}";
-            var    mesh      = SaveGeneratedMesh(towerName, node.tower.Build(StoneShadingForBuild));
+
+            if (node.towerKind == LevelSelectDesignerData.TowerKind.Turret)
+            {
+                var turret = node.turret.Scaled(node.towerScale);
+                var built  = PlaceTurret(container.transform, towerName, turret, _data.riverMaterial);
+                if (built == null) continue;
+
+                built.transform.localPosition = nodes[i].StandOn;
+                built.transform.localRotation = Quaternion.identity;
+                built.transform.localScale    = Vector3.one;
+
+                ApplyPerch(built, node.towerPerch, Vector3.up * turret.TopY);
+                continue;
+            }
+
+            var    placed    = node.tower.Scaled(node.towerScale);
+            var    mesh      = SaveGeneratedMesh(towerName, placed.Build(StoneShadingForBuild));
             if (mesh == null) continue;
 
             // The wall sits unrotated at the rim top, so the node's top is already local — the
@@ -758,13 +932,15 @@ public partial class LevelSelectDesignerWindow
             tower.transform.localScale    = Vector3.one;
 
             // Her feet go on the top of the orb.
-            ApplyPerch(tower, node.towerPerch, Vector3.up * node.tower.TopY);
+            ApplyPerch(tower, node.towerPerch, Vector3.up * placed.TopY);
         }
     }
 
     // Named off the wall's id, which survives every regenerate — so the mesh asset is reused.
     private static string WallMeshName(LevelSelectDesignerData.DesignerWall wall)
         => $"Wall_{SanitiseAssetName(wall.wallId)}";
+
+    private static string WallChunkName(string wallName, int chunk) => $"{wallName}_Chunk{chunk + 1}";
 }
 
 #endif

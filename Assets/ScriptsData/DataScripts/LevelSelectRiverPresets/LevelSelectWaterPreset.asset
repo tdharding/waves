@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: LevelSelectWaterPreset
   m_EditorClassIdentifier: Assembly-CSharp::LevelSelectRiverWaterPreset
   edgeRipples:
-    strength: 0.37
+    strength: 0.64
     width: 0.904
     softness: 1
     spacing: 0.14
@@ -48,3 +48,20 @@ MonoBehaviour:
     grainStrength: 0.08
     grainSize: 1.04
     grainAlpha: 0.081
+    lowResStyle: 1
+    blockSize: 0.06
+    scatterGrain: 0.01
+    blocksOnScreen: 0
+    contrast: 0.55
+  soulZone:
+    strength: 1
+    baseColour: {r: 0, g: 0, b: 0, a: 1}
+    brightness: 1.11
+    width: 0.43
+    fadeStart: 0.219
+    grainSize: 0.35
+    grainStrength: 1
+    scrollSpeed: 1.32
+    drainSpeed: 0.05
+    poolFillRadius: 1
+    fillSpeed: 1

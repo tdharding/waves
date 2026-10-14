@@ -54,6 +54,18 @@ public class LevelSelectBoatToShaders : MonoBehaviour
             return;
         }
 
+        Push(boatControl);
+    }
+
+    /// <summary>
+    /// Writes the boat's position to both globals once. LateUpdate calls it every frame in
+    /// play; the designer calls it after Generate stands the boat at its start, since nothing
+    /// runs LateUpdate in edit mode.
+    /// </summary>
+    public static void Push(LevelSelectBoatControl boatControl)
+    {
+        if (boatControl == null) return;
+
         // The hull, not the physics transform — the same choice BoatToWaterMaterial makes in
         // taking the boat VISUAL, so the light sits on the boat that is drawn rather than half
         // a metre off it. Falls back to the body for a boat with no separate mesh.
@@ -61,6 +73,12 @@ public class LevelSelectBoatToShaders : MonoBehaviour
             ? boatControl.MeshTransform
             : boatControl.BoatTransform;
 
+        Push(visual);
+    }
+
+    /// <summary>The same write for a boat found without its LevelSelectBoatControl.</summary>
+    public static void Push(Transform visual)
+    {
         if (visual == null) return;
 
         Shader.SetGlobalVector(BoatCentreId, visual.position);

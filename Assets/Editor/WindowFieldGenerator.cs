@@ -38,7 +38,7 @@ public class WindowFieldGenerator : EditorWindow
 
     Texture2D preview;
 
-    [MenuItem("Tools/Waves/Window Field Generator")]
+    [MenuItem("Tools/Studios/Window Field Generator", false, 320)]
     static void Open() => GetWindow<WindowFieldGenerator>("Window Field");
 
     void OnGUI()

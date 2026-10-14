@@ -1,0 +1,369 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+[RequireComponent(typeof(AudioSource))]
+public class LevelSelectMusicController : MonoBehaviour
+{
+    public static LevelSelectMusicController Instance;
+
+    [SerializeField] private LevelSelectDesignerData data;
+
+    public bool playOnStart = true;
+
+    [Tooltip("Seconds the music takes to fade in when a camera sequence finishes and lets it go. 0 = straight in.")]
+    [Min(0f)] public float fadeInAfterSequence = 4f;
+
+    private AudioSource _source;
+    // The AudioSource's own volume — what every fade climbs back to.
+    private float _baseVolume;
+    private Coroutine _fade;
+    private Coroutine _sequence;
+
+    // Held while a camera sequence plays its own audio. Holds stack; the music comes back when the last one lets go.
+    // The wind is never held — it plays under the intro.
+    private int  _holds;
+    private bool _playWhenReleased;
+    private bool _pausedByHold;
+
+    // ── Wind and node music ───────────────────────────────────────
+    // The wind loops from the start. A node with Audio on crossfades whatever is playing into
+    // its own music when the boat comes within its radius. Two sources, swapped each crossfade.
+    private readonly AudioSource[] _tracks = new AudioSource[2];
+    private readonly Coroutine[]   _trackFades = new Coroutine[2];
+    private int    _current = -1;
+    private bool   _currentIsWind;
+    private string _currentNodeId;
+    private bool   _trackPausedByHold;
+
+    private readonly List<LevelSelectDesignerData.DesignerNode> _triggers = new();
+    // Nodes the boat is inside — a node fires on the way in, not every frame it's there.
+    private readonly HashSet<string> _inside = new();
+    private Transform _boat;
+
+    // The last node whose music played. It outlives the scene: back from a level, the level
+    // select starts on that music rather than the wind. Session only — a fresh launch starts on the wind.
+    private static string s_lastNodeId;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetSession() => s_lastNodeId = null;
+
+    public bool IsHeld => _holds > 0;
+
+    private void Awake()
+    {
+        Instance = this;
+        _source = GetComponent<AudioSource>();
+        _baseVolume = _source.volume;
+    }
+
+    private void Start()
+    {
+        if (!playOnStart || data == null) return;
+
+        CollectTriggers();
+
+        var last = _triggers.Find(n => n.id == s_lastNodeId);
+        if (last != null)
+        {
+            Debug.Log($"[LevelSelectMusic] Back in the level select — resuming node {last.id}'s music {last.musicClip.name}.");
+            CrossfadeTo(last.musicClip, last.musicLooped, 0f, false, last.id);
+        }
+        else if (data.windLoop != null)
+        {
+            Debug.Log($"[LevelSelectMusic] Wind: {data.windLoop.name} looping, {_triggers.Count} node(s) with Audio.");
+            CrossfadeTo(data.windLoop, true, 0f, true, null);
+        }
+        else
+        {
+            Play();
+        }
+    }
+
+    private void Update()
+    {
+        if (_triggers.Count == 0) return;
+
+        if (_boat == null)
+        {
+            var boat = FindAnyObjectByType<LevelSelectBoatControl>();
+            if (boat == null) return;
+            _boat = boat.transform;
+        }
+
+        Vector3 boatPos = _boat.position;
+        foreach (var node in _triggers)
+        {
+            float dx = boatPos.x - node.worldPosition.x;
+            float dz = boatPos.z - node.worldPosition.z;
+            float r  = node.musicTriggerRadius;
+            bool inside = dx * dx + dz * dz <= r * r;
+
+            if (!inside) { _inside.Remove(node.id); continue; }
+            if (!_inside.Add(node.id)) continue;      // already in — fired on the way in
+            if (node.id == _currentNodeId) continue;
+
+            s_lastNodeId = node.id;
+            // The same song on another node carries straight on.
+            if (_current >= 0 && _tracks[_current].clip == node.musicClip && !_currentIsWind)
+            {
+                _currentNodeId = node.id;
+                continue;
+            }
+
+            Debug.Log($"[LevelSelectMusic] Boat reached node {node.id} — crossfading to {node.musicClip.name} over {node.musicCrossfade:F1}s.");
+            CrossfadeTo(node.musicClip, node.musicLooped, node.musicCrossfade, false, node.id);
+        }
+    }
+
+    private void CollectTriggers()
+    {
+        _triggers.Clear();
+        foreach (var node in data.nodes)
+        {
+            if (node == null || !node.musicTrigger) continue;
+            if (node.musicClip == null)
+            {
+                Debug.LogWarning($"[LevelSelectMusic] Node {node.id} has Audio on but no music clip — skipped.");
+                continue;
+            }
+            _triggers.Add(node);
+        }
+
+        if (data.windLoop != null && _triggers.Count == 0)
+            Debug.LogWarning("[LevelSelectMusic] Wind is set but no river node has Audio on — the wind will never stop.");
+    }
+
+    private void CrossfadeTo(AudioClip clip, bool loop, float duration, bool isWind, string nodeId)
+    {
+        int prev = _current;
+        int next = prev == 0 ? 1 : 0;
+
+        if (_tracks[next] == null) _tracks[next] = AddTrackSource();
+        var src = _tracks[next];
+        StopTrackFade(next);
+        src.clip   = clip;
+        src.loop   = loop;
+        src.volume = duration > 0f ? 0f : _baseVolume;
+        src.Play();
+
+        _current       = next;
+        _currentIsWind = isWind;
+        _currentNodeId = nodeId;
+        _trackPausedByHold = false;
+
+        if (prev >= 0)
+        {
+            StopTrackFade(prev);
+            if (duration > 0f) _trackFades[prev] = StartCoroutine(FadeTrack(prev, 0f, duration, true));
+            else _tracks[prev].Stop();
+        }
+
+        // With no Wind set the level select starts on Music Intro/Loop — a node's music takes over from it.
+        if (!isWind) FadeOutIntroLoop(duration);
+
+        // Music arriving while a camera sequence holds waits for it to let go. The wind never waits.
+        if (!isWind && IsHeld)
+        {
+            src.Pause();
+            _trackPausedByHold = true;
+            return;
+        }
+        if (duration > 0f) _trackFades[next] = StartCoroutine(FadeTrack(next, _baseVolume, duration, false));
+    }
+
+    private AudioSource AddTrackSource()
+    {
+        var src = gameObject.AddComponent<AudioSource>();
+        src.playOnAwake           = false;
+        src.outputAudioMixerGroup = _source.outputAudioMixerGroup;
+        src.spatialBlend          = _source.spatialBlend;
+        src.priority              = _source.priority;
+        return src;
+    }
+
+    private void StopTrackFade(int i)
+    {
+        if (_trackFades[i] != null) StopCoroutine(_trackFades[i]);
+        _trackFades[i] = null;
+    }
+
+    private IEnumerator FadeTrack(int i, float to, float duration, bool stopAtEnd)
+    {
+        var src = _tracks[i];
+        float from = src.volume;
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            src.volume = Mathf.Lerp(from, to, elapsed / duration);
+            yield return null;
+        }
+        src.volume = to;
+        if (stopAtEnd) src.Stop();
+        _trackFades[i] = null;
+    }
+
+    // ── Music Intro / Loop (no Wind set) ──────────────────────────
+
+    private void FadeOutIntroLoop(float duration)
+    {
+        _playWhenReleased = false;
+        _pausedByHold     = false;
+        if (_sequence != null) StopCoroutine(_sequence);
+        _sequence = null;
+        if (_fade != null) StopCoroutine(_fade);
+        _fade = null;
+        if (!_source.isPlaying) { _source.Stop(); return; }
+        if (duration > 0f) _fade = StartCoroutine(FadeOutRoutine(duration));
+        else _source.Stop();
+    }
+
+    private IEnumerator FadeOutRoutine(float duration)
+    {
+        float from = _source.volume;
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            _source.volume = Mathf.Lerp(from, 0f, elapsed / duration);
+            yield return null;
+        }
+        _source.Stop();
+        _source.volume = _baseVolume;
+        _fade = null;
+    }
+
+    public void Play()
+    {
+        if (data == null) return;
+        if (data.musicIntro == null && data.musicLoop == null) return;
+        if (IsHeld)
+        {
+            _playWhenReleased = true;
+            Debug.Log("[LevelSelectMusic] Play: held — starts when released.");
+            return;
+        }
+        // Not StopAllCoroutines — that would cut a wind or node music fade short.
+        if (_sequence != null) StopCoroutine(_sequence);
+        if (_fade != null) StopCoroutine(_fade);
+        _fade = null;
+        _source.volume = _baseVolume;
+        _pausedByHold = false;
+        _sequence = StartCoroutine(PlaySequence());
+    }
+
+    public void FadeIn(float duration)
+    {
+        Play();
+        if (IsHeld) return;
+        StartFade(duration);
+    }
+
+    /// <summary>Pause the music (or keep it from starting) until Release.</summary>
+    public void Hold()
+    {
+        _holds++;
+        if (_holds > 1) return;
+        StopFade();
+        if (_source.isPlaying)
+        {
+            _source.Pause();
+            _pausedByHold = true;
+        }
+
+        // Node music pauses too; the wind plays on.
+        if (_current >= 0 && !_currentIsWind && _tracks[_current].isPlaying)
+        {
+            StopTrackFade(_current);
+            _tracks[_current].volume = _baseVolume;
+            _tracks[_current].Pause();
+            _trackPausedByHold = true;
+        }
+        Debug.Log($"[LevelSelectMusic] Hold: {(_pausedByHold || _trackPausedByHold ? "paused" : "nothing to pause")}.");
+    }
+
+    /// <summary>Let go of a Hold — the music picks up where it paused, or starts if it was waiting to.</summary>
+    public void Release()
+    {
+        if (_holds == 0) return;
+        if (--_holds > 0) return;
+
+        if (_playWhenReleased)
+        {
+            _playWhenReleased = false;
+            Debug.Log($"[LevelSelectMusic] Release: starting, fade in {fadeInAfterSequence:F1}s.");
+            Play();
+            StartFade(fadeInAfterSequence);
+        }
+        else if (_pausedByHold)
+        {
+            _pausedByHold = false;
+            _source.volume = 0f;
+            _source.UnPause();
+            StartFade(fadeInAfterSequence);
+            Debug.Log($"[LevelSelectMusic] Release: resumed, fade in {fadeInAfterSequence:F1}s.");
+        }
+
+        if (_trackPausedByHold && _current >= 0)
+        {
+            _trackPausedByHold = false;
+            var src = _tracks[_current];
+            src.volume = fadeInAfterSequence > 0f ? 0f : _baseVolume;
+            src.UnPause();
+            StopTrackFade(_current);
+            if (fadeInAfterSequence > 0f)
+                _trackFades[_current] = StartCoroutine(FadeTrack(_current, _baseVolume, fadeInAfterSequence, false));
+            Debug.Log($"[LevelSelectMusic] Release: node {_currentNodeId}'s music resumed, fade in {fadeInAfterSequence:F1}s.");
+        }
+    }
+
+    private void StartFade(float duration)
+    {
+        StopFade();
+        if (duration <= 0f) return;
+        _fade = StartCoroutine(FadeInRoutine(duration));
+    }
+
+    // A fade cut short leaves the volume where the music should sit, not part way up.
+    private void StopFade()
+    {
+        if (_fade != null) StopCoroutine(_fade);
+        _fade = null;
+        _source.volume = _baseVolume;
+    }
+
+    private IEnumerator FadeInRoutine(float duration)
+    {
+        _source.volume = 0f;
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            _source.volume = Mathf.Lerp(0f, _baseVolume, elapsed / duration);
+            yield return null;
+        }
+        _source.volume = _baseVolume;
+        _fade = null;
+    }
+
+    private IEnumerator PlaySequence()
+    {
+        if (data.musicIntro != null)
+        {
+            _source.clip = data.musicIntro;
+            _source.loop = false;
+            _source.Play();
+            // Not a fixed wait — a Hold can pause the intro part way through.
+            yield return new WaitUntil(() => !_source.isPlaying && !IsHeld);
+        }
+
+        if (data.musicLoop != null)
+        {
+            _source.clip = data.musicLoop;
+            _source.loop = true;
+            _source.Play();
+        }
+        _sequence = null;
+    }
+}

@@ -32,6 +32,16 @@ public enum RiverRippleDebugView
     Both = 4,
 }
 
+/// <summary>How the Low Resolution setting coarsens the water's effect.</summary>
+public enum RiverRippleLowResStyle
+{
+    /// <summary>Square blocks — a mosaic.</summary>
+    Blocks = 0,
+
+    /// <summary>Each pixel reads from a random point nearby — a sandy grain.</summary>
+    Scatter = 1,
+}
+
 /// <summary>
 /// One set of edge ripple numbers, and the only place they are written into the shaders.
 ///
@@ -215,6 +225,34 @@ public class RiverEdgeRippleSettings
              "Strength, so the alpha can take the grain with or without the colour.")]
     [Range(0f, 1f)] public float grainAlpha = 0f;
 
+    [Header("Low Resolution")]
+
+    [Tooltip("Blocks draws the effect in squares, a mosaic. Scatter has every pixel read the " +
+             "effect from a random point nearby instead, so edges dissolve into a sandy grain.")]
+    public RiverRippleLowResStyle lowResStyle = RiverRippleLowResStyle.Blocks;
+
+    [Tooltip("Blocks: how big one square is. Scatter: how far a pixel may read from, the " +
+             "radius. In metres, or in screen pixels with Blocks On Screen on. 0 is full " +
+             "resolution — the effect exactly as it was.")]
+    [Min(0f)] public float blockSize = 0f;
+
+    [Tooltip("Scatter only: how fine the grain doing the scattering is — each grain of this size " +
+             "reads from its own random point. Tiny gives a fine sand; nearer the radius, clumps. " +
+             "Same units as Block Size.")]
+    [Min(0.0001f)] public float scatterGrain = 0.002f;
+
+    [Tooltip("On: blocks are screen pixels, the same size wherever the water is — a low-res " +
+             "render look. Off: blocks are metres pinned to the world, so they stay stuck to the " +
+             "water as the camera moves and line up across every join.")]
+    public bool blocksOnScreen = false;
+
+    [Header("Final Colour")]
+
+    [Tooltip("Contrast on the water's finished colour, pushed out from mid-grey: 1 leaves it as " +
+             "it is, higher pulls lights and darks apart, lower flattens them together. Only " +
+             "heard once the River Water Contrast subgraph sits just before Base Color.")]
+    [Min(0f)] public float contrast = 1f;
+
     // ─────────────────────────────────────────────────────────────
     // PUSHING
     // ─────────────────────────────────────────────────────────────
@@ -268,7 +306,12 @@ public class RiverEdgeRippleSettings
     private static readonly int GrainStrengthId       = Shader.PropertyToID("_RiverEdgeRippleGrainStrength");
     private static readonly int GrainSizeId           = Shader.PropertyToID("_RiverEdgeRippleGrainSize");
     private static readonly int GrainAlphaId          = Shader.PropertyToID("_RiverEdgeRippleGrainAlpha");
-    private static readonly int DebugId               = Shader.PropertyToID("_RiverEdgeRippleDebug");
+    private static readonly int BlockSizeId           = Shader.PropertyToID("_RiverEdgeRippleBlockSize");
+    private static readonly int BlockScreenId         = Shader.PropertyToID("_RiverEdgeRippleBlockScreen");
+    private static readonly int LowResStyleId         = Shader.PropertyToID("_RiverEdgeRippleLowResStyle");
+    private static readonly int ScatterGrainId        = Shader.PropertyToID("_RiverEdgeRippleScatterGrain");
+    private static readonly int ContrastId            = Shader.PropertyToID("_RiverEdgeRippleContrast");
+    private static readonly int DebugId             = Shader.PropertyToID("_RiverEdgeRippleDebug");
 
     /// <summary>
     /// Publishes one set of ripple numbers to the shaders — the tuner's if it is driving, this
@@ -343,6 +386,13 @@ public class RiverEdgeRippleSettings
         Shader.SetGlobalFloat(GrainStrengthId,       grainStrength);
         Shader.SetGlobalFloat(GrainSizeId,           grainSize);
         Shader.SetGlobalFloat(GrainAlphaId,          grainAlpha);
+
+        Shader.SetGlobalFloat(BlockSizeId,           blockSize);
+        Shader.SetGlobalFloat(BlockScreenId,         blocksOnScreen ? 1f : 0f);
+        Shader.SetGlobalFloat(LowResStyleId,         (float)lowResStyle);
+        Shader.SetGlobalFloat(ScatterGrainId,        scatterGrain);
+
+        Shader.SetGlobalFloat(ContrastId,            contrast);
     }
 
     /// <summary>Field-by-field copy, so the tuner can load a preset without holding on to it.</summary>
@@ -390,5 +440,12 @@ public class RiverEdgeRippleSettings
         grainStrength = other.grainStrength;
         grainSize     = other.grainSize;
         grainAlpha    = other.grainAlpha;
+
+        blockSize      = other.blockSize;
+        blocksOnScreen = other.blocksOnScreen;
+        lowResStyle    = other.lowResStyle;
+        scatterGrain   = other.scatterGrain;
+
+        contrast = other.contrast;
     }
 }

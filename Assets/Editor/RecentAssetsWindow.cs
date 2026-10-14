@@ -245,7 +245,7 @@ public class RecentAssetsWindow : EditorWindow
     // Window
     // -------------------------------------------------------------------------
 
-    [MenuItem("Tools/Waves/Recent Assets")]
+    [MenuItem("Tools/Scene and Assets/Recent Assets", false, 1002)]
     public static void Open() => GetWindow<RecentAssetsWindow>("Recent");
 
     void OnEnable()

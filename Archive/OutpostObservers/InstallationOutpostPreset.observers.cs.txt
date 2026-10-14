@@ -1,0 +1,21 @@
+// Archived from Assets/ScriptsData/LevelSelectScripts/InstallationOutpostPreset.cs (2026-10-12).
+
+    [Min(0f)]     public float   columnHeight      = 0.2f;
+    [Min(0.001f)] public float   columnRadius      = 0.1f;
+
+    public List<LevelSelectDesignerData.OutpostObserver> observers = new();
+
+        towerOnUpstream   = outpost.towerOnUpstream;
+        columnHeight  = outpost.columnHeight;
+        columnRadius  = outpost.columnRadius;
+        observers     = (outpost.observers ?? new List<LevelSelectDesignerData.OutpostObserver>())
+                        .Select(o => o.Clone()).ToList();
+        towerPreset   = outpost.towerPreset;
+        turretPreset  = outpost.turretPreset;
+        outpost.towerOnUpstream   = towerOnUpstream;
+        outpost.columnHeight  = columnHeight;
+        outpost.columnRadius  = columnRadius;
+        outpost.observers     = (observers ?? new List<LevelSelectDesignerData.OutpostObserver>())
+                                .Select(o => o.Clone()).ToList();
+        outpost.towerPreset   = towerPreset;
+        outpost.turretPreset  = turretPreset;

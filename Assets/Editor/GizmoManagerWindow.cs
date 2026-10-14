@@ -3,6 +3,7 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.Reflection;
 using System;
+using UnityEngine.Rendering;
 
 public class GizmoManagerWindow : EditorWindow
 {
@@ -23,6 +24,7 @@ public class GizmoManagerWindow : EditorWindow
     Vector2          scroll;
     bool             annotationsAvailable;
     bool             showColliders        = true;
+    bool             showCanvases         = true;
 
     // Filter and opacity. Both exist for the same reason: when a dozen scripts draw into the same
     // patch of scene, the listing is too long to find the one you care about and the drawing is
@@ -31,8 +33,12 @@ public class GizmoManagerWindow : EditorWindow
     string           filter               = "";
     bool             onlyActive           = false;
     bool             onlyInScene          = false;
-    bool             enabledFirst         = false;
     float            gizmoOpacity         = 1f;
+
+    enum SortOrder { Name, InScene, Enabled }
+
+    // Serialized so the choice survives a recompile while the window stays open.
+    [SerializeField] SortOrder sortOrder  = SortOrder.Name;
 
     const string OpacityKey = "FogTools.GizmoManager.Opacity";
 
@@ -51,7 +57,7 @@ public class GizmoManagerWindow : EditorWindow
     FieldInfo  fScriptClass;
     FieldInfo  fGizmoEnabled;
 
-    [MenuItem("Tools/Gizmo Manager")]
+    [MenuItem("Tools/Scene and Assets/Gizmo Manager", false, 1000)]
     static void Open() => GetWindow<GizmoManagerWindow>("Gizmo Manager");
 
     void OnEnable()
@@ -172,9 +178,10 @@ public class GizmoManagerWindow : EditorWindow
 
         SortEntries();
         showColliders = ReadColliderVisibility();
+        showCanvases  = ReadCanvasVisibility();
     }
 
-    // Enabled-first is a snapshot taken when sorted, not a live order: re-sorting every frame
+    // The order is a snapshot taken when sorted, not a live order: re-sorting every frame
     // would make a row jump out from under the cursor the moment you toggle it.
     void SortEntries()
     {
@@ -190,8 +197,10 @@ public class GizmoManagerWindow : EditorWindow
             bool aSel = onSelection.Contains(a.type), bSel = onSelection.Contains(b.type);
             if (aSel != bSel)
                 return aSel ? -1 : 1;
-            if (enabledFirst && a.gizmoEnabled != b.gizmoEnabled)
+            if (sortOrder == SortOrder.Enabled && a.gizmoEnabled != b.gizmoEnabled)
                 return a.gizmoEnabled ? -1 : 1;
+            if (sortOrder == SortOrder.InScene && a.instanceCount != b.instanceCount)
+                return b.instanceCount.CompareTo(a.instanceCount);
             return string.Compare(a.type.Name, b.type.Name, StringComparison.Ordinal);
         });
     }
@@ -217,6 +226,15 @@ public class GizmoManagerWindow : EditorWindow
         // Toolbar
         EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
         GUILayout.Label("Gizmo Manager", EditorStyles.boldLabel);
+        GUILayout.Space(6);
+        GUILayout.Label("Sort", EditorStyles.miniLabel, GUILayout.Width(28));
+        var newSort = (SortOrder)EditorGUILayout.Popup((int)sortOrder,
+            new[] { "Name", "In Scene", "Enabled" }, EditorStyles.toolbarDropDown, GUILayout.Width(72));
+        if (newSort != sortOrder)
+        {
+            sortOrder = newSort;
+            SortEntries();
+        }
         GUILayout.FlexibleSpace();
         if (GUILayout.Button("All On",  EditorStyles.toolbarButton, GUILayout.Width(52))) SetAll(true);
         if (GUILayout.Button("All Off", EditorStyles.toolbarButton, GUILayout.Width(52))) SetAll(false);
@@ -227,6 +245,17 @@ public class GizmoManagerWindow : EditorWindow
             showColliders = newShowColliders;
             SetCollidersVisible(showColliders);
         }
+        bool newShowCanvases = GUILayout.Toggle(showCanvases, "Canvases", EditorStyles.toolbarButton, GUILayout.Width(65));
+        if (newShowCanvases != showCanvases)
+        {
+            showCanvases = newShowCanvases;
+            SetCanvasesVisible(showCanvases);
+        }
+        bool newWhiteFade = GUILayout.Toggle(SceneViewWhiteFade.Shown, new GUIContent("White Fade",
+            "Show the level select's White Fade in the Scene view. Off clears it from Scene view " +
+            "cameras only — the Game view and play mode keep it."),
+            EditorStyles.toolbarButton, GUILayout.Width(72));
+        if (newWhiteFade != SceneViewWhiteFade.Shown) SceneViewWhiteFade.Shown = newWhiteFade;
         if (GUILayout.Button("Refresh", EditorStyles.toolbarButton, GUILayout.Width(55))) Refresh();
         EditorGUILayout.EndHorizontal();
 
@@ -273,13 +302,7 @@ public class GizmoManagerWindow : EditorWindow
         GUILayout.Label("",           GUILayout.Width(20));  // toggle
         GUILayout.Label("Script",     GUILayout.Width(190));
         GUILayout.Label("Gizmos",     GUILayout.Width(52));
-        bool newEnabledFirst = GUILayout.Toggle(enabledFirst, "Selected", EditorStyles.toolbarButton,
-                                                GUILayout.Width(62));
-        if (newEnabledFirst != enabledFirst)
-        {
-            enabledFirst = newEnabledFirst;
-            SortEntries();
-        }
+        GUILayout.Label("Selected",   GUILayout.Width(62));
         GUILayout.Label("In Scene",   GUILayout.Width(58));
         EditorGUILayout.EndHorizontal();
 
@@ -375,6 +398,32 @@ public class GizmoManagerWindow : EditorWindow
         SceneView.RepaintAll();
     }
 
+    // Canvases are hidden with the Scene view's own visibility (the eye in the Hierarchy), so the
+    // Game view and play mode still draw them and nothing is written into the scene file.
+    static List<GameObject> RootCanvasObjects()
+    {
+        var list = new List<GameObject>();
+        foreach (var canvas in FindObjectsOfType<Canvas>(true))
+            if (canvas.isRootCanvas && !EditorUtility.IsPersistent(canvas))
+                list.Add(canvas.gameObject);
+        return list;
+    }
+
+    static bool ReadCanvasVisibility()
+    {
+        foreach (var go in RootCanvasObjects())
+            if (!SceneVisibilityManager.instance.IsHidden(go, true)) return true;
+        return RootCanvasObjects().Count == 0;
+    }
+
+    static void SetCanvasesVisible(bool visible)
+    {
+        var objects = RootCanvasObjects().ToArray();
+        if (visible) SceneVisibilityManager.instance.Show(objects, true);
+        else         SceneVisibilityManager.instance.Hide(objects, true);
+        SceneView.RepaintAll();
+    }
+
     static void PingScript(Type type)
     {
         foreach (var guid in AssetDatabase.FindAssets($"t:MonoScript {type.Name}"))
@@ -387,5 +436,67 @@ public class GizmoManagerWindow : EditorWindow
                 return;
             }
         }
+    }
+}
+
+/// <summary>
+/// The Gizmo Manager's White Fade toggle. Off, every Scene view camera renders with the White Fade
+/// switched off — both rings at no opacity and the bottom gradient pushed out of the world — and
+/// the real numbers go straight back after it, so the Game view, play mode and builds never see
+/// the difference. Nothing is written to the preset or the scene; the choice lives in EditorPrefs.
+/// </summary>
+[InitializeOnLoad]
+static class SceneViewWhiteFade
+{
+    const string ShownKey = "FogTools.GizmoManager.SceneViewWhiteFade";
+
+    static readonly int OuterOpacityId   = Shader.PropertyToID("_WhiteFadeOuterOpacity");
+    static readonly int InnerOpacityId   = Shader.PropertyToID("_WhiteFadeInnerOpacity");
+    static readonly int GradientBottomId = Shader.PropertyToID("_WhiteFadeGradientBottom");
+
+    // A Gradient Bottom far above the gradient's top at Y = 1 turns the smoothstep round, so the
+    // white it adds is all but zero at any height the world reaches.
+    const float NoGradientBottom = 1e6f;
+
+    static bool  _swapped;
+    static float _savedOuter, _savedInner, _savedBottom;
+
+    static SceneViewWhiteFade()
+    {
+        RenderPipelineManager.beginCameraRendering += SwapOut;
+        RenderPipelineManager.endCameraRendering   += PutBack;
+    }
+
+    public static bool Shown
+    {
+        get => EditorPrefs.GetBool(ShownKey, true);
+        set
+        {
+            EditorPrefs.SetBool(ShownKey, value);
+            SceneView.RepaintAll();
+        }
+    }
+
+    static void SwapOut(ScriptableRenderContext context, Camera cam)
+    {
+        if (_swapped || cam.cameraType != CameraType.SceneView || Shown) return;
+
+        _savedOuter  = Shader.GetGlobalFloat(OuterOpacityId);
+        _savedInner  = Shader.GetGlobalFloat(InnerOpacityId);
+        _savedBottom = Shader.GetGlobalFloat(GradientBottomId);
+        _swapped = true;
+
+        Shader.SetGlobalFloat(OuterOpacityId,   0f);
+        Shader.SetGlobalFloat(InnerOpacityId,   0f);
+        Shader.SetGlobalFloat(GradientBottomId, NoGradientBottom);
+    }
+
+    static void PutBack(ScriptableRenderContext context, Camera cam)
+    {
+        if (!_swapped) return;
+        Shader.SetGlobalFloat(OuterOpacityId,   _savedOuter);
+        Shader.SetGlobalFloat(InnerOpacityId,   _savedInner);
+        Shader.SetGlobalFloat(GradientBottomId, _savedBottom);
+        _swapped = false;
     }
 }

@@ -19,277 +19,1665 @@ MonoBehaviour:
     height: -2.1
     smoothness: 1
     noise: 0
+    omitFromFog: 0
   - id: 3bac5b98-b285-4e13-a01c-e39756b776c9
     positionXZ: {x: 103.945526, y: -46.826683}
     scale: 19.2
     height: -1.8
     smoothness: 1
     noise: 0
+    omitFromFog: 0
   - id: 4d317da8-59b2-41f7-8f77-34530b2f8871
-    positionXZ: {x: 80.39063, y: -12.724364}
-    scale: 100
+    positionXZ: {x: 89.90267, y: -18.899784}
+    scale: 217
     height: 39.5
     smoothness: 0.111
     noise: 0.083
+    omitFromFog: 0
   - id: 521c1ca6-70c7-47da-854f-15a8bc60d246
-    positionXZ: {x: 104.374405, y: 8.758636}
+    positionXZ: {x: 115.57828, y: 4.918462}
     scale: 19.2
     height: -15
     smoothness: 1
     noise: 0
+    omitFromFog: 0
   - id: c1d2c02f-86b8-4ed5-a166-64ad2d931b20
     positionXZ: {x: 86.12777, y: 13.246971}
     scale: 13.9
     height: -2
     smoothness: 0.676
     noise: 0.171
+    omitFromFog: 0
   - id: 65a6e1b8-fc75-4df3-be19-1455a7358016
     positionXZ: {x: 35.871002, y: 4.8546124}
     scale: 9.1
     height: 15
     smoothness: 1
     noise: 0
+    omitFromFog: 0
   - id: 69b3cec3-ee38-4a82-87bd-c0e581ea2c3f
-    positionXZ: {x: 40.423027, y: -49.30663}
+    positionXZ: {x: 87.44042, y: -20.687687}
+    scale: 25.2
+    height: -3.9
+    smoothness: 1
+    noise: 0.403
+    omitFromFog: 0
+  - id: a18f1fb0-c97b-4e0f-9041-29cb20875ef2
+    positionXZ: {x: 42.423027, y: -47.30663}
     scale: 25.2
     height: 26.1
     smoothness: 1
     noise: 0.403
+    omitFromFog: 0
   - id: d67f3d4b-67ac-4ddb-84e3-f0d3bf55da1c
-    positionXZ: {x: 105.806564, y: 27.376728}
+    positionXZ: {x: 113.83918, y: 24.206678}
     scale: 19.2
     height: -15
     smoothness: 1
     noise: 0
+    omitFromFog: 0
+  - id: e2b8c556-ab02-4ad6-9e30-8c42ef20043e
+    positionXZ: {x: 170.09457, y: 29.926235}
+    scale: 38.4
+    height: 31.5
+    smoothness: 1
+    noise: 0.313
+    omitFromFog: 0
+  - id: 8ea44a93-c3dd-4fd6-97a5-dfc89126f7b4
+    positionXZ: {x: 105.92679, y: 188.29404}
+    scale: 80
+    height: 50
+    smoothness: 1
+    noise: 0.313
+    omitFromFog: 0
   - id: 00fe1733-413a-40e4-9edb-dc27a93ff34a
-    positionXZ: {x: 104.374405, y: 42.844067}
+    positionXZ: {x: 110.202866, y: 40.9653}
     scale: 19.2
     height: -15
     smoothness: 1
     noise: 0
+    omitFromFog: 0
   - id: 3431c960-de4c-4d4e-a856-43080ed69465
-    positionXZ: {x: 106.37943, y: 75.78377}
+    positionXZ: {x: 95.072754, y: 73.84052}
     scale: 19.2
     height: -15
     smoothness: 1
     noise: 0
+    omitFromFog: 0
+  - id: fcc0f5b2-7096-48b1-a562-48db2f4608c3
+    positionXZ: {x: 62.040237, y: 118.90816}
+    scale: 19.2
+    height: -15
+    smoothness: 1
+    noise: 0
+    omitFromFog: 0
+  - id: 2bf3f718-1aa3-4417-9f02-4531f3ad2fc2
+    positionXZ: {x: 73.77074, y: 101.95926}
+    scale: 19.2
+    height: -15
+    smoothness: 1
+    noise: 0
+    omitFromFog: 0
+  - id: 423b848c-1282-4157-a3c3-5969e9bda79e
+    positionXZ: {x: 84.26944, y: 87.363495}
+    scale: 19.2
+    height: -15
+    smoothness: 1
+    noise: 0
+    omitFromFog: 0
   - id: 1136dd83-1937-4637-b4ae-a3ea877cbc5b
-    positionXZ: {x: 113.79636, y: -51.306026}
+    positionXZ: {x: 114.42296, y: -51.507446}
     scale: 10.4
-    height: -3.4
+    height: -8
     smoothness: 1
     noise: 0.178
+    omitFromFog: 0
+  - id: 237e5850-faa3-4cec-804f-68292b12336d
+    positionXZ: {x: 118.36734, y: -41.75319}
+    scale: 8.79
+    height: 5.62
+    smoothness: 0.84
+    noise: 0.97
+    omitFromFog: 0
   - id: b158b27b-6663-4e50-9ed7-3821639a76ec
-    positionXZ: {x: 97.48683, y: -44.904156}
+    positionXZ: {x: 97.74172, y: -44.937954}
     scale: 10.4
     height: -3.4
     smoothness: 1
     noise: 0.178
+    omitFromFog: 0
+  - id: 8c4846f4-5ba5-4f61-abe9-32cfb5b36b7d
+    positionXZ: {x: 93.81126, y: -39.547607}
+    scale: 10.4
+    height: -8.1
+    smoothness: 1
+    noise: 0.178
+    omitFromFog: 0
   - id: ad0999a7-4d21-4e50-973d-ee39158be948
-    positionXZ: {x: 124.85666, y: -56.959164}
+    positionXZ: {x: 125.05956, y: -55.843544}
     scale: 10.4
-    height: -4.5
+    height: -7.8
     smoothness: 1
     noise: 0.178
-  - id: 7492e713-91e1-4d1d-acd9-8d961de0dc83
-    positionXZ: {x: 121.98399, y: -56.48039}
-    scale: 10.4
-    height: 0
+    omitFromFog: 0
+  - id: ebe903bb-2662-4cc8-aba4-7337ffdd5a9f
+    positionXZ: {x: 126.94056, y: -62.845615}
+    scale: 2.35
+    height: -39.2
     smoothness: 1
     noise: 0.178
+    omitFromFog: 1
+  - id: 241290a8-5549-40d9-808c-c16c86c69ca5
+    positionXZ: {x: 129.31801, y: -69.74486}
+    scale: 2.35
+    height: -39.2
+    smoothness: 1
+    noise: 0.178
+    omitFromFog: 1
+  - id: 130d52e2-5df5-42e5-a712-f9add2562204
+    positionXZ: {x: 120.414246, y: -62.89223}
+    scale: 2.35
+    height: -39.2
+    smoothness: 1
+    noise: 0.178
+    omitFromFog: 1
+  - id: 918855a3-4c9d-4bca-abc6-19ffd8242e29
+    positionXZ: {x: 133.65178, y: -49.866665}
+    scale: 2.35
+    height: -39.2
+    smoothness: 1
+    noise: 0.178
+    omitFromFog: 1
   - id: 56529c54-6faa-4773-9ce0-2825da3da7ce
-    positionXZ: {x: 139.55586, y: -75.65284}
+    positionXZ: {x: 139.22342, y: -67.19579}
     scale: 32
-    height: -10
+    height: -8
     smoothness: 1
     noise: 0.178
+    omitFromFog: 0
+  - id: da197014-bec0-43f2-82f5-cce8372ed0bd
+    positionXZ: {x: 159.80061, y: -92.06933}
+    scale: 32
+    height: -8
+    smoothness: 1
+    noise: 0.178
+    omitFromFog: 0
+  - id: 5b371e01-7173-4dd8-970a-18f96a556458
+    positionXZ: {x: 171.0847, y: -89.49837}
+    scale: 32
+    height: -1
+    smoothness: 1
+    noise: 0.178
+    omitFromFog: 0
   - id: 7ed3a08a-8a2d-4b14-9a24-c11e29f11913
-    positionXZ: {x: 106.95229, y: -97.79414}
+    positionXZ: {x: 79.5634, y: -86.11477}
     scale: 19.2
     height: -15
     smoothness: 1
     noise: 0
+    omitFromFog: 0
   - id: 460b642f-eacf-459c-88d5-cbbe77be19e2
     positionXZ: {x: 106.092995, y: -121.568016}
     scale: 19.2
     height: -15
     smoothness: 1
     noise: 0
+    omitFromFog: 0
   - id: cb1a48e7-7b53-417b-bf4e-6ee013beb217
-    positionXZ: {x: 102.942245, y: 60.602863}
+    positionXZ: {x: 106.69842, y: 58.401585}
     scale: 19.2
     height: -15
     smoothness: 1
     noise: 0
+    omitFromFog: 0
   - id: 5ab2b4ba-43c0-4a2f-8ddb-11586901d588
     positionXZ: {x: 71.3702, y: 18.007244}
     scale: 8.3
     height: -2
     smoothness: 1
     noise: 0
+    omitFromFog: 0
   nodes:
   - id: 6c2c0bb8-0ed6-4a0c-a0c7-31ed04a6984b
-    worldPosition: {x: 93.71437, y: 2, z: -16.329378}
+    worldPosition: {x: 74.24908, y: 17, z: 26.691713}
     type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: e1f05638-ddfe-4bb2-9b7b-68de9e60a628
-    worldPosition: {x: 55.501385, y: 0, z: -16.445084}
+    worldPosition: {x: 19.751413, y: 15, z: 26.794003}
     type: 2
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: b120236e-0200-44b0-a8dc-f6f9940c46d6
-    worldPosition: {x: 74.349236, y: 0, z: -16.231432}
+    worldPosition: {x: 53.541023, y: 15.5, z: 26.64803}
     type: 0
+    inBetween: 1
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: fdd41757-67b3-4add-89dc-85b6fed6be9b
-    worldPosition: {x: 70.680374, y: 0, z: -16.395206}
+    worldPosition: {x: 48.03245, y: 15, z: 26.634867}
     type: 1
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: db7d413b-45c1-4245-8ed4-960f13707658
-    worldPosition: {x: 76.162575, y: 0, z: -26.950674}
-    type: 0
-  - id: b2e5db0b-7bc0-4af6-ab70-c3e42776e421
-    worldPosition: {x: 93.31871, y: -2, z: -27.030493}
-    type: 0
-  - id: 7b809514-9d66-45d4-ba5d-68ef656aa1a8
-    worldPosition: {x: 70.73956, y: 0, z: -20.083752}
-    type: 0
-  - id: e179a491-5f75-445d-b2b3-b04178d9ba43
-    worldPosition: {x: 43.501385, y: 0, z: -16.445084}
-    type: 0
-  - id: aeb22f6f-e051-4245-9d02-92afcf23088a
-    worldPosition: {x: 33.043938, y: 0, z: -16.371576}
-    type: 0
-  - id: 23885b89-514e-4831-8e52-baa25f4c2085
-    worldPosition: {x: 11.140257, y: 0, z: -16.427258}
-    type: 2
-  - id: efd82fa0-c355-44bb-9f6d-50c203cfaa13
-    worldPosition: {x: 23.466682, y: 0, z: -16.371576}
-    type: 0
-  - id: 10aaff99-cd7f-4c2a-b7bc-4106c47e94b6
-    worldPosition: {x: -0.23974323, y: 0, z: -16.427258}
-    type: 2
-  - id: 070587d1-da56-4508-8d85-b420d153e1f4
-    worldPosition: {x: -11.309286, y: 0, z: -19.480831}
-    type: 0
-  - id: a41925ea-6c83-4673-a2e2-d0bcfe2d40f1
-    worldPosition: {x: -10.93479, y: 0, z: -37.67138}
-    type: 0
-  - id: a91f922f-1baa-4392-9d95-e2fa616534cc
-    worldPosition: {x: -4.422264, y: 0, z: -47.32525}
-    type: 0
-  - id: 486291ce-e817-4b2b-8b3d-3d3f706f0234
-    worldPosition: {x: 14.425763, y: 0, z: -61.576195}
-    type: 0
-  - id: fbe762a1-75cd-477f-96d1-9369b4fb0eab
-    worldPosition: {x: 82.292046, y: 0, z: -27.009445}
-    type: 0
-  - id: 0342c7d0-6045-4291-827e-982a0d16420d
-    worldPosition: {x: 82.086624, y: 2, z: -16.301846}
-    type: 0
-  - id: 5e03aaba-f7bf-4158-bb7a-7003c42a4dd4
-    worldPosition: {x: 70.69861, y: 0, z: -25.199215}
-    type: 0
-  - id: a58ee8b5-98eb-4b11-8809-c253ca889e25
-    worldPosition: {x: 66.88144, y: 0, z: -16.374634}
+    worldPosition: {x: 56.535824, y: 15, z: -15.905666}
     type: 1
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: b2e5db0b-7bc0-4af6-ab70-c3e42776e421
+    worldPosition: {x: 68.46241, y: 15, z: -15.588266}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: 7b809514-9d66-45d4-ba5d-68ef656aa1a8
+    worldPosition: {x: 47.26962, y: 15, z: -9.551342}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: e179a491-5f75-445d-b2b3-b04178d9ba43
+    worldPosition: {x: 7.7514133, y: 15, z: 26.794003}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: aeb22f6f-e051-4245-9d02-92afcf23088a
+    worldPosition: {x: 1.2130799, y: 0, z: 28.00587}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: 23885b89-514e-4831-8e52-baa25f4c2085
+    worldPosition: {x: -30.783281, y: 0, z: 28.323988}
+    type: 2
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: efd82fa0-c355-44bb-9f6d-50c203cfaa13
+    worldPosition: {x: -8.364176, y: 0, z: 28.00587}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: 10aaff99-cd7f-4c2a-b7bc-4106c47e94b6
+    worldPosition: {x: -42.16328, y: 0, z: 28.323988}
+    type: 2
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: 070587d1-da56-4508-8d85-b420d153e1f4
+    worldPosition: {x: -62.234535, y: 0, z: 23.963783}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: a41925ea-6c83-4673-a2e2-d0bcfe2d40f1
+    worldPosition: {x: -63.542137, y: 0, z: -1.3290195}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: a91f922f-1baa-4392-9d95-e2fa616534cc
+    worldPosition: {x: -58.52482, y: 0, z: -13.412605}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: 486291ce-e817-4b2b-8b3d-3d3f706f0234
+    worldPosition: {x: -26.219904, y: 0, z: -24.112427}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: fbe762a1-75cd-477f-96d1-9369b4fb0eab
+    worldPosition: {x: 60.236702, y: 15, z: -15.720444}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: 0342c7d0-6045-4291-827e-982a0d16420d
+    worldPosition: {x: 64.638695, y: 17, z: 26.671852}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: 5e03aaba-f7bf-4158-bb7a-7003c42a4dd4
+    worldPosition: {x: 47.05277, y: 15, z: -15.839245}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: a58ee8b5-98eb-4b11-8809-c253ca889e25
+    worldPosition: {x: 39.825466, y: 15, z: 26.69075}
+    type: 1
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: d9194d90-8bf7-477e-9462-c545c38e4ae0
-    worldPosition: {x: 66.91641, y: -2, z: -1.5001916}
+    worldPosition: {x: 40.022068, y: 13, z: 46.72199}
     type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: 8f40ac36-55c8-4a05-bdc8-ed9b2164c33c
-    worldPosition: {x: 66.93726, y: 0, z: 10.753112}
-    type: 0
-  - id: 516afc15-081f-4655-a1ae-e25437d8792f
-    worldPosition: {x: 49.063263, y: 0, z: 10.753119}
-    type: 0
+    worldPosition: {x: 40.384773, y: 15, z: 61.865753}
+    type: 1
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: 8c7e7d33-8ba8-45df-9ab6-4548a226b0c5
-    worldPosition: {x: 45.785126, y: 0, z: -5.7120843}
+    worldPosition: {x: 16.635649, y: 15, z: 47.356266}
     type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: b2c76aa4-f3f0-49b3-bd58-6bffcd6ce6b9
-    worldPosition: {x: 93.95227, y: 0, z: -1.9869249}
-    type: 0
+    worldPosition: {x: 74.25179, y: 15, z: 46.322258}
+    type: 1
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: ea327af0-34ba-4737-8916-f61e478b6da6
-    worldPosition: {x: 66.98213, y: 0, z: -12.8643875}
+    worldPosition: {x: 39.863148, y: 15, z: 30.235764}
     type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: 92a723a9-d10c-4b70-95db-55b19d1e0042
-    worldPosition: {x: 86.361984, y: 0, z: -1.7583077}
+    worldPosition: {x: 68.41164, y: 15, z: 46.443817}
     type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: eb189b33-9866-4f6e-a259-daa7b0aea130
-    worldPosition: {x: 77.029106, y: -2, z: -1.8844259}
+    worldPosition: {x: 57.108166, y: 13, z: 46.566444}
     type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: fcf4e930-5244-43d7-9352-29178364205a
-    worldPosition: {x: 89.92871, y: -2, z: -27.030493}
+    worldPosition: {x: 64.22241, y: 15, z: -15.588266}
     type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: d27d87d3-e1b5-495b-9c67-5416cb42e486
-    worldPosition: {x: 66.91641, y: -2, z: -7.5101914}
+    worldPosition: {x: 40.022068, y: 13, z: 40.71199}
     type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: 51ffc462-ccd1-4111-82e6-dfcba3068e7f
-    worldPosition: {x: 66.91641, y: -2, z: 4.509808}
+    worldPosition: {x: 40.022068, y: 13, z: 52.731987}
     type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: 496fec47-c98c-44cb-b08e-a85d1d51653a
-    worldPosition: {x: 60.906414, y: -2, z: -1.5001916}
+    worldPosition: {x: 34.01207, y: 13, z: 46.72199}
     type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: 69082a8e-19d1-4bcd-97ed-e4d12bd7a940
-    worldPosition: {x: 72.926414, y: -2, z: -1.5001916}
+    worldPosition: {x: 46.032066, y: 13, z: 46.72199}
     type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: 5dd7daf7-1839-46fb-8b5f-d6f4b9c0f05c
-    worldPosition: {x: 88.3475, y: 2, z: -16.329378}
+    worldPosition: {x: 68.88221, y: 17, z: 26.691713}
     type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: f20a68f9-11d5-401c-950f-8d9067239df9
-    worldPosition: {x: 93.71437, y: 2, z: -10.962509}
+    worldPosition: {x: 74.24908, y: 17, z: 32.058582}
     type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: eaae9b77-0702-4301-bde7-346599acac1b
-    worldPosition: {x: 57.501385, y: 0, z: -16.445084}
+    worldPosition: {x: 21.751413, y: 15, z: 26.794003}
     type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: c5135933-e600-4297-87c2-d3baed4813f4
-    worldPosition: {x: 41.501385, y: 0, z: -16.445084}
+    worldPosition: {x: 5.7514133, y: 15, z: 26.794003}
     type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: 87f28ecb-cad1-4443-9ec7-c917e552e6f1
-    worldPosition: {x: 13.140257, y: 0, z: -16.427258}
+    worldPosition: {x: -28.783281, y: 0, z: 28.323988}
     type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: e91713d5-bbd1-4f04-9445-a5f55b880ec5
-    worldPosition: {x: -2.2397432, y: 0, z: -16.427258}
+    worldPosition: {x: -44.16328, y: 0, z: 28.323988}
     type: 0
-  - id: 11897299-3fb7-4e2a-a953-09d3299025e9
-    worldPosition: {x: 72.46258, y: 0, z: -26.950674}
-    type: 0
-  - id: 4c74a89d-411b-4bda-ad02-e39cf0adb8dc
-    worldPosition: {x: 79.86257, y: 0, z: -26.950674}
-    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: 3640a78a-cdef-45de-a712-ff8e882580c9
-    worldPosition: {x: 75.86306, y: 0, z: -34.136063}
+    worldPosition: {x: 56.004177, y: 15, z: -23.794834}
     type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: 1546b85f-4733-47d0-9474-60cd9f6974c1
-    worldPosition: {x: 65.17544, y: 0, z: -34.881714}
+    worldPosition: {x: 46.13123, y: 15, z: -24.120592}
     type: 0
-  - id: be02d845-96f7-4575-a069-dc9d17810310
-    worldPosition: {x: 76.162575, y: 0, z: -30.650675}
-    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: d8fc67c2-d72c-4496-af01-adfeb3bfa25e
-    worldPosition: {x: 77.71235, y: 0, z: -16.26664}
+    worldPosition: {x: 56.368237, y: 16, z: 26.665314}
     type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: 790e0924-1a56-4d59-a2cb-2da151df4d7e
-    worldPosition: {x: 93.53153, y: -5, z: -39.641212}
+    worldPosition: {x: 91.47513, y: -5, z: -40.346268}
     type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: cd43a64c-0bad-4584-8e26-74aa70256149
     worldPosition: {x: 99.10605, y: -6, z: -45.65465}
     type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: c40a2ff8-a2af-4d0b-a743-0a277a479a7d
     worldPosition: {x: 118.752335, y: -8, z: -54.321163}
     type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: ad0f4680-a479-4203-862c-f532ec88e3bc
     worldPosition: {x: 106.26835, y: -7, z: -49.916424}
     type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: 72817e4b-2fc7-4c58-a856-a5bd1c90dd2b
-    worldPosition: {x: 93.31871, y: -2, z: -30.420492}
+    worldPosition: {x: 68.46241, y: 15, z: -19.828266}
     type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: b0265fc9-851b-4e74-806c-7a603759acdd
-    worldPosition: {x: 137.60399, y: -10, z: -69.044266}
+    worldPosition: {x: 157.43596, y: -10, z: -91.65152}
     type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: 0155b428-c1f1-46ef-8623-d662f6b12a54
     worldPosition: {x: 129.3122, y: -10, z: -57.119946}
     type: 0
-  - id: e5184da0-6eb1-4ab3-b422-325ae24a7769
-    worldPosition: {x: 137.60399, y: -10, z: -64.58427}
-    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
   - id: 9a15dec0-56b5-4099-9ba1-2f4e1658e78b
-    worldPosition: {x: 137.2661, y: -10, z: -61.16206}
+    worldPosition: {x: 137.32707, y: -10, z: -60.40797}
     type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: efb05958-c008-4f0d-81c2-ef6e6806131e
+    worldPosition: {x: 59.589626, y: 14, z: 61.692177}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: 308459f1-81dc-421a-b183-4b94b058c759
+    worldPosition: {x: 85.540565, y: 13, z: 61.00624}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: d1f4c212-ee07-49cb-a8e1-c16696d20300
+    worldPosition: {x: 85.446785, y: 12, z: 50.770325}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 11400000, guid: 8e2ceab7d1060c84c82a71302c37f373, type: 2}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 85.446785, y: 12, z: 50.770325}
+  - id: f814d305-d6f3-449f-bbb7-1c940a787c50
+    worldPosition: {x: 74.26293, y: 17, z: 33.59108}
+    type: 0
+    inBetween: 1
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: 4c8bc0d1-fd26-4211-b63c-4e716c4eec2c
+    worldPosition: {x: 74.28124, y: 17, z: 37.340885}
+    type: 1
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: b9322b27-fc46-4036-bbb8-154d2ff98485
+    worldPosition: {x: 82.31405, y: 17, z: 37.20634}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: 11737128-b816-4b3c-99ce-b6b718b094bc
+    worldPosition: {x: 82.118065, y: 15, z: 26.230988}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: 89c93c73-903c-4354-9f10-c0fb7cd33351
+    worldPosition: {x: 79.60601, y: 17, z: 37.279015}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: cd89449a-cf6a-4793-b2eb-8e17039ecebd
+    worldPosition: {x: 82.41204, y: 17, z: 32.894592}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: c4972190-08e7-42f7-823a-debae2f0cf92
+    worldPosition: {x: 74.26652, y: 17, z: 40.731407}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: b4c5a219-e173-4f01-b495-1213b4330eb0
+    worldPosition: {x: 94.89606, y: -5.5, z: -42.861576}
+    type: 0
+    inBetween: 0
+    musicTrigger: 1
+    musicClip: {fileID: 8300000, guid: 1ff10eeae8633404da517dacc2021e9e, type: 3}
+    musicLooped: 1
+    musicCrossfade: 15
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: ae3253a8-6291-478d-9ccc-033b07d5aed9
+    worldPosition: {x: 41.114353, y: 15, z: 78.73312}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: 8cc4d5e8-8cf6-4315-bd0e-bee482c76b1f
+    worldPosition: {x: 74.40392, y: 15, z: 51.1473}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: aa4f6c88-29f6-42c2-9358-dd5547d532cb
+    worldPosition: {x: 59.45474, y: 17, z: 26.659256}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: be845384-8b58-4f31-b176-5fb14d0406d5
+    worldPosition: {x: 86.69156, y: -3.5, z: -34.418087}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: d962abed-40a2-4787-a235-ada9cf524603
+    worldPosition: {x: 66.0532, y: 17, z: 26.678473}
+    type: 0
+    inBetween: 1
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: 7872f327-1ffd-4211-8778-fd08ea54c391
+    worldPosition: {x: 25.32386, y: 14, z: 47.039127}
+    type: 0
+    inBetween: 1
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: 0daf831b-d5d4-41dc-9c3a-91ed168f21d5
+    worldPosition: {x: 50.713814, y: 15, z: 26.630743}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: 8c10798f-2b43-4a1e-9459-c550a313ef4b
+    worldPosition: {x: 45.35109, y: 15, z: 26.63899}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: b8927c1f-848f-440b-9024-7d0919fef2db
+    worldPosition: {x: 47.9611, y: 15, z: 23.250252}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: 03ef0acf-7df2-4eda-b32d-eba499e5b48e
+    worldPosition: {x: 42.471226, y: 15, z: 26.67473}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: 82d37b18-7bdd-4b16-b96e-d0007d893943
+    worldPosition: {x: 37.179707, y: 15, z: 26.70677}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: ddef4154-ec66-49bb-a283-bb5fa97538bc
+    worldPosition: {x: 39.86124, y: 15, z: 30.056416}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: cd319a37-1975-46d7-aac4-5b9f9b6ad2ee
+    worldPosition: {x: 74.27679, y: 17, z: 35.12358}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: 8e584cf6-cec3-4df3-85a6-3191b9d0cfaa
+    worldPosition: {x: 74.2857, y: 17, z: 39.55819}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: 4190cdbe-3270-44c1-baa8-65386b54571c
+    worldPosition: {x: 76.5684, y: 17, z: 37.31431}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: c85d7508-d4c4-4406-8795-e4aee1b8b422
+    worldPosition: {x: 40.30492, y: 15, z: 59.9649}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: 6ba17db6-e0b3-48fd-bd4d-84ba0cb77817
+    worldPosition: {x: 40.464626, y: 15, z: 63.766605}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: bc59ac19-3d2f-48e8-ab22-32261f6d8b49
+    worldPosition: {x: 42.691025, y: 15, z: 61.84491}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: d8a01c94-998a-4add-ad5b-aa29e728a576
+    worldPosition: {x: 54.22973, y: 15, z: -15.926447}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: fb94a0ab-a0bd-4c87-aad1-67cb2692c652
+    worldPosition: {x: 58.84192, y: 15, z: -15.884886}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: a5b09b74-ef9d-411a-b63e-1bc37e26c46c
+    worldPosition: {x: 56.376057, y: 15, z: -18.27648}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: 18cdfb64-ac95-4991-a263-1b4afeb5d9f5
+    worldPosition: {x: 74.22258, y: 15, z: 44.107697}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: d3cf7fb8-0cf3-4707-8773-75267c73b304
+    worldPosition: {x: 74.281006, y: 15, z: 48.53682}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: 979cdbd0-0f2a-4544-87fa-01a81402e710
+    worldPosition: {x: 71.96754, y: 15, z: 46.369804}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: 07daf7f1-0b8c-46db-90f3-a8d352ba5d8b
+    worldPosition: {x: 155.37051, y: -10, z: -75.434494}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: ef2f819b-a7ee-4aa5-a8b3-1d413198583c
+    worldPosition: {x: 152.54236, y: -10, z: -70.30959}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: a7497f96-e6bb-4a32-abc7-480e0e26ea51
+    worldPosition: {x: 67.467705, y: 17, z: 26.685093}
+    type: 0
+    inBetween: 1
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: 95f58f30-6d0c-4ebe-8c48-4f9a7677f6b9
+    worldPosition: {x: 62.046715, y: 17, z: 26.665554}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: cd7eb262-2051-4573-9ea1-1fc3630c303a
+    worldPosition: {x: 59.76312, y: 13, z: 46.53974}
+    type: 0
+    inBetween: 1
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: 9c35a8a3-b31d-44d4-af4e-d72f58c4d164
+    worldPosition: {x: 49.7241, y: 13, z: 46.67014}
+    type: 0
+    inBetween: 1
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: 30b29125-395c-4fe7-ba1f-cf6d05e130c3
+    worldPosition: {x: 53.416134, y: 13, z: 46.618294}
+    type: 0
+    inBetween: 1
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: 84d23d39-713d-47c7-88a0-7eba41cd384f
+    worldPosition: {x: 62.41807, y: 13, z: 46.51304}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: 8503d88d-6bd5-4cfa-8dbb-6e69a75be5b6
+    worldPosition: {x: 145.47089, y: -10, z: -64.75559}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: 11903a55-8d33-4204-b0b6-fc2fa1679ee2
+    worldPosition: {x: 157.43596, y: -10, z: -83.15974}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: accf5f46-4e31-4df4-9795-fa92a603f22f
+    worldPosition: {x: 85.446785, y: 12, z: 55.200325}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 0
+    cinematicPreset: {fileID: 0}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - id: 1e990f8a-0da6-453c-859a-0f757fb28551
+    worldPosition: {x: 85.493675, y: 12.5, z: 58.103283}
+    type: 0
+    inBetween: 0
+    musicTrigger: 0
+    musicClip: {fileID: 0}
+    musicLooped: 1
+    musicCrossfade: 4
+    cinematicTrigger: 1
+    cinematicPreset: {fileID: 11400000, guid: 8e2ceab7d1060c84c82a71302c37f373, type: 2}
+    cinematicStart: 0
+    cinematicPrompt: Look
+    cinematicReach: 3
+    cinematicPinCameras: 0
+    cinematicPinnedAt: {x: 85.493675, y: 12.5, z: 58.103283}
   paths:
   - pathId: cb512902-99c4-4aa3-973b-d4a908cef861
     segmentId: MainRiver
@@ -297,11 +1685,19 @@ MonoBehaviour:
     nodeIds:
     - 6c2c0bb8-0ed6-4a0c-a0c7-31ed04a6984b
     - 5dd7daf7-1839-46fb-8b5f-d6f4b9c0f05c
+    - a7497f96-e6bb-4a32-abc7-480e0e26ea51
+    - d962abed-40a2-4787-a235-ada9cf524603
     - 0342c7d0-6045-4291-827e-982a0d16420d
+    - 95f58f30-6d0c-4ebe-8c48-4f9a7677f6b9
+    - aa4f6c88-29f6-42c2-9358-dd5547d532cb
     - d8fc67c2-d72c-4496-af01-adfeb3bfa25e
     - b120236e-0200-44b0-a8dc-f6f9940c46d6
+    - 0daf831b-d5d4-41dc-9c3a-91ed168f21d5
     - fdd41757-67b3-4add-89dc-85b6fed6be9b
+    - 8c10798f-2b43-4a1e-9459-c550a313ef4b
+    - 03ef0acf-7df2-4eda-b32d-eba499e5b48e
     - a58ee8b5-98eb-4b11-8809-c253ca889e25
+    - 82d37b18-7bdd-4b16-b96e-d0007d893943
     - eaae9b77-0702-4301-bde7-346599acac1b
     - e1f05638-ddfe-4bb2-9b7b-68de9e60a628
     isLeftPath: 0
@@ -310,7 +1706,6 @@ MonoBehaviour:
     riverName: MainRiver
     leadsToArena: 1
     arenaIsAtEnd: 1
-    extrudeOnExit: 0
     tJunctionBidirectional: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.27, g: 0.45396018, b: 0.9, a: 1}
@@ -319,16 +1714,22 @@ MonoBehaviour:
     landscapeInfluence: 0
     landscapeToOuterRim: 1
     influenceDistance: 10
+    influenceStrength: 1
+    influenceCancelledNodes: []
+    runType: 0
+    rimRounding: 0
+    outerWalls: 1
   - pathId: 9d03b668-69f2-44e9-bf9d-6b5f77785098
     segmentId: Branch_01
     loreName: 
     nodeIds:
     - fdd41757-67b3-4add-89dc-85b6fed6be9b
+    - b8927c1f-848f-440b-9024-7d0919fef2db
     - 7b809514-9d66-45d4-ba5d-68ef656aa1a8
     - 5e03aaba-f7bf-4158-bb7a-7003c42a4dd4
-    - 11897299-3fb7-4e2a-a953-09d3299025e9
+    - d8a01c94-998a-4add-ad5b-aa29e728a576
     - db7d413b-45c1-4245-8ed4-960f13707658
-    - 4c74a89d-411b-4bda-ad02-e39cf0adb8dc
+    - fb94a0ab-a0bd-4c87-aad1-67cb2692c652
     - fbe762a1-75cd-477f-96d1-9369b4fb0eab
     - fcf4e930-5244-43d7-9352-29178364205a
     - b2e5db0b-7bc0-4af6-ab70-c3e42776e421
@@ -338,15 +1739,19 @@ MonoBehaviour:
     riverName: Branch_01
     leadsToArena: 0
     arenaIsAtEnd: 0
-    extrudeOnExit: 0
     tJunctionBidirectional: 0
     arenaGridDataGuid: 
-    editorColor: {r: 0.27, g: 0.4539601, b: 0.9, a: 1}
+    editorColor: {r: 0.9019608, g: 0.28555056, b: 0.2705882, a: 1}
     curveStrength: 1
     curveSubdivisions: 2
     landscapeInfluence: 0
     landscapeToOuterRim: 1
     influenceDistance: 10
+    influenceStrength: 1
+    influenceCancelledNodes: []
+    runType: 0
+    rimRounding: 0
+    outerWalls: 1
   - pathId: 5b0a0255-7e55-4784-b96c-248b5958e1ee
     segmentId: Branch_02
     loreName: 
@@ -363,7 +1768,6 @@ MonoBehaviour:
     riverName: Branch_02
     leadsToArena: 1
     arenaIsAtEnd: 0
-    extrudeOnExit: 0
     tJunctionBidirectional: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.6379202, g: 0.9, b: 0.27, a: 1}
@@ -372,6 +1776,11 @@ MonoBehaviour:
     landscapeInfluence: 0
     landscapeToOuterRim: 1
     influenceDistance: 10
+    influenceStrength: 1
+    influenceCancelledNodes: []
+    runType: 0
+    rimRounding: 0
+    outerWalls: 1
   - pathId: a98e74a7-1543-405a-b87e-925ffbd7ea7a
     segmentId: Branch_03
     loreName: 
@@ -388,7 +1797,6 @@ MonoBehaviour:
     riverName: Branch_03
     leadsToArena: 1
     arenaIsAtEnd: 0
-    extrudeOnExit: 0
     tJunctionBidirectional: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.9, g: 0.27, b: 0.8218803, a: 1}
@@ -397,24 +1805,31 @@ MonoBehaviour:
     landscapeInfluence: 0
     landscapeToOuterRim: 1
     influenceDistance: 10
+    influenceStrength: 1
+    influenceCancelledNodes: []
+    runType: 0
+    rimRounding: 0
+    outerWalls: 1
   - pathId: 5742468e-f8ad-487c-ad1b-620284208bea
     segmentId: Branch_04
     loreName: 
     nodeIds:
     - a58ee8b5-98eb-4b11-8809-c253ca889e25
+    - ddef4154-ec66-49bb-a283-bb5fa97538bc
     - ea327af0-34ba-4737-8916-f61e478b6da6
     - d27d87d3-e1b5-495b-9c67-5416cb42e486
     - d9194d90-8bf7-477e-9462-c545c38e4ae0
     - 51ffc462-ccd1-4111-82e6-dfcba3068e7f
+    - c85d7508-d4c4-4406-8795-e4aee1b8b422
     - 8f40ac36-55c8-4a05-bdc8-ed9b2164c33c
-    - 516afc15-081f-4655-a1ae-e25437d8792f
+    - 6ba17db6-e0b3-48fd-bd4d-84ba0cb77817
+    - ae3253a8-6291-478d-9ccc-033b07d5aed9
     isLeftPath: 1
     isRightPath: 0
     segmentType: 1
     riverName: Branch_04
     leadsToArena: 0
     arenaIsAtEnd: 0
-    extrudeOnExit: 0
     tJunctionBidirectional: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.27, g: 0.9, b: 0.79415953, a: 1}
@@ -423,12 +1838,18 @@ MonoBehaviour:
     landscapeInfluence: 0
     landscapeToOuterRim: 1
     influenceDistance: 10
+    influenceStrength: 1
+    influenceCancelledNodes: []
+    runType: 0
+    rimRounding: 0
+    outerWalls: 1
   - pathId: b121d03d-dc5f-4040-b6c3-84a562bb77c2
     segmentId: Branch_06
     loreName: 
     nodeIds:
     - d9194d90-8bf7-477e-9462-c545c38e4ae0
     - 496fec47-c98c-44cb-b08e-a85d1d51653a
+    - 7872f327-1ffd-4211-8778-fd08ea54c391
     - 8c7e7d33-8ba8-45df-9ab6-4548a226b0c5
     isLeftPath: 0
     isRightPath: 0
@@ -436,7 +1857,6 @@ MonoBehaviour:
     riverName: Branch_06
     leadsToArena: 0
     arenaIsAtEnd: 0
-    extrudeOnExit: 0
     tJunctionBidirectional: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.42623934, g: 0.27, b: 0.9, a: 1}
@@ -445,24 +1865,32 @@ MonoBehaviour:
     landscapeInfluence: 0
     landscapeToOuterRim: 1
     influenceDistance: 10
+    influenceStrength: 1
+    influenceCancelledNodes: []
+    runType: 0
+    rimRounding: 0
+    outerWalls: 1
   - pathId: 621befc7-fa46-46de-88d6-ae72d6010b90
     segmentId: Branch_07
     loreName: 
     nodeIds:
     - 6c2c0bb8-0ed6-4a0c-a0c7-31ed04a6984b
     - f20a68f9-11d5-401c-950f-8d9067239df9
+    - f814d305-d6f3-449f-bbb7-1c940a787c50
+    - cd319a37-1975-46d7-aac4-5b9f9b6ad2ee
+    - 4c8bc0d1-fd26-4211-b63c-4e716c4eec2c
+    - 8e584cf6-cec3-4df3-85a6-3191b9d0cfaa
+    - c4972190-08e7-42f7-823a-debae2f0cf92
+    - 18cdfb64-ac95-4991-a263-1b4afeb5d9f5
     - b2c76aa4-f3f0-49b3-bd58-6bffcd6ce6b9
-    - 92a723a9-d10c-4b70-95db-55b19d1e0042
-    - eb189b33-9866-4f6e-a259-daa7b0aea130
-    - 69082a8e-19d1-4bcd-97ed-e4d12bd7a940
-    - d9194d90-8bf7-477e-9462-c545c38e4ae0
+    - d3cf7fb8-0cf3-4707-8773-75267c73b304
+    - 8cc4d5e8-8cf6-4315-bd0e-bee482c76b1f
     isLeftPath: 0
     isRightPath: 0
     segmentType: 1
     riverName: Branch_07
     leadsToArena: 0
     arenaIsAtEnd: 0
-    extrudeOnExit: 0
     tJunctionBidirectional: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.29772076, g: 0.9, b: 0.27, a: 1}
@@ -471,21 +1899,58 @@ MonoBehaviour:
     landscapeInfluence: 0
     landscapeToOuterRim: 1
     influenceDistance: 10
+    influenceStrength: 1
+    influenceCancelledNodes: []
+    runType: 0
+    rimRounding: 0
+    outerWalls: 1
+  - pathId: 19a8ecb9-6813-41ab-9cf6-28a2960c40c7
+    segmentId: Branch_13
+    loreName: 
+    nodeIds:
+    - b2c76aa4-f3f0-49b3-bd58-6bffcd6ce6b9
+    - 979cdbd0-0f2a-4544-87fa-01a81402e710
+    - 92a723a9-d10c-4b70-95db-55b19d1e0042
+    - 84d23d39-713d-47c7-88a0-7eba41cd384f
+    - cd7eb262-2051-4573-9ea1-1fc3630c303a
+    - eb189b33-9866-4f6e-a259-daa7b0aea130
+    - 30b29125-395c-4fe7-ba1f-cf6d05e130c3
+    - 9c35a8a3-b31d-44d4-af4e-d72f58c4d164
+    - 69082a8e-19d1-4bcd-97ed-e4d12bd7a940
+    - d9194d90-8bf7-477e-9462-c545c38e4ae0
+    isLeftPath: 0
+    isRightPath: 1
+    segmentType: 1
+    riverName: Branch_07
+    leadsToArena: 0
+    arenaIsAtEnd: 0
+    tJunctionBidirectional: 0
+    arenaGridDataGuid: 
+    editorColor: {r: 0.29772076, g: 0.9, b: 0.27, a: 1}
+    curveStrength: 1
+    curveSubdivisions: 2
+    landscapeInfluence: 0
+    landscapeToOuterRim: 1
+    influenceDistance: 10
+    influenceStrength: 1
+    influenceCancelledNodes: []
+    runType: 0
+    rimRounding: 0
+    outerWalls: 1
   - pathId: feb08ca1-0c92-401e-a567-632ced7c3fda
     segmentId: Branch_08
     loreName: 
     nodeIds:
     - db7d413b-45c1-4245-8ed4-960f13707658
-    - be02d845-96f7-4575-a069-dc9d17810310
+    - a5b09b74-ef9d-411a-b63e-1bc37e26c46c
     - 3640a78a-cdef-45de-a712-ff8e882580c9
     - 1546b85f-4733-47d0-9474-60cd9f6974c1
-    isLeftPath: 0
+    isLeftPath: 1
     isRightPath: 0
     segmentType: 2
     riverName: Branch08
     leadsToArena: 0
     arenaIsAtEnd: 0
-    extrudeOnExit: 0
     tJunctionBidirectional: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.29772076, g: 0.9, b: 0.27, a: 1}
@@ -494,19 +1959,57 @@ MonoBehaviour:
     landscapeInfluence: 0
     landscapeToOuterRim: 1
     influenceDistance: 10
+    influenceStrength: 1
+    influenceCancelledNodes: []
+    runType: 0
+    rimRounding: 0
+    outerWalls: 1
   - pathId: bff36f04-8fc4-44b7-8514-d5d5a953ee5e
     segmentId: Branch_09
     loreName: 
     nodeIds:
     - b2e5db0b-7bc0-4af6-ab70-c3e42776e421
     - 72817e4b-2fc7-4c58-a856-a5bd1c90dd2b
+    - be845384-8b58-4f31-b176-5fb14d0406d5
     - 790e0924-1a56-4d59-a2cb-2da151df4d7e
+    - b4c5a219-e173-4f01-b495-1213b4330eb0
+    - cd43a64c-0bad-4584-8e26-74aa70256149
+    isLeftPath: 0
+    isRightPath: 0
+    segmentType: 2
+    riverName: starting river2
+    leadsToArena: 0
+    arenaIsAtEnd: 0
+    tJunctionBidirectional: 0
+    arenaGridDataGuid: 
+    editorColor: {r: 0.9, g: 0.27, b: 0.48168087, a: 1}
+    curveStrength: 1
+    curveSubdivisions: 2
+    landscapeInfluence: 0
+    landscapeToOuterRim: 1
+    influenceDistance: 7.76
+    influenceStrength: 0.876
+    influenceCancelledNodes:
+    - 790e0924-1a56-4d59-a2cb-2da151df4d7e
+    - 72817e4b-2fc7-4c58-a856-a5bd1c90dd2b
+    - b2e5db0b-7bc0-4af6-ab70-c3e42776e421
+    - cd43a64c-0bad-4584-8e26-74aa70256149
+    runType: 0
+    rimRounding: 0
+    outerWalls: 1
+  - pathId: e2d240e6-66da-4190-b5c5-52b9f6196e9a
+    segmentId: Branch_12
+    loreName: 
+    nodeIds:
     - cd43a64c-0bad-4584-8e26-74aa70256149
     - ad0f4680-a479-4203-862c-f532ec88e3bc
     - c40a2ff8-a2af-4d0b-a743-0a277a479a7d
     - 0155b428-c1f1-46ef-8623-d662f6b12a54
     - 9a15dec0-56b5-4099-9ba1-2f4e1658e78b
-    - e5184da0-6eb1-4ab3-b422-325ae24a7769
+    - 8503d88d-6bd5-4cfa-8dbb-6e69a75be5b6
+    - ef2f819b-a7ee-4aa5-a8b3-1d413198583c
+    - 07daf7f1-0b8c-46db-90f3-a8d352ba5d8b
+    - 11903a55-8d33-4204-b0b6-fc2fa1679ee2
     - b0265fc9-851b-4e74-806c-7a603759acdd
     isLeftPath: 0
     isRightPath: 0
@@ -514,7 +2017,6 @@ MonoBehaviour:
     riverName: starting river
     leadsToArena: 0
     arenaIsAtEnd: 0
-    extrudeOnExit: 0
     tJunctionBidirectional: 0
     arenaGridDataGuid: 
     editorColor: {r: 0.9, g: 0.27, b: 0.48168087, a: 1}
@@ -523,6 +2025,70 @@ MonoBehaviour:
     landscapeInfluence: 1
     landscapeToOuterRim: 1
     influenceDistance: 7.76
+    influenceStrength: 0.706
+    influenceCancelledNodes: []
+    runType: 1
+    rimRounding: 0.886
+    outerWalls: 1
+  - pathId: ab36e4af-4d04-4feb-a29c-043d468f7326
+    segmentId: Branch_10
+    loreName: 
+    nodeIds:
+    - 8f40ac36-55c8-4a05-bdc8-ed9b2164c33c
+    - bc59ac19-3d2f-48e8-ab22-32261f6d8b49
+    - efb05958-c008-4f0d-81c2-ef6e6806131e
+    - 308459f1-81dc-421a-b183-4b94b058c759
+    - 1e990f8a-0da6-453c-859a-0f757fb28551
+    - accf5f46-4e31-4df4-9795-fa92a603f22f
+    - d1f4c212-ee07-49cb-a8e1-c16696d20300
+    isLeftPath: 1
+    isRightPath: 0
+    segmentType: 2
+    riverName: Branch_10
+    leadsToArena: 0
+    arenaIsAtEnd: 0
+    tJunctionBidirectional: 0
+    arenaGridDataGuid: 
+    editorColor: {r: 0.27, g: 0.66564095, b: 0.9, a: 1}
+    curveStrength: 1
+    curveSubdivisions: 2
+    landscapeInfluence: 0
+    landscapeToOuterRim: 1
+    influenceDistance: 10
+    influenceStrength: 1
+    influenceCancelledNodes: []
+    runType: 0
+    rimRounding: 0
+    outerWalls: 1
+  - pathId: 0a220ae9-f048-4ec6-afd6-796c91bb0a64
+    segmentId: Branch_11
+    loreName: 
+    nodeIds:
+    - 4c8bc0d1-fd26-4211-b63c-4e716c4eec2c
+    - 4190cdbe-3270-44c1-baa8-65386b54571c
+    - 89c93c73-903c-4354-9f10-c0fb7cd33351
+    - b9322b27-fc46-4036-bbb8-154d2ff98485
+    - cd89449a-cf6a-4793-b2eb-8e17039ecebd
+    - 11737128-b816-4b3c-99ce-b6b718b094bc
+    isLeftPath: 1
+    isRightPath: 0
+    segmentType: 2
+    riverName: Branch_11
+    leadsToArena: 0
+    arenaIsAtEnd: 0
+    tJunctionBidirectional: 0
+    arenaGridDataGuid: 
+    editorColor: {r: 0.8496011, g: 0.9, b: 0.27, a: 1}
+    curveStrength: 1
+    curveSubdivisions: 2
+    landscapeInfluence: 0
+    landscapeToOuterRim: 1
+    influenceDistance: 10
+    influenceStrength: 1
+    influenceCancelledNodes: []
+    runType: 0
+    rimRounding: 0
+    outerWalls: 1
   junctions:
   - junctionId: 2b1e6d8e-a1f0-47ec-a245-a106ee8e225a
     nodeId: fdd41757-67b3-4add-89dc-85b6fed6be9b
@@ -531,6 +2097,10 @@ MonoBehaviour:
     - 9d03b668-69f2-44e9-bf9d-6b5f77785098
     riverPathId: cb512902-99c4-4aa3-973b-d4a908cef861
     branchPathId: 9d03b668-69f2-44e9-bf9d-6b5f77785098
+    leadIns:
+    - nodeId: 0daf831b-d5d4-41dc-9c3a-91ed168f21d5
+    - nodeId: 8c10798f-2b43-4a1e-9459-c550a313ef4b
+    - nodeId: b8927c1f-848f-440b-9024-7d0919fef2db
   - junctionId: a3c8eb48-ffea-44d2-a2cf-6f36e7eb2980
     nodeId: a58ee8b5-98eb-4b11-8809-c253ca889e25
     pathIds:
@@ -538,6 +2108,56 @@ MonoBehaviour:
     - 5742468e-f8ad-487c-ad1b-620284208bea
     riverPathId: cb512902-99c4-4aa3-973b-d4a908cef861
     branchPathId: 5742468e-f8ad-487c-ad1b-620284208bea
+    leadIns:
+    - nodeId: 03ef0acf-7df2-4eda-b32d-eba499e5b48e
+    - nodeId: 82d37b18-7bdd-4b16-b96e-d0007d893943
+    - nodeId: ddef4154-ec66-49bb-a283-bb5fa97538bc
+  - junctionId: f5b3c747-3a7d-4d1f-b191-a4823c8e02f1
+    nodeId: 4c8bc0d1-fd26-4211-b63c-4e716c4eec2c
+    pathIds:
+    - 621befc7-fa46-46de-88d6-ae72d6010b90
+    - 0a220ae9-f048-4ec6-afd6-796c91bb0a64
+    riverPathId: 621befc7-fa46-46de-88d6-ae72d6010b90
+    branchPathId: 0a220ae9-f048-4ec6-afd6-796c91bb0a64
+    leadIns:
+    - nodeId: cd319a37-1975-46d7-aac4-5b9f9b6ad2ee
+    - nodeId: 8e584cf6-cec3-4df3-85a6-3191b9d0cfaa
+    - nodeId: 4190cdbe-3270-44c1-baa8-65386b54571c
+  - junctionId: b5e373ef-85f1-49e6-9184-93e720833384
+    nodeId: 8f40ac36-55c8-4a05-bdc8-ed9b2164c33c
+    pathIds:
+    - 5742468e-f8ad-487c-ad1b-620284208bea
+    - ab36e4af-4d04-4feb-a29c-043d468f7326
+    riverPathId: 5742468e-f8ad-487c-ad1b-620284208bea
+    branchPathId: ab36e4af-4d04-4feb-a29c-043d468f7326
+    leadIns:
+    - nodeId: c85d7508-d4c4-4406-8795-e4aee1b8b422
+    - nodeId: 6ba17db6-e0b3-48fd-bd4d-84ba0cb77817
+    - nodeId: bc59ac19-3d2f-48e8-ab22-32261f6d8b49
+  - junctionId: d3b10076-46b1-4467-8d88-787468d4e616
+    nodeId: db7d413b-45c1-4245-8ed4-960f13707658
+    pathIds:
+    - 9d03b668-69f2-44e9-bf9d-6b5f77785098
+    - feb08ca1-0c92-401e-a567-632ced7c3fda
+    riverPathId: 9d03b668-69f2-44e9-bf9d-6b5f77785098
+    branchPathId: feb08ca1-0c92-401e-a567-632ced7c3fda
+    leadIns:
+    - nodeId: d8a01c94-998a-4add-ad5b-aa29e728a576
+    - nodeId: fb94a0ab-a0bd-4c87-aad1-67cb2692c652
+    - nodeId: a5b09b74-ef9d-411a-b63e-1bc37e26c46c
+  - junctionId: fa425b27-d1c8-40de-a12f-58a7b6bfe3f1
+    nodeId: b2c76aa4-f3f0-49b3-bd58-6bffcd6ce6b9
+    pathIds:
+    - 621befc7-fa46-46de-88d6-ae72d6010b90
+    - 19a8ecb9-6813-41ab-9cf6-28a2960c40c7
+    riverPathId: 621befc7-fa46-46de-88d6-ae72d6010b90
+    branchPathId: 19a8ecb9-6813-41ab-9cf6-28a2960c40c7
+    leadIns:
+    - nodeId: 18cdfb64-ac95-4991-a263-1b4afeb5d9f5
+    - nodeId: d3cf7fb8-0cf3-4707-8773-75267c73b304
+    - nodeId: 979cdbd0-0f2a-4544-87fa-01a81402e710
+  riverJoins:
+  - nodeId: cd43a64c-0bad-4584-8e26-74aa70256149
   shops:
   - nodeId: 96534931-abe4-4d47-80b1-94b5937fbf7e
     pathId: 
@@ -557,13 +2177,13 @@ MonoBehaviour:
     arenaRadius: 7
     overrideWall: 1
     archwayOnEntrances: 1
-    overrideArchway: 0
+    overrideArchway: 1
     archwayProfile:
       openingWidth: 0
       thickness: 0
-      legHeight: 0.35
-      archHeight: 0.4
-      depth: 0
+      legHeight: 0.97
+      archHeight: 0.97
+      depth: 5
     overrideDoor: 1
     doorProfile:
       height: 2
@@ -575,7 +2195,7 @@ MonoBehaviour:
       frameWidth: 0.1
       frameDepth: 0.3
       flapRimWidth: 0.1
-      panelDepth: 0.3
+      panelDepth: 0.2
       flapWidth: 0.3
       flapLegHeight: 0.3
       flapCrownHeight: 0.2
@@ -599,7 +2219,8 @@ MonoBehaviour:
     entranceAlignment:
       across: 0
       up: -0.5
-      along: 2.79
+      along: 4.57
+    boatSpawnDistance: 3
     secondaryEntrances:
     - nodeId: e179a491-5f75-445d-b2b3-b04178d9ba43
       entranceIndex: 1
@@ -611,6 +2232,7 @@ MonoBehaviour:
         across: 0
         up: -0.5
         along: -3.44
+      boatSpawnDistance: 3
     compassEntrances: 1
     compass: 1
     leadIns:
@@ -668,6 +2290,7 @@ MonoBehaviour:
       across: 0
       up: -0.5
       along: -3.44
+    boatSpawnDistance: 3
     secondaryEntrances:
     - nodeId: 10aaff99-cd7f-4c2a-b7bc-4106c47e94b6
       entranceIndex: 1
@@ -679,6 +2302,7 @@ MonoBehaviour:
         across: 0
         up: -0.5
         along: -3.44
+      boatSpawnDistance: 3
     compassEntrances: 1
     compass: 1
     leadIns:
@@ -736,6 +2360,7 @@ MonoBehaviour:
       across: 0
       up: 0
       along: 0
+    boatSpawnDistance: 3
     secondaryEntrances: []
     compassEntrances: 0
     compass: 2
@@ -743,7 +2368,7 @@ MonoBehaviour:
   pools:
   - nodeId: b2e5db0b-7bc0-4af6-ab70-c3e42776e421
     overrideShape: 1
-    poolRadius: 1.96
+    poolRadius: 2.81
     islandRadius: 0.61
     floorDepth: 0
     editorColor: {r: 0.35, g: 0.75, b: 1, a: 1}
@@ -759,10 +2384,31 @@ MonoBehaviour:
       orbRadius: 0.5
       baseRadius: 0.62
       baseHeight: 0.3
+      lowerRampHeight: 0
+      lowerRampRadius: 0.08
       rampHeight: 0.56
       base2Radius: 0.29
       base2Height: 0.17
     towerPreset: {fileID: 11400000, guid: 16e422adff10b2d4290d628d4c2350f5, type: 2}
+    towerKind: 0
+    turret:
+      body:
+        stemRadius: 0.05
+        stemHeight: 0.8
+        orbRadius: 0.25
+        baseRadius: 0.12
+        baseHeight: 0.08
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      noseLength: 0.3
+      noseOuterRadius: 0.075
+      noseInnerRadius: 0.045
+      restPitch: 20
+    turretPreset: {fileID: 0}
+    towerScale: 1
     towerPerch:
       enabled: 0
       perchRadius: 12
@@ -774,6 +2420,26 @@ MonoBehaviour:
       talkPrompt: Talk
       talkText: 
       talkCameraDistance: 0
+    soulsPool:
+      baseRadius: 0.16
+      baseHeight: 0.08
+      rampHeight: 0
+      base2Radius: 0.12
+      base2Height: 0
+      columnRadius: 0.1
+      columnHeight: 0.8
+      bowlRadius: 0.6
+      rimWidth: 0.08
+      bandHeight: 0.06
+      undersideDepth: 0.25
+      basinDepth: 0.18
+      waterDrop: 0.05
+      holeRadius: 0
+    soulsPoolPreset: {fileID: 0}
+    towerCinematic: 0
+    towerCinematicPreset: {fileID: 0}
+    towerCinematicPinCameras: 0
+    towerCinematicPinnedAt: {x: 0, y: 0, z: 0}
   - nodeId: 6c2c0bb8-0ed6-4a0c-a0c7-31ed04a6984b
     overrideShape: 1
     poolRadius: 3
@@ -792,10 +2458,31 @@ MonoBehaviour:
       orbRadius: 0.25
       baseRadius: 0.12
       baseHeight: 0.08
+      lowerRampHeight: 0
+      lowerRampRadius: 0.08
       rampHeight: 0
       base2Radius: 0.03
       base2Height: 0
     towerPreset: {fileID: 0}
+    towerKind: 0
+    turret:
+      body:
+        stemRadius: 0.05
+        stemHeight: 0.8
+        orbRadius: 0.25
+        baseRadius: 0.12
+        baseHeight: 0.08
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      noseLength: 0.3
+      noseOuterRadius: 0.075
+      noseInnerRadius: 0.045
+      restPitch: 20
+    turretPreset: {fileID: 0}
+    towerScale: 1
     towerPerch:
       enabled: 0
       perchRadius: 12
@@ -807,6 +2494,26 @@ MonoBehaviour:
       talkPrompt: Talk
       talkText: 
       talkCameraDistance: 0
+    soulsPool:
+      baseRadius: 0.16
+      baseHeight: 0.08
+      rampHeight: 0
+      base2Radius: 0.12
+      base2Height: 0
+      columnRadius: 0.1
+      columnHeight: 0.8
+      bowlRadius: 0.6
+      rimWidth: 0.08
+      bandHeight: 0.06
+      undersideDepth: 0.25
+      basinDepth: 0.18
+      waterDrop: 0.05
+      holeRadius: 0
+    soulsPoolPreset: {fileID: 0}
+    towerCinematic: 0
+    towerCinematicPreset: {fileID: 0}
+    towerCinematicPinCameras: 0
+    towerCinematicPinnedAt: {x: 0, y: 0, z: 0}
   - nodeId: d9194d90-8bf7-477e-9462-c545c38e4ae0
     overrideShape: 1
     poolRadius: 4.58
@@ -829,10 +2536,31 @@ MonoBehaviour:
       orbRadius: 0.55
       baseRadius: 0.75
       baseHeight: 0.29
+      lowerRampHeight: 0
+      lowerRampRadius: 0.08
       rampHeight: 0
       base2Radius: 0.03
       base2Height: 0
     towerPreset: {fileID: 0}
+    towerKind: 0
+    turret:
+      body:
+        stemRadius: 0.05
+        stemHeight: 0.8
+        orbRadius: 0.25
+        baseRadius: 0.12
+        baseHeight: 0.08
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      noseLength: 0.3
+      noseOuterRadius: 0.075
+      noseInnerRadius: 0.045
+      restPitch: 20
+    turretPreset: {fileID: 0}
+    towerScale: 1
     towerPerch:
       enabled: 0
       perchRadius: 12
@@ -844,49 +2572,34 @@ MonoBehaviour:
       talkPrompt: Talk
       talkText: 
       talkCameraDistance: 0
-  - nodeId: db7d413b-45c1-4245-8ed4-960f13707658
-    overrideShape: 1
-    poolRadius: 2.27
-    islandRadius: 0
-    floorDepth: 0
-    editorColor: {r: 0.35, g: 0.75, b: 1, a: 1}
-    leadIns:
-    - nodeId: 11897299-3fb7-4e2a-a953-09d3299025e9
-      compass: 3
-    - nodeId: 4c74a89d-411b-4bda-ad02-e39cf0adb8dc
-      compass: 1
-    - nodeId: be02d845-96f7-4575-a069-dc9d17810310
-      compass: 2
-    hasTower: 0
-    tower:
-      stemRadius: 0.05
-      stemHeight: 0.8
-      orbRadius: 0.25
-      baseRadius: 0.12
+    soulsPool:
+      baseRadius: 0.16
       baseHeight: 0.08
       rampHeight: 0
-      base2Radius: 0.03
+      base2Radius: 0.12
       base2Height: 0
-    towerPreset: {fileID: 0}
-    towerPerch:
-      enabled: 0
-      perchRadius: 12
-      priority: 0
-      startPerch: 0
-      landingCurveSize: 2
-      talkEnabled: 0
-      talkRadius: 4
-      talkPrompt: Talk
-      talkText: 
-      talkCameraDistance: 0
+      columnRadius: 0.1
+      columnHeight: 0.8
+      bowlRadius: 0.6
+      rimWidth: 0.08
+      bandHeight: 0.06
+      undersideDepth: 0.25
+      basinDepth: 0.18
+      waterDrop: 0.05
+      holeRadius: 0
+    soulsPoolPreset: {fileID: 0}
+    towerCinematic: 0
+    towerCinematicPreset: {fileID: 0}
+    towerCinematicPinCameras: 0
+    towerCinematicPinnedAt: {x: 0, y: 0, z: 0}
   - nodeId: b0265fc9-851b-4e74-806c-7a603759acdd
     overrideShape: 1
-    poolRadius: 3.16
+    poolRadius: 4.5
     islandRadius: 0
     floorDepth: 0
     editorColor: {r: 0.35, g: 0.75, b: 1, a: 1}
     leadIns:
-    - nodeId: e5184da0-6eb1-4ab3-b422-325ae24a7769
+    - nodeId: 11903a55-8d33-4204-b0b6-fc2fa1679ee2
       compass: 0
     hasTower: 0
     tower:
@@ -895,10 +2608,31 @@ MonoBehaviour:
       orbRadius: 0.25
       baseRadius: 0.12
       baseHeight: 0.08
+      lowerRampHeight: 0
+      lowerRampRadius: 0.08
       rampHeight: 0
       base2Radius: 0.03
       base2Height: 0
     towerPreset: {fileID: 0}
+    towerKind: 0
+    turret:
+      body:
+        stemRadius: 0.05
+        stemHeight: 0.8
+        orbRadius: 0.25
+        baseRadius: 0.12
+        baseHeight: 0.08
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      noseLength: 0.3
+      noseOuterRadius: 0.075
+      noseInnerRadius: 0.045
+      restPitch: 20
+    turretPreset: {fileID: 0}
+    towerScale: 1
     towerPerch:
       enabled: 0
       perchRadius: 12
@@ -910,14 +2644,106 @@ MonoBehaviour:
       talkPrompt: Talk
       talkText: 
       talkCameraDistance: 0
+    soulsPool:
+      baseRadius: 0.16
+      baseHeight: 0.08
+      rampHeight: 0
+      base2Radius: 0.12
+      base2Height: 0
+      columnRadius: 0.1
+      columnHeight: 0.8
+      bowlRadius: 0.6
+      rimWidth: 0.08
+      bandHeight: 0.06
+      undersideDepth: 0.25
+      basinDepth: 0.18
+      waterDrop: 0.05
+      holeRadius: 0
+    soulsPoolPreset: {fileID: 0}
+    towerCinematic: 0
+    towerCinematicPreset: {fileID: 0}
+    towerCinematicPinCameras: 0
+    towerCinematicPinnedAt: {x: 0, y: 0, z: 0}
+  - nodeId: d1f4c212-ee07-49cb-a8e1-c16696d20300
+    overrideShape: 1
+    poolRadius: 3
+    islandRadius: 0.65
+    floorDepth: 0
+    editorColor: {r: 0.35, g: 0.75, b: 1, a: 1}
+    leadIns:
+    - nodeId: accf5f46-4e31-4df4-9795-fa92a603f22f
+      compass: 0
+    hasTower: 1
+    tower:
+      stemRadius: 0.05
+      stemHeight: 0.8
+      orbRadius: 0.25
+      baseRadius: 0.12
+      baseHeight: 0.08
+      lowerRampHeight: 0
+      lowerRampRadius: 0.08
+      rampHeight: 0
+      base2Radius: 0.03
+      base2Height: 0
+    towerPreset: {fileID: 0}
+    towerKind: 2
+    turret:
+      body:
+        stemRadius: 0.05
+        stemHeight: 0.8
+        orbRadius: 0.25
+        baseRadius: 0.12
+        baseHeight: 0.08
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      noseLength: 0.3
+      noseOuterRadius: 0.075
+      noseInnerRadius: 0.045
+      restPitch: 20
+    turretPreset: {fileID: 0}
+    towerScale: 1.15
+    towerPerch:
+      enabled: 0
+      perchRadius: 12
+      priority: 0
+      startPerch: 0
+      landingCurveSize: 2
+      talkEnabled: 0
+      talkRadius: 4
+      talkPrompt: Talk
+      talkText: 
+      talkCameraDistance: 0
+    soulsPool:
+      baseRadius: 0.52
+      baseHeight: 0.08
+      rampHeight: 0
+      base2Radius: 0.1
+      base2Height: 0
+      columnRadius: 0.46
+      columnHeight: 0.6
+      bowlRadius: 0.48
+      rimWidth: 0.08
+      bandHeight: 0.06
+      undersideDepth: 0.25
+      basinDepth: 0.18
+      waterDrop: 0.05
+      holeRadius: 0
+    soulsPoolPreset: {fileID: 11400000, guid: ec7b68ceaa0c99049ae6a5ff425c0082, type: 2}
+    towerCinematic: 1
+    towerCinematicPreset: {fileID: 11400000, guid: 2fd19bc4059bd81449923c1f3fb5f7ea, type: 2}
+    towerCinematicPinCameras: 0
+    towerCinematicPinnedAt: {x: 85.446785, y: 12, z: 50.770325}
   outposts:
   - outpostId: 54e0ec99-d17c-49c7-9afe-d338173ef8be
     pathId: cb512902-99c4-4aa3-973b-d4a908cef861
     pathT: 0.25
-    side: 1
+    side: 2
     width: 3.24
     depth: 2.54
-    height: 0.32
+    height: 0.6
     wallThickness: 0.44
     wallHeight: 0.22
     tower:
@@ -926,21 +2752,47 @@ MonoBehaviour:
       orbRadius: 0.5
       baseRadius: 0.62
       baseHeight: 0.3
+      lowerRampHeight: 0
+      lowerRampRadius: 0.08
       rampHeight: 0.56
       base2Radius: 0.29
       base2Height: 0.17
     towerOffset: {x: 0.62, y: 0}
-    observers:
-    - offsetAlong: -0.84
-      offsetAway: -0.59
-      facing: 11.75
-      height: 0.6
-    - offsetAlong: 0.94
-      offsetAway: -0.59
-      facing: 0
-      height: 0.6
+    columnDownstream: 1
+    towerOnDownstream: 1
+    columnUpstream: 0
+    towerOnUpstream: 1
+    columnHeight: 0.38
+    columnRadius: 0.5
+    opening: 1
+    openingWidth: 0.6
+    openingOffset: 0
+    slope: 1
+    slopeWay: 0
+    landingLength: 0.37
+    slopeLength: 1.06
+    slopeWidth: 0.58
     preset: {fileID: 11400000, guid: 13dce602f9f6a514485f0086fe1284e7, type: 2}
-    towerPreset: {fileID: 11400000, guid: 16e422adff10b2d4290d628d4c2350f5, type: 2}
+    towerPreset: {fileID: 0}
+    towerKind: 0
+    turret:
+      body:
+        stemRadius: 0.02
+        stemHeight: 0.35
+        orbRadius: 0.1
+        baseRadius: 0.05
+        baseHeight: 0.03
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      noseLength: 0.12
+      noseOuterRadius: 0.03
+      noseInnerRadius: 0.018
+      restPitch: 20
+    turretPreset: {fileID: 0}
+    towerScale: 0.46
     towerPerch:
       enabled: 0
       perchRadius: 12
@@ -952,25 +2804,48 @@ MonoBehaviour:
       talkPrompt: Talk
       talkText: 
       talkCameraDistance: 0
+    bothLeft:
+      rid: 8492782992085221485
   rimNodes:
   - nodeId: b120236e-0200-44b0-a8dc-f6f9940c46d6
     side: 0
     radius: 0.435
-    height: 0.12
-    width: 1.59
+    height: 0.09
+    shape: 1
+    width: 0.38
     plinthRadius: 0.284
     plinthHeight: 0.18
-    topper: 2
+    topper: 0
     tower:
       stemRadius: 0.02
       stemHeight: 0.35
       orbRadius: 0.1
       baseRadius: 0.05
       baseHeight: 0.03
+      lowerRampHeight: 0
+      lowerRampRadius: 0.08
       rampHeight: 0
       base2Radius: 0.03
       base2Height: 0
     towerPreset: {fileID: 0}
+    turret:
+      body:
+        stemRadius: 0.02
+        stemHeight: 0.35
+        orbRadius: 0.1
+        baseRadius: 0.05
+        baseHeight: 0.03
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      noseLength: 0.12
+      noseOuterRadius: 0.03
+      noseInnerRadius: 0.018
+      restPitch: 20
+    turretPreset: {fileID: 0}
+    towerScale: 1
     displayHeight: 1.2
     interact:
       enabled: 1
@@ -985,10 +2860,30 @@ MonoBehaviour:
         orbRadius: 0.1
         baseRadius: 0.05
         baseHeight: 0.03
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
         rampHeight: 0
         base2Radius: 0.03
         base2Height: 0
       towerPreset: {fileID: 0}
+      turret:
+        body:
+          stemRadius: 0.02
+          stemHeight: 0.35
+          orbRadius: 0.1
+          baseRadius: 0.05
+          baseHeight: 0.03
+          lowerRampHeight: 0
+          lowerRampRadius: 0.08
+          rampHeight: 0
+          base2Radius: 0.03
+          base2Height: 0
+        noseLength: 0.12
+        noseOuterRadius: 0.03
+        noseInnerRadius: 0.018
+        restPitch: 20
+      turretPreset: {fileID: 0}
+      towerScale: 1
       displayHeight: 0.84
       interact:
         enabled: 0
@@ -1006,34 +2901,306 @@ MonoBehaviour:
         talkPrompt: Talk
         talkText: 
         talkCameraDistance: 0
+  - nodeId: eb189b33-9866-4f6e-a259-daa7b0aea130
+    side: 0
+    radius: 0.653
+    height: 0.23
+    shape: 0
+    width: 0.24
+    plinthRadius: 0
+    plinthHeight: 0.01
+    topper: 2
+    tower:
+      stemRadius: 0.02
+      stemHeight: 0.35
+      orbRadius: 0.1
+      baseRadius: 0.05
+      baseHeight: 0.03
+      lowerRampHeight: 0
+      lowerRampRadius: 0.08
+      rampHeight: 0
+      base2Radius: 0.03
+      base2Height: 0
+    towerPreset: {fileID: 0}
+    turret:
+      body:
+        stemRadius: 0.02
+        stemHeight: 0.35
+        orbRadius: 0.1
+        baseRadius: 0.05
+        baseHeight: 0.03
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      noseLength: 0.12
+      noseOuterRadius: 0.03
+      noseInnerRadius: 0.018
+      restPitch: 20
+    turretPreset: {fileID: 0}
+    towerScale: 1
+    displayHeight: 0.61
+    interact:
+      enabled: 1
+      prompt: Look
+      radius: 3
+      posterName: 1stPoster
+    bothLeft:
+      topper: 0
+      tower:
+        stemRadius: 0.02
+        stemHeight: 0.35
+        orbRadius: 0.1
+        baseRadius: 0.05
+        baseHeight: 0.03
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      towerPreset: {fileID: 0}
+      turret:
+        body:
+          stemRadius: 0.02
+          stemHeight: 0.35
+          orbRadius: 0.1
+          baseRadius: 0.05
+          baseHeight: 0.03
+          lowerRampHeight: 0
+          lowerRampRadius: 0.08
+          rampHeight: 0
+          base2Radius: 0.03
+          base2Height: 0
+        noseLength: 0.12
+        noseOuterRadius: 0.03
+        noseInnerRadius: 0.018
+        restPitch: 20
+      turretPreset: {fileID: 0}
+      towerScale: 1
+      displayHeight: 0.15
+      interact:
+        enabled: 0
+        prompt: Look
+        radius: 3
+        posterName: 
+      perch:
+        enabled: 0
+        perchRadius: 12
+        priority: 0
+        startPerch: 0
+        landingCurveSize: 2
+        talkEnabled: 0
+        talkRadius: 4
+        talkPrompt: Talk
+        talkText: 
+        talkCameraDistance: 0
+  - nodeId: 30b29125-395c-4fe7-ba1f-cf6d05e130c3
+    side: 1
+    radius: 0.1
+    height: 0.41
+    shape: 0
+    width: 0.88
+    plinthRadius: 0.1
+    plinthHeight: 0.16
+    topper: 1
+    tower:
+      stemRadius: 0.3
+      stemHeight: 0.7
+      orbRadius: 0.5
+      baseRadius: 0.4
+      baseHeight: 0.3
+      lowerRampHeight: 0
+      lowerRampRadius: 0.08
+      rampHeight: 0.3
+      base2Radius: 0.29
+      base2Height: 0.17
+    towerPreset: {fileID: 11400000, guid: d7248bc5f19390e408ea301da55f8c25, type: 2}
+    turret:
+      body:
+        stemRadius: 0.02
+        stemHeight: 0.35
+        orbRadius: 0.1
+        baseRadius: 0.05
+        baseHeight: 0.03
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      noseLength: 0.12
+      noseOuterRadius: 0.03
+      noseInnerRadius: 0.018
+      restPitch: 20
+    turretPreset: {fileID: 0}
+    towerScale: 0.26
+    displayHeight: 0.15
+    interact:
+      enabled: 0
+      prompt: Look
+      radius: 3
+      posterName: 
+    bothLeft:
+      topper: 0
+      tower:
+        stemRadius: 0.02
+        stemHeight: 0.35
+        orbRadius: 0.1
+        baseRadius: 0.05
+        baseHeight: 0.03
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      towerPreset: {fileID: 0}
+      turret:
+        body:
+          stemRadius: 0.02
+          stemHeight: 0.35
+          orbRadius: 0.1
+          baseRadius: 0.05
+          baseHeight: 0.03
+          lowerRampHeight: 0
+          lowerRampRadius: 0.08
+          rampHeight: 0
+          base2Radius: 0.03
+          base2Height: 0
+        noseLength: 0.12
+        noseOuterRadius: 0.03
+        noseInnerRadius: 0.018
+        restPitch: 20
+      turretPreset: {fileID: 0}
+      towerScale: 1
+      displayHeight: 0.15
+      interact:
+        enabled: 0
+        prompt: Look
+        radius: 3
+        posterName: 
+      perch:
+        enabled: 0
+        perchRadius: 12
+        priority: 0
+        startPerch: 0
+        landingCurveSize: 2
+        talkEnabled: 0
+        talkRadius: 4
+        talkPrompt: Talk
+        talkText: 
+        talkCameraDistance: 0
+  walkways:
+  - nodeId: 0342c7d0-6045-4291-827e-982a0d16420d
+    enabled: 1
+    side: 2
+    width: 0.5
+    height: 0
+  - nodeId: aa4f6c88-29f6-42c2-9358-dd5547d532cb
+    enabled: 1
+    side: 2
+    width: 0.5
+    height: 0
+  - nodeId: d962abed-40a2-4787-a235-ada9cf524603
+    enabled: 1
+    side: 2
+    width: 0.56
+    height: 0
+  - nodeId: d8fc67c2-d72c-4496-af01-adfeb3bfa25e
+    enabled: 1
+    side: 2
+    width: 1
+    height: 0
+  - nodeId: a7497f96-e6bb-4a32-abc7-480e0e26ea51
+    enabled: 1
+    side: 2
+    width: 0.56
+    height: 0
+  - nodeId: 95f58f30-6d0c-4ebe-8c48-4f9a7677f6b9
+    enabled: 1
+    side: 2
+    width: 0.2
+    height: 0
+  - nodeId: eb189b33-9866-4f6e-a259-daa7b0aea130
+    enabled: 1
+    side: 2
+    width: 1
+    height: 0
+  - nodeId: cd7eb262-2051-4573-9ea1-1fc3630c303a
+    enabled: 1
+    side: 2
+    width: 1
+    height: 0
+  - nodeId: 30b29125-395c-4fe7-ba1f-cf6d05e130c3
+    enabled: 1
+    side: 2
+    width: 1
+    height: 0
+  walkways2:
+  - nodeId: 0342c7d0-6045-4291-827e-982a0d16420d
+    enabled: 1
+    side: 2
+    width: 0.5
+    height: 0
+  - nodeId: 95f58f30-6d0c-4ebe-8c48-4f9a7677f6b9
+    enabled: 1
+    side: 2
+    width: 0.2
+    height: 0
+  - nodeId: d962abed-40a2-4787-a235-ada9cf524603
+    enabled: 1
+    side: 2
+    width: 0.2
+    height: 0
+  - nodeId: a7497f96-e6bb-4a32-abc7-480e0e26ea51
+    enabled: 1
+    side: 2
+    width: 0.68
+    height: 0
+  bridges:
+  - nodeId: d962abed-40a2-4787-a235-ada9cf524603
+    deckHeight: 0.9
+    deckWidth: 1.12
+    deckThickness: 0.1
+    rampLength: 0.85
+    offsetAlong: 0
+    bridgePreset: {fileID: 0}
   pipes:
   - pipeId: fa8bf69f-ccaa-47ee-a557-4d537bd9eeaf
     nodes:
-    - positionXZ: {x: 119.54251, y: -105.644135}
+    - positionXZ: {x: 46.200058, y: -104.49077}
       overrideHeight: 1
       height: 10
-    - positionXZ: {x: 87.97397, y: -63.990334}
+    - positionXZ: {x: 14.6315155, y: -62.836967}
       overrideHeight: 1
       height: 10
-    - positionXZ: {x: 79.390945, y: -50.88009}
+    - positionXZ: {x: 6.0484924, y: -49.726723}
       overrideHeight: 1
       height: 10
-    - positionXZ: {x: 82.27085, y: -38.59612}
-      overrideHeight: 1
+    - positionXZ: {x: 8.928398, y: -37.442757}
+      overrideHeight: 0
       height: 2.68
-    - positionXZ: {x: 81.44073, y: -21.370863}
+    - positionXZ: {x: 8.098274, y: -20.217499}
       overrideHeight: 0
       height: 0.5
-    - positionXZ: {x: 79.06234, y: -11.143803}
+    - positionXZ: {x: 5.719887, y: -9.990438}
       overrideHeight: 0
       height: 0.5
-    - positionXZ: {x: 82.47136, y: 3.443629}
+    - positionXZ: {x: 7.365013, y: 9.986675}
       overrideHeight: 0
       height: 0.5
-    - positionXZ: {x: 90.39931, y: 15.731955}
+    - positionXZ: {x: 8.321556, y: 26.78751}
       overrideHeight: 0
       height: 0.5
-    - positionXZ: {x: 86.35606, y: 23.659906}
+    - positionXZ: {x: 9.70504, y: 37.31433}
+      overrideHeight: 0
+      height: 0.5
+    - positionXZ: {x: 4.62558, y: 51.6214}
+      overrideHeight: 0
+      height: 0.5
+    - positionXZ: {x: -12.919334, y: 71.61799}
+      overrideHeight: 0
+      height: 0.5
+    - positionXZ: {x: -29.715218, y: 105.09637}
       overrideHeight: 0
       height: 0.5
     supports:
@@ -1055,15 +3222,17 @@ MonoBehaviour:
       along: 0.7134884
     - leg: 1
       along: 0.20900518
-    height: 6.43
-    pipeThickness: 1.2
-    wallThickness: 0.03
+    - leg: 9
+      along: 0.4470319
+    height: 10
+    pipeThickness: 3
+    wallThickness: 0.005
     supportThickness: 0.7
     ringOverhang: 0.38
   walls:
   - wallId: e2ecc0d8-7741-4e54-9dd5-4ed3849e47db
     nodes:
-    - positionXZ: {x: 115.22973, y: 25.683638}
+    - positionXZ: {x: -32.091152, y: 220.51382}
       overrideHeight: 0
       height: 0.3
       curvedToNext: 0
@@ -1078,10 +3247,31 @@ MonoBehaviour:
         orbRadius: 0.1
         baseRadius: 0.05
         baseHeight: 0.03
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
         rampHeight: 0
         base2Radius: 0.03
         base2Height: 0
       towerPreset: {fileID: 0}
+      towerKind: 0
+      turret:
+        body:
+          stemRadius: 0.02
+          stemHeight: 0.35
+          orbRadius: 0.1
+          baseRadius: 0.05
+          baseHeight: 0.03
+          lowerRampHeight: 0
+          lowerRampRadius: 0.08
+          rampHeight: 0
+          base2Radius: 0.03
+          base2Height: 0
+        noseLength: 0.12
+        noseOuterRadius: 0.03
+        noseInnerRadius: 0.018
+        restPitch: 20
+      turretPreset: {fileID: 0}
+      towerScale: 1
       towerPerch:
         enabled: 0
         perchRadius: 12
@@ -1096,7 +3286,10 @@ MonoBehaviour:
       hasArchway: 0
       archWidth: 0.1
       archHeight: 0.2
-    - positionXZ: {x: 115.06115, y: -0.9518875}
+      hasPorthole: 0
+      portholeRadius: 0.08
+      portholeHeight: 0.2
+    - positionXZ: {x: 36.29243, y: 151.82327}
       overrideHeight: 0
       height: 0.3
       curvedToNext: 0
@@ -1111,10 +3304,31 @@ MonoBehaviour:
         orbRadius: 0.1
         baseRadius: 0.05
         baseHeight: 0.03
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
         rampHeight: 0
         base2Radius: 0.03
         base2Height: 0
       towerPreset: {fileID: 0}
+      towerKind: 0
+      turret:
+        body:
+          stemRadius: 0.02
+          stemHeight: 0.35
+          orbRadius: 0.1
+          baseRadius: 0.05
+          baseHeight: 0.03
+          lowerRampHeight: 0
+          lowerRampRadius: 0.08
+          rampHeight: 0
+          base2Radius: 0.03
+          base2Height: 0
+        noseLength: 0.12
+        noseOuterRadius: 0.03
+        noseInnerRadius: 0.018
+        restPitch: 20
+      turretPreset: {fileID: 0}
+      towerScale: 1
       towerPerch:
         enabled: 0
         perchRadius: 12
@@ -1129,6 +3343,408 @@ MonoBehaviour:
       hasArchway: 0
       archWidth: 0.1
       archHeight: 0.2
+      hasPorthole: 0
+      portholeRadius: 0.08
+      portholeHeight: 0.2
+    - positionXZ: {x: 79.9548, y: 87.39234}
+      overrideHeight: 0
+      height: 0.3
+      curvedToNext: 0
+      gapToNext: 0
+      hasColumn: 0
+      columnRadius: 0.08
+      columnHeight: 0.05
+      hasTower: 0
+      tower:
+        stemRadius: 0.02
+        stemHeight: 0.35
+        orbRadius: 0.1
+        baseRadius: 0.05
+        baseHeight: 0.03
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      towerPreset: {fileID: 0}
+      towerKind: 0
+      turret:
+        body:
+          stemRadius: 0.02
+          stemHeight: 0.35
+          orbRadius: 0.1
+          baseRadius: 0.05
+          baseHeight: 0.03
+          lowerRampHeight: 0
+          lowerRampRadius: 0.08
+          rampHeight: 0
+          base2Radius: 0.03
+          base2Height: 0
+        noseLength: 0.12
+        noseOuterRadius: 0.03
+        noseInnerRadius: 0.018
+        restPitch: 20
+      turretPreset: {fileID: 0}
+      towerScale: 1
+      towerPerch:
+        enabled: 0
+        perchRadius: 12
+        priority: 0
+        startPerch: 0
+        landingCurveSize: 2
+        talkEnabled: 0
+        talkRadius: 4
+        talkPrompt: Talk
+        talkText: 
+        talkCameraDistance: 0
+      hasArchway: 0
+      archWidth: 0.1
+      archHeight: 0.2
+      hasPorthole: 0
+      portholeRadius: 0.08
+      portholeHeight: 0.2
+    - positionXZ: {x: 88.032776, y: 77.8463}
+      overrideHeight: 0
+      height: 0.3
+      curvedToNext: 0
+      gapToNext: 0
+      hasColumn: 0
+      columnRadius: 0.08
+      columnHeight: 0.05
+      hasTower: 0
+      tower:
+        stemRadius: 0.02
+        stemHeight: 0.35
+        orbRadius: 0.1
+        baseRadius: 0.05
+        baseHeight: 0.03
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      towerPreset: {fileID: 0}
+      towerKind: 0
+      turret:
+        body:
+          stemRadius: 0.02
+          stemHeight: 0.35
+          orbRadius: 0.1
+          baseRadius: 0.05
+          baseHeight: 0.03
+          lowerRampHeight: 0
+          lowerRampRadius: 0.08
+          rampHeight: 0
+          base2Radius: 0.03
+          base2Height: 0
+        noseLength: 0.12
+        noseOuterRadius: 0.03
+        noseInnerRadius: 0.018
+        restPitch: 20
+      turretPreset: {fileID: 0}
+      towerScale: 1
+      towerPerch:
+        enabled: 0
+        perchRadius: 12
+        priority: 0
+        startPerch: 0
+        landingCurveSize: 2
+        talkEnabled: 0
+        talkRadius: 4
+        talkPrompt: Talk
+        talkText: 
+        talkCameraDistance: 0
+      hasArchway: 0
+      archWidth: 0.1
+      archHeight: 0.2
+      hasPorthole: 0
+      portholeRadius: 0.08
+      portholeHeight: 0.2
+    - positionXZ: {x: 99.6116, y: 61.203968}
+      overrideHeight: 0
+      height: 0.3
+      curvedToNext: 1
+      gapToNext: 0
+      hasColumn: 0
+      columnRadius: 0.08
+      columnHeight: 0.05
+      hasTower: 0
+      tower:
+        stemRadius: 0.02
+        stemHeight: 0.35
+        orbRadius: 0.1
+        baseRadius: 0.05
+        baseHeight: 0.03
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      towerPreset: {fileID: 0}
+      towerKind: 0
+      turret:
+        body:
+          stemRadius: 0.02
+          stemHeight: 0.35
+          orbRadius: 0.1
+          baseRadius: 0.05
+          baseHeight: 0.03
+          lowerRampHeight: 0
+          lowerRampRadius: 0.08
+          rampHeight: 0
+          base2Radius: 0.03
+          base2Height: 0
+        noseLength: 0.12
+        noseOuterRadius: 0.03
+        noseInnerRadius: 0.018
+        restPitch: 20
+      turretPreset: {fileID: 0}
+      towerScale: 1
+      towerPerch:
+        enabled: 0
+        perchRadius: 12
+        priority: 0
+        startPerch: 0
+        landingCurveSize: 2
+        talkEnabled: 0
+        talkRadius: 4
+        talkPrompt: Talk
+        talkText: 
+        talkCameraDistance: 0
+      hasArchway: 0
+      archWidth: 0.1
+      archHeight: 0.2
+      hasPorthole: 1
+      portholeRadius: 10
+      portholeHeight: 50
+    - positionXZ: {x: 110.033195, y: 39.658157}
+      overrideHeight: 0
+      height: 0.3
+      curvedToNext: 0
+      gapToNext: 0
+      hasColumn: 0
+      columnRadius: 0.08
+      columnHeight: 0.05
+      hasTower: 0
+      tower:
+        stemRadius: 0.02
+        stemHeight: 0.35
+        orbRadius: 0.1
+        baseRadius: 0.05
+        baseHeight: 0.03
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      towerPreset: {fileID: 0}
+      towerKind: 0
+      turret:
+        body:
+          stemRadius: 0.02
+          stemHeight: 0.35
+          orbRadius: 0.1
+          baseRadius: 0.05
+          baseHeight: 0.03
+          lowerRampHeight: 0
+          lowerRampRadius: 0.08
+          rampHeight: 0
+          base2Radius: 0.03
+          base2Height: 0
+        noseLength: 0.12
+        noseOuterRadius: 0.03
+        noseInnerRadius: 0.018
+        restPitch: 20
+      turretPreset: {fileID: 0}
+      towerScale: 1
+      towerPerch:
+        enabled: 0
+        perchRadius: 12
+        priority: 0
+        startPerch: 0
+        landingCurveSize: 2
+        talkEnabled: 0
+        talkRadius: 4
+        talkPrompt: Talk
+        talkText: 
+        talkCameraDistance: 0
+      hasArchway: 0
+      archWidth: 0.1
+      archHeight: 0.2
+      hasPorthole: 0
+      portholeRadius: 0.08
+      portholeHeight: 0.2
+    - positionXZ: {x: 113.94004, y: 26.067}
+      overrideHeight: 0
+      height: 0.3
+      curvedToNext: 0
+      gapToNext: 0
+      hasColumn: 0
+      columnRadius: 0.08
+      columnHeight: 0.05
+      hasTower: 0
+      tower:
+        stemRadius: 0.02
+        stemHeight: 0.35
+        orbRadius: 0.1
+        baseRadius: 0.05
+        baseHeight: 0.03
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      towerPreset: {fileID: 0}
+      towerKind: 0
+      turret:
+        body:
+          stemRadius: 0.02
+          stemHeight: 0.35
+          orbRadius: 0.1
+          baseRadius: 0.05
+          baseHeight: 0.03
+          lowerRampHeight: 0
+          lowerRampRadius: 0.08
+          rampHeight: 0
+          base2Radius: 0.03
+          base2Height: 0
+        noseLength: 0.12
+        noseOuterRadius: 0.03
+        noseInnerRadius: 0.018
+        restPitch: 20
+      turretPreset: {fileID: 0}
+      towerScale: 1
+      towerPerch:
+        enabled: 0
+        perchRadius: 12
+        priority: 0
+        startPerch: 0
+        landingCurveSize: 2
+        talkEnabled: 0
+        talkRadius: 4
+        talkPrompt: Talk
+        talkText: 
+        talkCameraDistance: 0
+      hasArchway: 0
+      archWidth: 0.1
+      archHeight: 0.2
+      hasPorthole: 1
+      portholeRadius: 6
+      portholeHeight: 60
+    - positionXZ: {x: 115.076836, y: 8.489941}
+      overrideHeight: 0
+      height: 0.3
+      curvedToNext: 0
+      gapToNext: 0
+      hasColumn: 0
+      columnRadius: 0.08
+      columnHeight: 0.05
+      hasTower: 0
+      tower:
+        stemRadius: 0.02
+        stemHeight: 0.35
+        orbRadius: 0.1
+        baseRadius: 0.05
+        baseHeight: 0.03
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      towerPreset: {fileID: 0}
+      towerKind: 0
+      turret:
+        body:
+          stemRadius: 0.02
+          stemHeight: 0.35
+          orbRadius: 0.1
+          baseRadius: 0.05
+          baseHeight: 0.03
+          lowerRampHeight: 0
+          lowerRampRadius: 0.08
+          rampHeight: 0
+          base2Radius: 0.03
+          base2Height: 0
+        noseLength: 0.12
+        noseOuterRadius: 0.03
+        noseInnerRadius: 0.018
+        restPitch: 20
+      turretPreset: {fileID: 0}
+      towerScale: 1
+      towerPerch:
+        enabled: 0
+        perchRadius: 12
+        priority: 0
+        startPerch: 0
+        landingCurveSize: 2
+        talkEnabled: 0
+        talkRadius: 4
+        talkPrompt: Talk
+        talkText: 
+        talkCameraDistance: 0
+      hasArchway: 0
+      archWidth: 0.1
+      archHeight: 0.2
+      hasPorthole: 1
+      portholeRadius: 6
+      portholeHeight: 60
+    - positionXZ: {x: 114.42671, y: -8.880877}
+      overrideHeight: 0
+      height: 0.3
+      curvedToNext: 0
+      gapToNext: 0
+      hasColumn: 0
+      columnRadius: 0.08
+      columnHeight: 0.05
+      hasTower: 0
+      tower:
+        stemRadius: 0.02
+        stemHeight: 0.35
+        orbRadius: 0.1
+        baseRadius: 0.05
+        baseHeight: 0.03
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      towerPreset: {fileID: 0}
+      towerKind: 0
+      turret:
+        body:
+          stemRadius: 0.02
+          stemHeight: 0.35
+          orbRadius: 0.1
+          baseRadius: 0.05
+          baseHeight: 0.03
+          lowerRampHeight: 0
+          lowerRampRadius: 0.08
+          rampHeight: 0
+          base2Radius: 0.03
+          base2Height: 0
+        noseLength: 0.12
+        noseOuterRadius: 0.03
+        noseInnerRadius: 0.018
+        restPitch: 20
+      turretPreset: {fileID: 0}
+      towerScale: 1
+      towerPerch:
+        enabled: 0
+        perchRadius: 12
+        priority: 0
+        startPerch: 0
+        landingCurveSize: 2
+        talkEnabled: 0
+        talkRadius: 4
+        talkPrompt: Talk
+        talkText: 
+        talkCameraDistance: 0
+      hasArchway: 0
+      archWidth: 0.1
+      archHeight: 0.2
+      hasPorthole: 1
+      portholeRadius: 6
+      portholeHeight: 60
     - positionXZ: {x: 112.81329, y: -25.869547}
       overrideHeight: 0
       height: 0.3
@@ -1144,10 +3760,31 @@ MonoBehaviour:
         orbRadius: 0.1
         baseRadius: 0.05
         baseHeight: 0.03
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
         rampHeight: 0
         base2Radius: 0.03
         base2Height: 0
       towerPreset: {fileID: 0}
+      towerKind: 0
+      turret:
+        body:
+          stemRadius: 0.02
+          stemHeight: 0.35
+          orbRadius: 0.1
+          baseRadius: 0.05
+          baseHeight: 0.03
+          lowerRampHeight: 0
+          lowerRampRadius: 0.08
+          rampHeight: 0
+          base2Radius: 0.03
+          base2Height: 0
+        noseLength: 0.12
+        noseOuterRadius: 0.03
+        noseInnerRadius: 0.018
+        restPitch: 20
+      turretPreset: {fileID: 0}
+      towerScale: 1
       towerPerch:
         enabled: 0
         perchRadius: 12
@@ -1162,25 +3799,49 @@ MonoBehaviour:
       hasArchway: 0
       archWidth: 0.1
       archHeight: 0.2
+      hasPorthole: 0
+      portholeRadius: 0.08
+      portholeHeight: 0.2
     - positionXZ: {x: 108.598495, y: -33.64814}
       overrideHeight: 0
       height: 0.3
       curvedToNext: 0
       gapToNext: 0
       hasColumn: 1
-      columnRadius: 3
-      columnHeight: 1.2
+      columnRadius: 3.97
+      columnHeight: 3.24
       hasTower: 1
       tower:
         stemRadius: 1.4
         stemHeight: 4
         orbRadius: 3
-        baseRadius: 1
+        baseRadius: 1.4
         baseHeight: 0
+        lowerRampHeight: 1.76
+        lowerRampRadius: 2.93
         rampHeight: 0
         base2Radius: 1
         base2Height: 0
       towerPreset: {fileID: 11400000, guid: 2e5c40ef279790842a6cb79837018802, type: 2}
+      towerKind: 0
+      turret:
+        body:
+          stemRadius: 0.68
+          stemHeight: 3.13
+          orbRadius: 1.24
+          baseRadius: 2.51
+          baseHeight: 0.03
+          lowerRampHeight: 0
+          lowerRampRadius: 0.08
+          rampHeight: 1.3
+          base2Radius: 1.86
+          base2Height: 0.84
+        noseLength: 1.5
+        noseOuterRadius: 0.6
+        noseInnerRadius: 0.35
+        restPitch: 20
+      turretPreset: {fileID: 0}
+      towerScale: 1
       towerPerch:
         enabled: 0
         perchRadius: 12
@@ -1195,6 +3856,9 @@ MonoBehaviour:
       hasArchway: 0
       archWidth: 0.1
       archHeight: 0.2
+      hasPorthole: 0
+      portholeRadius: 0.08
+      portholeHeight: 0.2
     - positionXZ: {x: 100.294334, y: -44.248444}
       overrideHeight: 0
       height: 0.3
@@ -1210,10 +3874,31 @@ MonoBehaviour:
         orbRadius: 0.1
         baseRadius: 0.05
         baseHeight: 0.03
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
         rampHeight: 0
         base2Radius: 0.03
         base2Height: 0
       towerPreset: {fileID: 0}
+      towerKind: 0
+      turret:
+        body:
+          stemRadius: 0.02
+          stemHeight: 0.35
+          orbRadius: 0.1
+          baseRadius: 0.05
+          baseHeight: 0.03
+          lowerRampHeight: 0
+          lowerRampRadius: 0.08
+          rampHeight: 0
+          base2Radius: 0.03
+          base2Height: 0
+        noseLength: 0.12
+        noseOuterRadius: 0.03
+        noseInnerRadius: 0.018
+        restPitch: 20
+      turretPreset: {fileID: 0}
+      towerScale: 1
       towerPerch:
         enabled: 0
         perchRadius: 12
@@ -1228,6 +3913,9 @@ MonoBehaviour:
       hasArchway: 0
       archWidth: 0.1
       archHeight: 0.2
+      hasPorthole: 0
+      portholeRadius: 0.08
+      portholeHeight: 0.2
     - positionXZ: {x: 99.090195, y: -45.72188}
       overrideHeight: 0
       height: 0.3
@@ -1243,10 +3931,31 @@ MonoBehaviour:
         orbRadius: 0.1
         baseRadius: 0.05
         baseHeight: 0.03
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
         rampHeight: 0
         base2Radius: 0.03
         base2Height: 0
       towerPreset: {fileID: 0}
+      towerKind: 0
+      turret:
+        body:
+          stemRadius: 0.02
+          stemHeight: 0.35
+          orbRadius: 0.1
+          baseRadius: 0.05
+          baseHeight: 0.03
+          lowerRampHeight: 0
+          lowerRampRadius: 0.08
+          rampHeight: 0
+          base2Radius: 0.03
+          base2Height: 0
+        noseLength: 0.12
+        noseOuterRadius: 0.03
+        noseInnerRadius: 0.018
+        restPitch: 20
+      turretPreset: {fileID: 0}
+      towerScale: 1
       towerPerch:
         enabled: 0
         perchRadius: 12
@@ -1261,6 +3970,9 @@ MonoBehaviour:
       hasArchway: 1
       archWidth: 3.23
       archHeight: 39.1
+      hasPorthole: 0
+      portholeRadius: 0.08
+      portholeHeight: 0.2
     - positionXZ: {x: 97.68458, y: -47.73523}
       overrideHeight: 0
       height: 0.3
@@ -1276,10 +3988,31 @@ MonoBehaviour:
         orbRadius: 0.1
         baseRadius: 0.05
         baseHeight: 0.03
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
         rampHeight: 0
         base2Radius: 0.03
         base2Height: 0
       towerPreset: {fileID: 0}
+      towerKind: 0
+      turret:
+        body:
+          stemRadius: 0.02
+          stemHeight: 0.35
+          orbRadius: 0.1
+          baseRadius: 0.05
+          baseHeight: 0.03
+          lowerRampHeight: 0
+          lowerRampRadius: 0.08
+          rampHeight: 0
+          base2Radius: 0.03
+          base2Height: 0
+        noseLength: 0.12
+        noseOuterRadius: 0.03
+        noseInnerRadius: 0.018
+        restPitch: 20
+      turretPreset: {fileID: 0}
+      towerScale: 1
       towerPerch:
         enabled: 0
         perchRadius: 12
@@ -1294,25 +4027,49 @@ MonoBehaviour:
       hasArchway: 0
       archWidth: 0.1
       archHeight: 0.2
-    - positionXZ: {x: 89.3481, y: -54.727543}
+      hasPorthole: 0
+      portholeRadius: 0.08
+      portholeHeight: 0.2
+    - positionXZ: {x: 76.316986, y: -69.31459}
       overrideHeight: 0
       height: 4
       curvedToNext: 1
       gapToNext: 0
       hasColumn: 1
-      columnRadius: 3
-      columnHeight: 1.2
+      columnRadius: 3.97
+      columnHeight: 3.24
       hasTower: 1
       tower:
         stemRadius: 1.4
         stemHeight: 4
         orbRadius: 3
-        baseRadius: 1
+        baseRadius: 1.4
         baseHeight: 0
+        lowerRampHeight: 1.76
+        lowerRampRadius: 2.93
         rampHeight: 0
         base2Radius: 1
         base2Height: 0
       towerPreset: {fileID: 11400000, guid: 2e5c40ef279790842a6cb79837018802, type: 2}
+      towerKind: 0
+      turret:
+        body:
+          stemRadius: 0.02
+          stemHeight: 0.35
+          orbRadius: 0.1
+          baseRadius: 0.05
+          baseHeight: 0.03
+          lowerRampHeight: 0
+          lowerRampRadius: 0.08
+          rampHeight: 0
+          base2Radius: 0.03
+          base2Height: 0
+        noseLength: 0.12
+        noseOuterRadius: 0.03
+        noseInnerRadius: 0.018
+        restPitch: 20
+      turretPreset: {fileID: 0}
+      towerScale: 1
       towerPerch:
         enabled: 0
         perchRadius: 12
@@ -1327,7 +4084,10 @@ MonoBehaviour:
       hasArchway: 0
       archWidth: 0.1
       archHeight: 0.2
-    - positionXZ: {x: 68.87042, y: -67.70928}
+      hasPorthole: 0
+      portholeRadius: 0.08
+      portholeHeight: 0.2
+    - positionXZ: {x: 64.786064, y: -79.573425}
       overrideHeight: 0
       height: 8
       curvedToNext: 1
@@ -1342,10 +4102,31 @@ MonoBehaviour:
         orbRadius: 0.1
         baseRadius: 0.05
         baseHeight: 0.03
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
         rampHeight: 0
         base2Radius: 0.03
         base2Height: 0
       towerPreset: {fileID: 0}
+      towerKind: 0
+      turret:
+        body:
+          stemRadius: 0.02
+          stemHeight: 0.35
+          orbRadius: 0.1
+          baseRadius: 0.05
+          baseHeight: 0.03
+          lowerRampHeight: 0
+          lowerRampRadius: 0.08
+          rampHeight: 0
+          base2Radius: 0.03
+          base2Height: 0
+        noseLength: 0.12
+        noseOuterRadius: 0.03
+        noseInnerRadius: 0.018
+        restPitch: 20
+      turretPreset: {fileID: 0}
+      towerScale: 1
       towerPerch:
         enabled: 0
         perchRadius: 12
@@ -1360,7 +4141,10 @@ MonoBehaviour:
       hasArchway: 0
       archWidth: 0.1
       archHeight: 0.2
-    - positionXZ: {x: 37.0848, y: -91.781265}
+      hasPorthole: 0
+      portholeRadius: 0.08
+      portholeHeight: 0.2
+    - positionXZ: {x: 17.72404, y: -101.908455}
       overrideHeight: 0
       height: 0.3
       curvedToNext: 1
@@ -1375,10 +4159,31 @@ MonoBehaviour:
         orbRadius: 0.1
         baseRadius: 0.05
         baseHeight: 0.03
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
         rampHeight: 0
         base2Radius: 0.03
         base2Height: 0
       towerPreset: {fileID: 0}
+      towerKind: 0
+      turret:
+        body:
+          stemRadius: 0.02
+          stemHeight: 0.35
+          orbRadius: 0.1
+          baseRadius: 0.05
+          baseHeight: 0.03
+          lowerRampHeight: 0
+          lowerRampRadius: 0.08
+          rampHeight: 0
+          base2Radius: 0.03
+          base2Height: 0
+        noseLength: 0.12
+        noseOuterRadius: 0.03
+        noseInnerRadius: 0.018
+        restPitch: 20
+      turretPreset: {fileID: 0}
+      towerScale: 1
       towerPerch:
         enabled: 0
         perchRadius: 12
@@ -1393,14 +4198,436 @@ MonoBehaviour:
       hasArchway: 0
       archWidth: 0.1
       archHeight: 0.2
+      hasPorthole: 0
+      portholeRadius: 0.08
+      portholeHeight: 0.2
+    - positionXZ: {x: -118.51009, y: -145.27687}
+      overrideHeight: 0
+      height: 0.3
+      curvedToNext: 1
+      gapToNext: 0
+      hasColumn: 0
+      columnRadius: 0.08
+      columnHeight: 0.05
+      hasTower: 0
+      tower:
+        stemRadius: 0.02
+        stemHeight: 0.35
+        orbRadius: 0.1
+        baseRadius: 0.05
+        baseHeight: 0.03
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      towerPreset: {fileID: 0}
+      towerKind: 0
+      turret:
+        body:
+          stemRadius: 0.02
+          stemHeight: 0.35
+          orbRadius: 0.1
+          baseRadius: 0.05
+          baseHeight: 0.03
+          lowerRampHeight: 0
+          lowerRampRadius: 0.08
+          rampHeight: 0
+          base2Radius: 0.03
+          base2Height: 0
+        noseLength: 0.12
+        noseOuterRadius: 0.03
+        noseInnerRadius: 0.018
+        restPitch: 20
+      turretPreset: {fileID: 0}
+      towerScale: 1
+      towerPerch:
+        enabled: 0
+        perchRadius: 12
+        priority: 0
+        startPerch: 0
+        landingCurveSize: 2
+        talkEnabled: 0
+        talkRadius: 4
+        talkPrompt: Talk
+        talkText: 
+        talkCameraDistance: 0
+      hasArchway: 0
+      archWidth: 0.1
+      archHeight: 0.2
+      hasPorthole: 0
+      portholeRadius: 0.08
+      portholeHeight: 0.2
     closed: 0
-    height: 8.68
+    height: 32.7
     thickness: 4
+    hasLip: 1
+    lip:
+      height: 3
+      thickness: 4.44
+      columnRing: 2.22
+    wallPreset: {fileID: 11400000, guid: 44147be6292107c479bf0dfad390ff81, type: 2}
+    removedSeams:
+    - node: 8
+      along: 0.14395142
+      across: -2.0000079
+      height: 6.398943
+      fromTop: 1
+      direction: {x: -0, y: -1, z: 0}
+      measuredBoth: 0
+      otherHeight: 0
+    - node: 10
+      along: -0.4202423
+      across: -2.000001
+      height: 5.295728
+      fromTop: 1
+      direction: {x: 0, y: 1, z: 0}
+      measuredBoth: 0
+      otherHeight: 0
+    - node: 11
+      along: -5.4482574
+      across: -2.0000029
+      height: 8.972439
+      fromTop: 1
+      direction: {x: 0, y: 1, z: 0}
+      measuredBoth: 0
+      otherHeight: 0
+    - node: 7
+      along: 6.732849
+      across: -2.0000036
+      height: 13.839794
+      fromTop: 1
+      direction: {x: 0, y: 1, z: 0}
+      measuredBoth: 0
+      otherHeight: 0
+    - node: 5
+      along: 6.420059
+      across: -2.0000026
+      height: 5.1763535
+      fromTop: 1
+      direction: {x: 0.9999996, y: -0.00095658976, z: 0.00000006555223}
+      measuredBoth: 0
+      otherHeight: 0
+    - node: 5
+      along: -6.7841034
+      across: -1.9999975
+      height: 5.1782427
+      fromTop: 1
+      direction: {x: 0.999999, y: 0.0014120985, z: -0.00000061263444}
+      measuredBoth: 0
+      otherHeight: 0
+    - node: 5
+      along: -4.3747253
+      across: -1.9999974
+      height: 5.1851597
+      fromTop: 1
+      direction: {x: -0.999999, y: 0.0014120985, z: 0.00000061263444}
+      measuredBoth: 0
+      otherHeight: 0
+    - node: 5
+      along: 6.3400574
+      across: -2.0000014
+      height: 5.183724
+      fromTop: 1
+      direction: {x: 0.9999996, y: 0.00095658976, z: 0.00000006555223}
+      measuredBoth: 0
+      otherHeight: 0
+    - node: 4
+      along: 7.6285553
+      across: -1.9999974
+      height: 8.635402
+      fromTop: 1
+      direction: {x: -0, y: -1, z: 0}
+      measuredBoth: 0
+      otherHeight: 0
+    - node: 4
+      along: 7.6285553
+      across: -1.9999974
+      height: 3.7491913
+      fromTop: 1
+      direction: {x: 0, y: 1, z: 0}
+      measuredBoth: 0
+      otherHeight: 0
+    - node: 6
+      along: 4.423538
+      across: -2.0000014
+      height: 8.59502
+      fromTop: 1
+      direction: {x: 0, y: 1, z: 0}
+      measuredBoth: 0
+      otherHeight: 0
+    - node: 12
+      along: -12.126129
+      across: -2.0000033
+      height: 7.6353874
+      fromTop: 1
+      direction: {x: 0, y: 1, z: 0}
+      measuredBoth: 0
+      otherHeight: 0
+    - node: 12
+      along: 19.936935
+      across: -2.000002
+      height: 7.2237473
+      fromTop: 1
+      direction: {x: 0, y: 1, z: 0}
+      measuredBoth: 0
+      otherHeight: 0
+    - node: 13
+      along: 0
+      across: -2.0000002
+      height: 12.341507
+      fromTop: 1
+      direction: {x: 0, y: 1, z: 0}
+      measuredBoth: 0
+      otherHeight: 0
+    - node: 5
+      along: -6.3174744
+      across: -1.9999975
+      height: 10.547585
+      fromTop: 1
+      direction: {x: 0.999999, y: 0.0014120985, z: -0.00000061263444}
+      measuredBoth: 0
+      otherHeight: 0
+    - node: 5
+      along: -5.047714
+      across: -1.9999971
+      height: 10.55421
+      fromTop: 1
+      direction: {x: -0.999999, y: 0.0014120985, z: 0.00000061263444}
+      measuredBoth: 0
+      otherHeight: 0
+    - node: 4
+      along: 7.6285553
+      across: -1.9999974
+      height: 12.473456
+      fromTop: 1
+      direction: {x: -0, y: -1, z: 0}
+      measuredBoth: 0
+      otherHeight: 0
+    - node: 5
+      along: 7.9123535
+      across: -1.9999949
+      height: 10.547781
+      fromTop: 1
+      direction: {x: 0.9999996, y: -0.00095658976, z: 0.00000006555223}
+      measuredBoth: 0
+      otherHeight: 0
+    - node: 5
+      along: 7.921112
+      across: -2.0000017
+      height: 10.552212
+      fromTop: 1
+      direction: {x: 0.9999996, y: 0.00095658976, z: 0.00000006555223}
+      measuredBoth: 0
+      otherHeight: 0
+    - node: 3
+      along: 7.0737076
+      across: -1.9999993
+      height: 6.1490364
+      fromTop: 1
+      direction: {x: 0, y: 1, z: 0}
+      measuredBoth: 0
+      otherHeight: 0
+    - node: 5
+      along: 6.113739
+      across: -2.0000014
+      height: 17.00394
+      fromTop: 1
+      direction: {x: 0.9999996, y: 0.00095658976, z: 0.00000006555223}
+      measuredBoth: 0
+      otherHeight: 0
+    - node: 5
+      along: 6.800888
+      across: -2.0000021
+      height: 16.996717
+      fromTop: 1
+      direction: {x: 0.9999996, y: -0.00095658976, z: 0.00000006555223}
+      measuredBoth: 0
+      otherHeight: 0
+    - node: 5
+      along: -6.90802
+      across: -1.9999975
+      height: 16.998417
+      fromTop: 1
+      direction: {x: 0.999999, y: 0.0014120985, z: -0.00000061263444}
+      measuredBoth: 0
+      otherHeight: 0
+    - node: 5
+      along: -6.099823
+      across: -1.9999974
+      height: 17.002724
+      fromTop: 1
+      direction: {x: -0.999999, y: 0.0014120985, z: 0.00000061263444}
+      measuredBoth: 0
+      otherHeight: 0
+    - node: 4
+      along: 7.6285553
+      across: -1.9999974
+      height: 18.22706
+      fromTop: 1
+      direction: {x: -0, y: -1, z: 0}
+      measuredBoth: 0
+      otherHeight: 0
+    - node: 6
+      along: -6.8325653
+      across: -2.0000021
+      height: 19.499199
+      fromTop: 1
+      direction: {x: 0, y: 1, z: 0}
+      measuredBoth: 0
+      otherHeight: 0
+    - node: 6
+      along: -6.8325653
+      across: -2.0000021
+      height: 14.963236
+      fromTop: 1
+      direction: {x: 0, y: 1, z: 0}
+      measuredBoth: 0
+      otherHeight: 0
+    - node: 5
+      along: 6.812729
+      across: 1.9999945
+      height: 16.996729
+      fromTop: 1
+      direction: {x: 0.9999996, y: -0.00095660577, z: 0.0000016418535}
+      measuredBoth: 1
+      otherHeight: 46.003273
+    - node: 5
+      along: -5.936081
+      across: 1.9999973
+      height: 16.997046
+      fromTop: 1
+      direction: {x: 0.999999, y: 0.0014120993, z: -0.0000005958778}
+      measuredBoth: 1
+      otherHeight: 46.002956
+    - node: 5
+      along: 5.7194366
+      across: 2.0000014
+      height: 17.004318
+      fromTop: 1
+      direction: {x: 0.9999996, y: 0.00095660577, z: 0.0000016418535}
+      measuredBoth: 1
+      otherHeight: 45.99568
+    - node: 5
+      along: -3.8343658
+      across: 1.9999973
+      height: 17.005922
+      fromTop: 1
+      direction: {x: -0.999999, y: 0.0014120993, z: 0.0000005958778}
+      measuredBoth: 1
+      otherHeight: 45.994076
+    faceGroups:
+    - surfaces:
+      - node: 7
+        along: 5.4247894
+        across: -2.0000036
+        height: 10.713009
+        fromTop: 1
+        direction: {x: 0.0000002142786, y: 0, z: -1}
+        measuredBoth: 0
+        otherHeight: 0
+      - node: 8
+        along: -2.9299164
+        across: -2.0000036
+        height: 4.5321856
+        fromTop: 1
+        direction: {x: -0.00000017752109, y: 0, z: -1}
+        measuredBoth: 0
+        otherHeight: 0
+      - node: 10
+        along: 0.474823
+        across: -2.0000045
+        height: 7.070186
+        fromTop: 1
+        direction: {x: -0.0000026144573, y: 0, z: -1}
+        measuredBoth: 0
+        otherHeight: 0
+      - node: 9
+        along: -0.27449036
+        across: -1.999997
+        height: 2.4058132
+        fromTop: 1
+        direction: {x: -0.000002633729, y: 0, z: -1}
+        measuredBoth: 0
+        otherHeight: 0
+      - node: 11
+        along: -5.0034485
+        across: -2.0000079
+        height: 5.9305234
+        fromTop: 1
+        direction: {x: -0.0000035178343, y: 0, z: -1}
+        measuredBoth: 0
+        otherHeight: 0
+      - node: 6
+        along: 0.4111023
+        across: -1.9999938
+        height: 9.263543
+        fromTop: 1
+        direction: {x: 0.0000009870539, y: 0, z: -1}
+        measuredBoth: 0
+        otherHeight: 0
+      - node: 5
+        along: 8.450684
+        across: -1.9999866
+        height: 6.1534615
+        fromTop: 1
+        direction: {x: 0.00000005755576, y: 0, z: -1}
+        measuredBoth: 0
+        otherHeight: 0
+      - node: 5
+        along: 5.386856
+        across: -2.000002
+        height: 15.79816
+        fromTop: 1
+        direction: {x: 0.000000059337648, y: 0, z: -1}
+        measuredBoth: 0
+        otherHeight: 0
+      - node: 12
+        along: -6.506073
+        across: -1.9999982
+        height: 12.456012
+        fromTop: 1
+        direction: {x: -0.0000015542437, y: 0, z: -1}
+        measuredBoth: 0
+        otherHeight: 0
+      - node: 13
+        along: -5.5379486
+        across: -2.000006
+        height: 7.6596813
+        fromTop: 1
+        direction: {x: -0.0000017879975, y: 0, z: -1}
+        measuredBoth: 0
+        otherHeight: 0
+      - node: 4
+        along: 1.4407883
+        across: -1.9999974
+        height: 4.5145845
+        fromTop: 1
+        direction: {x: 0.0000042428, y: 0, z: -1}
+        measuredBoth: 0
+        otherHeight: 0
+      - node: 3
+        along: -12.494675
+        across: -2.0000012
+        height: 1.7816696
+        fromTop: 1
+        direction: {x: -0.0000002037481, y: 0, z: -1}
+        measuredBoth: 0
+        otherHeight: 0
+      - node: 2
+        along: 9.390144
+        across: -2.0000021
+        height: 3.4273787
+        fromTop: 1
+        direction: {x: 0.00000005646163, y: 0, z: -1}
+        measuredBoth: 0
+        otherHeight: 0
+    - surfaces: []
   perchMarkers: []
   spikes:
   - spikeId: e3473f80-9987-450c-9f79-f29ef5bb3fb1
-    positionXZ: {x: 131.58969, y: -63.952393}
-    preset: {fileID: 11400000, guid: f0c8644364ce011499b709ab71e70237, type: 2}
+    positionXZ: {x: 153.19756, y: -84.57895}
+    preset: {fileID: 11400000, guid: bb5df4b648ca28a49b1d1a998a6b7182, type: 2}
     scale: 0.6
     perch:
       enabled: 1
@@ -1408,11 +4635,13 @@ MonoBehaviour:
       priority: 0
       startPerch: 1
       landingCurveSize: 2
-      talkEnabled: 0
-      talkRadius: 4
+      talkEnabled: 1
+      talkRadius: 4.29
       talkPrompt: Talk
-      talkText: 
-      talkCameraDistance: 0
+      talkText: 'You must free the souls... /
+
+        You have been created for this purpose...'
+      talkCameraDistance: 1
   - spikeId: 32407a52-d53b-489a-a274-bc3293975275
     positionXZ: {x: 114.92204, y: -59.35305}
     preset: {fileID: 11400000, guid: f0c8644364ce011499b709ab71e70237, type: 2}
@@ -1444,8 +4673,8 @@ MonoBehaviour:
       talkText: 
       talkCameraDistance: 0
   - spikeId: f0f7a4cf-3278-4344-b981-c5464e704296
-    positionXZ: {x: 137.09676, y: -55.09756}
-    preset: {fileID: 11400000, guid: 78c2f18a4515c534e98b1827ed6f86a3, type: 2}
+    positionXZ: {x: 136.92126, y: -55.09756}
+    preset: {fileID: 11400000, guid: cfa10ee31ee4e824fb767e4c34f8f91c, type: 2}
     scale: 1.1
     perch:
       enabled: 0
@@ -1459,8 +4688,8 @@ MonoBehaviour:
       talkText: 
       talkCameraDistance: 0
   - spikeId: 05c4ca7f-a0e5-4643-9f86-ee27da2a102d
-    positionXZ: {x: 120.914505, y: -50.415886}
-    preset: {fileID: 11400000, guid: f0c8644364ce011499b709ab71e70237, type: 2}
+    positionXZ: {x: 121.61645, y: -49.71394}
+    preset: {fileID: 11400000, guid: edb1c2e55cd4cfa41afcfc4818420b4d, type: 2}
     scale: 1.86
     perch:
       enabled: 0
@@ -1473,7 +4702,309 @@ MonoBehaviour:
       talkPrompt: Talk
       talkText: 
       talkCameraDistance: 0
+  - spikeId: 1b7e6996-99d3-4762-bee3-95e2593ae6e7
+    positionXZ: {x: 126.247856, y: -51.96949}
+    preset: {fileID: 11400000, guid: edb1c2e55cd4cfa41afcfc4818420b4d, type: 2}
+    scale: 1.46
+    perch:
+      enabled: 0
+      perchRadius: 12
+      priority: 0
+      startPerch: 0
+      landingCurveSize: 2
+      talkEnabled: 0
+      talkRadius: 4
+      talkPrompt: Talk
+      talkText: 
+      talkCameraDistance: 0
+  - spikeId: 7fa34544-7bb6-4f97-8df8-b6419d920a18
+    positionXZ: {x: 130.00317, y: -53.456}
+    preset: {fileID: 11400000, guid: edb1c2e55cd4cfa41afcfc4818420b4d, type: 2}
+    scale: 0.86
+    perch:
+      enabled: 0
+      perchRadius: 12
+      priority: 0
+      startPerch: 0
+      landingCurveSize: 2
+      talkEnabled: 0
+      talkRadius: 4
+      talkPrompt: Talk
+      talkText: 
+      talkCameraDistance: 0
   spikeMaterial: {fileID: 0}
+  structures:
+  - structureId: 3041b1c0-c191-4ad2-80e6-ff7ba57a0cf3
+    positionXZ: {x: 95.38622, y: 34.106667}
+    shape: 1
+    width: 0.8
+    depth: 0.8
+    radius: 3
+    height: 6.27
+    turn: 0
+    top: 1
+    tower:
+      stemRadius: 0.3
+      stemHeight: 0.2
+      orbRadius: 0.5
+      baseRadius: 0.62
+      baseHeight: 0.1
+      lowerRampHeight: 0
+      lowerRampRadius: 0.08
+      rampHeight: 0.3
+      base2Radius: 0.29
+      base2Height: 0
+    towerPreset: {fileID: 11400000, guid: b798e2997d6cd1c48865a4a6c973c7dc, type: 2}
+    turret:
+      body:
+        stemRadius: 0.02
+        stemHeight: 0.35
+        orbRadius: 0.1
+        baseRadius: 0.05
+        baseHeight: 0.03
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      noseLength: 0.12
+      noseOuterRadius: 0.03
+      noseInnerRadius: 0.018
+      restPitch: 20
+    turretPreset: {fileID: 0}
+    towerScale: 5
+    perch:
+      enabled: 0
+      perchRadius: 12
+      priority: 0
+      startPerch: 0
+      landingCurveSize: 2
+      talkEnabled: 0
+      talkRadius: 4
+      talkPrompt: Talk
+      talkText: 
+      talkCameraDistance: 0
+    outpost:
+      outpostId: 
+      pathId: 
+      pathT: 0
+      side: 1
+      width: 0.8
+      depth: 0.8
+      height: 6.27
+      wallThickness: 0.05
+      wallHeight: 0.1
+      tower:
+        stemRadius: 0.02
+        stemHeight: 0.35
+        orbRadius: 0.1
+        baseRadius: 0.05
+        baseHeight: 0.03
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      towerOffset: {x: 0, y: 0}
+      columnDownstream: 0
+      towerOnDownstream: 1
+      columnUpstream: 0
+      towerOnUpstream: 1
+      columnHeight: 0.2
+      columnRadius: 0.1
+      opening: 0
+      openingWidth: 0.3
+      openingOffset: 0
+      slope: 0
+      slopeWay: 0
+      landingLength: 0.3
+      slopeLength: 1
+      slopeWidth: 0.2
+      preset: {fileID: 0}
+      towerPreset: {fileID: 0}
+      towerKind: 0
+      turret:
+        body:
+          stemRadius: 0.02
+          stemHeight: 0.35
+          orbRadius: 0.1
+          baseRadius: 0.05
+          baseHeight: 0.03
+          lowerRampHeight: 0
+          lowerRampRadius: 0.08
+          rampHeight: 0
+          base2Radius: 0.03
+          base2Height: 0
+        noseLength: 0.12
+        noseOuterRadius: 0.03
+        noseInnerRadius: 0.018
+        restPitch: 20
+      turretPreset: {fileID: 0}
+      towerScale: 1
+      towerPerch:
+        enabled: 0
+        perchRadius: 12
+        priority: 0
+        startPerch: 0
+        landingCurveSize: 2
+        talkEnabled: 0
+        talkRadius: 4
+        talkPrompt: Talk
+        talkText: 
+        talkCameraDistance: 0
+      bothLeft:
+        rid: -2
+  - structureId: de9399e6-d77d-40d3-bfc1-8e3754fb25b6
+    positionXZ: {x: 128.4752, y: 76.18039}
+    shape: 1
+    width: 0.8
+    depth: 0.8
+    radius: 7.5
+    height: 21.16
+    turn: 0
+    top: 1
+    tower:
+      stemRadius: 0.3
+      stemHeight: 1.04
+      orbRadius: 0.71
+      baseRadius: 1.08
+      baseHeight: 0.1
+      lowerRampHeight: 0
+      lowerRampRadius: 0.08
+      rampHeight: 0.46
+      base2Radius: 0.29
+      base2Height: 0
+    towerPreset: {fileID: 11400000, guid: b798e2997d6cd1c48865a4a6c973c7dc, type: 2}
+    turret:
+      body:
+        stemRadius: 0.02
+        stemHeight: 0.35
+        orbRadius: 0.1
+        baseRadius: 0.05
+        baseHeight: 0.03
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      noseLength: 0.12
+      noseOuterRadius: 0.03
+      noseInnerRadius: 0.018
+      restPitch: 20
+    turretPreset: {fileID: 0}
+    towerScale: 6.02
+    perch:
+      enabled: 0
+      perchRadius: 12
+      priority: 0
+      startPerch: 0
+      landingCurveSize: 2
+      talkEnabled: 0
+      talkRadius: 4
+      talkPrompt: Talk
+      talkText: 
+      talkCameraDistance: 0
+    outpost:
+      outpostId: 
+      pathId: 
+      pathT: 0
+      side: 1
+      width: 0.8
+      depth: 0.8
+      height: 21.16
+      wallThickness: 0.05
+      wallHeight: 0.1
+      tower:
+        stemRadius: 0.02
+        stemHeight: 0.35
+        orbRadius: 0.1
+        baseRadius: 0.05
+        baseHeight: 0.03
+        lowerRampHeight: 0
+        lowerRampRadius: 0.08
+        rampHeight: 0
+        base2Radius: 0.03
+        base2Height: 0
+      towerOffset: {x: 0, y: 0}
+      columnDownstream: 0
+      towerOnDownstream: 1
+      columnUpstream: 0
+      towerOnUpstream: 1
+      columnHeight: 0.2
+      columnRadius: 0.1
+      opening: 0
+      openingWidth: 0.3
+      openingOffset: 0
+      slope: 0
+      slopeWay: 0
+      landingLength: 0.3
+      slopeLength: 1
+      slopeWidth: 0.2
+      preset: {fileID: 0}
+      towerPreset: {fileID: 0}
+      towerKind: 0
+      turret:
+        body:
+          stemRadius: 0.02
+          stemHeight: 0.35
+          orbRadius: 0.1
+          baseRadius: 0.05
+          baseHeight: 0.03
+          lowerRampHeight: 0
+          lowerRampRadius: 0.08
+          rampHeight: 0
+          base2Radius: 0.03
+          base2Height: 0
+        noseLength: 0.12
+        noseOuterRadius: 0.03
+        noseInnerRadius: 0.018
+        restPitch: 20
+      turretPreset: {fileID: 0}
+      towerScale: 1
+      towerPerch:
+        enabled: 0
+        perchRadius: 12
+        priority: 0
+        startPerch: 0
+        landingCurveSize: 2
+        talkEnabled: 0
+        talkRadius: 4
+        talkPrompt: Talk
+        talkText: 
+        talkCameraDistance: 0
+      bothLeft:
+        rid: -2
+  cameraClamps:
+  - cameraLink: 5cdbe577502f4de69a3c6593c7a378a3
+    on: 1
+    target: 0
+    targetId: b0265fc9-851b-4e74-806c-7a603759acdd
+    targetIndex: -1
+    targetAt: {x: 157.43596, y: -10, z: -91.65152}
+  - cameraLink: 465e624b78f34dd79320cd0bed36efa2
+    on: 1
+    target: 0
+    targetId: b0265fc9-851b-4e74-806c-7a603759acdd
+    targetIndex: -1
+    targetAt: {x: 157.43596, y: -10, z: -91.65152}
+  - cameraLink: 6d405c96204e4382aff836b5cc816afb
+    on: 1
+    target: 4
+    targetId: e3473f80-9987-450c-9f79-f29ef5bb3fb1
+    targetIndex: -1
+    targetAt: {x: 153.19756, y: 0, z: -84.57895}
+  - cameraLink: 5296ba54a3da4c3b9a06b9d42c87d2b1
+    on: 1
+    target: 4
+    targetId: e3473f80-9987-450c-9f79-f29ef5bb3fb1
+    targetIndex: -1
+    targetAt: {x: 153.19756, y: 0, z: -84.57895}
+  - cameraLink: 9c8a13080c9549c685999ba275f48944
+    on: 1
+    target: 0
+    targetId: b0265fc9-851b-4e74-806c-7a603759acdd
+    targetIndex: -1
+    targetAt: {x: 157.43596, y: -10, z: -91.65152}
   junctionScriptObject: {fileID: 3543737601092306643, guid: cdc03d5a67a4c8a4ca447c17a1a65a6b, type: 3}
   arenaPrefab: {fileID: 6685816687890925279, guid: 1f8a1bc0973719f48851a1d2efa25504, type: 3}
   arenaEntrancePrefab: {fileID: 3190444306040296516, guid: fb37ce94a14f8f24a9a64d50b2d45a57, type: 3}
@@ -1487,7 +5018,7 @@ MonoBehaviour:
   posterLibrary: {fileID: 11400000, guid: 88679f7c1c224b544ac2e67fd09d49c1, type: 2}
   waterFilled: 1
   waterLevel: 0.48
-  waterPoolOverlap: 4
+  waterPoolOverlap: 1
   generatedDrop: 42.5
   defaultRiverProfile:
     riverName: 
@@ -1516,9 +5047,15 @@ MonoBehaviour:
     depth: 42.98
     jointGroove: 0
   - riverName: starting river
-    innerWidth: 1.69
-    rimWidth: 0.3
+    innerWidth: 1.7
+    rimWidth: 2.45
     riverDepth: 0.69
+    depth: 42.98
+    jointGroove: 0
+  - riverName: Branch_10
+    innerWidth: 1
+    rimWidth: 0.43
+    riverDepth: 1
     depth: 42.98
     jointGroove: 0
   defaultPoolShape:
@@ -1527,6 +5064,7 @@ MonoBehaviour:
     floorDepth: 0
   poolLeadInDistance: 0.5
   arenaLeadInDistance: 2
+  junctionLeadInDistance: 0.5
   defaultArenaWall:
     radius: 0
     thickness: 1
@@ -1543,60 +5081,99 @@ MonoBehaviour:
     baseWidth: 1
     bulbRadius: 0.5
     waistWidth: 0.6
-    waistHeight: 2.3
-    baseCurve: 0.5
+    waistHeight: 1
+    baseCurve: 0.4
     frameWidth: 0.1
     frameDepth: 0.3
     flapRimWidth: 0.1
-    panelDepth: 0.15
+    panelDepth: 0.2
     flapWidth: 0.3
     flapLegHeight: 0.3
     flapCrownHeight: 0.2
     flapCurve: 0.1
-    discRadius: 0.45
-    discDepth: 0.06
+    discRadius: 0
+    discDepth: 0.01
     discRise: 0
-    discSideSteps: 1
-    numeralSize: 0.7
-    numeralRise: 0
+    discSideSteps: 3
+    numeralSize: 0.71
+    numeralRise: -0.025
     numeralLift: 0.004
   defaultDoorPreset: {fileID: 11400000, guid: 6b7325486d0e83b4c8a13303177b0117, type: 2}
   defaultEntranceAlignment:
     across: 0
     up: -0.5
-    along: -3.44
+    along: 0
   arenaRunOverlap: 0
-  junctionGapPadding: 0
   splineInstantiateSpacing: 0.5
   arenaHeadOffset: 5
   shopHeadOffset: 5
   landscapeTilePrefab: {fileID: 849136606222838744, guid: 78fcaaa5184a3c2448e4c351b4ed9e79, type: 3}
-  landscapeTileSize: 41.62
-  landscapeTilesX: 5
-  landscapeTilesZ: 5
+  landscapeTileSize: 51.4
+  landscapeTilesX: 7
+  landscapeTilesZ: 7
   landscapeTileSubdivisions: 33
-  landscapeOffset: {x: -43.9, y: -130.9}
+  landscapeOffset: {x: -109.4, y: -190.5}
   landscapeWorldY: 0
   landscapeHeightOffset: -44.1
   landscapeNoiseScale: 0.25
   fogEnabled: 1
   fogMap: {fileID: 11400000, guid: 4062942389ca8354dbda8fa65eabcd24, type: 2}
   fogHeightOffset: 40.5
+  fogPlaneMode: 1
+  fogZoneFadeTime: 1
+  fogZones:
+  - zoneId: e7d7459b-33d2-429e-b323-581948de0814
+    centreXZ: {x: 137.5, y: -64.9}
+    size: 47.2
+    height: 35.4
+    edgeFade: 1
+    subdivisions: 14
+    landscapeInfluence: 1
+    smoothing: 11
+    boundsCentreXZ: {x: 142.1, y: -61.4}
+    boundsSizeXZ: {x: 73.6, y: 78.9}
+  - zoneId: 80dd68a3-1a4a-427e-98ef-279013aea63f
+    centreXZ: {x: 111.700676, y: -44.76696}
+    size: 39.4
+    height: 38.2
+    edgeFade: 1
+    subdivisions: 16
+    landscapeInfluence: 1
+    smoothing: 10
+    boundsCentreXZ: {x: 133.27704, y: -65.392715}
+    boundsSizeXZ: {x: 93.5, y: 77.4}
+  - zoneId: 8d01b090-c205-4969-a1c7-af7ff30a555d
+    centreXZ: {x: 70.38256, y: -6.2582703}
+    size: 84.25
+    height: 59.8
+    edgeFade: 1
+    subdivisions: 41
+    landscapeInfluence: 1
+    smoothing: 3
+    boundsCentreXZ: {x: 70.38256, y: -6.2582703}
+    boundsSizeXZ: {x: 93.13, y: 94.79}
+  - zoneId: b44f95a8-b9d4-497b-8c4a-5986226a26a1
+    centreXZ: {x: 128.7, y: -62.8}
+    size: 78.2
+    height: 68.8
+    edgeFade: 1
+    subdivisions: 6
+    landscapeInfluence: 0.054
+    smoothing: 1
+    boundsCentreXZ: {x: 142.30603, y: -70.748634}
+    boundsSizeXZ: {x: 86.25, y: 99.77}
   whiteGradientPos: -43.13
   waterPreset: {fileID: 11400000, guid: 38955bea00a774b41909025653e8fef0, type: 2}
   structurePreset: {fileID: 11400000, guid: 4b84725422771dc429cc34f4a98d090d, type: 2}
   landscapePreset: {fileID: 11400000, guid: b31f14bcb0e114443bc560d80d52c44c, type: 2}
   whiteFadePreset: {fileID: 11400000, guid: 1054e9b367bd4811b112a9fe177e8a07, type: 2}
+  skyboxPreset: {fileID: 11400000, guid: 500dc8b3b1e57754c89fbc1e8677f218, type: 2}
   lightPosition: {x: 362.3, y: 259.8, z: -7.75}
   rippleDebugView: 0
   distanceFadeRadius: 105.15
   landscapeTool: {fileID: 0}
-  boatPathManager: {fileID: 0}
   dataController: {fileID: 0}
   fogFieldManager: {fileID: 0}
-  riverManager: {fileID: 0}
-  segmentRegistry: {fileID: 0}
-  splineManager: {fileID: 0}
   boatControl: {fileID: 0}
   cameraController: {fileID: 0}
   soulDisplaySlotManager: {fileID: 0}
@@ -1607,9 +5184,6 @@ MonoBehaviour:
   videoPlayerController: {fileID: 0}
   cameraPrefab: {fileID: 5450230635296789988, guid: fe8178a8b0cae4447b5ffd9ae4e14c6d, type: 3}
   dataControllerPrefab: {fileID: 3035356737094321521, guid: 6b22932c3e7b0874081f1cf19cb45440, type: 3}
-  pathPrefab: {fileID: 6414728786108141072, guid: f4129452c015d6547947f34b10d1341f, type: 3}
-  branchWaterExtrudePrefab: {fileID: 1541003137950059885, guid: 236c1531b2c82bc40a42e7657502f16a, type: 3}
-  barrierPrefab: {fileID: 5827812438927096501, guid: 81f54d9e5f0cd2149a669edc76b1ab99, type: 3}
   pauseManagerScriptPrefab: {fileID: 6401531644574261173, guid: bbbf8fae451ede54099f8b840c7f35f3, type: 3}
   portalConfirmUIScriptPrefab: {fileID: 2016724640348184634, guid: 50d0c938afb39ff46804f74b97ba6334, type: 3}
   soulsOnBoatDisplayScriptPrefab: {fileID: 6589475697257968682, guid: 9848bdf02a10a194e94177b011aa6f0e, type: 3}
@@ -1622,12 +5196,14 @@ MonoBehaviour:
   soulsOnBoatDisplayPrefab: {fileID: 119181983208249819, guid: c491e8905455bae4a9e9846dc5636c90, type: 3}
   orbsCounterPrefab: {fileID: 6410123795611025558, guid: f7834076e3f155f479d6773e68cb88a6, type: 3}
   shopTooltipPrefab: {fileID: 3280615064872562827, guid: 98f47fd9a15190a4ba4ad6d946e45e4c, type: 3}
-  musicIntro: {fileID: 8300000, guid: 1ff10eeae8633404da517dacc2021e9e, type: 3}
-  musicLoop: {fileID: 8300000, guid: 1ff10eeae8633404da517dacc2021e9e, type: 3}
+  startingAudio: {fileID: 8300000, guid: 8f84b6af482afca4eb6b2c30f700dd78, type: 3}
+  startingAudioLooped: 1
+  startingAudioFadeIn: 5
   musicController: {fileID: 0}
   targetScenePath: Assets/Scenes/LevelSelectWorlds/LevelSelectWorld2.unity
   openingSequenceStartPos: {x: 143.3325, y: 0, z: -12.623}
   boatStartNodeId: b0265fc9-851b-4e74-806c-7a603759acdd
+  playtestBoatNodeId: 308459f1-81dc-421a-b183-4b94b058c759
   canvasOriginX: 0
   canvasOriginZ: 0
   canvasUnitsPerPixel: 0.1
@@ -1635,7 +5211,7 @@ MonoBehaviour:
   soulRoutes:
   - routeId: 75c845e2
     displayName: Route 1
-    originNodeId: b2e5db0b-7bc0-4af6-ab70-c3e42776e421
+    originNodeId: d1f4c212-ee07-49cb-a8e1-c16696d20300
     originRadius: 2.93
     bandWidth: 0.72
     editorColor: {r: 0.45, g: 0.85, b: 1, a: 1}
@@ -1652,17 +5228,32 @@ MonoBehaviour:
     - {fileID: 11400000, guid: d28f26c27e043fc489d44691d4e3231d, type: 2}
     points:
     - kind: 0
-      nodeId: db7d413b-45c1-4245-8ed4-960f13707658
+      nodeId: accf5f46-4e31-4df4-9795-fa92a603f22f
       entranceIn: -1
       entranceOut: -1
       gateCondition: 
     - kind: 0
-      nodeId: 7b809514-9d66-45d4-ba5d-68ef656aa1a8
+      nodeId: 1e990f8a-0da6-453c-859a-0f757fb28551
       entranceIn: -1
       entranceOut: -1
       gateCondition: 
     - kind: 0
-      nodeId: fdd41757-67b3-4add-89dc-85b6fed6be9b
+      nodeId: 308459f1-81dc-421a-b183-4b94b058c759
+      entranceIn: -1
+      entranceOut: -1
+      gateCondition: 
+    - kind: 0
+      nodeId: 8f40ac36-55c8-4a05-bdc8-ed9b2164c33c
+      entranceIn: -1
+      entranceOut: -1
+      gateCondition: 
+    - kind: 0
+      nodeId: d9194d90-8bf7-477e-9462-c545c38e4ae0
+      entranceIn: -1
+      entranceOut: -1
+      gateCondition: 
+    - kind: 0
+      nodeId: a58ee8b5-98eb-4b11-8809-c253ca889e25
       entranceIn: -1
       entranceOut: -1
       gateCondition: 
@@ -1672,7 +5263,7 @@ MonoBehaviour:
       entranceOut: -1
       gateCondition: 
     - kind: 0
-      nodeId: e179a491-5f75-445d-b2b3-b04178d9ba43
+      nodeId: c5135933-e600-4297-87c2-d3baed4813f4
       entranceIn: -1
       entranceOut: -1
       gateCondition: 
@@ -1697,22 +5288,84 @@ MonoBehaviour:
       entranceOut: -1
       gateCondition: 
     - kind: 0
-      nodeId: 070587d1-da56-4508-8d85-b420d153e1f4
+      nodeId: e91713d5-bbd1-4f04-9445-a5f55b880ec5
       entranceIn: -1
       entranceOut: -1
       gateCondition: 
-    - kind: 0
-      nodeId: a41925ea-6c83-4673-a2e2-d0bcfe2d40f1
-      entranceIn: -1
-      entranceOut: -1
-      gateCondition: 
-    - kind: 0
-      nodeId: a91f922f-1baa-4392-9d95-e2fa616534cc
-      entranceIn: -1
-      entranceOut: -1
-      gateCondition: 
-    - kind: 0
-      nodeId: 486291ce-e817-4b2b-8b3d-3d3f706f0234
-      entranceIn: -1
-      entranceOut: -1
-      gateCondition: 
+  references:
+    version: 2
+    RefIds:
+    - rid: -2
+      type: {class: , ns: , asm: }
+    - rid: 8492782992085221485
+      type: {class: LevelSelectDesignerData/DesignerOutpost, ns: , asm: Assembly-CSharp}
+      data:
+        outpostId: 54e0ec99-d17c-49c7-9afe-d338173ef8be
+        pathId: cb512902-99c4-4aa3-973b-d4a908cef861
+        pathT: 0.25
+        side: 0
+        width: 3.24
+        depth: 2.54
+        height: 1.6
+        wallThickness: 0.44
+        wallHeight: 0.6
+        tower:
+          stemRadius: 0.15
+          stemHeight: 1.34
+          orbRadius: 0.5
+          baseRadius: 0.62
+          baseHeight: 1.11
+          lowerRampHeight: 0.33
+          lowerRampRadius: 1
+          rampHeight: 0.56
+          base2Radius: 0.29
+          base2Height: 0.17
+        towerOffset: {x: 0.62, y: 0}
+        columnDownstream: 0
+        towerOnDownstream: 1
+        columnUpstream: 1
+        towerOnUpstream: 1
+        columnHeight: 0.96
+        columnRadius: 0.45
+        opening: 1
+        openingWidth: 0.6
+        openingOffset: 0.87
+        slope: 1
+        slopeWay: 1
+        landingLength: 0.39
+        slopeLength: 1.4
+        slopeWidth: 0.58
+        preset: {fileID: 11400000, guid: f065cc79be9a99347988eb9db99acafc, type: 2}
+        towerPreset: {fileID: 11400000, guid: a370b7f97b3af794f857163502ab0e74, type: 2}
+        towerKind: 0
+        turret:
+          body:
+            stemRadius: 0.02
+            stemHeight: 0.35
+            orbRadius: 0.1
+            baseRadius: 0.05
+            baseHeight: 0.03
+            lowerRampHeight: 0
+            lowerRampRadius: 0.08
+            rampHeight: 0
+            base2Radius: 0.03
+            base2Height: 0
+          noseLength: 0.12
+          noseOuterRadius: 0.03
+          noseInnerRadius: 0.018
+          restPitch: 20
+        turretPreset: {fileID: 0}
+        towerScale: 0.46
+        towerPerch:
+          enabled: 0
+          perchRadius: 12
+          priority: 0
+          startPerch: 0
+          landingCurveSize: 2
+          talkEnabled: 0
+          talkRadius: 4
+          talkPrompt: Talk
+          talkText: 
+          talkCameraDistance: 0
+        bothLeft:
+          rid: -2

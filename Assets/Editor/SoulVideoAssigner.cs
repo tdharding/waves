@@ -13,7 +13,7 @@ public static class SoulVideoAssigner
     private const string SoulsFolder  = "Assets/Resources/Souls";
     private const string VideosFolder = "Assets/Resources/Videos";
 
-    [MenuItem("Tools/Soul System/Randomly Assign Videos to All Souls")]
+    [MenuItem("Tools/Souls/Randomly Assign Videos to All Souls", false, 802)]
     public static void AssignVideos()
     {
         // Load all video clips from the videos folder

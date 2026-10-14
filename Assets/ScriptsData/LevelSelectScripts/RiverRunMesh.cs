@@ -76,6 +76,20 @@ public class RiverRunMesh : MonoBehaviour
              "pool reaches across the rim it was trimmed against and meets the water inside.")]
     public float waterLeadOut;
 
+    [Tooltip("Whether the start of this run meets a pool. Its water is then held level with the " +
+             "pool's where the pool's water laps out over it.")]
+    public bool poolAtStart;
+
+    [Tooltip("World height of the rim top of the pool this run's start meets.")]
+    public float poolRimYStart;
+
+    [Tooltip("Whether the end of this run meets a pool. Its water is then held level with the " +
+             "pool's where the pool's water laps out over it.")]
+    public bool poolAtEnd;
+
+    [Tooltip("World height of the rim top of the pool this run's end meets.")]
+    public float poolRimYEnd;
+
     [Tooltip("The river this run branches off, when it starts at a junction — empty otherwise. " +
              "Its water carries that river's banks, so its lines take on that river's Reach " +
              "where the two meet. The name rather than a width, so Rebuild Runs reads that " +
@@ -110,6 +124,11 @@ public class RiverRunMesh : MonoBehaviour
              "open — the pool's mouth patch picks the section up there and carries it round.")]
     public bool capEnd = true;
 
+    [Tooltip("Whether this run was built as a Landscape Natural River Run. Stamped by the designer " +
+             "on generate and on every rebuild; read by the fog chain, so the FogMap can leave " +
+             "natural runs out of the fog repellers.")]
+    public bool naturalRun;
+
     [Tooltip("The unbroken curve the run was swept along, in this object's local space.")]
     public List<Knot> knots = new List<Knot>();
 
@@ -123,6 +142,9 @@ public class RiverRunMesh : MonoBehaviour
 
     [Tooltip("Name of the generated rim node mesh asset, when this run carries any.")]
     public string rimNodesMeshAssetName;
+
+    [Tooltip("Name of the generated river walkway mesh asset, when this run carries any.")]
+    public string walkwaysMeshAssetName;
 
     /// <summary>
     /// Rebuilds the curve the run was swept along.

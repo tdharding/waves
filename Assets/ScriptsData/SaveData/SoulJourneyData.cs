@@ -98,6 +98,31 @@ public static class SoulJourneyData
         return result;
     }
 
+    /// <summary>
+    /// True while a soul's fish is drawn on the level-select river: on the river, or already
+    /// counted into a level by its entry trigger but still swimming the last stretch to the Arena
+    /// point. The second kind keeps its route position; reaching the point or being caught clears it.
+    /// </summary>
+    public static bool IsSwimming(SoulJourneyEntry entry)
+    {
+        if (entry.place == SoulPlace.OnRiver) return true;
+        return entry.place == SoulPlace.InLevel &&
+               !string.IsNullOrEmpty(entry.routeId) &&
+               entry.legIndex >= 0;
+    }
+
+    /// <summary>Every soul whose fish is drawn on the river — see <see cref="IsSwimming"/>.</summary>
+    public static List<SoulJourneyEntry> Swimming()
+    {
+        var result = new List<SoulJourneyEntry>();
+
+        foreach (var entry in SaveManager.Load().soulJourneys)
+            if (IsSwimming(entry))
+                result.Add(entry);
+
+        return result;
+    }
+
     // ─────────────────────────────────────────────
     // MOVES
     // ─────────────────────────────────────────────
@@ -146,7 +171,7 @@ public static class SoulJourneyData
     public static void Advance(int identity, float progress)
     {
         var entry = Where(identity);
-        if (entry.place != SoulPlace.OnRiver) return;
+        if (!IsSwimming(entry)) return;
 
         entry.progress = Mathf.Clamp01(progress);
     }
@@ -192,7 +217,7 @@ public static class SoulJourneyData
     public static void EnterLeg(int identity, int legIndex)
     {
         var entry = Where(identity);
-        if (entry.place != SoulPlace.OnRiver) return;
+        if (!IsSwimming(entry)) return;
 
         entry.legIndex = legIndex;
         entry.progress = 0f;
@@ -215,6 +240,38 @@ public static class SoulJourneyData
 
         SaveManager.Write();
         Debug.Log($"[SoulJourney] Soul #{identity} arrived in '{levelID}' by door {entranceIndex}.");
+    }
+
+    /// <summary>
+    /// The soul's fish has swum into a level's entry trigger: from now on it is in that level, and
+    /// entering the arena finds it there. Unlike <see cref="Arrive"/> the route position is kept,
+    /// so the fish carries on swimming to the Arena point on the map and nothing visibly changes.
+    /// </summary>
+    public static void EnterLevel(int identity, string levelID, int entranceIndex)
+    {
+        var entry = Where(identity);
+
+        entry.place                = SoulPlace.InLevel;
+        entry.levelID              = levelID ?? string.Empty;
+        entry.arrivedEntranceIndex = entranceIndex;
+
+        SaveManager.Write();
+        Debug.Log($"[SoulJourney] Soul #{identity} entered '{levelID}' by door {entranceIndex} " +
+                  "(entry trigger) — still swimming in on the map.");
+    }
+
+    /// <summary>
+    /// A soul already in a level whose fish has reached the Arena point on the map — it stops
+    /// being drawn there. Its place is untouched.
+    /// </summary>
+    public static void FinishSwimmingIn(int identity)
+    {
+        var entry = Where(identity);
+        if (entry.place != SoulPlace.InLevel) return;
+
+        entry.legIndex = -1;
+        entry.progress = 0f;
+        SaveManager.Write();
     }
 
     /// <summary>

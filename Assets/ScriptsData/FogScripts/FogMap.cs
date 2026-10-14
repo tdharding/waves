@@ -197,6 +197,10 @@ public class FogMap : ScriptableObject
     [Range(0f, 1f)] public float globalRepelStrength = 1f;
 
     [Header("Rocks")]
+    [Tooltip("Whether rocks push fog at all: spikes that throw rock rings in a level, and the " +
+             "level select's spikes. Off, fog flows straight through them.")]
+    public bool rocksRepel = true;
+
     [Tooltip("Clear water the SKELETON is pushed out of, beyond a rock's own waterline radius.")]
     [FormerlySerializedAs("rockClearRadius")]
     public float rockRepelRadius = 0.7f;
@@ -242,6 +246,11 @@ public class FogMap : ScriptableObject
              "up above the fog like highways, and without this the fog slides straight through " +
              "the structures holding them up.")]
     public bool runsRepel = true;
+
+    [Tooltip("Whether Landscape Natural River Runs are strung with fog repellers too. Off leaves " +
+             "them out, so fog lies over them like the rest of the landscape; the structural runs " +
+             "still repel. Needs Runs Repel on.")]
+    public bool naturalRunsRepel = true;
 
     [Tooltip("How far apart the circles are strung along a run, IN WORLD UNITS. This is the " +
              "amount on a chain — the whole budget control. Every circle is one obstacle, " +

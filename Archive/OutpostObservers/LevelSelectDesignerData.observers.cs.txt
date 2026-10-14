@@ -1,0 +1,28 @@
+// Archived from Assets/ScriptsData/LevelSelectScripts/LevelSelectDesignerData.cs (2026-10-12).
+
+        [Tooltip("The observers standing on the floor, each placed around the lollipop tower.")]
+        public List<OutpostObserver> observers = new();
+            copy.observers  = observers?.ConvertAll(o => o.Clone()) ?? new List<OutpostObserver>();
+
+    /// <summary>
+    /// One observer standing on an outpost's floor, moved off the floor's centre the same way the
+    /// tower is. Facing goes clockwise seen from above from the river, so it reads the same on
+    /// either bank.
+    /// </summary>
+    [Serializable]
+    public class OutpostObserver
+    {
+        [Tooltip("Moves it along the river from the floor's centre, down the path the way it was drawn.")]
+        public float offsetAlong = 0f;
+
+        [Tooltip("Moves it away from the river from the floor's centre.")]
+        public float offsetAway = 0f;
+
+        [Tooltip("Which way it faces, in degrees. 0 = facing the river, clockwise seen from above.")]
+        public float facing = 0f;
+
+        [Tooltip("How tall it stands, from its feet to the top marker on its prefab.")]
+        [Min(0.001f)] public float height = 0.15f;
+
+        public OutpostObserver Clone() => (OutpostObserver)MemberwiseClone();
+    }

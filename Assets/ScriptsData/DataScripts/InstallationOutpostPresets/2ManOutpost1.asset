@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::InstallationOutpostPreset
   width: 3.24
   depth: 2.54
-  height: 0.32
+  height: 0.6
   wallThickness: 0.44
   wallHeight: 0.22
   tower:
@@ -23,10 +23,35 @@ MonoBehaviour:
     orbRadius: 0.5
     baseRadius: 0.62
     baseHeight: 0.3
+    lowerRampHeight: 0
+    lowerRampRadius: 0.08
     rampHeight: 0.56
     base2Radius: 0.29
     base2Height: 0.17
   towerOffset: {x: 0.62, y: 0}
+  towerKind: 0
+  turret:
+    body:
+      stemRadius: 0.02
+      stemHeight: 0.35
+      orbRadius: 0.1
+      baseRadius: 0.05
+      baseHeight: 0.03
+      lowerRampHeight: 0
+      lowerRampRadius: 0.08
+      rampHeight: 0
+      base2Radius: 0.03
+      base2Height: 0
+    noseLength: 0.12
+    noseOuterRadius: 0.03
+    noseInnerRadius: 0.018
+    restPitch: 20
+  columnDownstream: 1
+  towerOnDownstream: 1
+  columnUpstream: 0
+  towerOnUpstream: 1
+  columnHeight: 0.38
+  columnRadius: 0.5
   observers:
   - offsetAlong: -0.84
     offsetAway: -0.59
@@ -36,3 +61,5 @@ MonoBehaviour:
     offsetAway: -0.59
     facing: 0
     height: 0.6
+  towerPreset: {fileID: 0}
+  turretPreset: {fileID: 0}

@@ -11,7 +11,7 @@ public class GridDesignerSettingsWindow : EditorWindow
     Vector2 _scroll;
     bool    _showIcons;
 
-    [MenuItem("Tools/Waves/Grid Designer Settings")]
+    [MenuItem("Tools/Level Design/Grid Designer Settings", false, 120)]
     public static void Open() => ShowFor(FindDesigner());
 
     // Opens (or focuses) the settings window bound to a specific designer window.

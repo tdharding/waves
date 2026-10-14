@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: befd69eaf5040d146a7e22a1a8b2eecf, type: 3}
+  m_Name: NewSoulsPoolTowerPreset
+  m_EditorClassIdentifier: Assembly-CSharp::SoulsPoolTowerPreset
+  tower:
+    baseRadius: 0.52
+    baseHeight: 0.08
+    rampHeight: 0
+    base2Radius: 0.1
+    base2Height: 0
+    columnRadius: 0.46
+    columnHeight: 0.6
+    bowlRadius: 0.48
+    rimWidth: 0.08
+    bandHeight: 0.06
+    undersideDepth: 0.25
+    basinDepth: 0.18
+    waterDrop: 0.05
+    holeRadius: 0

@@ -13,7 +13,7 @@ using UnityEngine;
 /// </summary>
 public class EditorLoadMonitor : EditorWindow
 {
-    [MenuItem("Tools/Waves/Editor Load Monitor")]
+    [MenuItem("Tools/Testing/Editor Load Monitor", false, 920)]
     public static void Open() => GetWindow<EditorLoadMonitor>("Load Monitor");
 
     const string ShaderGraphWindowType = "MaterialGraphEditWindow";

@@ -1,0 +1,1302 @@
+// Slices of Assets/Editor/LevelSelectDesignerWindow.cs as they stood on 2026-10-02, just before
+// the scene splines were retired. Verbatim; line numbers are from that version. Not compiled.
+
+
+// ════════ Path panel: Extrude on Exit toggle  (lines 1095-1097) ════════
+        path.arenaIsAtEnd          = EditorGUILayout.Toggle("Arena at End",          path.arenaIsAtEnd);
+        path.extrudeOnExit         = EditorGUILayout.Toggle("Extrude on Exit",       path.extrudeOnExit);
+        path.tJunctionBidirectional = EditorGUILayout.Toggle("T-Junction Both Ways", path.tJunctionBidirectional);
+
+// ════════ Setup > Script Objects: Boat Path Manager field  (lines 1739-1750) ════════
+    private void DrawSceneRefsSection()
+    {
+        EditorGUILayout.Space(2);
+        EditorGUI.BeginChangeCheck();
+        _data.landscapeTool       = (LandscapeTool)EditorGUILayout.ObjectField(
+            "Landscape Tool", _data.landscapeTool, typeof(LandscapeTool), true);
+        _data.landscapeTilePrefab = (GameObject)EditorGUILayout.ObjectField(
+            "  Tile Prefab", _data.landscapeTilePrefab, typeof(GameObject), false);
+        _data.boatPathManager = (SplinePathStitcher)EditorGUILayout.ObjectField(
+            "Boat Path Manager", _data.boatPathManager, typeof(SplinePathStitcher), false);
+        if (EditorGUI.EndChangeCheck()) MarkDirty();
+    }
+
+// ════════ Setup > River Prefabs: split preset, path prefab, branch extrude, barrier  (lines 1784-1800) ════════
+    private void DrawRiverPrefabsSection()
+    {
+        EditorGUI.BeginChangeCheck();
+        EditorGUILayout.BeginHorizontal();
+        EditorGUILayout.LabelField("Split Preset", GUILayout.Width(EditorGUIUtility.labelWidth));
+        _splitPreset = (SplineSplitterPreset)EditorGUILayout.ObjectField(_splitPreset, typeof(SplineSplitterPreset), false);
+        EditorGUILayout.EndHorizontal();
+        _data.pathPrefab               = (GameObject)EditorGUILayout.ObjectField("Path Prefab",    _data.pathPrefab,               typeof(GameObject), false);
+        _data.branchWaterExtrudePrefab = (GameObject)EditorGUILayout.ObjectField("Branch Extrude", _data.branchWaterExtrudePrefab, typeof(GameObject), false);
+        _data.barrierPrefab            = (GameObject)EditorGUILayout.ObjectField("Barrier",         _data.barrierPrefab,            typeof(GameObject), false);
+        _data.riverMaterial            = (Material)EditorGUILayout.ObjectField("Run Material",     _data.riverMaterial,            typeof(Material), false);
+        _data.waterMaterial            = (Material)EditorGUILayout.ObjectField("Water Material",   _data.waterMaterial,            typeof(Material), false);
+        if (EditorGUI.EndChangeCheck()) MarkDirty();
+
+        EditorGUILayout.LabelField("Run shape and water are authored under Procedural Generation.",
+                                   EditorStyles.miniLabel);
+    }
+
+// ════════ Procedural Generation: Water Filled carrying the boat splines with the surface  (lines 1847-1880) ════════
+    private void DrawProcGenRiversSection()
+    {
+        EditorGUI.BeginChangeCheck();
+        _data.splineInstantiateSpacing = Mathf.Max(0.01f, EditorGUILayout.FloatField(
+            new GUIContent("Detail",
+                "Target length of an edge in every generated mesh. Ring spacing along a run, " +
+                "the columns across its section, and a pool's rings and columns all come off " +
+                "this one number — so a run, a branch and a pool all carry the same density. " +
+                "Smaller is finer and heavier."),
+            _data.splineInstantiateSpacing));
+
+        float previousDrop = BoatSplineDrop;   // to carry the boat's splines with the surface
+        _data.waterFilled              = EditorGUILayout.Toggle("Water Filled",                    _data.waterFilled);
+        using (new EditorGUI.DisabledScope(!_data.waterFilled))
+            _data.waterLevel = Mathf.Max(0f, EditorGUILayout.FloatField("Water Level",               _data.waterLevel));
+        EditorGUILayout.HelpBox(
+            _data.waterFilled
+                ? "Every river is generated already full of water, and nothing blocks the boat. " +
+                  "The surface is each run's own inner width, held Water Level below the rim top " +
+                  "on every river — so a run that climbs or drops carries its water with it. " +
+                  "The boat's splines are laid on that surface, not on the rim."
+                : "No water is generated. The SplineExtrude water unfolds ahead of the boat as " +
+                  "it travels, held back by the barriers.",
+            MessageType.None);
+        if (EditorGUI.EndChangeCheck())
+        {
+            MarkDirty();
+            SyncWaterPrefilledFlag();
+            // The water level is part of how far a run reaches down, so the pools go with it.
+            RebuildRunMeshes();
+            RebuildPoolMeshes();
+            ShiftBoatSplinesInScene(BoatSplineDrop - previousDrop);
+        }
+
+
+// ════════ Setup > Junction Prefabs: gap padding (only split the boat splines)  (lines 2970-2981) ════════
+    private void DrawJunctionPrefabsSection()
+    {
+        EditorGUI.BeginChangeCheck();
+        _data.junctionGapPadding        = EditorGUILayout.FloatField("Gap Padding",                 _data.junctionGapPadding);
+        if (EditorGUI.EndChangeCheck()) MarkDirty();
+
+        EditorGUILayout.HelpBox(
+            "Branches are cut into the run they meet — no junction geometry to assign. This gap " +
+            "only splits the spline either side of the mouth, so each stretch of river is " +
+            "named separately. The boat drives through a fork; it is not routed round one.",
+            MessageType.None);
+    }
+
+// ════════ Setup template save: river/junction entries  (lines 3354-3365) ════════
+        // River
+        AddObj  ("splitPreset",                   _splitPreset);
+        AddObj  ("pathPrefab",                    _data.pathPrefab);
+        AddObj  ("branchWaterExtrudePrefab",      _data.branchWaterExtrudePrefab);
+        AddObj  ("barrierPrefab",                 _data.barrierPrefab);
+        AddObj  ("riverMaterial",                 _data.riverMaterial);
+        AddObj  ("waterMaterial",                 _data.waterMaterial);
+        AddFloat("splineInstantiateSpacing",      _data.splineInstantiateSpacing);
+        AddFloat("waterLevel",                    _data.waterLevel);
+        AddFloat("generatedDrop",                 _data.generatedDrop);
+        // Junctions
+        AddFloat("junctionGapPadding",            _data.junctionGapPadding);
+
+// ════════ Setup template load: river/junction entries  (lines 3448-3459) ════════
+        // River
+        _splitPreset                          = LoadObj<SplineSplitterPreset>("splitPreset");
+        _data.pathPrefab                      = LoadObj<GameObject>("pathPrefab");
+        _data.branchWaterExtrudePrefab        = LoadObj<GameObject>("branchWaterExtrudePrefab");
+        _data.barrierPrefab                   = LoadObj<GameObject>("barrierPrefab");
+        _data.riverMaterial                   = LoadObj<Material>("riverMaterial");
+        _data.waterMaterial                   = LoadObj<Material>("waterMaterial");
+        _data.splineInstantiateSpacing        = LoadFloat("splineInstantiateSpacing", 0.15f);
+        _data.waterLevel                      = LoadFloat("waterLevel", 0f);
+        _data.generatedDrop                   = LoadFloat("generatedDrop", 8f);
+        // Junctions
+        _data.junctionGapPadding              = LoadFloat("junctionGapPadding", 0f);
+
+// ════════ Scene Deploy rows for the spline managers  (lines 3530-3553) ════════
+        DrawDeployRow("Segment Registry",  _data.segmentRegistry  != null,
+            () => { var f = UnityEngine.Object.FindObjectOfType<RiverSegmentRegistry>();  if (f) _data.segmentRegistry  = f; },
+            () => { if (DeployScriptOnly<RiverSegmentRegistry>("RiverSegmentRegistry", out var c, null)) _data.segmentRegistry = c; });
+
+        DrawDeployRow("Data Controller",   _data.dataController   != null,
+            () => { var f = UnityEngine.Object.FindObjectOfType<LevelSelectDataController>(); if (f) _data.dataController   = f; },
+            () => { if (DeployScriptOnly<LevelSelectDataController>("LevelSelectDataController", out var c, _data.dataControllerPrefab)) _data.dataController = c; });
+
+        DrawDeployRow("Boat Path Manager", _data.boatPathManager  != null,
+            () => { var f = UnityEngine.Object.FindObjectOfType<SplinePathStitcher>(); if (f) _data.boatPathManager = f; },
+            () => { if (DeployScriptOnly<SplinePathStitcher>("BoatPathManager", out var c, null)) _data.boatPathManager = c; });
+
+        DrawDeployRow("River Manager",     _data.riverManager     != null,
+            () => { var f = UnityEngine.Object.FindObjectOfType<SplineRiverManager>();    if (f) _data.riverManager    = f; },
+            () => { if (DeployScriptOnly<SplineRiverManager>("SplineRiverManager",    out var c, null)) _data.riverManager    = c; });
+
+        bool riverExtrusionReady = GameObject.Find("RiverExtrusion") != null;
+        DrawDeployRow("River Extrusion",   riverExtrusionReady,
+            () => { },
+            () => DeployRiverExtrusion());
+
+        DrawDeployRow("Spline Manager",    _data.splineManager    != null,
+            () => { var f = UnityEngine.Object.FindObjectOfType<LevelSelectSplineManager>(); if (f) _data.splineManager = f; },
+            () => { if (DeployScriptOnly<LevelSelectSplineManager>("LevelSelectSplineManager", out var c, null)) _data.splineManager = c; });
+
+// ════════ SyncWaterPrefilledFlag + DeployRiverExtrusion  (lines 3884-3952) ════════
+    /// <summary>
+    /// Filled rivers carry generated water and no barriers, so the manager has to stop
+    /// extruding and hide its own.
+    /// </summary>
+    private void SyncWaterPrefilledFlag()
+    {
+        if (_data == null || _data.riverManager == null) return;
+
+        var so = new SerializedObject(_data.riverManager);
+        so.Update();
+        var wp = so.FindProperty("_waterPrefilled");
+        if (wp == null || wp.boolValue == _data.waterFilled) return;
+
+        wp.boolValue = _data.waterFilled;
+        so.ApplyModifiedProperties();
+        EditorUtility.SetDirty(_data.riverManager);
+    }
+
+    private void DeployRiverExtrusion()
+    {
+        if (_data.riverManager == null)
+        {
+            Debug.LogWarning("[LevelSelectDesigner] Cannot deploy RiverExtrusion — SplineRiverManager not yet deployed.");
+            return;
+        }
+
+        var standingParent  = FindParent("RiverExtrusion");
+        var standingHighway = standingParent != null ? standingParent.transform.Find("MainHighway") : null;
+        if (standingHighway == null && ScriptsLocked("deploying the River Extrusion")) return;
+
+        var parent = FindOrCreateParent("RiverExtrusion");
+
+        // Find or create the main highway child
+        var highwayT = parent.transform.Find("MainHighway");
+        GameObject highwayGo;
+        bool       freshHighway = highwayT == null;
+        if (freshHighway)
+        {
+            highwayGo = new GameObject("MainHighway");
+            Undo.RegisterCreatedObjectUndo(highwayGo, "Deploy MainHighway");
+            highwayGo.transform.SetParent(parent.transform, false);
+        }
+        else
+        {
+            highwayGo = highwayT.gameObject;
+        }
+
+        var container = highwayGo.GetComponent<SplineContainer>();
+        if (container == null) container = Undo.AddComponent<SplineContainer>(highwayGo);
+
+        var extrude = highwayGo.GetComponent<SplineExtrude>();
+        bool freshExtrude = extrude == null;
+        if (freshExtrude) extrude = Undo.AddComponent<SplineExtrude>(highwayGo);
+
+        // Mirror SplineExtrude settings from BranchWaterExtrudePrefab — once, when the extrude
+        // is first made. Re-copying on every GENERATE stamped over whatever the extrusion had
+        // been tuned to since, which read as the river quietly changing shape on its own.
+        if ((freshHighway || freshExtrude) && _data.branchWaterExtrudePrefab != null)
+        {
+            var branchExtrude = _data.branchWaterExtrudePrefab.GetComponentInChildren<SplineExtrude>();
+            if (branchExtrude != null)
+            {
+                EditorUtility.CopySerialized(branchExtrude, extrude);
+                EditorUtility.SetDirty(extrude);
+            }
+        }
+
+        // Wiring handled by WireAllSceneObjects
+    }
+
+// ════════ DeployAllSceneObjects + AutoFindAll  (lines 4256-4320) ════════
+    private void DeployAllSceneObjects()
+    {
+        // Every deploy below finds what already stands before it makes anything, and asks the
+        // lock before it makes anything at all — so they are all safe to call plainly on every
+        // pass. The old "if (_data.x == null)" pre-tests are gone on purpose: those references
+        // live on the workspace clone and come back null after a domain reload, which is how a
+        // second copy of a manager used to end up beside the first.
+        AutoFindAll();
+        EnsureMainCamera();
+
+        DeployVideoController();
+        if (DeployScriptOnly<RiverSegmentRegistry>("RiverSegmentRegistry",             out var reg, null))                       _data.segmentRegistry = reg;
+        if (DeployScriptOnly<LevelSelectDataController>("LevelSelectDataController",   out var dc,  _data.dataControllerPrefab)) _data.dataController  = dc;
+        if (DeployScriptOnly<SplinePathStitcher>("BoatPathManager",                    out var bpm, null))                       _data.boatPathManager = bpm;
+        if (DeployScriptOnly<SplineRiverManager>("SplineRiverManager",                 out var rm,  null))                       _data.riverManager    = rm;
+        DeployRiverExtrusion();
+        if (DeployScriptOnly<LevelSelectSplineManager>("LevelSelectSplineManager",     out var sm,  null))                       _data.splineManager   = sm;
+        DeployBoat();
+        DeployPlayerBoat();
+        DeployCameraController();
+        DeployMusicController();
+        DeployArenaSoulsWindow();
+        DeployPauseManager();
+
+        // UI Canvas prefabs — only deploy if CANVAS parent prefab is assigned
+        if (_data.canvasParentPrefab != null)
+        {
+            if (GameObject.Find("CANVAS") == null && !ScriptsLocked("deploying the CANVAS"))
+            {
+                var canvas = (GameObject)PrefabUtility.InstantiatePrefab(_data.canvasParentPrefab);
+                Undo.RegisterCreatedObjectUndo(canvas, "Deploy CANVAS");
+                canvas.name = "CANVAS";
+            }
+            DeployUIPrefab(_data.pauseMenuPrefab,          "PauseMenuUI");
+            DeployUIPrefab(_data.boatHUDPrefab,            "BoatHUDPrompts");
+            DeployUIPrefab(_data.soulsOnBoatDisplayPrefab, "SoulsDisplayBarUI");
+            DeployUIPrefab(_data.orbsCounterPrefab,        "OrbsCounterUI");
+            DeployUIPrefab(_data.shopTooltipPrefab,        "ShopTooltipHUD");
+        }
+
+        // Deployed after SoulsDisplayBarUI exists so the wiring can find it
+        DeploySoulsOnBoatDisplay();
+        WirePauseMenuPanels();
+        EditorUtility.SetDirty(_data);
+    }
+
+    private void AutoFindAll()
+    {
+        Undo.RecordObject(_data, "Auto-Find Scene Objects");
+        TryFind<RiverSegmentRegistry>(v   => _data.segmentRegistry   = v);
+        TryFind<LevelSelectDataController>(v => _data.dataController = v);
+        TryFind<SplinePathStitcher>(v     => _data.boatPathManager   = v);
+        TryFind<SplineRiverManager>(v     => _data.riverManager      = v);
+        TryFind<LevelSelectSplineManager>(v => _data.splineManager   = v);
+        TryFind<LevelSelectBoatControl>(v => _data.boatControl       = v);
+        TryFind<LevelSelectCameraController>(v => _data.cameraController = v);
+        TryFind<LandscapeTool>(v             => _data.landscapeTool          = v);
+        TryFind<SoulDisplaySlotManager>(v       => _data.soulDisplaySlotManager    = v);
+        TryFind<PauseMenuUI>(v                  => _data.pauseMenuUI               = v);
+        TryFind<PauseManager>(v                 => _data.pauseManager              = v);
+        TryFind<SoulsOnBoatDisplayManager>(v    => _data.soulsOnBoatDisplayManager = v);
+        TryFind<VideoPlayerController>(v        => _data.videoPlayerController     = v);
+        TryFind<FogFieldManager>(v              => _data.fogFieldManager           = v);
+        MarkDirty();
+    }
+
+// ════════ WireAllSceneObjects: extrusion, barriers, path prefab  (lines 4377-4425) ════════
+    private void WireAllSceneObjects()
+    {
+        // ── River extrusion → SplineRiverManager ──────────────────────────────
+        var riverExtrusionGO = GameObject.Find("RiverExtrusion");
+        if (riverExtrusionGO != null && _data.riverManager != null)
+        {
+            var mainHighway = riverExtrusionGO.transform.Find("MainHighway");
+            if (mainHighway != null)
+            {
+                var container = mainHighway.GetComponent<SplineContainer>();
+                var extrude   = mainHighway.GetComponent<SplineExtrude>();
+                _data.riverManager.SetupContainers(container, extrude, _data.barrierPrefab);
+                var so = new SerializedObject(_data.riverManager);
+                so.Update();
+                var mc = so.FindProperty("_mainContainer");
+                var me = so.FindProperty("_mainExtrude");
+                var mb = so.FindProperty("_barrierPrefab");
+                if (mc != null) mc.objectReferenceValue = container;
+                if (me != null) me.objectReferenceValue = extrude;
+                if (mb != null && _data.barrierPrefab != null) mb.objectReferenceValue = _data.barrierPrefab;
+                so.ApplyModifiedProperties();
+                EditorUtility.SetDirty(_data.riverManager);
+            }
+        }
+
+        // ── Branch + barrier prefabs → SplineRiverManager ────────────────────
+        if (_data.riverManager != null && (_data.branchWaterExtrudePrefab != null || _data.barrierPrefab != null))
+        {
+            var so = new SerializedObject(_data.riverManager);
+            so.Update();
+            var bp = so.FindProperty("_branchPrefab");
+            var br = so.FindProperty("_barrierPrefab");
+            bool dirty = false;
+            if (bp != null && bp.objectReferenceValue == null && _data.branchWaterExtrudePrefab != null) { bp.objectReferenceValue = _data.branchWaterExtrudePrefab; dirty = true; }
+            if (br != null && br.objectReferenceValue == null && _data.barrierPrefab            != null) { br.objectReferenceValue = _data.barrierPrefab;            dirty = true; }
+            if (dirty) { so.ApplyModifiedProperties(); EditorUtility.SetDirty(_data.riverManager); }
+        }
+
+        // ── Water filled → SplineRiverManager ───────────────────────────
+        SyncWaterPrefilledFlag();
+
+        // ── Path prefab → SplinePathStitcher ──────────────────────────────────
+        if (_data.boatPathManager != null && _data.pathPrefab != null)
+        {
+            var so = new SerializedObject(_data.boatPathManager);
+            var pp = so.FindProperty("_pathPrefab");
+            if (pp != null && pp.objectReferenceValue == null) { pp.objectReferenceValue = _data.pathPrefab; so.ApplyModifiedProperties(); EditorUtility.SetDirty(_data.boatPathManager); }
+        }
+
+
+// ════════ WireAllSceneObjects: defaultSegmentID on the boat (already a dead property)  (lines 4480-4496) ════════
+        // ── Auto-fill defaultSegmentID on boat control from first main river path in data
+        if (_data.boatControl != null && _data.paths.Count > 0)
+        {
+            var mainPath = _data.paths.Find(p => p.segmentType == LevelSelectDesignerData.SegmentType.MainRiver)
+                        ?? _data.paths[0];
+            if (!string.IsNullOrEmpty(mainPath.segmentId))
+            {
+                var so = new SerializedObject(_data.boatControl);
+                var prop = so.FindProperty("defaultSegmentID");
+                if (prop != null && prop.stringValue != mainPath.segmentId)
+                {
+                    prop.stringValue = mainPath.segmentId;
+                    so.ApplyModifiedProperties();
+                    EditorUtility.SetDirty(_data.boatControl);
+                }
+            }
+        }
+
+// ════════ WireAllSceneObjects: spline manager -> river manager  (lines 4529-4535) ════════
+        if (_data.splineManager != null && _data.riverManager != null)
+        {
+            var so = new SerializedObject(_data.splineManager);
+            var prop = so.FindProperty("_riverManager");
+            if (prop != null) { prop.objectReferenceValue = _data.riverManager; so.ApplyModifiedProperties(); }
+            EditorUtility.SetDirty(_data.splineManager);
+        }
+
+// ════════ GenerateLevelSelect: the list of generated containers  (lines 7619-7619) ════════
+        var generatedContainers = new List<SplineContainer>();
+
+// ════════ GenerateLevelSelect: run-in/source wiring and the boat path bake  (lines 7840-7851) ════════
+        WireRunInSegments(generatedContainers);
+        WireSourceSegments(generatedContainers);
+        WireAllSceneObjects();
+
+        var stitcher = _data.boatPathManager;
+        if (stitcher != null)
+        {
+            stitcher.BakePaths();
+            Debug.Log("[LevelSelectDesigner] Boat paths baked.");
+
+        }
+
+
+// ════════ GenerateSimpleSegment  (lines 7868-7887) ════════
+    private SplineContainer GenerateSimpleSegment(LevelSelectDesignerData.DesignerPath path, GameObject parent)
+    {
+        var go = new GameObject(path.segmentId ?? "Segment");
+        Undo.RegisterCreatedObjectUndo(go, "Generate Segment");
+        go.transform.SetParent(parent.transform, false);
+
+        var container = go.AddComponent<SplineContainer>();
+        SetSplineFromPath(container, path);
+
+        var segId = go.AddComponent<RiverSegmentID>();
+        ApplySegmentID(segId, path);
+
+        BuildRunMesh(go, container.Splines[0], path,
+            $"RiverRun_{SanitiseAssetName(path.segmentId ?? "Segment")}", null);
+
+        // Only once the run has been swept along it — the sweep wants the rim top.
+        DropSplinesToWater(go, BoatSplineDrop);
+
+        return container;
+    }
+
+// ════════ GenerateJunctionSplit (the run is swept along fullSpline; the rest split it for the boat)  (lines 7964-8218) ════════
+    // Handles 1..N junctions on a single path in one pass.
+    private void GenerateJunctionSplit(
+        LevelSelectDesignerData.DesignerPath path,
+        List<LevelSelectDesignerData.DesignerJunction> junctions,
+        GameObject parent,
+        List<SplineContainer> containers)
+    {
+        // ── 1. Build full spline ──────────────────────────────────
+        var go = new GameObject(path.segmentId ?? "JunctionSegment");
+        Undo.RegisterCreatedObjectUndo(go, "Generate Junction Segment");
+        go.transform.SetParent(parent.transform, false);
+
+        var fullContainer = go.AddComponent<SplineContainer>();
+        SetSplineFromPath(fullContainer, path);
+
+        var      fullSpline = fullContainer.Splines[0];
+        float4x4 fl2w       = fullContainer.transform.localToWorldMatrix;
+
+        int subs  = path.curveSubdivisions > 0 ? path.curveSubdivisions
+                  : (_splitPreset != null ? _splitPreset.subdivisions : 5);
+        int steps = subs * Mathf.Max(1, fullSpline.Count - 1);
+
+        // ── 2. Resolve each junction: nearestT, gap bounds, branch mouth ─
+        var resolved = new List<(
+            float nearestT, float T_endA, float T_startB,
+            float3 endALocal, float3 startBLocal,
+            Vector3 tanWorld,
+            LevelSelectDesignerData.DesignerJunction junction)>();
+
+        // Mouths cut into this river's run where its branches meet it.
+        var mouths = new List<RiverRunMesh.Mouth>();
+
+        foreach (var junc in junctions)
+        {
+            int     jIdx    = path.nodeIds.IndexOf(junc.nodeId);
+            Vector3 jWorld3 = WorldPosOfNode(junc.nodeId);
+            float3  jLocal  = fullContainer.transform.InverseTransformPoint(jWorld3);
+            SplineUtility.GetNearestPoint(fullSpline, jLocal, out _, out float nearestT);
+
+            Vector3 actualJuncWorld = go.transform.TransformPoint(fullSpline.EvaluatePosition(nearestT));
+            _correctedNodePositions[junc.nodeId] = actualJuncWorld;
+
+            float3  jTanL   = math.normalize(fullSpline.EvaluateTangent(nearestT));
+            float3  jTanW   = math.normalize(math.mul(fl2w, new float4(jTanL, 0f)).xyz);
+            Vector3 tanWorld = new Vector3(jTanW.x, jTanW.y, jTanW.z);
+
+            // ── The direction the branch actually leaves in drives everything ──
+            var branchPath = _data.paths.FirstOrDefault(
+                p => p.pathId != SourcePathId(path) && p.nodeIds.Contains(junc.nodeId));
+
+            Vector3 branchDir = Vector3.zero;
+            if (branchPath != null)
+            {
+                int    bIdx   = branchPath.nodeIds.IndexOf(junc.nodeId);
+                string nextId = bIdx >= 0 && bIdx < branchPath.nodeIds.Count - 1
+                    ? branchPath.nodeIds[bIdx + 1] : null;
+                if (nextId != null)
+                {
+                    branchDir   = WorldPosOfNode(nextId) - actualJuncWorld;
+                    branchDir.y = 0f;
+                }
+            }
+            // No branch node to read — fall back to leaving at 90° right of travel.
+            if (branchDir.sqrMagnitude < 0.0001f)
+                branchDir = new Vector3(tanWorld.z, 0f, -tanWorld.x);
+            branchDir.Normalize();
+
+            // Top = LEFT of travel, Bottom = RIGHT. Still recorded so segment IDs read the same.
+            if (branchPath != null && !branchPath.isLeftPath && !branchPath.isRightPath)
+            {
+                float cross = SplineSplitUtility.CrossXZ(tanWorld, branchDir);
+                Undo.RecordObject(_data, "Auto-detect branch side");
+                branchPath.isLeftPath  = cross < 0f;
+                branchPath.isRightPath = cross > 0f;
+                EditorUtility.SetDirty(_data);
+            }
+
+            // The branch gets no piece of its own — it is a mouth cut down through this
+            // river's rim, at its own width and depth, wherever it happens to meet.
+            Quaternion juncRot     = Quaternion.LookRotation(tanWorld, Vector3.up);
+            Vector3    branchLocal = Quaternion.Inverse(juncRot) * branchDir;
+            float      branchAngle = Mathf.Atan2(branchLocal.x, branchLocal.z);
+
+            var mainProfile   = _data.ProfileFor(path.riverName);
+            var branchProfile = branchPath != null ? _data.ProfileFor(branchPath.riverName) : mainProfile;
+
+            // The branch's own run stops a collar clear of this river, so the whole of its
+            // last ring is outside — that ring is where the mouth patch picks the section up.
+            // Both sides work off this one number, so the two always meet.
+            float collar = RiverMeshBuilder.RunCollar(mainProfile, branchProfile, branchAngle,
+                                                      MeshEdge);
+
+            mouths.Add(new RiverRunMesh.Mouth
+            {
+                riverName = branchPath != null ? branchPath.riverName : path.riverName,
+                centre    = go.transform.InverseTransformPoint(actualJuncWorld),
+                direction = go.transform.InverseTransformDirection(branchDir).normalized,
+                collar    = collar,
+            });
+
+            _junctionPerpDirections[junc.nodeId] = branchDir;
+            _junctionBranchStart[junc.nodeId]    = collar;
+
+            // Its water carries the whole way in to this river's centreline, where the two
+            // channels are already the same depth and one surface runs into the other.
+            _junctionWaterLeadIn[junc.nodeId] = collar;
+
+            // This river's centreline across the junction, facing out toward the branch, so the
+            // branch's water can be told how far each of its corners lies from this river's banks.
+            Vector3 acrossWorld = Vector3.Cross(Vector3.up, new Vector3(tanWorld.x, 0f, tanWorld.z));
+            if (Vector3.Dot(acrossWorld, branchDir) < 0f) acrossWorld = -acrossWorld;
+            if (acrossWorld.sqrMagnitude > 1e-8f)
+                _junctionJoin[junc.nodeId] = (actualJuncWorld, acrossWorld.normalized, path.riverName);
+
+            // The visual run carries straight on through; this gap only splits the spline
+            // so the boat has a segment either side of the mouth to route between.
+            float halfGap = Mathf.Max(0f,
+                RiverMeshBuilder.JunctionSpan(mainProfile, branchProfile, branchAngle)
+                + (_splitPreset != null ? _splitPreset.padding : _data.junctionGapPadding));
+
+            SplineUtility.GetPointAtLinearDistance(fullSpline, nearestT, -halfGap, out float T_endA);
+            SplineUtility.GetPointAtLinearDistance(fullSpline, nearestT,  halfGap, out float T_startB);
+
+            resolved.Add((nearestT, T_endA, T_startB,
+                fullSpline.EvaluatePosition(T_endA),
+                fullSpline.EvaluatePosition(T_startB),
+                tanWorld, junc));
+        }
+
+        // ── 2b. One unbroken run for the whole river, mouths and all ─
+        BuildRunMesh(go, fullSpline, path,
+            $"RiverRun_{SanitiseAssetName(path.segmentId ?? "Segment")}", mouths);
+
+        // Sort by T so we process left-to-right along the river
+        resolved.Sort((a, b) => a.nearestT.CompareTo(b.nearestT));
+
+        // ── 3. Build segment position lists ───────────────────────
+        // Boundaries: [0..T_endA[0]], [T_startB[0]..T_endA[1]], ..., [T_startB[N-1]..1]
+        // N+1 segments, N gaps
+        var segBounds = new List<(float from, float to)>();
+        float prev = 0f;
+        foreach (var r in resolved)
+        {
+            segBounds.Add((prev, r.T_endA));
+            prev = r.T_startB;
+        }
+        segBounds.Add((prev, 1f));
+
+        // Single walk — distribute points to the correct segment
+        var segPos = new List<List<float3>>(segBounds.Count);
+        for (int s = 0; s < segBounds.Count; s++) segPos.Add(new List<float3>());
+
+        for (int i = 0; i <= steps; i++)
+        {
+            float  t = (float)i / steps;
+            float3 p = fullSpline.EvaluatePosition(t);
+            for (int s = 0; s < segBounds.Count; s++)
+                if (t >= segBounds[s].from && t <= segBounds[s].to)
+                    segPos[s].Add(p);
+        }
+
+        // Ensure exact gap endpoints are the segment boundaries
+        for (int s = 0; s < segBounds.Count; s++)
+        {
+            float3 startP = fullSpline.EvaluatePosition(segBounds[s].from);
+            float3 endP   = fullSpline.EvaluatePosition(segBounds[s].to);
+            if (segPos[s].Count == 0 || math.distance(segPos[s][0], startP) > 0.001f)
+                segPos[s].Insert(0, startP);
+            if (segPos[s].Count < 2 || math.distance(segPos[s][segPos[s].Count - 1], endP) > 0.001f)
+                segPos[s].Add(endP);
+        }
+
+        // ── 4. Create containers ──────────────────────────────────
+        string[] suffixes = { "_A", "_B", "_C", "_D", "_E", "_F" };
+        bool firstSeg = true;
+
+        for (int s = 0; s < segBounds.Count; s++)
+        {
+            if (segPos[s].Count < 2) continue;
+
+            var segSpline = SplineSplitUtility.BuildSplineFromPositions(segPos[s], TangentMode.AutoSmooth);
+
+            SplineContainer segContainer;
+            if (firstSeg)
+            {
+                Undo.RegisterCompleteObjectUndo(fullContainer, "Split Spline");
+                fullContainer.RemoveSplineAt(0);
+                fullContainer.AddSpline(segSpline);
+                EditorUtility.SetDirty(fullContainer);
+                segContainer = fullContainer;
+                firstSeg = false;
+            }
+            else
+            {
+                segContainer = Undo.AddComponent<SplineContainer>(go);
+                segContainer.RemoveSplineAt(0);
+                segContainer.AddSpline(segSpline);
+                EditorUtility.SetDirty(segContainer);
+            }
+
+            var segId = go.AddComponent<RiverSegmentID>();
+            ApplySegmentID(segId, path);
+            segId.SetSegmentID(path.segmentId + (s < suffixes.Length ? suffixes[s] : $"_{s}"));
+
+            // For T-junction bidirectional paths, every segment except the last is a "left half"
+            // whose junction is at t=1 — it must extrude backward from the junction toward its start.
+            if (path.tJunctionBidirectional && s < segBounds.Count - 1)
+            {
+                var so2 = new SerializedObject(segId);
+                so2.Update();
+                so2.FindProperty("reverseExtrude").boolValue = true;
+                so2.ApplyModifiedProperties();
+                EditorUtility.SetDirty(segId);
+            }
+
+            containers.Add(segContainer);
+
+            // Create gap container after this segment (if not the last)
+            if (s < resolved.Count)
+            {
+                var r = resolved[s];
+                var gapSpline = SplineSplitUtility.BuildSplineFromPositions(
+                    new List<float3> { r.endALocal, r.startBLocal }, TangentMode.Broken);
+
+                var gapContainer = Undo.AddComponent<SplineContainer>(go);
+                gapContainer.RemoveSplineAt(0);
+                gapContainer.AddSpline(gapSpline);
+                EditorUtility.SetDirty(gapContainer);
+
+                // Top/bottom for branch
+                var branchPath = _data.paths.FirstOrDefault(
+                    p => p.pathId != SourcePathId(path) && p.nodeIds.Contains(r.junction.nodeId));
+                if (branchPath != null)
+                {
+                    int    bIdx   = branchPath.nodeIds.IndexOf(r.junction.nodeId);
+                    string nextId = bIdx < branchPath.nodeIds.Count - 1
+                        ? branchPath.nodeIds[bIdx + 1]
+                        : bIdx > 0 ? branchPath.nodeIds[bIdx - 1] : null;
+                    if (nextId != null)
+                    {
+                        float cross = SplineSplitUtility.CrossXZ(r.tanWorld,
+                            (WorldPosOfNode(nextId) - _correctedNodePositions[r.junction.nodeId]).normalized);
+                        branchPath.isRightPath = cross > 0f;
+                        branchPath.isLeftPath    = cross < 0f;
+                    }
+                }
+
+            }
+        }
+
+        // Every segment and gap spline on this object is now built, and the run has already
+        // been swept along the rim top — so the boat's splines can come down to the water.
+        DropSplinesToWater(go, BoatSplineDrop);
+    }
+
+
+// ════════ DropSplinesToWater / ShiftBoatSplinesInScene  (lines 9120-9169) ════════
+    /// <summary>
+    /// How far the boat's splines sit below the run they were swept along: the water surface
+    /// is held Water Level under the rim top, and the splines are laid on the rim top, so
+    /// without this drop the boat travels in the air above its own river.
+    /// </summary>
+    private float BoatSplineDrop => _data != null && _data.waterFilled ? _data.waterLevel : 0f;
+
+    /// <summary>
+    /// Lowers every boat spline on a generated segment onto the water surface. The run and its
+    /// water hang off this object as children with their own transforms, so only the splines
+    /// the boat travels move.
+    /// </summary>
+    private static void DropSplinesToWater(GameObject segmentGO, float drop)
+    {
+        if (segmentGO == null || Mathf.Abs(drop) < 0.0001f) return;
+
+        foreach (var container in segmentGO.GetComponents<SplineContainer>())
+        {
+            float3 localDrop = container.transform.InverseTransformVector(Vector3.down * drop);
+            Undo.RecordObject(container, "Drop Splines To Water");
+
+            foreach (var spline in container.Splines)
+            {
+                for (int i = 0; i < spline.Count; i++)
+                {
+                    var knot = spline[i];
+                    knot.Position += localDrop;
+                    spline.SetKnot(i, knot);
+                }
+            }
+            EditorUtility.SetDirty(container);
+        }
+    }
+
+    /// <summary>
+    /// Moves the boat splines of every generated run in the open scene by <paramref name="delta"/>,
+    /// so a Water Level edit carries them with the surface instead of waiting for a regenerate.
+    /// </summary>
+    private void ShiftBoatSplinesInScene(float delta)
+    {
+        if (Mathf.Abs(delta) < 0.0001f) return;
+
+        var moved = new HashSet<GameObject>();
+        foreach (var record in FindObjectsOfType<RiverRunMesh>())
+        {
+            var segmentGO = record.transform.parent != null ? record.transform.parent.gameObject : null;
+            if (segmentGO == null || !moved.Add(segmentGO)) continue;
+            DropSplinesToWater(segmentGO, delta);
+        }
+    }
+
+// ════════ GeneratePools: the ring spline a boat travelled a pool on  (lines 9420-9428) ════════
+            // The loop a boat travels the pool on. An open bowl has no ring to travel.
+            if (channelR > 0.001f)
+            {
+                var ring = go.AddComponent<SplineContainer>();
+                ring.RemoveSplineAt(0);
+                ring.AddSpline(BuildRingSpline(channelR));
+                EditorUtility.SetDirty(ring);
+                DropSplinesToWater(go, BoatSplineDrop);
+            }
+
+// ════════ BuildRingSpline  (lines 9538-9558) ════════
+    /// <summary>
+    /// A closed circle as a spline, its knots carrying the exact tangents that make the four
+    /// arcs true quarter-circles rather than an eight-sided approximation of one.
+    /// </summary>
+    private static Spline BuildRingSpline(float radius, int knots = 8)
+    {
+        var spline = new Spline();
+        float handle = radius * 4f / 3f * Mathf.Tan(Mathf.PI / (2f * knots));
+
+        for (int i = 0; i < knots; i++)
+        {
+            float   a   = 2f * Mathf.PI * i / knots;
+            Vector3 p   = new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * radius;
+            Vector3 tan = new Vector3(Mathf.Cos(a), 0f, -Mathf.Sin(a)) * handle;
+
+            spline.Add(new BezierKnot(p, -tan, tan, Quaternion.identity), TangentMode.Broken);
+        }
+
+        spline.Closed = true;
+        return spline;
+    }
+
+// ════════ GenerateObstacles: river stop points and the obstacle chain for the extrusion  (lines 9648-9717) ════════
+        // Create or find RiverStopPoint child on each obstacle and wire _riverStopPoint
+        var stopPoints = new List<Transform>();
+        foreach (var go in spawnedGOs)
+        {
+            var manager = go.GetComponent<LevelSelectObstacleManager>()
+                       ?? go.GetComponentInChildren<LevelSelectObstacleManager>();
+
+            // Find or create child GO named "RiverStopPoint"
+            var existing = go.transform.Find("RiverStopPoint");
+            Transform stopT;
+            if (existing != null)
+            {
+                stopT = existing;
+            }
+            else
+            {
+                var stopGO = new GameObject("RiverStopPoint");
+                Undo.RegisterCreatedObjectUndo(stopGO, "Create RiverStopPoint");
+                stopGO.transform.SetParent(go.transform, false);
+                stopT = stopGO.transform;
+            }
+            stopPoints.Add(stopT);
+
+            if (manager != null)
+            {
+                var so       = new SerializedObject(manager);
+                var stopProp = so.FindProperty("_riverStopPoint");
+                if (stopProp != null)
+                {
+                    stopProp.objectReferenceValue = stopT;
+                    so.ApplyModifiedProperties();
+                    EditorUtility.SetDirty(manager);
+                }
+            }
+        }
+
+        // Build a flat list of managers in spawn order so we can chain _nextObstacle
+        var managers = new List<LevelSelectObstacleManager>();
+        foreach (var go in spawnedGOs)
+        {
+            var m = go.GetComponent<LevelSelectObstacleManager>()
+                 ?? go.GetComponentInChildren<LevelSelectObstacleManager>();
+            if (m != null) managers.Add(m);
+        }
+
+        // Wire _nextObstacle: each obstacle points to the next manager in sequence
+        for (int i = 0; i < managers.Count; i++)
+        {
+            var so       = new SerializedObject(managers[i]);
+            var nextProp = so.FindProperty("_nextObstacle");
+            if (nextProp != null)
+            {
+                nextProp.objectReferenceValue = (i + 1 < managers.Count) ? managers[i + 1] : null;
+                so.ApplyModifiedProperties();
+                EditorUtility.SetDirty(managers[i]);
+            }
+        }
+
+        // Wire _firstObstacle on LevelSelectSplineManager to the first obstacle in the chain
+        if (managers.Count > 0 && _data.splineManager != null)
+        {
+            var so   = new SerializedObject(_data.splineManager);
+            var prop = so.FindProperty("_firstObstacle");
+            if (prop != null)
+            {
+                prop.objectReferenceValue = managers[0];
+                so.ApplyModifiedProperties();
+                EditorUtility.SetDirty(_data.splineManager);
+            }
+        }
+
+// ════════ WireRunInSegments / WireSourceSegments  (lines 10623-10751) ════════
+    private void WireRunInSegments(List<SplineContainer> generatedContainers)
+    {
+        var runIns = FindObjectsOfType<EntranceSplineRunIn>();
+        foreach (var runIn in runIns)
+        {
+            var container = runIn.GetComponent<SplineContainer>();
+            var segId     = runIn.GetComponent<RiverSegmentID>();
+            if (container == null || segId == null || container.Spline.Count < 2) continue;
+
+            // Knot 0 is the river-connection side.
+            // Check the arena-flagged endpoint of each path — last knot for arenaIsAtEnd=true,
+            // first knot for arenaIsAtEnd=false — so branches in either direction match correctly.
+            Vector3 runInKnot0  = container.transform.TransformPoint((Vector3)container.Spline[0].Position);
+
+            SplineContainer nearest      = null;
+            float           nearestDist  = float.MaxValue;
+            bool            matchedStart = false;
+
+            foreach (var c in generatedContainers)
+            {
+                if (c == null || c.Spline.Count == 0) continue;
+                var cSegId = c.GetComponent<RiverSegmentID>();
+                if (cSegId == null || !cSegId.LeadsToArena) continue;
+
+                Vector3 arenaKnot;
+                bool    atStart;
+                if (cSegId.ArenaIsAtEnd)
+                {
+                    arenaKnot = c.transform.TransformPoint((Vector3)c.Spline[c.Spline.Count - 1].Position);
+                    atStart   = false;
+                }
+                else
+                {
+                    arenaKnot = c.transform.TransformPoint((Vector3)c.Spline[0].Position);
+                    atStart   = true;
+                }
+
+                float dist = Vector3.Distance(runInKnot0, arenaKnot);
+                if (dist < nearestDist) { nearestDist = dist; nearest = c; matchedStart = atStart; }
+            }
+
+            if (nearest == null)
+            {
+                Debug.LogWarning($"[LSD] EntranceSplineRunIn '{runIn.name}': no matching path found.");
+                continue;
+            }
+
+            // Copy segment identity from the parent path so stitching appends to the same highway.
+            // arenaIsAtEnd on the RunIn always matches the parent — the RunIn sits at the same end.
+            var srcSegId = nearest.GetComponent<RiverSegmentID>();
+            if (srcSegId != null)
+            {
+                var so = new SerializedObject(segId);
+                so.Update();
+                so.FindProperty("segmentID").stringValue      = srcSegId.SegmentID;
+                so.FindProperty("junctionGroup").stringValue  = srcSegId.JunctionGroup;
+                so.FindProperty("segmentType").enumValueIndex = (int)srcSegId.Type;
+                so.FindProperty("isLeftPath").boolValue       = srcSegId.IsLeftPath;
+                so.FindProperty("isRightPath").boolValue      = srcSegId.IsRightPath;
+                so.FindProperty("extrudeOnExit").boolValue    = srcSegId.ExtrudeOnExit;
+                so.FindProperty("leadsToArena").boolValue     = true;
+                so.FindProperty("arenaIsAtEnd").boolValue     = srcSegId.ArenaIsAtEnd;
+                so.FindProperty("skipRegistration").boolValue = true;
+                so.ApplyModifiedProperties();
+                EditorUtility.SetDirty(segId);
+            }
+
+            // Replace both terminal knots with exact RunIn positions so the path
+            // follows the RunIn geometry and welds correctly.
+            Vector3 runInK1World    = container.transform.TransformPoint((Vector3)container.Spline[1].Position);
+            int     arenaKnotIdx    = matchedStart ? 0 : nearest.Spline.Count - 1;
+            int     adjacentKnotIdx = matchedStart ? 1 : nearest.Spline.Count - 2;
+
+            var k0snap = nearest.Spline[arenaKnotIdx];
+            k0snap.Position = (Unity.Mathematics.float3)nearest.transform.InverseTransformPoint(runInKnot0);
+            nearest.Spline.SetTangentMode(arenaKnotIdx, TangentMode.AutoSmooth);
+            nearest.Spline[arenaKnotIdx] = k0snap;
+
+            var k1snap = nearest.Spline[adjacentKnotIdx];
+            k1snap.Position = (Unity.Mathematics.float3)nearest.transform.InverseTransformPoint(runInK1World);
+            nearest.Spline.SetTangentMode(adjacentKnotIdx, TangentMode.AutoSmooth);
+            nearest.Spline[adjacentKnotIdx] = k1snap;
+
+            EditorUtility.SetDirty(nearest);
+
+            // The branch's terminal knots now carry the RunIn geometry, so the RunIn container
+            // does NOT go into generatedContainers (that would duplicate those knots in the boat path).
+            // SplineRiverManager picks up the RunIn independently via its RiverSegmentID in the scene.
+            Debug.Log($"[LSD] RunIn '{runIn.name}' → '{nearest.name}' dist={nearestDist:F3}m — terminal knots replaced, RunIn excluded from boat path");
+        }
+    }
+
+    private void WireSourceSegments(List<SplineContainer> containers)
+    {
+        var sorted = containers
+            .OrderBy(c => c.GetComponent<RiverSegmentID>()?.BranchDepth ?? 0)
+            .ToList();
+
+        void Wire(UnityEngine.Object target)
+        {
+            if (target == null) return;
+            var so = new SerializedObject(target);
+            so.Update();
+            var prop = so.FindProperty("_sourceSegments");
+            prop.ClearArray();
+            for (int i = 0; i < sorted.Count; i++)
+            {
+                prop.InsertArrayElementAtIndex(i);
+                prop.GetArrayElementAtIndex(i).objectReferenceValue = sorted[i];
+            }
+            so.ApplyModifiedProperties();
+            EditorUtility.SetDirty(target);
+        }
+
+        Wire(_data.riverManager     ?? FindObjectOfType<SplineRiverManager>());
+        Wire(_data.boatPathManager  ?? FindObjectOfType<SplinePathStitcher>());
+
+        // Wire SplineRiverManager → LevelSelectSplineManager._riverManager
+        var splineManager = _data.splineManager ?? FindObjectOfType<LevelSelectSplineManager>();
+        var riverManager  = _data.riverManager  ?? FindObjectOfType<SplineRiverManager>();
+        if (splineManager != null && riverManager != null)
+        {
+            var so = new SerializedObject(splineManager);
+            so.Update();
+            so.FindProperty("_riverManager").objectReferenceValue = riverManager;
+            so.ApplyModifiedProperties();
+            EditorUtility.SetDirty(splineManager);
+        }
+    }
+
+// ════════ ClearGeneratedObjects: clearing the manager references  (lines 10799-10814) ════════
+        // Clear scene object references so deploy status resets
+        if (clearScripts && _data != null)
+        {
+            Undo.RecordObject(_data, "Clear Scene References");
+            _data.segmentRegistry  = null;
+            _data.dataController   = null;
+            _data.riverManager     = null;
+            _data.splineManager    = null;
+            _data.boatControl      = null;
+            _data.cameraController      = null;
+            _data.soulDisplaySlotManager = null;
+            _data.musicController        = null;
+            _data.pauseManager           = null;
+            MarkDirty();
+        }
+    }
+
+// ════════ SetSplineFromPath (container version)  (lines 10832-10992) ════════
+    // ── Spline building ───────────────────────────────────────────
+    private void SetSplineFromPath(SplineContainer container, LevelSelectDesignerData.DesignerPath path)
+    {
+        var    positions       = new List<Vector3>();
+        bool   isJunctionStart = false;
+        string junctionNodeId  = null;
+
+        for (int i = 0; i < path.nodeIds.Count; i++)
+        {
+            string  nodeId = path.nodeIds[i];
+            Vector3 pos    = WorldPosOfNode(nodeId);
+            positions.Add(pos);
+
+            if (i == 0 && _correctedNodePositions.ContainsKey(nodeId))
+            {
+                isJunctionStart = true;
+                junctionNodeId  = nodeId;
+            }
+        }
+
+        SetSplineFromPositions(container, positions, path.curveStrength);
+
+        if (container.Splines.Count == 0) return;
+        var spline = container.Splines[0];
+        if (spline.Count < 2) return;
+
+        // ── 1. Trim leading end (Junctions) ───────────────────────
+        // Cut back the collar, so the whole of this branch's last ring stands clear of the
+        // river it leaves and the mouth patch there picks its section up.
+        string firstNodeId = path.nodeIds[0];
+        string lastNodeId  = path.nodeIds[path.nodeIds.Count - 1];
+
+        float startTrim = 0f;
+        if (isJunctionStart && _junctionBranchStart.TryGetValue(junctionNodeId, out float collar))
+            startTrim = collar;
+
+        if (isJunctionStart && startTrim > 0f)
+        {
+            SplineUtility.GetPointAtLinearDistance(spline, 0f, startTrim, out float T_start);
+
+            int subs  = path.curveSubdivisions > 0 ? path.curveSubdivisions : 5;
+            int steps = subs * Mathf.Max(1, spline.Count - 1);
+
+            // The mouth patch picks the section up on the branch's own last ring, so that
+            // ring has to be exactly where the patch expects it: a collar out along the
+            // heading the branch leaves on, not a length measured round its own curve. The
+            // start tangent is forced to that same heading below, so the two agree.
+            const float MinStartGap = 0.02f;
+
+            float3 startP = spline.EvaluatePosition(T_start);
+            if (_correctedNodePositions.TryGetValue(junctionNodeId, out Vector3 juncWorld) &&
+                _junctionPerpDirections.TryGetValue(junctionNodeId, out Vector3 leaveDir) &&
+                leaveDir.sqrMagnitude > 0.0001f)
+            {
+                Vector3 local = container.transform.InverseTransformPoint(
+                    juncWorld + leaveDir.normalized * startTrim);
+                startP = new float3(local.x, local.y, local.z);
+            }
+
+            var trimPos = new List<float3> { startP };
+            for (int i = 0; i <= steps; i++)
+            {
+                float t = (float)i / steps;
+                if (t <= T_start) continue;
+
+                float3 p = spline.EvaluatePosition(t);
+                if (math.distance(trimPos[trimPos.Count - 1], p) < MinStartGap) continue;
+                trimPos.Add(p);
+            }
+            float3 endP = spline.EvaluatePosition(1f);
+            if (trimPos.Count < 2 || math.distance(trimPos[trimPos.Count - 1], endP) > 0.001f)
+                trimPos.Add(endP);
+
+            if (trimPos.Count >= 2)
+            {
+                var trimmed = SplineSplitUtility.BuildSplineFromPositions(trimPos, TangentMode.AutoSmooth);
+                container.RemoveSplineAt(0);
+                container.AddSpline(trimmed);
+                spline = container.Splines[0];
+            }
+        }
+
+        // ── 1b. Trim either end against a pool ────────────────────
+        // A river meeting a pool is cut exactly where its curve crosses the pool's outer wall,
+        // not a length measured back along itself — that is what puts its rim corners on the
+        // pool's rim corners however it happened to curve in. No designer offset either: the
+        // two are one piece of water, so the run butts straight onto the wall.
+        bool poolAtEnd   = TrimAgainstPool(container, path, lastNodeId,  fromEnd: true);
+        bool poolAtStart = TrimAgainstPool(container, path, firstNodeId, fromEnd: false);
+        spline = container.Splines[0];
+
+        if (spline.Count < 2) return;
+
+        // ── 2. Force start tangent (Junction or Arena Exit) ───────
+        string  startNodeId = path.nodeIds[0];
+        Vector3 forceDir    = Vector3.zero;
+        bool    forceStart  = false;
+
+        if (_junctionPerpDirections.TryGetValue(startNodeId, out var perp))
+        {
+            forceDir   = perp;
+            forceStart = true;
+        }
+        else if (_arenaEntranceDirections.TryGetValue(startNodeId, out var arenaDir))
+        {
+            // For an EXIT path (emanating), point AWAY from center
+            forceDir   = -arenaDir;
+            forceStart = true;
+        }
+
+        if (forceStart && spline.Count > 0)
+        {
+            // Broken FIRST, then the knot. A knot written while it is still AutoSmooth has
+            // both its tangents re-derived from its neighbours on the way in, so a heading
+            // assigned before the mode change is thrown straight away and the branch leaves
+            // on the curve's own tangent instead — a few degrees off the mouth waiting for
+            // it, which opens the hairline gap where the two rims should meet. The mouth
+            // patch is built off this heading, so the heading wins over the drawn curve.
+            spline.SetTangentMode(0, TangentMode.Broken);
+
+            var   knot   = spline[0];
+            float tanLen = math.length(knot.TangentOut);
+            if (tanLen < 0.0001f) tanLen = 0.333f;
+
+            // A knot holds its tangents in its OWN rotation frame — an auto-smoothed one
+            // carries (0, 0, length) and keeps the heading in its rotation. So the heading
+            // goes into the rotation and the tangent stays a length along local forward.
+            // Writing the heading straight into TangentOut has it rotated a second time and
+            // folds the first stretch of the run back over itself.
+            SetKnotHeading(spline, 0, container.transform.InverseTransformDirection(forceDir),
+                           tanLen, leading: true);
+        }
+
+        // ── 3. Force end tangent (Arena Entrance) ─────────────────
+        string endNodeId = path.nodeIds[path.nodeIds.Count - 1];
+        if (_arenaEntranceDirections.TryGetValue(endNodeId, out var entDir) && spline.Count > 0)
+        {
+            // Broken first, and the heading into the rotation, for the same reasons as the
+            // start above. The tangent leading in points back up the curve, so it is the
+            // length along local BACKWARD.
+            int last = spline.Count - 1;
+            spline.SetTangentMode(last, TangentMode.Broken);
+
+            var   knot   = spline[last];
+            float tanLen = math.length(knot.TangentIn);
+            if (tanLen < 0.0001f) tanLen = 0.333f;
+
+            SetKnotHeading(spline, last, container.transform.InverseTransformDirection(entDir),
+                           tanLen, leading: false);
+        }
+
+        // ── 4. Record where each end meeting a pool came to rest ──
+        // Last of all, and only once every cut and every forced heading is in: the mouth patch
+        // in the pool is cut on this frame, and the run's own last ring is swept on it, so it
+        // has to be the frame the curve finally ends with. A river cut at both ends has its far
+        // end resampled by the second cut, which is why neither is read as it is made.
+        if (poolAtEnd)   RecordPoolArrival(container, path, lastNodeId,  fromEnd: true);
+        if (poolAtStart) RecordPoolArrival(container, path, firstNodeId, fromEnd: false);
+
+        EditorUtility.SetDirty(container);
+        }
+
+// ════════ TrimAgainstPool / RecordPoolArrival (container version)  (lines 11025-11136) ════════
+    /// <summary>
+    /// Cuts one end of a river off at the pool it meets — exactly where its curve crosses the
+    /// pool's outer wall. Returns whether it cut anything; where the run ended up is read back
+    /// afterwards by <see cref="RecordPoolArrival"/>, once both ends have been cut.
+    ///
+    /// Does nothing when that end carries no pool.
+    /// </summary>
+    private bool TrimAgainstPool(
+        SplineContainer container, LevelSelectDesignerData.DesignerPath path,
+        string nodeId, bool fromEnd)
+    {
+        if (!_poolEdgeDistance.TryGetValue(nodeId, out float edge))  return false;
+        if (!_poolCentre.TryGetValue(nodeId, out Vector3 poolWorld)) return false;
+        if (container.Splines.Count == 0) return false;
+
+        var spline = container.Splines[0];
+        if (spline.Count < 2) return false;
+
+        Vector3 centreLocal = container.transform.InverseTransformPoint(poolWorld);
+        if (!SolveCircleCrossing(spline, centreLocal, edge, fromEnd, out float tCut)) return false;
+
+        int subs  = path.curveSubdivisions > 0 ? path.curveSubdivisions : 5;
+        int steps = subs * Mathf.Max(1, spline.Count - 1);
+
+        // The cut lands wherever the circle happens to be, which is usually just past one of
+        // these samples. Two knots almost on top of each other send AutoSmooth wild and the
+        // last ring of the sweep comes out skewed — so a sample that close to the cut is
+        // dropped rather than kept alongside it.
+        const float MinKnotGap = 0.02f;
+
+        var positions = new List<float3>();
+        void Place(float3 p)
+        {
+            if (positions.Count > 0 &&
+                math.distance(positions[positions.Count - 1], p) < MinKnotGap) return;
+            positions.Add(p);
+        }
+
+        if (!fromEnd) Place(spline.EvaluatePosition(tCut));
+        else          Place(spline.EvaluatePosition(0f));
+
+        for (int i = 0; i <= steps; i++)
+        {
+            float t = (float)i / steps;
+            if (fromEnd ? (t > 0f && t < tCut) : (t > tCut && t < 1f))
+                Place(spline.EvaluatePosition(t));
+        }
+
+        // The cut itself is the end of the run and has to be exact, so it replaces any sample
+        // that crowded up against it rather than the other way round.
+        float3 last = spline.EvaluatePosition(fromEnd ? tCut : 1f);
+        if (positions.Count > 0 &&
+            math.distance(positions[positions.Count - 1], last) < MinKnotGap)
+            positions[positions.Count - 1] = last;
+        else
+            positions.Add(last);
+
+        if (positions.Count < 2) return false;
+
+        var trimmed = SplineSplitUtility.BuildSplineFromPositions(positions, TangentMode.AutoSmooth);
+        container.RemoveSplineAt(0);
+        container.AddSpline(trimmed);
+        EditorUtility.SetDirty(container);
+
+        // This end now runs into the pool, so the run is left open there.
+        (fromEnd ? _poolOpenEnd : _poolOpenStart).Add(path.pathId);
+        return true;
+    }
+
+    /// <summary>
+    /// Records where a run trimmed against a pool actually ended up, so the mouth cut through
+    /// the pool's rim is placed on that run's own last ring and bearing.
+    ///
+    /// Both are read off the run as it now stands, NOT off the curve it was cut from. The
+    /// mouth patch starts on the run's last ring, and that ring is swept on the frame the
+    /// trimmed curve really ends with — an auto-smoothed chord back to the sample before it,
+    /// a degree or two off the tangent the original curve had at the cut. Reading the old
+    /// curve is what left the run and the pool a sliver apart.
+    ///
+    /// Called after BOTH ends have been cut: a river that meets a pool at each end has its far
+    /// end resampled by the second cut, so anything read during the first one is out of date.
+    /// </summary>
+    private void RecordPoolArrival(
+        SplineContainer container, LevelSelectDesignerData.DesignerPath path,
+        string nodeId, bool fromEnd)
+    {
+        if (container.Splines.Count == 0) return;
+
+        var spline = container.Splines[0];
+        if (spline.Count < 2) return;
+
+        float   t        = fromEnd ? 1f : 0f;
+        float3  cutLocal = spline.EvaluatePosition(t);
+        float3  tanLocal = spline.EvaluateTangent(t);
+
+        Vector3 outward = container.transform.TransformDirection(
+            new Vector3(tanLocal.x, 0f, tanLocal.z));
+        if (fromEnd) outward = -outward;
+        outward.y = 0f;
+        if (outward.sqrMagnitude < 1e-8f) return;
+
+        if (!_poolArrivals.TryGetValue(nodeId, out var list))
+            _poolArrivals[nodeId] = list = new List<PoolArrival>();
+
+        list.Add(new PoolArrival
+        {
+            riverName = path.riverName,
+            worldPos  = container.transform.TransformPoint(
+                            new Vector3(cutLocal.x, cutLocal.y, cutLocal.z)),
+            outward   = outward.normalized,
+        });
+    }
+
+// ════════ SetSplineFromPositions / ApplySegmentID  (lines 11248-11305) ════════
+    private static void SetSplineFromPositions(SplineContainer container, List<Vector3> worldPositions, float curveStrength = 1f)
+    {
+        float tangentScale = 0.333f * Mathf.Max(0.01f, curveStrength);
+
+        var local = worldPositions
+            .Select(p => (float3)container.transform.InverseTransformPoint(p))
+            .ToList();
+
+        var spline = new Spline();
+        for (int i = 0; i < local.Count; i++)
+        {
+            float3 pos    = local[i];
+            float3 tanIn  = float3.zero;
+            float3 tanOut = float3.zero;
+
+            if (i > 0 && i < local.Count - 1)
+            {
+                tanIn  = (pos - local[i - 1]) * tangentScale;
+                tanOut = (local[i + 1] - pos) * tangentScale;
+            }
+            else if (i == 0 && local.Count > 1)
+            {
+                tanOut = (local[1] - pos) * tangentScale;
+                tanIn  = -tanOut;
+            }
+            else if (i == local.Count - 1 && local.Count > 1)
+            {
+                tanIn  = (pos - local[i - 1]) * tangentScale;
+                tanOut = -tanIn;
+            }
+
+            spline.Add(new BezierKnot(pos, -tanIn, tanOut, quaternion.identity), TangentMode.AutoSmooth);
+        }
+
+        SplineSplitUtility.ZeroKnotRollAngles(spline);
+
+        if (container.Splines.Count > 0)
+            container.RemoveSplineAt(0);
+        container.AddSpline(spline);
+        EditorUtility.SetDirty(container);
+    }
+
+    private static void ApplySegmentID(RiverSegmentID segId, LevelSelectDesignerData.DesignerPath path)
+    {
+        var so = new SerializedObject(segId);
+        so.Update();
+        so.FindProperty("segmentID").stringValue      = path.segmentId ?? "";
+        so.FindProperty("isLeftPath").boolValue        = path.isLeftPath;
+        so.FindProperty("isRightPath").boolValue     = path.isRightPath;
+        so.FindProperty("segmentType").enumValueIndex = (int)path.segmentType;
+        so.FindProperty("junctionGroup").stringValue  = path.riverName ?? "";
+        so.FindProperty("leadsToArena").boolValue     = path.leadsToArena;
+        so.FindProperty("arenaIsAtEnd").boolValue     = path.arenaIsAtEnd;
+        so.FindProperty("extrudeOnExit").boolValue    = path.extrudeOnExit;
+        so.FindProperty("skipRegistration").boolValue = true; // visual source segments must not appear in registry
+        so.ApplyModifiedProperties();
+        EditorUtility.SetDirty(segId);
+    }

@@ -22,7 +22,7 @@ MonoBehaviour:
     frameWidth: 0.1
     frameDepth: 0.3
     flapRimWidth: 0.1
-    panelDepth: 0.3
+    panelDepth: 0.2
     flapWidth: 0.3
     flapLegHeight: 0.3
     flapCrownHeight: 0.2

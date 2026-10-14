@@ -1,0 +1,198 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &-7134128255637909213
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Sky Skybox
+  m_Shader: {fileID: 4800000, guid: 62388b93ead5d544e95ce011e10de314, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _CloudAtlas:
+        m_Texture: {fileID: 2800000, guid: b09baf5de82f0f944b85187355f107e2, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _CloudData:
+        m_Texture: {fileID: -6293863669844130627}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _GradientTex:
+        m_Texture: {fileID: -6933734321557508019}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _AtlasGrid: 2
+    - _AtlasPad: 0.00390625
+    - _CloudCount: 64
+    - _CloudOpacity: 0.225
+    - _PanSpeed: 1
+    m_Colors: []
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
+--- !u!28 &-6933734321557508019
+Texture2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Sky Gradient
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: adb3805416a23e6ff001ed74a34309fd
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 4
+  m_Width: 256
+  m_Height: 1
+  m_CompleteImageSize: 1024
+  m_MipsStripped: 0
+  m_TextureFormat: 4
+  m_MipCount: 1
+  m_IsReadable: 1
+  m_IsPreProcessed: 0
+  m_IgnoreMipmapLimit: 1
+  m_MipmapLimitGroupName: 
+  m_StreamingMipmaps: 0
+  m_StreamingMipmapsPriority: 0
+  m_VTOnly: 0
+  m_AlphaIsTransparency: 0
+  m_ImageCount: 1
+  m_TextureDimension: 2
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 1
+    m_WrapV: 1
+    m_WrapW: 1
+  m_LightmapFormat: 0
+  m_ColorSpace: 1
+  m_PlatformBlob: 
+  image data: 1024
+  _typelessdata: fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffbfbfbfff7f7f7fff4f4f4fff0f0f0ffecececffe8e8e8ffe5e5e5ffe1e1e1ffddddddffd9d9d9ffd6d6d6ffd2d2d2ffcececeffcacacaffc7c7c7ffc3c3c3ffbfbfbfffbbbbbbffb8b8b8ffb4b4b4ffb0b0b0ffacacacffa9a9a9ffa5a5a5ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ffa2a2a2ff
+  m_StreamData:
+    serializedVersion: 2
+    offset: 0
+    size: 0
+    path: 
+--- !u!28 &-6293863669844130627
+Texture2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Sky Cloud Data
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: a201df7f210ccc84ab822e17b31a9c3f
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 4
+  m_Width: 64
+  m_Height: 2
+  m_CompleteImageSize: 2048
+  m_MipsStripped: 0
+  m_TextureFormat: 20
+  m_MipCount: 1
+  m_IsReadable: 1
+  m_IsPreProcessed: 0
+  m_IgnoreMipmapLimit: 1
+  m_MipmapLimitGroupName: 
+  m_StreamingMipmaps: 0
+  m_StreamingMipmapsPriority: 0
+  m_VTOnly: 0
+  m_AlphaIsTransparency: 0
+  m_ImageCount: 1
+  m_TextureDimension: 2
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 0
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 1
+    m_WrapV: 1
+    m_WrapW: 1
+  m_LightmapFormat: 0
+  m_ColorSpace: 0
+  m_PlatformBlob: 
+  image data: 2048
+  _typelessdata: 9521323f3c6cb13e0eb8b53e0eb8b53e3f082e40b3cca33e2980dd3e2980dd3e612c8140c513793eb4c90c3eb4c90c3e2701c740945fcb3e4cd99b3e4cd99b3e0c727740f80ace3e4027a63e4027a63e0737163fcf7e8c3ebecb433ebecb433d284b883f00d8d83efdfb243efdfb243d3b3cb240d631bc3ec675a93ec675a93d8d30af3db7bdf03e2291bd3e2291bd3d9812c93e9223b73ec7e17f3ec7e17f3d8bd0c740f374cc3ea3b8453ea3b8453e60cc874026cdca3ec6bd693ec6bd693ef8240e40d091b83e67c9d93d67c9d93dd3128b40bec0a83e725ace3d725ace3d2bc9083f088bee3e4e22703e4e22703dd9bb963e38a9873e338cfe3d338cfe3dddd8fa3f1648bb3e12af243e12af243e2918b040e820d93e7c7a013e7c7a013d77f48f3f77d5ac3efd61e03efd61e03e3bae9b407a67eb3e5ef1b33d5ef1b33d8e0b014028a6803e4457683e4457683e5a921b40c2bca53ea0412f3da0412f3d2635a840cb67e03e1531b63e1531b63eea7b293ef0ffe33eeccf033eeccf033edd883f40b3549d3e76dab33d76dab33c602415407762b23ee34c3e3ee34c3e3e0f1ff63f3458813e084ed83d084ed83ddd9830405becd33e31bcde3d31bcde3d6e20ab40083cf13e5471293e5471293e15f38240962de03ed898a53ed898a53d2f9a5940d415cc3e7e36d33d7e36d33c6461103ee3ee883e39618d3d39618d3d8943a33f6519833ed244d93ed244d93ee3eaa5400e39f13e6cdcb23d6cdcb23d1a8a8b403421e73efdf6793dfdf6793cd8e6a23fa0f1d23e2ac8e13d2ac8e13d33e8884077d8c53e8898083e8898083e73796440c241963ef810023ef810023e1dc0714049e18e3e65d28c3e65d28c3e8848fc3f373aa33e95fd813e95fd813d06d4c740e89fe23e226c813d226c813d3b48a640a8bccd3ed705273ed705273edee1af40690bb23edefa1d3edefa1d3d8deda0403008a73e6e75ae3e6e75ae3dec904c40f674823eb2cf313eb2cf313da3adb34035d77c3edd32ab3edd32ab3e1c2fad40a7c99d3eedcbcc3eedcbcc3de9002540bcf6ad3e926c813e926c813e2db917408030e33e74172c3e74172c3e3ec289408263dc3ee145103ee145103e95540240ed39a73e769ece3d769ece3c3e59bf40504db33efefdc03efefdc03e84863140104dd83eb99add3db99add3d7d4e8c3db0078b3e743e1a3e743e1a3efcbf713fd1f8843ed9fa723ed9fa723dc8b1a64010a1c93e4d025e3e4d025e3ed7fbbc404d24eb3ed7703b3ed7703b3ef33fb53e51baaa3ed7b9aa3dd7b9aa3c4c18a540b96ba43e5347833d5347833c39abb24064e9c43ed447323dd447323db1304240c2c7c73e5706f53d5706f53d8679d43f68d29c3e96e32f3e96e32f3e09b07040cc4fa63e793be03d793be03d0c0c0440d49bd13e8c32ca3d8c32ca3d000000000000000000000000000000000000803f0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000040000000000000000000000000000000400000000000000000000000000000004000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000803f000000000000000000000000000000000000000000000000000000000000803f000000000000000000000000000000400000000000000000000000000000803f0000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000803f0000000000000000000000000000803f0000000000000000000000000000803f0000000000000000000000000000803f0000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000803f0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000803f000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000803f00000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000803f0000000000000000000000000000004000000000000000000000000000000040000000000000000000000000000000400000000000000000000000000000803f000000000000000000000000000000400000000000000000000000000000803f0000000000000000000000000000803f0000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000803f0000000000000000000000000000803f00000000000000000000000000000040000000000000000000000000000000400000000000000000000000000000803f0000000000000000000000000000803f0000000000000000000000000000803f000000000000000000000000000000000000000000000000000000000000803f000000000000000000000000
+  m_StreamData:
+    serializedVersion: 2
+    offset: 0
+    size: 0
+    path: 
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cde5df41f04b69f43aa6ad80f45544bb, type: 3}
+  m_Name: Sky
+  m_EditorClassIdentifier: Assembly-CSharp::SkyboxPreset
+  skyGradient:
+    serializedVersion: 2
+    key0: {r: 1, g: 1, b: 1, a: 1}
+    key1: {r: 0.63522005, g: 0.63522005, b: 0.63522005, a: 1}
+    key2: {r: 0, g: 0, b: 0, a: 0}
+    key3: {r: 0, g: 0, b: 0, a: 0}
+    key4: {r: 0, g: 0, b: 0, a: 0}
+    key5: {r: 0, g: 0, b: 0, a: 0}
+    key6: {r: 0, g: 0, b: 0, a: 0}
+    key7: {r: 0, g: 0, b: 0, a: 0}
+    ctime0: 35460
+    ctime1: 41840
+    ctime2: 0
+    ctime3: 0
+    ctime4: 0
+    ctime5: 0
+    ctime6: 0
+    ctime7: 0
+    atime0: 0
+    atime1: 65535
+    atime2: 0
+    atime3: 0
+    atime4: 0
+    atime5: 0
+    atime6: 0
+    atime7: 0
+    m_Mode: 0
+    m_ColorSpace: -1
+    m_NumColorKeys: 2
+    m_NumAlphaKeys: 2
+  clouds:
+  - {fileID: 2800000, guid: d559f41762a86924580d89ba30d0f533, type: 3}
+  - {fileID: 2800000, guid: c0a938307fd3d134d9e4ce3f68a7222d, type: 3}
+  - {fileID: 2800000, guid: d409bde97f9641644b11467355ce14e1, type: 3}
+  opacity: 0.225
+  amount: 64
+  sizeMin: 4.56
+  sizeMax: 49.3
+  spread: 13.5
+  height: 20.3
+  seed: 1
+  panSpeed: 1
+  material: {fileID: -7134128255637909213}
+  gradientTexture: {fileID: -6933734321557508019}
+  cloudDataTexture: {fileID: -6293863669844130627}
+  cloudAtlas: {fileID: 2800000, guid: b09baf5de82f0f944b85187355f107e2, type: 3}
+  cloudAtlasKey: d559f41762a86924580d89ba30d0f533:5fa08e276305e6bf42d23d57aa4481d3|c0a938307fd3d134d9e4ce3f68a7222d:1bead17424fcf6bcf335b3eff37a2fbe|d409bde97f9641644b11467355ce14e1:3194d5c1759e6963aae75d10e24ad5b8

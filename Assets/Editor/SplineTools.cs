@@ -51,18 +51,6 @@ public class SplineToolsWindow : EditorWindow
     private Vector3         _junctionPosOffset;
     private SplineSplitterPreset _activePreset;
 
-    // ── Junction: River Segment ID flags ─────────────────────────
-    private bool _addRiverSegmentID;
-    private bool _sideAIsLeftPath;
-    private bool _sideAIsRightPath;
-    private bool _sideBIsLeftPath;
-    private bool _sideBIsRightPath;
-    private const string K_AddSegID   = "SplineSplitter_AddSegID";
-    private const string K_SideATop   = "SplineSplitter_SideATop";
-    private const string K_SideABot   = "SplineSplitter_SideABot";
-    private const string K_SideBTop   = "SplineSplitter_SideBTop";
-    private const string K_SideBBot   = "SplineSplitter_SideBBot";
-
     // ── Merge: Fields ────────────────────────────────────────────
     private enum MergeMode { CrossObject, SameGameObject, SameContainer }
     private MergeMode _mergeMode;
@@ -86,7 +74,7 @@ public class SplineToolsWindow : EditorWindow
     private Vector2 _scroll;
 
     // ── Menu ─────────────────────────────────────────────────────
-    [MenuItem("Tools/Spline Tools")]
+    [MenuItem("Tools/Splines/Spline Tools", false, 500)]
     public static void OpenWindow()
     {
         var win = GetWindow<SplineToolsWindow>("Spline Tools");
@@ -94,10 +82,10 @@ public class SplineToolsWindow : EditorWindow
         win.Show();
     }
 
-    [MenuItem("Tools/Spline Tools (Split)")]
+    [MenuItem("Tools/Splines/Spline Tools (Split)", false, 501)]
     public static void OpenSplit() { OpenWindow(); GetWindow<SplineToolsWindow>()._tab = Tab.Split; }
 
-    [MenuItem("Tools/Spline Tools (Merge)")]
+    [MenuItem("Tools/Splines/Spline Tools (Merge)", false, 502)]
     public static void OpenMerge() { OpenWindow(); GetWindow<SplineToolsWindow>()._tab = Tab.Merge; }
 
     // ── Prefs ────────────────────────────────────────────────────
@@ -125,12 +113,6 @@ public class SplineToolsWindow : EditorWindow
         _simplifyAfterMerge    = EditorPrefs.GetBool            (K_SimplifyAfterMerge,  false);
         _simplifyTargetKnots   = EditorPrefs.GetInt             (K_SimplifyTargetKnots, 30);
         _simplifyManyPointsAuto= EditorPrefs.GetBool            (K_SimplifyAutoSamples, true);
-
-        _addRiverSegmentID = EditorPrefs.GetBool(K_AddSegID, false);
-        _sideAIsLeftPath    = EditorPrefs.GetBool(K_SideATop, false);
-        _sideAIsRightPath = EditorPrefs.GetBool(K_SideABot, false);
-        _sideBIsLeftPath    = EditorPrefs.GetBool(K_SideBTop, false);
-        _sideBIsRightPath = EditorPrefs.GetBool(K_SideBBot, false);
 
         string prefabGUID = EditorPrefs.GetString(K_JunctionPrefab, "");
         if (!string.IsNullOrEmpty(prefabGUID))
@@ -163,12 +145,6 @@ public class SplineToolsWindow : EditorWindow
         EditorPrefs.SetBool (K_SimplifyAfterMerge,  _simplifyAfterMerge);
         EditorPrefs.SetInt  (K_SimplifyTargetKnots, _simplifyTargetKnots);
         EditorPrefs.SetBool (K_SimplifyAutoSamples,  _simplifyManyPointsAuto);
-
-        EditorPrefs.SetBool(K_AddSegID,  _addRiverSegmentID);
-        EditorPrefs.SetBool(K_SideATop,  _sideAIsLeftPath);
-        EditorPrefs.SetBool(K_SideABot,  _sideAIsRightPath);
-        EditorPrefs.SetBool(K_SideBTop,  _sideBIsLeftPath);
-        EditorPrefs.SetBool(K_SideBBot,  _sideBIsRightPath);
 
         if (_junctionPrefab != null)
         {
@@ -278,25 +254,6 @@ public class SplineToolsWindow : EditorWindow
                     "Junction gets its own SplineInstantiate (InstanceCount = 1).",
                     MessageType.None);
             }
-
-            EditorGUILayout.Space(4);
-            EditorGUILayout.LabelField("River Segment IDs", EditorStyles.boldLabel);
-            EditorGUI.BeginChangeCheck();
-            _addRiverSegmentID = EditorGUILayout.Toggle("Add RiverSegmentID", _addRiverSegmentID);
-            if (_addRiverSegmentID)
-            {
-                EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField("Side A (before junction)", GUILayout.Width(150));
-                _sideAIsLeftPath    = EditorGUILayout.ToggleLeft("Top",    _sideAIsLeftPath,    GUILayout.Width(48));
-                _sideAIsRightPath = EditorGUILayout.ToggleLeft("Bottom", _sideAIsRightPath, GUILayout.Width(60));
-                EditorGUILayout.EndHorizontal();
-                EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField("Side B (after junction)",  GUILayout.Width(150));
-                _sideBIsLeftPath    = EditorGUILayout.ToggleLeft("Top",    _sideBIsLeftPath,    GUILayout.Width(48));
-                _sideBIsRightPath = EditorGUILayout.ToggleLeft("Bottom", _sideBIsRightPath, GUILayout.Width(60));
-                EditorGUILayout.EndHorizontal();
-            }
-            if (EditorGUI.EndChangeCheck()) SavePrefs();
         }
 
         // Button
@@ -750,13 +707,6 @@ public class SplineToolsWindow : EditorWindow
             if (_copySplineInstantiate)
                 CopySpecificInstantiates(originalInstantiates, original, containerB);
 
-            // Optionally stamp RiverSegmentID with top/bottom path flags
-            if (_addRiverSegmentID)
-            {
-                ApplySegmentIDFlags(original, _splitTarget,  _sideAIsLeftPath, _sideAIsRightPath);
-                ApplySegmentIDFlags(original, containerB,    _sideBIsLeftPath, _sideBIsRightPath);
-            }
-
             Debug.Log($"[SplineTools] Junction split done on same GO. halfGap={halfGap:F3}");
         }
         else if (_splitToSameObject)
@@ -1140,24 +1090,6 @@ public class SplineToolsWindow : EditorWindow
 
     private float MeasurePrefabXExtent(GameObject prefab)
         => SplineSplitUtility.MeasurePrefabXExtent(prefab);
-
-    // Adds or updates a RiverSegmentID on the GO for the given SplineContainer,
-    // stamping the top/bottom path flags from the split junction UI.
-    private static void ApplySegmentIDFlags(
-        GameObject go, SplineContainer container, bool isLeft, bool isRight)
-    {
-        // Reuse an existing RiverSegmentID that isn't already paired with a different container,
-        // otherwise add a new one.
-        var existing = go.GetComponents<RiverSegmentID>();
-        RiverSegmentID seg = existing.Length > 0 ? existing[0] : Undo.AddComponent<RiverSegmentID>(go);
-
-        var so = new SerializedObject(seg);
-        so.Update();
-        so.FindProperty("isLeftPath").boolValue  = isLeft;
-        so.FindProperty("isRightPath").boolValue = isRight;
-        so.ApplyModifiedProperties();
-        EditorUtility.SetDirty(seg);
-    }
 
     private static Spline BuildSplineFromPositions(List<float3> positions, KnotTangentMode knotMode)
     {

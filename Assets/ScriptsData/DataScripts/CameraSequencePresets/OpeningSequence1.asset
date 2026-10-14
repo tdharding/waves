@@ -1,0 +1,460 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d4357627f9937304899c8369ae27b593, type: 3}
+  m_Name: OpeningSequence1
+  m_EditorClassIdentifier: Assembly-CSharp::CameraSequencePreset
+  shots:
+  - cameraLink: 9c8a13080c9549c685999ba275f48944
+    orbitPointLink: be00e934db784bae8d8b199dbddcac87
+    endCameraLink: 
+    characterLinks: []
+    shot:
+      camera: {fileID: 0}
+      duration: 5
+      blendIn:
+        Style: 0
+        Time: 0
+        CustomCurve:
+          serializedVersion: 2
+          m_Curve: []
+          m_PreInfinity: 0
+          m_PostInfinity: 0
+          m_RotationOrder: 4
+      pressAnyKey: 1
+      lines:
+      - text: This is the first installation, on the fringes of the empire of Nom Kabar
+        hold: 2
+        pressAnyKey: 1
+        fadeIn: 1
+        fadeOut: 1
+      textFades: 1
+      audio: {fileID: 0}
+      fogCentre: 1
+      animated: 1
+      animation: 1
+      endCamera: {fileID: 0}
+      zoomDistance: 1
+      orbitPoint: {fileID: 0}
+      orbitStartDegrees: -35.84
+      orbitDegrees: -30
+      animationTime: 60
+      easing: 2
+      characterAnimations: []
+  - cameraLink: 5296ba54a3da4c3b9a06b9d42c87d2b1
+    orbitPointLink: 
+    endCameraLink: 0b9c50acaddf421cbde99d496b657559
+    characterLinks:
+    - d010c057d56e43d580b2379bad1803b3
+    shot:
+      camera: {fileID: 0}
+      duration: 5
+      blendIn:
+        Style: 0
+        Time: 0
+        CustomCurve:
+          serializedVersion: 2
+          m_Curve: []
+          m_PreInfinity: 0
+          m_PostInfinity: 0
+          m_RotationOrder: 4
+      pressAnyKey: 1
+      lines:
+      - text: I am your guide
+        hold: 2
+        pressAnyKey: 1
+        fadeIn: 1
+        fadeOut: 1
+      textFades: 1
+      audio: {fileID: 0}
+      fogCentre: 2
+      animated: 1
+      animation: 2
+      endCamera: {fileID: 0}
+      zoomDistance: 1
+      orbitPoint: {fileID: 0}
+      orbitStartDegrees: 0
+      orbitDegrees: 90
+      animationTime: 15
+      easing: 3
+      characterAnimations:
+      - character: {fileID: 0}
+        state: Base Layer.AngelTalking
+        layer: 0
+        blend: 0
+  - cameraLink: 465e624b78f34dd79320cd0bed36efa2
+    orbitPointLink: 
+    endCameraLink: 
+    characterLinks: []
+    shot:
+      camera: {fileID: 0}
+      duration: 3
+      blendIn:
+        Style: 0
+        Time: 0
+        CustomCurve:
+          serializedVersion: 2
+          m_Curve: []
+          m_PreInfinity: 0
+          m_PostInfinity: 0
+          m_RotationOrder: 4
+      pressAnyKey: 1
+      lines:
+      - text: You have been chosen for this task
+        hold: 2
+        pressAnyKey: 1
+        fadeIn: 1
+        fadeOut: 1
+      textFades: 1
+      audio: {fileID: 0}
+      fogCentre: 1
+      animated: 0
+      animation: 0
+      endCamera: {fileID: 0}
+      zoomDistance: 1
+      orbitPoint: {fileID: 0}
+      orbitStartDegrees: 0
+      orbitDegrees: 90
+      animationTime: 3
+      easing: 0
+      characterAnimations: []
+  - cameraLink: 6d405c96204e4382aff836b5cc816afb
+    orbitPointLink: 
+    endCameraLink: 13930804a84f4669b2fc34c0d0b9839c
+    characterLinks:
+    - d010c057d56e43d580b2379bad1803b3
+    shot:
+      camera: {fileID: 0}
+      duration: 5
+      blendIn:
+        Style: 0
+        Time: 0
+        CustomCurve:
+          serializedVersion: 2
+          m_Curve: []
+          m_PreInfinity: 0
+          m_PostInfinity: 0
+          m_RotationOrder: 4
+      pressAnyKey: 1
+      lines:
+      - text: I have given you a key
+        hold: 2
+        pressAnyKey: 1
+        fadeIn: 1
+        fadeOut: 1
+      textFades: 1
+      audio: {fileID: 0}
+      fogCentre: 1
+      animated: 1
+      animation: 2
+      endCamera: {fileID: 0}
+      zoomDistance: 0.3
+      orbitPoint: {fileID: 0}
+      orbitStartDegrees: 0
+      orbitDegrees: 90
+      animationTime: 15
+      easing: 2
+      characterAnimations:
+      - character: {fileID: 0}
+        state: Base Layer.AngelTalking
+        layer: 0
+        blend: 0
+  - cameraLink: ff4a810b928f4be8a790ff48fbc8ea8f
+    orbitPointLink: 
+    endCameraLink: 2bf52e23ea3f49a0b7c14252040cb00c
+    characterLinks: []
+    shot:
+      camera: {fileID: 0}
+      duration: 3
+      blendIn:
+        Style: 0
+        Time: 0
+        CustomCurve:
+          serializedVersion: 2
+          m_Curve: []
+          m_PreInfinity: 0
+          m_PostInfinity: 0
+          m_RotationOrder: 4
+      pressAnyKey: 1
+      lines:
+      - text: You are to release the souls
+        hold: 2
+        pressAnyKey: 1
+        fadeIn: 1
+        fadeOut: 1
+      textFades: 1
+      audio: {fileID: 0}
+      fogCentre: 0
+      animated: 1
+      animation: 2
+      endCamera: {fileID: 0}
+      zoomDistance: 2
+      orbitPoint: {fileID: 0}
+      orbitStartDegrees: 0
+      orbitDegrees: 90
+      animationTime: 20
+      easing: 2
+      characterAnimations: []
+  - cameraLink: 358af943b3bf41f698a9a80e1b0e4130
+    orbitPointLink: 
+    endCameraLink: a30aab53fa1a40aaabee65a575b1ba0f
+    characterLinks: []
+    shot:
+      camera: {fileID: 0}
+      duration: 3
+      blendIn:
+        Style: 0
+        Time: 4
+        CustomCurve:
+          serializedVersion: 2
+          m_Curve: []
+          m_PreInfinity: 0
+          m_PostInfinity: 0
+          m_RotationOrder: 4
+      pressAnyKey: 1
+      lines:
+      - text: There is a smal outlet for the waters of Nom Kabar here... this is where you can safely enter the installation...
+        hold: 2
+        pressAnyKey: 1
+        fadeIn: 1
+        fadeOut: 1
+      textFades: 1
+      audio: {fileID: 0}
+      fogCentre: 0
+      animated: 1
+      animation: 2
+      endCamera: {fileID: 0}
+      zoomDistance: 1
+      orbitPoint: {fileID: 0}
+      orbitStartDegrees: 0
+      orbitDegrees: 90
+      animationTime: 20
+      easing: 2
+      characterAnimations: []
+  - cameraLink: 5cdbe577502f4de69a3c6593c7a378a3
+    orbitPointLink: 
+    endCameraLink: 
+    characterLinks: []
+    shot:
+      camera: {fileID: 0}
+      duration: 3
+      blendIn:
+        Style: 0
+        Time: 4
+        CustomCurve:
+          serializedVersion: 2
+          m_Curve: []
+          m_PreInfinity: 0
+          m_PostInfinity: 0
+          m_RotationOrder: 4
+      pressAnyKey: 1
+      lines:
+      - text: I will not be able to follow and guide you in this installation whilst the turrets are active...
+        hold: 2
+        pressAnyKey: 1
+        fadeIn: 1
+        fadeOut: 1
+      textFades: 1
+      audio: {fileID: 0}
+      fogCentre: 1
+      animated: 0
+      animation: 0
+      endCamera: {fileID: 0}
+      zoomDistance: 1
+      orbitPoint: {fileID: 0}
+      orbitStartDegrees: 0
+      orbitDegrees: 90
+      animationTime: 3
+      easing: 0
+      characterAnimations: []
+  useAudio: 1
+  sequenceAudio: {fileID: 0}
+  audioFadeOut: 30
+  endBlend:
+    Style: 3
+    Time: 2
+    CustomCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+  overrideFog: 1
+  fog:
+    radius: 258.1
+    outerOpacity: 0.6
+    innerDivision: 5.45
+    innerOpacity: 0.513
+    gradientBottom: -43.13
+  playOnce: 1
+  storedObjects:
+  - linkId: 9c8a13080c9549c685999ba275f48944
+    name: OpeningShot
+    parentPath: CAMERA
+    tag: Untagged
+    layer: 0
+    active: 1
+    position: {x: 165.98866, y: -7.3252425, z: -108.89819}
+    rotation: {x: -0.020218337, y: -0.30761933, z: -0.00653814, w: 0.95127225}
+    localScale: {x: 1, y: 1, z: 1}
+    components:
+    - type: Unity.Cinemachine.CinemachineCamera, Unity.Cinemachine, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+      json: '{"MonoBehaviour":{"m_Enabled":true,"m_EditorHideFlags":0,"m_Name":"","m_EditorClassIdentifier":"Unity.Cinemachine::Unity.Cinemachine.CinemachineCamera","Priority":{"Enabled":false,"m_Value":0},"OutputChannel":1,"StandbyUpdate":2,"m_StreamingVersion":20241001,"m_LegacyPriority":0,"Target":{"TrackingTarget":{"instanceID":0},"LookAtTarget":{"instanceID":0},"CustomLookAtTarget":false},"Lens":{"FieldOfView":55.20000076293945,"OrthographicSize":10.0,"NearClipPlane":0.10000000149011612,"FarClipPlane":5000.0,"Dutch":0.0,"ModeOverride":0,"PhysicalProperties":{"GateFit":2,"SensorSize":{"x":21.945999145507813,"y":16.00200080871582},"LensShift":{"x":0.0,"y":0.0},"FocusDistance":10.0,"Iso":200,"ShutterSpeed":0.004999999888241291,"Aperture":16.0,"BladeCount":5,"Curvature":{"x":2.0,"y":11.0},"BarrelClipping":0.25,"Anamorphism":0.0}},"BlendHint":0}}'
+      references: []
+  - linkId: be00e934db784bae8d8b199dbddcac87
+    name: Shot 1 Orbit Point
+    parentPath: SCRIPTS2/CameraSequence
+    tag: Untagged
+    layer: 0
+    active: 1
+    position: {x: 137.57695, y: -5.26167, z: -69.562294}
+    rotation: {x: -0, y: -0, z: -0, w: 1}
+    localScale: {x: 1, y: 1, z: 1}
+    components: []
+  - linkId: 5296ba54a3da4c3b9a06b9d42c87d2b1
+    name: OpeningShot2
+    parentPath: CAMERA
+    tag: Untagged
+    layer: 0
+    active: 1
+    position: {x: 155.08641, y: -8.95652, z: -84.757385}
+    rotation: {x: -0.07221167, y: -0.67747366, z: -0.076225616, w: 0.7280141}
+    localScale: {x: 1, y: 1, z: 1}
+    components:
+    - type: Unity.Cinemachine.CinemachineCamera, Unity.Cinemachine, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+      json: '{"MonoBehaviour":{"m_Enabled":true,"m_EditorHideFlags":0,"m_Name":"","m_EditorClassIdentifier":"Unity.Cinemachine::Unity.Cinemachine.CinemachineCamera","Priority":{"Enabled":false,"m_Value":0},"OutputChannel":1,"StandbyUpdate":2,"m_StreamingVersion":20241001,"m_LegacyPriority":0,"Target":{"TrackingTarget":{"instanceID":0},"LookAtTarget":{"instanceID":0},"CustomLookAtTarget":false},"Lens":{"FieldOfView":33.900001525878906,"OrthographicSize":10.0,"NearClipPlane":0.10000000149011612,"FarClipPlane":5000.0,"Dutch":0.0,"ModeOverride":0,"PhysicalProperties":{"GateFit":2,"SensorSize":{"x":21.945999145507813,"y":16.00200080871582},"LensShift":{"x":0.0,"y":0.0},"FocusDistance":10.0,"Iso":200,"ShutterSpeed":0.004999999888241291,"Aperture":16.0,"BladeCount":5,"Curvature":{"x":2.0,"y":11.0},"BarrelClipping":0.25,"Anamorphism":0.0}},"BlendHint":0}}'
+      references:
+      - propertyPath: Target.TrackingTarget
+        globalId: GlobalObjectId_V1-2-75d8ada57d588024bb0e20899004fcd8-5500964813966392834-1132759176
+        linkId: 
+  - linkId: 0b9c50acaddf421cbde99d496b657559
+    name: Shot 2 End Camera
+    parentPath: SCRIPTS2/CameraSequence/OpeningSequence1
+    tag: Untagged
+    layer: 0
+    active: 1
+    position: {x: 154.38428, y: -8.806454, z: -84.705795}
+    rotation: {x: -0.07221167, y: -0.67747366, z: -0.076225616, w: 0.7280141}
+    localScale: {x: 1, y: 1, z: 1}
+    components:
+    - type: Unity.Cinemachine.CinemachineCamera, Unity.Cinemachine, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+      json: '{"MonoBehaviour":{"m_Enabled":false,"m_EditorHideFlags":0,"m_Name":"","m_EditorClassIdentifier":"Unity.Cinemachine::Unity.Cinemachine.CinemachineCamera","Priority":{"Enabled":false,"m_Value":0},"OutputChannel":1,"StandbyUpdate":2,"m_StreamingVersion":0,"m_LegacyPriority":0,"Target":{"TrackingTarget":{"instanceID":0},"LookAtTarget":{"instanceID":0},"CustomLookAtTarget":false},"Lens":{"FieldOfView":33.900001525878906,"OrthographicSize":10.0,"NearClipPlane":0.10000000149011612,"FarClipPlane":5000.0,"Dutch":0.0,"ModeOverride":0,"PhysicalProperties":{"GateFit":2,"SensorSize":{"x":21.945999145507813,"y":16.00200080871582},"LensShift":{"x":0.0,"y":0.0},"FocusDistance":10.0,"Iso":200,"ShutterSpeed":0.004999999888241291,"Aperture":16.0,"BladeCount":5,"Curvature":{"x":2.0,"y":11.0},"BarrelClipping":0.25,"Anamorphism":0.0}},"BlendHint":0}}'
+      references: []
+  - linkId: 465e624b78f34dd79320cd0bed36efa2
+    name: Shot 5 Camera
+    parentPath: SCRIPTS2/CameraSequence
+    tag: Untagged
+    layer: 0
+    active: 1
+    position: {x: 159.07742, y: -10.01182, z: -90.18678}
+    rotation: {x: 0.03789247, y: -0.89645797, z: 0.08620924, w: 0.43300727}
+    localScale: {x: 1, y: 1, z: 1}
+    components:
+    - type: Unity.Cinemachine.CinemachineCamera, Unity.Cinemachine, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+      json: '{"MonoBehaviour":{"m_Enabled":true,"m_EditorHideFlags":0,"m_Name":"","m_EditorClassIdentifier":"Unity.Cinemachine::Unity.Cinemachine.CinemachineCamera","Priority":{"Enabled":false,"m_Value":0},"OutputChannel":1,"StandbyUpdate":2,"m_StreamingVersion":20241001,"m_LegacyPriority":0,"Target":{"TrackingTarget":{"instanceID":0},"LookAtTarget":{"instanceID":0},"CustomLookAtTarget":false},"Lens":{"FieldOfView":17.799999237060547,"OrthographicSize":10.0,"NearClipPlane":0.10000000149011612,"FarClipPlane":5000.0,"Dutch":0.0,"ModeOverride":0,"PhysicalProperties":{"GateFit":2,"SensorSize":{"x":21.945999145507813,"y":16.00200080871582},"LensShift":{"x":0.0,"y":0.0},"FocusDistance":10.0,"Iso":200,"ShutterSpeed":0.004999999888241291,"Aperture":16.0,"BladeCount":5,"Curvature":{"x":2.0,"y":11.0},"BarrelClipping":0.25,"Anamorphism":0.0}},"BlendHint":0}}'
+      references: []
+  - linkId: 6d405c96204e4382aff836b5cc816afb
+    name: OpeningShot3
+    parentPath: CAMERA
+    tag: Untagged
+    layer: 0
+    active: 1
+    position: {x: 154.48543, y: -8.799473, z: -86.16755}
+    rotation: {x: -0.03356588, y: -0.33215487, z: -0.018939303, w: 0.9424372}
+    localScale: {x: 1, y: 1, z: 1}
+    components:
+    - type: Unity.Cinemachine.CinemachineCamera, Unity.Cinemachine, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+      json: '{"MonoBehaviour":{"m_Enabled":true,"m_EditorHideFlags":0,"m_Name":"","m_EditorClassIdentifier":"Unity.Cinemachine::Unity.Cinemachine.CinemachineCamera","Priority":{"Enabled":false,"m_Value":0},"OutputChannel":1,"StandbyUpdate":2,"m_StreamingVersion":20241001,"m_LegacyPriority":0,"Target":{"TrackingTarget":{"instanceID":0},"LookAtTarget":{"instanceID":0},"CustomLookAtTarget":false},"Lens":{"FieldOfView":33.900001525878906,"OrthographicSize":10.0,"NearClipPlane":0.10000000149011612,"FarClipPlane":5000.0,"Dutch":0.0,"ModeOverride":0,"PhysicalProperties":{"GateFit":2,"SensorSize":{"x":21.945999145507813,"y":16.00200080871582},"LensShift":{"x":0.0,"y":0.0},"FocusDistance":10.0,"Iso":200,"ShutterSpeed":0.004999999888241291,"Aperture":16.0,"BladeCount":5,"Curvature":{"x":2.0,"y":11.0},"BarrelClipping":0.25,"Anamorphism":0.0}},"BlendHint":0}}'
+      references:
+      - propertyPath: Target.TrackingTarget
+        globalId: GlobalObjectId_V1-2-75d8ada57d588024bb0e20899004fcd8-5500964813966392834-1132759176
+        linkId: 
+  - linkId: 13930804a84f4669b2fc34c0d0b9839c
+    name: Shot 4 End Camera
+    parentPath: SCRIPTS2/CameraSequence/OpeningSequence1
+    tag: Untagged
+    layer: 0
+    active: 1
+    position: {x: 153.73798, y: -8.668576, z: -85.2371}
+    rotation: {x: -0.03356588, y: -0.33215487, z: -0.018939303, w: 0.9424372}
+    localScale: {x: 1, y: 1, z: 1}
+    components:
+    - type: Unity.Cinemachine.CinemachineCamera, Unity.Cinemachine, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+      json: '{"MonoBehaviour":{"m_Enabled":false,"m_EditorHideFlags":0,"m_Name":"","m_EditorClassIdentifier":"Unity.Cinemachine::Unity.Cinemachine.CinemachineCamera","Priority":{"Enabled":false,"m_Value":0},"OutputChannel":1,"StandbyUpdate":2,"m_StreamingVersion":0,"m_LegacyPriority":0,"Target":{"TrackingTarget":{"instanceID":0},"LookAtTarget":{"instanceID":0},"CustomLookAtTarget":false},"Lens":{"FieldOfView":33.900001525878906,"OrthographicSize":10.0,"NearClipPlane":0.10000000149011612,"FarClipPlane":5000.0,"Dutch":0.0,"ModeOverride":0,"PhysicalProperties":{"GateFit":2,"SensorSize":{"x":21.945999145507813,"y":16.00200080871582},"LensShift":{"x":0.0,"y":0.0},"FocusDistance":10.0,"Iso":200,"ShutterSpeed":0.004999999888241291,"Aperture":16.0,"BladeCount":5,"Curvature":{"x":2.0,"y":11.0},"BarrelClipping":0.25,"Anamorphism":0.0}},"BlendHint":0}}'
+      references: []
+  - linkId: ff4a810b928f4be8a790ff48fbc8ea8f
+    name: Shot 6 Camera
+    parentPath: SCRIPTS2/CameraSequence
+    tag: Untagged
+    layer: 0
+    active: 1
+    position: {x: 85.44422, y: 13.251719, z: 50.780582}
+    rotation: {x: 0.0077255354, y: -0.70706457, z: 0.70706457, w: 0.0077255354}
+    localScale: {x: 1, y: 1, z: 1}
+    components:
+    - type: Unity.Cinemachine.CinemachineCamera, Unity.Cinemachine, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+      json: '{"MonoBehaviour":{"m_Enabled":true,"m_EditorHideFlags":0,"m_Name":"","m_EditorClassIdentifier":"Unity.Cinemachine::Unity.Cinemachine.CinemachineCamera","Priority":{"Enabled":false,"m_Value":0},"OutputChannel":1,"StandbyUpdate":2,"m_StreamingVersion":20241001,"m_LegacyPriority":0,"Target":{"TrackingTarget":{"instanceID":0},"LookAtTarget":{"instanceID":0},"CustomLookAtTarget":false},"Lens":{"FieldOfView":40.0,"OrthographicSize":10.0,"NearClipPlane":0.10000000149011612,"FarClipPlane":5000.0,"Dutch":0.0,"ModeOverride":0,"PhysicalProperties":{"GateFit":2,"SensorSize":{"x":21.945999145507813,"y":16.00200080871582},"LensShift":{"x":0.0,"y":0.0},"FocusDistance":10.0,"Iso":200,"ShutterSpeed":0.004999999888241291,"Aperture":16.0,"BladeCount":5,"Curvature":{"x":2.0,"y":11.0},"BarrelClipping":0.25,"Anamorphism":0.0}},"BlendHint":0}}'
+      references: []
+  - linkId: 2bf52e23ea3f49a0b7c14252040cb00c
+    name: Shot 5 End Camera
+    parentPath: SCRIPTS2/CameraSequence/OpeningSequence1
+    tag: Untagged
+    layer: 0
+    active: 1
+    position: {x: 85.581985, y: 18.431793, z: 50.677547}
+    rotation: {x: 0.0077255354, y: -0.70706457, z: 0.70706457, w: 0.0077255354}
+    localScale: {x: 1, y: 1, z: 1}
+    components:
+    - type: Unity.Cinemachine.CinemachineCamera, Unity.Cinemachine, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+      json: '{"MonoBehaviour":{"m_Enabled":false,"m_EditorHideFlags":0,"m_Name":"","m_EditorClassIdentifier":"Unity.Cinemachine::Unity.Cinemachine.CinemachineCamera","Priority":{"Enabled":false,"m_Value":0},"OutputChannel":1,"StandbyUpdate":2,"m_StreamingVersion":0,"m_LegacyPriority":0,"Target":{"TrackingTarget":{"instanceID":0},"LookAtTarget":{"instanceID":0},"CustomLookAtTarget":false},"Lens":{"FieldOfView":40.0,"OrthographicSize":10.0,"NearClipPlane":0.10000000149011612,"FarClipPlane":5000.0,"Dutch":0.0,"ModeOverride":0,"PhysicalProperties":{"GateFit":2,"SensorSize":{"x":21.945999145507813,"y":16.00200080871582},"LensShift":{"x":0.0,"y":0.0},"FocusDistance":10.0,"Iso":200,"ShutterSpeed":0.004999999888241291,"Aperture":16.0,"BladeCount":5,"Curvature":{"x":2.0,"y":11.0},"BarrelClipping":0.25,"Anamorphism":0.0}},"BlendHint":0}}'
+      references: []
+  - linkId: 358af943b3bf41f698a9a80e1b0e4130
+    name: Shot 7 Camera
+    parentPath: SCRIPTS2/CameraSequence/OpeningSequence1
+    tag: Untagged
+    layer: 0
+    active: 1
+    position: {x: 130.05353, y: -7.4313526, z: -61.297745}
+    rotation: {x: -0.037171848, y: -0.5397163, z: -0.022839643, w: 0.84071577}
+    localScale: {x: 1, y: 1, z: 1}
+    components:
+    - type: Unity.Cinemachine.CinemachineCamera, Unity.Cinemachine, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+      json: '{"MonoBehaviour":{"m_Enabled":true,"m_EditorHideFlags":0,"m_Name":"","m_EditorClassIdentifier":"Unity.Cinemachine::Unity.Cinemachine.CinemachineCamera","Priority":{"Enabled":false,"m_Value":0},"OutputChannel":1,"StandbyUpdate":2,"m_StreamingVersion":20241001,"m_LegacyPriority":0,"Target":{"TrackingTarget":{"instanceID":0},"LookAtTarget":{"instanceID":0},"CustomLookAtTarget":false},"Lens":{"FieldOfView":40.0,"OrthographicSize":10.0,"NearClipPlane":0.10000000149011612,"FarClipPlane":5000.0,"Dutch":0.0,"ModeOverride":0,"PhysicalProperties":{"GateFit":2,"SensorSize":{"x":21.945999145507813,"y":16.00200080871582},"LensShift":{"x":0.0,"y":0.0},"FocusDistance":10.0,"Iso":200,"ShutterSpeed":0.004999999888241291,"Aperture":16.0,"BladeCount":5,"Curvature":{"x":2.0,"y":11.0},"BarrelClipping":0.25,"Anamorphism":0.0}},"BlendHint":0}}'
+      references: []
+  - linkId: a30aab53fa1a40aaabee65a575b1ba0f
+    name: Shot 6 End Camera
+    parentPath: SCRIPTS2/CameraSequence/OpeningSequence1
+    tag: Untagged
+    layer: 0
+    active: 1
+    position: {x: 108.71453, y: -5.9210186, z: -50.49446}
+    rotation: {x: -0.037171848, y: -0.5397163, z: -0.022839643, w: 0.84071577}
+    localScale: {x: 1, y: 1, z: 1}
+    components:
+    - type: Unity.Cinemachine.CinemachineCamera, Unity.Cinemachine, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+      json: '{"MonoBehaviour":{"m_Enabled":false,"m_EditorHideFlags":0,"m_Name":"","m_EditorClassIdentifier":"Unity.Cinemachine::Unity.Cinemachine.CinemachineCamera","Priority":{"Enabled":false,"m_Value":0},"OutputChannel":1,"StandbyUpdate":2,"m_StreamingVersion":0,"m_LegacyPriority":0,"Target":{"TrackingTarget":{"instanceID":0},"LookAtTarget":{"instanceID":0},"CustomLookAtTarget":false},"Lens":{"FieldOfView":40.0,"OrthographicSize":10.0,"NearClipPlane":0.10000000149011612,"FarClipPlane":5000.0,"Dutch":0.0,"ModeOverride":0,"PhysicalProperties":{"GateFit":2,"SensorSize":{"x":21.945999145507813,"y":16.00200080871582},"LensShift":{"x":0.0,"y":0.0},"FocusDistance":10.0,"Iso":200,"ShutterSpeed":0.004999999888241291,"Aperture":16.0,"BladeCount":5,"Curvature":{"x":2.0,"y":11.0},"BarrelClipping":0.25,"Anamorphism":0.0}},"BlendHint":0}}'
+      references: []
+  - linkId: 5cdbe577502f4de69a3c6593c7a378a3
+    name: OpeningShot4
+    parentPath: CAMERA
+    tag: Untagged
+    layer: 0
+    active: 1
+    position: {x: 162.37561, y: -9.033308, z: -97.50649}
+    rotation: {x: -0.03356588, y: -0.33215487, z: -0.018939303, w: 0.9424372}
+    localScale: {x: 1, y: 1, z: 1}
+    components:
+    - type: Unity.Cinemachine.CinemachineCamera, Unity.Cinemachine, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+      json: '{"MonoBehaviour":{"m_Enabled":true,"m_EditorHideFlags":0,"m_Name":"","m_EditorClassIdentifier":"Unity.Cinemachine::Unity.Cinemachine.CinemachineCamera","Priority":{"Enabled":false,"m_Value":0},"OutputChannel":1,"StandbyUpdate":2,"m_StreamingVersion":20241001,"m_LegacyPriority":0,"Target":{"TrackingTarget":{"instanceID":0},"LookAtTarget":{"instanceID":0},"CustomLookAtTarget":false},"Lens":{"FieldOfView":41.29999923706055,"OrthographicSize":10.0,"NearClipPlane":0.10000000149011612,"FarClipPlane":5000.0,"Dutch":0.0,"ModeOverride":0,"PhysicalProperties":{"GateFit":2,"SensorSize":{"x":21.945999145507813,"y":16.00200080871582},"LensShift":{"x":0.0,"y":0.0},"FocusDistance":10.0,"Iso":200,"ShutterSpeed":0.004999999888241291,"Aperture":16.0,"BladeCount":5,"Curvature":{"x":2.0,"y":11.0},"BarrelClipping":0.25,"Anamorphism":0.0}},"BlendHint":0}}'
+      references:
+      - propertyPath: Target.TrackingTarget
+        globalId: GlobalObjectId_V1-2-75d8ada57d588024bb0e20899004fcd8-5500964813966392834-1132759176
+        linkId: 

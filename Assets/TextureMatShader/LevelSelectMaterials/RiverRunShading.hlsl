@@ -25,17 +25,32 @@
 // either to the other; three meet in the middle instead, which is what puts a line on both edges
 // of the rim and both ends of the wall with the whole middle left alone.
 //
-// ── Which part of the run a face is ──────────────────────────────────────────
-// Three colours rather than one: the OUTER faces a run shows the world — the outer walls, the
-// underside, the open ends — the RIM lip laid flat round the top, and the INNER faces of the
-// channel the water runs down.
+// ── Which stone a face is ────────────────────────────────────────────────────
+// The world holds a list of STONE TYPES — A, B, C, D and any added after — each a colour (or a
+// gradient across the piece in its place) with its own grain, and every face takes one.
 //
-// Like the seams, that cannot be answered here. A steep channel wall and an outer wall are both
-// very nearly vertical, and telling them apart needs to know which side of the piece a face is
-// on, which is a thing only the builder knows. So it is settled as the piece is generated and
-// baked into UV2.x — 1 outer, 2 rim, 3 inner, and 0 for a mesh built before any of this, which
-// is left with the colour it came in with. UV2.y is the width of the surface the face belongs to,
-// which the seam extent is a percentage of.
+// Which one cannot be answered here. A run shows the world its OUTER faces — the outer walls, the
+// underside, the open ends — a RIM lip laid flat round the top, and the INNER faces of the channel
+// the water runs down, and a steep channel wall and an outer wall are both very nearly vertical:
+// telling them apart needs to know which side of the piece a face is on, which only the builder
+// knows. So it is settled as the piece is generated and baked into UV2:
+//
+//     x : the stone type, 1 for A — or, where z is 1, which of the run's own three the face is,
+//         1 outer, 2 rim, 3 inner, looked up through _RiverRunRunStones so the River Runs choices
+//         reach a built run without a rebuild
+//     y : the width of the surface the face belongs to, which the seam extent is a percentage of
+//     z : 1 on a run part, 0 on a stone type taken as it is
+//     w : 1 on a mesh that carries any of this at all, so one built before it keeps its colour
+//
+// A piece baked before there were stone types carries 1, 2 and 3 with z at 0 — which are A, B and
+// C, the colours its outer, rim and inner always took.
+//
+// ── The gradient ─────────────────────────────────────────────────────────────
+// A stone type can be coloured by a gradient instead of its one colour, run across the WHOLE
+// piece it is on: up or down from the foot of the piece to its top, or left or right along the
+// world's X. "The piece" is the renderer's own bounds, so nothing has to be baked for it and a
+// piece of any shape, built at any time, takes it. Every stone type's gradient is one row of one
+// small sheet the settings make, read at mip 0 so changing stone across a face draws no seam.
 //
 // ── Why the waterline is measured off the rim and not off the world ──────────
 // The water out here is not one flat sheet. It is laid in each river's channel a fixed distance
@@ -45,8 +60,8 @@
 //
 // ── The grain ────────────────────────────────────────────────────────────────
 // Gradient noise — the same noise, the same hash and the same quintic fade the Gradient Noise
-// node draws, moved in here off the graph. In here because the stone's colour is now three
-// colours chosen per face, and a grain laid on outside would have to be laid on before that
+// node draws, moved in here off the graph. In here because the stone's colour is now a stone
+// type chosen per face, and a grain laid on outside would have to be laid on before that
 // choice was made.
 //
 // It goes on LAST, over the finished pixel, so it runs across the seams and the waterline as
@@ -160,30 +175,42 @@
 #ifndef RIVER_RUN_SHADING_INCLUDED
 #define RIVER_RUN_SHADING_INCLUDED
 
-float4 _RiverRunSeamColour;
-float  _RiverRunSeamStrength;
-
-// A PERCENTAGE, not metres: how far the gradient reaches off a seam as a share of the width of
-// the surface it runs across, which the builder bakes into UV2.y. One number for every piece, so a
-// wide river and a thin one, a tall wall and a tower stem are each shaded in proportion to
-// themselves.
-float  _RiverRunSeamExtent;
-
 float4 _RiverRunWaterlineColour;
 float  _RiverRunWaterlineStrength;
 float  _RiverRunWaterlineExtent;
 
-// The stone itself, one colour for each part of a run. Alpha is not a colour here — it is how a
-// colour that has been pushed is told from the zeroes a shader reimport leaves behind.
-float4 _RiverRunOuterColour;
-float4 _RiverRunRimColour;
-float4 _RiverRunInnerColour;
+// How many stone types there can be, and how many steps across one row of the gradient sheet.
+// Both must match RiverRunShadingSettings.MaxStoneTypes and GradientWidth.
+#define RIVER_RUN_STONE_TYPES  16
+#define RIVER_RUN_GRADIENT_W   128.0
 
-// How wide one cell of the grain is, in the units the surface is cut in, and how much of the
-// noise reaches the stone. Either of them at zero is no grain at all.
-// One grain per part of the stone — x outer, y rim, z inner, the same order as the face kinds.
-float4 _RiverRunGrainSizes;
-float4 _RiverRunGrainStrengths;
+// What UV3's z and w carry on a face in a face group, saying x and y are its place in the group —
+// RiverMeshBuilder.GroupGradientMarkZ/W. Both, so nothing else ever passes for one.
+#define RIVER_RUN_GROUP_MARK_Z -7.5
+#define RIVER_RUN_GROUP_MARK_W 4.25
+
+// The stone types, A first. Alpha on the colour is not a colour — it is how a colour that has
+// been pushed is told from the zeroes a shader reimport leaves behind.
+float4 _RiverRunStoneColours[RIVER_RUN_STONE_TYPES];
+
+// x how wide one cell of the grain is, in the units the surface is cut in; y how much of the
+// noise reaches the stone — either at zero is no grain at all. z the gradient: 0 off, 1 bottom
+// to top, 2 top to bottom, 3 left to right, 4 right to left. w the seam extent: a PERCENTAGE,
+// not metres — how far the gradient reaches off a seam as a share of the width of the surface it
+// runs across, which the builder bakes into UV2.y, so a wide river and a thin one, a tall wall
+// and a tower stem are each shaded in proportion to themselves.
+float4 _RiverRunStoneGrains[RIVER_RUN_STONE_TYPES];
+
+// Each stone type's seams: rgb the colour gathered along them, w how much of it sits on the seam.
+// All zero until pushed, which draws no seams at all.
+float4 _RiverRunStoneSeams[RIVER_RUN_STONE_TYPES];
+
+// Every stone type's gradient, one row each, A at the bottom.
+TEXTURE2D(_RiverRunStoneGradients);
+SAMPLER(sampler_RiverRunStoneGradients);
+
+// Which stone type a river run's own outer faces, rim and channel take — x, y, z, 1 for A.
+float4 _RiverRunRunStones;
 
 // The hand-drawn decals, all of them on one sheet: equal cells side by side, filled left to right
 // and bottom to top, each holding one drawing fitted to it with a little transparent padding
@@ -198,36 +225,60 @@ SAMPLER(sampler_RiverRunDecalSheet);
 // whatever Unity happened to bind.
 float4 _RiverRunDecalLayout;
 
-// One candidate place every Spacing metres; Amount is how many of those places are taken, 0 to 1.
-// Scale is the metres across the longest side of a decal, drawn between the two for each place.
-float _RiverRunDecalSpacing;
-float _RiverRunDecalScaleMin;
-float _RiverRunDecalScaleMax;
-float _RiverRunDecalAmount;
+// Each stone type's scatter. x Spacing: one candidate place every this many metres. y and z the
+// smallest and largest Scale, the metres across the longest side of a decal, drawn between the
+// two for each place. w Amount: how many of those places are taken, 0 to 1. A face scatters with
+// its own stone's numbers, so two stones with the same spacing share one grid and a decal carries
+// across the line between them while their scales agree.
+float4 _RiverRunStoneDecals[RIVER_RUN_STONE_TYPES];
 
-// How much of the stone underneath a decal hides, 0 to 1. A different thing from Amount:
-// that decides how MANY marks there are, this how far each of the ones there are sinks into
-// the stone. Turned down, every decal is still where it was and still the size it was —
-// the stone simply shows through it.
-float _RiverRunDecalOpacity;
+// How much of each stone type a decal hides, 0 to 1. A different thing from Amount: that decides
+// how MANY marks there are, this how far each of the ones there are sinks into the stone. Turned
+// down, every decal is still where it was and still the size it was — the stone simply shows
+// through it.
+float _RiverRunStoneDecalOpacities[RIVER_RUN_STONE_TYPES];
+
+// How many of each stone type's decals are given a random quarter turn — 90, 180 or 270, never
+// mirrored — 0 to 1. Zero with the rotation off, which leaves every decal standing as drawn.
+float _RiverRunStoneDecalRotations[RIVER_RUN_STONE_TYPES];
 
 // How far the water lies beneath the rim top — the world's Water Level, pushed alongside the rest
 // rather than authored a second time.
 float  _RiverRunWaterDepth;
 
-// Where the made-up light stands, in world space. Every pixel works out its own direction to it.
-// Authored once for the world in the designer's Aesthetics, and shared with the landscape hills.
+// Where the made-up light stands, in world space, and how strong it is. Every pixel works out its
+// own direction to it. Both come off the scene's LevelSelectLight, shared with the landscape hills.
 float4 _LevelSelectLightPosition;
-float  _RiverRunLightStrength;
+float  _LevelSelectLightStrength;
 
 // How far off flat a face may point and still count as facing up — the whole of the channel does,
 // and the outer walls, which stand exactly vertical, do not.
 #define RIVER_RUN_UP_FACING 0.15
 
-// What UV2.x says a face is. The builder writes these; 0 is a mesh that predates them.
+// What UV2.x says a run part is, where UV2.z marks it as one.
 #define RIVER_RUN_FACE_OUTER 1
 #define RIVER_RUN_FACE_RIM   2
 #define RIVER_RUN_FACE_INNER 3
+
+// Which stone type a face takes, 0 for A. A run part is looked up through the River Runs
+// choices; one nobody has pushed yet reads as the A, B and C the three always were. A face with
+// no kind at all — a mesh built before they were baked — reads as A.
+int RiverRunStoneIndex(float4 faceData)
+{
+    if (faceData.w < 0.5) return 0;
+
+    int kind = (int)(faceData.x + 0.5);
+
+    if (faceData.z > 0.5)
+    {
+        float chosen = kind == RIVER_RUN_FACE_RIM   ? _RiverRunRunStones.y
+                     : kind == RIVER_RUN_FACE_INNER ? _RiverRunRunStones.z
+                                                    : _RiverRunRunStones.x;
+        if (chosen > 0.5) kind = (int)(chosen + 0.5);
+    }
+
+    return clamp(kind - 1, 0, RIVER_RUN_STONE_TYPES - 1);
+}
 
 // A ramp that leaves and arrives flat, so neither end of a gradient shows the line it stops on.
 // An extent of nothing is nothing at all rather than a hairline on the seam itself — an effect
@@ -274,17 +325,13 @@ float RiverRunGradientNoise(float2 p)
 // other, so graining a colour does not also drag it down. The colour picked for a face is the
 // colour that face averages out at however hard the grain is turned up.
 //
-// Each part of the stone has its own grain, picked by the face kind. A face carrying no kind — a
-// mesh built before they were baked — takes the outer grain.
+// Each stone type has its own grain. A face carrying no kind — a mesh built before they were
+// baked — takes A's.
 float RiverRunGrain(float2 uv, float4 faceData)
 {
-    int   kind     = faceData.w < 0.5 ? RIVER_RUN_FACE_OUTER : (int)(faceData.x + 0.5);
-    float size     = kind == RIVER_RUN_FACE_RIM   ? _RiverRunGrainSizes.y
-                   : kind == RIVER_RUN_FACE_INNER ? _RiverRunGrainSizes.z
-                                                  : _RiverRunGrainSizes.x;
-    float strength = kind == RIVER_RUN_FACE_RIM   ? _RiverRunGrainStrengths.y
-                   : kind == RIVER_RUN_FACE_INNER ? _RiverRunGrainStrengths.z
-                                                  : _RiverRunGrainStrengths.x;
+    float4 grain    = _RiverRunStoneGrains[RiverRunStoneIndex(faceData)];
+    float  size     = grain.x;
+    float  strength = grain.y;
 
     if (size <= 0.0 || strength <= 0.0) return 1.0;
 
@@ -317,7 +364,7 @@ float4 RiverRunDecalHash(float2 c)
 //
 // Nothing here runs at all until a sheet has been pushed, a spacing and a scale given, and
 // Amount turned up off zero, so a preset that has never heard of decals draws none.
-float4 RiverRunDecals(float2 uv, float footprint)
+float4 RiverRunDecals(float2 uv, float footprint, float4 scatter, float rotation)
 {
     float4 nothing = float4(0.0, 0.0, 0.0, 0.0);
 
@@ -325,10 +372,10 @@ float4 RiverRunDecals(float2 uv, float footprint)
     int    held    = (int)(_RiverRunDecalLayout.z + 0.5);
     float  cellPix = _RiverRunDecalLayout.w;
 
-    float spacing = _RiverRunDecalSpacing;
-    float amount  = _RiverRunDecalAmount;
-    float largest = max(_RiverRunDecalScaleMin, _RiverRunDecalScaleMax);
-    float small   = min(_RiverRunDecalScaleMin, _RiverRunDecalScaleMax);
+    float spacing = scatter.x;
+    float amount  = scatter.w;
+    float largest = max(scatter.y, scatter.z);
+    float small   = min(scatter.y, scatter.z);
 
     if (held <= 0 || grid.x < 1.0 || grid.y < 1.0 || cellPix < 1.0) return nothing;
     if (spacing <= 0.0 || amount <= 0.0 || largest <= 0.0)          return nothing;
@@ -339,8 +386,9 @@ float4 RiverRunDecals(float2 uv, float footprint)
     // cells. Held to three rings: past six times the spacing the biggest decals are cut off
     // square rather than every pixel in the world paying for a search that wide.
     //
-    // Worked out from the uniforms rather than from anything about this pixel, so every pixel
-    // in the world takes the same number of turns round the loop and none of them diverges.
+    // Worked out from this stone type's uniforms rather than from anything about this pixel, so
+    // every pixel of one stone takes the same number of turns round the loop and only the line
+    // where two stones with different scatters meet can diverge.
     int rings = clamp(1 + (int)floor(largest / (2.0 * spacing)), 1, 3);
 
     // Which cell this pixel is standing in.
@@ -371,8 +419,20 @@ float4 RiverRunDecals(float2 uv, float footprint)
             if (any(local < 0.0) || any(local > 1.0)) continue;
 
             // Which of the sheet's drawings this place drew, and where that cell sits on it.
-            float pick = RiverRunDecalHash(c + 19.19).x;
+            float4 h2  = RiverRunDecalHash(c + 19.19);
+            float pick = h2.x;
             float slot = min(floor(pick * (float)held), (float)held - 1.0);
+
+            // A quarter turn for the share Rotation Amount asks for, by 90, 180 or 270. Turned
+            // about the middle of the decal's own square, which is the cell it is read from, so
+            // the turn never carries it out of its cell or changes how far it reaches.
+            if (h2.y < rotation)
+            {
+                int turns = min(1 + (int)floor(h2.z * 3.0), 3);
+                local = turns == 1 ? float2(local.y, 1.0 - local.x)
+                      : turns == 2 ? 1.0 - local
+                                   : float2(1.0 - local.y, local.x);
+            }
             float2 cell = float2(fmod(slot, grid.x), floor(slot / grid.x));
 
             // The mip to read: how many of the decal's own pixels one screen pixel covers. An
@@ -418,8 +478,12 @@ float4 RiverRunDecals(float2 uv, float footprint)
 // The three are the world's floor and each of its two walls, flattened the same way the builder
 // flattens UV0 so the two describe the same space: a face looking up reads the world's x and z, a
 // face looking along x reads z and y, a face looking along z reads x and y.
-float4 RiverRunDecalsOnStone(float3 worldPos, float3 n)
+float4 RiverRunDecalsOnStone(float3 worldPos, float3 n, int stoneIndex)
 {
+    float4 scatter = _RiverRunStoneDecals[stoneIndex];
+    float  opacity = _RiverRunStoneDecalOpacities[stoneIndex];
+    float  turned  = _RiverRunStoneDecalRotations[stoneIndex];
+
     // Every derivative taken up here, unconditionally, before a single plane has been weighed.
     // Below this line the code skips planes, and a derivative asked for inside a skip is
     // undefined — the mip it chooses would be whatever the pixels beside it happened to be doing.
@@ -447,21 +511,53 @@ float4 RiverRunDecalsOnStone(float3 worldPos, float3 n)
     // Premultiplied answers, so mixing them is a weighted sum and nothing has to be unwound
     // first. The weights add to one, so a pixel wholly covered on every plane it faces stays
     // wholly covered.
-    if (w.y > 0.0) mixed += w.y * RiverRunDecals(float2(worldPos.x, worldPos.z), footXZ);
-    if (w.x > 0.0) mixed += w.x * RiverRunDecals(float2(worldPos.z, worldPos.y), footZY);
-    if (w.z > 0.0) mixed += w.z * RiverRunDecals(float2(worldPos.x, worldPos.y), footXY);
+    if (w.y > 0.0) mixed += w.y * RiverRunDecals(float2(worldPos.x, worldPos.z), footXZ, scatter, turned);
+    if (w.x > 0.0) mixed += w.x * RiverRunDecals(float2(worldPos.z, worldPos.y), footZY, scatter, turned);
+    if (w.z > 0.0) mixed += w.z * RiverRunDecals(float2(worldPos.x, worldPos.y), footXY, scatter, turned);
 
     // Opacity spent once, on the finished mix rather than per plane, so a slanted face fades
     // by exactly as much as a flat one. Both the colour and the coverage are scaled, because
     // the colour is already multiplied by that coverage — scaling one without the other would
     // darken the mark as it faded instead of letting the stone through it.
-    return mixed * saturate(_RiverRunDecalOpacity);
+    return mixed * saturate(opacity);
+}
+
+// How far across the whole piece this pixel is along a gradient's direction, 0 where it starts
+// and 1 where it ends. The piece is the renderer's bounds in the world; a piece with no extent
+// that way at all sits in the middle of the gradient.
+//
+// A face in a face group carries its place in the GROUP on UV3 instead (see
+// RIVER_RUN_GROUP_MARK_Z), worked out over every mesh the group spans — so the gradient runs
+// once across the group rather than starting again in each separate mesh it is built in.
+float RiverRunGradientT(float3 worldPos, float direction, float4 gradientData)
+{
+    bool across = direction > 2.5;
+    float t;
+
+    if (abs(gradientData.z - RIVER_RUN_GROUP_MARK_Z) < 0.01 && abs(gradientData.w - RIVER_RUN_GROUP_MARK_W) < 0.01)
+    {
+        t = saturate(across ? gradientData.x : gradientData.y);
+    }
+    else
+    {
+        float3 lo = unity_RendererBounds_Min.xyz;
+        float3 hi = unity_RendererBounds_Max.xyz;
+
+        float span = across ? hi.x - lo.x : hi.y - lo.y;
+        if (span <= 1e-5) return 0.5;
+
+        t = saturate(across ? (worldPos.x - lo.x) / span : (worldPos.y - lo.y) / span);
+    }
+
+    // 1 bottom to top and 3 left to right run as measured; 2 and 4 run back the other way.
+    bool reversed = (direction > 1.5 && direction < 2.5) || direction > 3.5;
+    return reversed ? 1.0 - t : t;
 }
 
 // The colour this part of the run is drawn in. A face carrying no kind at all — a mesh built
 // before the builder was baking one — keeps whatever the graph handed in, and so does one whose
 // colour nobody has pushed yet.
-float3 RiverRunStone(float4 faceData, float3 baseColour)
+float3 RiverRunStone(float4 faceData, float3 worldPos, float3 baseColour, float4 gradientData)
 {
     // UV2.w is 1 on a piece that really carries face kinds, and nothing reads it but this line.
     // It is here because a channel the mesh does not have does NOT arrive as zero: it comes
@@ -472,14 +568,20 @@ float3 RiverRunStone(float4 faceData, float3 baseColour)
     // metres from its nearest seam.
     if (faceData.w < 0.5) return baseColour;
 
-    int kind = (int)(faceData.x + 0.5);
+    int    index  = RiverRunStoneIndex(faceData);
+    float4 chosen = _RiverRunStoneColours[index];
+    if (chosen.a <= 0.0) return baseColour;
 
-    float4 chosen = kind == RIVER_RUN_FACE_OUTER ? _RiverRunOuterColour
-                  : kind == RIVER_RUN_FACE_RIM   ? _RiverRunRimColour
-                  : kind == RIVER_RUN_FACE_INNER ? _RiverRunInnerColour
-                                                 : float4(0.0, 0.0, 0.0, 0.0);
+    float direction = _RiverRunStoneGrains[index].z;
+    if (direction < 0.5) return chosen.rgb;
 
-    return chosen.a > 0.0 ? chosen.rgb : baseColour;
+    // Half a step in from each end, so the two ends of the row read as the gradient's own ends
+    // rather than as halfway to the next pixel. Mip 0: the sheet has no others, and a level the
+    // hardware picked from derivatives would jump wherever the stone type changes across a face.
+    float  t  = RiverRunGradientT(worldPos, direction, gradientData);
+    float2 uv = float2((0.5 + t * (RIVER_RUN_GRADIENT_W - 1.0)) / RIVER_RUN_GRADIENT_W,
+                       (index + 0.5) / RIVER_RUN_STONE_TYPES);
+    return SAMPLE_TEXTURE2D_LOD(_RiverRunStoneGradients, sampler_RiverRunStoneGradients, uv, 0).rgb;
 }
 
 // Light     : 1 square on to the made-up light, 0 turned right away from it, and flat 1 when the
@@ -488,7 +590,7 @@ float3 RiverRunStone(float4 faceData, float3 baseColour)
 // Waterline : 0 above the band, 1 at the water and below it — held rather than falling away, so
 //             there is no second line drawn where the band meets the surface.
 // Tint/Blend: the two gradients composited, white over black, ready for one Lerp.
-// Colour    : the stone — this part of the run's own colour, grained and lit — with that Lerp
+// Colour    : the stone — this face's stone type, grained and lit — with that Lerp
 //             already done, for wiring the node straight inline.
 void RiverRunShading_float(
     float4 SeamData,
@@ -497,6 +599,7 @@ void RiverRunShading_float(
     float3 BaseColour,
     float2 GrainUV,
     float4 FaceData,
+    float4 GradientData,
     out float3 Colour,
     out float3 Tint,
     out float  Blend,
@@ -517,15 +620,15 @@ void RiverRunShading_float(
     // of it rather than scaling it, so 0 leaves the stone at full and unlit rather than at black.
     // Past 1 the fade is done and the rest multiplies the lit result, up to 10x brighter.
     float ndl = dot(n, toLight) * 0.5 + 0.5;
-    Light = lerp(1.0, saturate(ndl), saturate(_RiverRunLightStrength))
-          * max(_RiverRunLightStrength, 1.0);
+    Light = lerp(1.0, saturate(ndl), saturate(_LevelSelectLightStrength))
+          * max(_LevelSelectLightStrength, 1.0);
 
     // The stone under everything else, and the grain that goes over the top of the lot. The
     // grain is worked out here and spent at the very end: it is the last thing laid on, so it
     // runs across the seams and the waterline as well as across the bare stone. Under them it
     // would only be visible on whatever the two bands left uncovered, which on a run drawn with
     // any real extent is not much of it.
-    float3 stone = RiverRunStone(FaceData, BaseColour);
+    float3 stone = RiverRunStone(FaceData, WorldPos, BaseColour, GradientData);
     float  grain = RiverRunGrain(GrainUV, FaceData);
 
     // The hand-drawn marks, laid on the bare stone before any of the rest of it. Under the light
@@ -536,13 +639,19 @@ void RiverRunShading_float(
     // Off the world position and the normal rather than off GrainUV, which the grain still
     // uses: UV0 is flattened per triangle, and a drawing laid across two triangles that
     // flattened onto different planes is cut along the edge between them.
-    float4 decals = RiverRunDecalsOnStone(WorldPos, n);
+    //
+    // Scattered with this face's own stone type's numbers, so each stone carries its own.
+    int    stoneIndex = RiverRunStoneIndex(FaceData);
+    float4 decals     = RiverRunDecalsOnStone(WorldPos, n, stoneIndex);
     // rgb comes back already multiplied by its own coverage, so it is added rather than
     // weighted again — what the stone loses to the marks is all that has to be taken off it.
     stone = decals.rgb + stone * (1.0 - decals.a);
 
+    // This face's own stone type's seams — where two types meet, each side draws its own.
+    float4 seams      = _RiverRunStoneSeams[stoneIndex];
+
     Colour    = stone * Light * grain;
-    Tint      = _RiverRunSeamColour.rgb;
+    Tint      = seams.rgb;
     Blend     = 0.0;
     Seam      = 0.0;
     Waterline = 0.0;
@@ -563,9 +672,9 @@ void RiverRunShading_float(
     // The extent in metres for this face: the percentage of its own surface's width. A piece
     // built before the widths were baked carries no face data, and gets no seams until rebuilt.
     float surfaceWidth = FaceData.w >= 0.5 ? FaceData.y : 0.0;
-    float seamExtent   = _RiverRunSeamExtent * 0.01 * surfaceWidth;
+    float seamExtent   = _RiverRunStoneGrains[stoneIndex].w * 0.01 * surfaceWidth;
 
-    Seam = saturate(RiverRunRamp(toSeam, seamExtent) * _RiverRunSeamStrength);
+    Seam = saturate(RiverRunRamp(toSeam, seamExtent) * seams.w);
 
     // How far above the water this pixel is. w is zero on the rim top and negative under it, and
     // the water lies WaterDepth beneath the rim, so the two add. Below the water the ramp holds
@@ -581,9 +690,9 @@ void RiverRunShading_float(
     // when both are drawn wide — the white is the one that reads.
     Blend = Seam + Waterline - Seam * Waterline;
     Tint  = Blend > 1e-5
-          ? (_RiverRunSeamColour.rgb * Seam * (1.0 - Waterline)
+          ? (seams.rgb * Seam * (1.0 - Waterline)
              + _RiverRunWaterlineColour.rgb * Waterline) / Blend
-          : _RiverRunSeamColour.rgb;
+          : seams.rgb;
 
     // Laid over the lit stone rather than under it. A seam is an ink line where two faces meet
     // rather than a surface of its own, so a black seam stays black on the lit side of a run
@@ -602,6 +711,7 @@ void RiverRunShading_half(
     half3 BaseColour,
     half2 GrainUV,
     half4 FaceData,
+    half4 GradientData,
     out half3 Colour,
     out half3 Tint,
     out half  Blend,
@@ -611,7 +721,7 @@ void RiverRunShading_half(
 {
     float3 c, t;
     float  b, s, w, l;
-    RiverRunShading_float(SeamData, WorldNormal, WorldPos, BaseColour, GrainUV, FaceData,
+    RiverRunShading_float(SeamData, WorldNormal, WorldPos, BaseColour, GrainUV, FaceData, GradientData,
                           c, t, b, s, w, l);
     Colour    = (half3)c;
     Tint      = (half3)t;

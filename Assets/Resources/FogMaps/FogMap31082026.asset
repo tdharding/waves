@@ -12,6 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 62a877791e9312444a218bdc460321c9, type: 3}
   m_Name: FogMap31082026
   m_EditorClassIdentifier: Assembly-CSharp::FogMap
+  obstacleRange: 18.82
+  repelLimit: 64
+  maskLimit: 128
   properties:
     spineBend1: 0.03
     spineBend2: -0.03
@@ -44,15 +47,12 @@ MonoBehaviour:
   windSpeed: 0.07
   unitsPerTexel: 0.053
   maxGridResolution: 512
-  heightMapQuality: 2
+  heightMapQuality: 1
   heaviness: 0.98
   blurRadius: 0.112
   heightBlurRadius: 0.2
   spawnRadius: 3.95
   cullRadius: 4.7
-  obstacleRange: 18.82
-  repelLimit: 64
-  maskLimit: 128
   globalRepelStrength: 1
   rockRepelRadius: 0.33
   rockRepelStrength: 4
@@ -87,17 +87,19 @@ MonoBehaviour:
   fogMaterial: {fileID: 2100000, guid: 46e2e25193da1f44e8078d278e21e7f9, type: 2}
   overrideLook: 1
   threshold: 0.705
-  edgeSoftness: 0.1585
+  edgeSoftness: 0.178
   undulationAmount: 0
   undulationScale: 1.51
-  lipWidth: 0.056
-  lipLighting: 4
-  lipCurvature: 0.52
-  heightScale: 1
+  lipWidth: 0.028
+  lipLighting: 1.08
+  lipCurvature: 0.82
+  heightScale: 2.94
   fogColour: {r: 0, g: 0, b: 0, a: 1}
   litColour: {r: 1, g: 1, b: 1, a: 1}
-  ambient: 0.273
-  interiorFill: 0.75
-  transparencyFalloff: 0.25
-  grainAmount: 0.408
-  grainScale: 62
+  ambient: 0.12
+  interiorFill: 0.338
+  transparencyFalloff: 0.61
+  grainAmount: 0.44
+  grainScale: 8
+  edgeShadowWidth: 0.746
+  edgeShadowStrength: 4

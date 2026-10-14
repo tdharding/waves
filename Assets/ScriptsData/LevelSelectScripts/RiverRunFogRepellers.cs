@@ -35,7 +35,7 @@ public class RiverRunFogRepellers : MonoBehaviour
     /// </summary>
     class FogRunRepeller : IFogRepeller
     {
-        public MonoBehaviour Owner;
+        public RiverRunFogRepellers Owner;
         public Vector3 Centre;
 
         public Vector3 RepelCentre     => Centre;
@@ -49,10 +49,18 @@ public class RiverRunFogRepellers : MonoBehaviour
         public float   MaskClearRadius => FogFieldManager.RunMaskRadius;
         public float   MaskFeather     => FogFieldManager.RunMaskFeather;
 
-        public bool    RepelActive     => FogFieldManager.RunsRepel
-                                       && Owner != null && Owner.isActiveAndEnabled
+        public bool    RepelActive     => Owner != null && Owner.isActiveAndEnabled
+                                       && Owner.Repels
                                        && FogFieldManager.RunRepelRadius > 0.0001f;
     }
+
+    /// <summary>
+    /// Whether this run's chain counts right now: runs repel at all, and a Landscape Natural
+    /// River Run only while the FogMap's Natural Runs Repel is on. Read live, like every other
+    /// number here, so the toggle moves the fog while you watch it.
+    /// </summary>
+    bool Repels => FogFieldManager.RunsRepel
+                && (_run == null || !_run.naturalRun || FogFieldManager.NaturalRunsRepel);
 
     readonly List<FogRunRepeller> _chain = new List<FogRunRepeller>();
 
@@ -156,7 +164,7 @@ public class RiverRunFogRepellers : MonoBehaviour
         if (!SampleChain(points)) return;
 
         float radius = FogFieldManager.RunRepelRadius;
-        bool  on     = FogFieldManager.RunsRepel;
+        bool  on     = Repels;
 
         for (int i = 0; i < points.Count; i++)
         {
@@ -171,7 +179,9 @@ public class RiverRunFogRepellers : MonoBehaviour
 
         UnityEditor.Handles.color = Color.white;
         UnityEditor.Handles.Label(points[0],
-            on ? $"fog chain {points.Count}" : $"fog chain {points.Count} (runs repel off)");
+            on ? $"fog chain {points.Count}"
+               : FogFieldManager.RunsRepel ? $"fog chain {points.Count} (natural runs repel off)"
+                                           : $"fog chain {points.Count} (runs repel off)");
     }
 #endif
 }

@@ -1,0 +1,12 @@
+// Archived from Assets/Editor/LevelSelectDesignerWindow.Towers.cs (2026-10-12).
+
+            if (changed)
+            {
+                SyncStructureOutpost(s);
+                ClampStructureObservers(s);
+            }
+
+            case InstallationOutpostPreset op when o.preset == op:
+                op.ApplyTo(o);
+                foreach (var observer in o.observers) ClampObserverToFloor(o, observer);
+                return true;

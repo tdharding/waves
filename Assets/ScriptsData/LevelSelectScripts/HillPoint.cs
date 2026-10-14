@@ -2,8 +2,8 @@ using UnityEngine;
 
 /// <summary>
 /// The shape of one hill (or hole) beyond its position, radius and height. Put on each generated
-/// hill point by the Level Select Designer and read by <see cref="LandscapeTool"/> into the
-/// CalculateHills shader. Authored on the designer's hill list, not here — a sync overwrites it.
+/// hill point by the Level Select Designer and read by <see cref="LandscapeTool"/>, which bakes
+/// it into the landscape tiles. Authored on the designer's hill list, not here — a sync overwrites it.
 /// </summary>
 public class HillPoint : MonoBehaviour
 {

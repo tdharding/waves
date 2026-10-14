@@ -14,7 +14,7 @@ public class SoulDataGenerator : EditorWindow
     private string assetBaseName = "SoulData_";
     private int soulCount = 100;
 
-    [MenuItem("Tools/Soul System/Generate Souls")]
+    [MenuItem("Tools/Souls/Generate Souls", false, 800)]
     public static void ShowWindow()
     {
         GetWindow<SoulDataGenerator>("Soul Generator");

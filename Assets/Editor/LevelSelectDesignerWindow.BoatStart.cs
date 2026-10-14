@@ -1,7 +1,5 @@
-using System.Linq;
 using UnityEditor;
 using UnityEngine;
-using UnityEngine.Splines;
 
 #if UNITY_EDITOR
 
@@ -76,9 +74,9 @@ public partial class LevelSelectDesignerWindow
 
     /// <summary>
     /// Stands the boat in the scene where a save that has never seen the map starts it — the
-    /// same choice LevelSelectDataController makes at load: the set node or a pool the main
-    /// river begins in, otherwise the head of the main river. Run at the end of Generate, once
-    /// the rivers and their water are built. No boat in the scene, and nothing is touched.
+    /// same choice LevelSelectDataController makes at load: the set node, otherwise the head of
+    /// the main river, or the pool either sits in. Run at the end of Generate, once the rivers
+    /// and their water are built. No boat in the scene, and nothing is touched.
     /// </summary>
     private void PlaceBoatAtStart()
     {
@@ -94,27 +92,12 @@ public partial class LevelSelectDesignerWindow
         }
         if (boat == null) return;
 
-        Vector3    position;
-        Quaternion rotation;
-
-        if (_data.TryGetBoatStart(out Vector3 startPos, out Vector3 startForward, out bool inPool) &&
-            (inPool || _data.HasBoatStartNode))
+        if (!_data.TryGetBoatStart(out Vector3 position, out Vector3 startForward, out _))
         {
-            position = startPos;
-            rotation = Quaternion.LookRotation(startForward, Vector3.up);
+            Debug.LogWarning("[LevelSelectDesigner] No start node and no main river — boat left where it is.");
+            return;
         }
-        else
-        {
-            var main = FindObjectsByType<RiverSegmentID>(FindObjectsSortMode.None)
-                .FirstOrDefault(s => s.SegmentID == "MainRiver");
-            if (main == null ||
-                !LevelSelectBoatPlacement.TryResolve(main.GetComponent<SplineContainer>(), 0f,
-                                                     out position, out rotation))
-            {
-                Debug.LogWarning("[LevelSelectDesigner] No start node and no MainRiver — boat left where it is.");
-                return;
-            }
-        }
+        Quaternion rotation = Quaternion.LookRotation(startForward, Vector3.up);
 
         // Settled on the water the way PlaceAt settles it at load. The water was only just
         // built, so physics is told where it is before looking for it.
@@ -124,6 +107,12 @@ public partial class LevelSelectDesignerWindow
 
         Undo.RecordObject(boat, "Place Boat At Start");
         boat.SetPositionAndRotation(position, rotation);
+
+        // Nothing runs LevelSelectBoatToShaders.LateUpdate in edit mode, so the boat-centred
+        // effects (white fade, boat light, darkness mask) are told where the boat now is here.
+        if (control != null) LevelSelectBoatToShaders.Push(control);
+        else                 LevelSelectBoatToShaders.Push(boat);
+        SceneView.RepaintAll();
 
         Debug.Log($"[LevelSelectDesigner] Boat placed at its start, {position}.");
     }

@@ -21,4 +21,8 @@ public class LevelSelectRiverWaterPreset : ScriptableObject
     [Tooltip("The lines drawn on the water — along a river's banks, and in rings out of a " +
              "pool's middle.")]
     public RiverEdgeRippleSettings edgeRipples = new RiverEdgeRippleSettings();
+
+    [Tooltip("The soul zone drawn along a soul route when its souls are released — how it looks " +
+             "and how fast it draws out. The fish follow behind it.")]
+    public RiverSoulZoneSettings soulZone = new RiverSoulZoneSettings();
 }

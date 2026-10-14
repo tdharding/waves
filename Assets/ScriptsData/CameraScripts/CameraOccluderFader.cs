@@ -9,6 +9,8 @@ using UnityEngine;
 /// ramps in and out rather than snapping, so a rock passing through the view fades instead of popping.
 /// OccluderFade.hlsl turns that amount into an alpha; how far it fades is the shared _OccluderFadedAlpha
 /// global pushed from here.
+///
+/// The river the boat is floating on never fades — every run and pool carrying its name is left out.
 /// </summary>
 public class CameraOccluderFader : MonoBehaviour
 {
@@ -55,6 +57,15 @@ public class CameraOccluderFader : MonoBehaviour
 
     // Collider → its renderers. Cached because the cast runs every frame.
     readonly Dictionary<Collider, Renderer[]> _rendererCache = new Dictionary<Collider, Renderer[]>();
+
+    // Collider → the river it is part of (null for anything that is not a river piece).
+    readonly Dictionary<Collider, string> _riverCache = new Dictionary<Collider, string>();
+
+    // The river whose water the boat is on this frame — never faded, it is what the boat sits in.
+    string _boatRiver;
+
+    int  _waterMask;
+    bool _waterMaskFound;
 
     MaterialPropertyBlock _block;
 
@@ -109,6 +120,8 @@ public class CameraOccluderFader : MonoBehaviour
 
         if (full <= 0.0001f || dist <= 0.01f) return;
 
+        _boatRiver = RiverUnderBoat();
+
         Vector3 dir = delta / full;
 
         int count = rayRadius > 0.001f
@@ -122,6 +135,8 @@ public class CameraOccluderFader : MonoBehaviour
             Collider col = _hits[i].collider;
             if (col == null) continue;
 
+            if (_boatRiver != null && RiverOf(col) == _boatRiver) continue;
+
             Renderer[] renderers = GetRenderers(col);
             for (int r = 0; r < renderers.Length; r++)
             {
@@ -132,6 +147,49 @@ public class CameraOccluderFader : MonoBehaviour
 
         if (drawRay)
             Debug.DrawLine(from, from + dir * dist, count > 0 ? Color.red : Color.green);
+    }
+
+    /// <summary>
+    /// The river the boat is floating on: the water straight below it, looked for from above as
+    /// the boat finds its own surface, and the run or pool that water belongs to. Null off a river.
+    /// </summary>
+    private string RiverUnderBoat()
+    {
+        if (!_waterMaskFound)
+        {
+            _waterMask      = LayerMask.GetMask("Water");
+            _waterMaskFound = true;
+        }
+        if (_waterMask == 0) return null;
+
+        Vector3 from = boatTarget.position + Vector3.up * 4f;
+        if (!Physics.Raycast(from, Vector3.down, out RaycastHit hit, 16f, _waterMask,
+                             QueryTriggerInteraction.Collide))
+            return null;
+
+        return RiverOf(hit.collider);
+    }
+
+    /// <summary>Which river a collider is part of — its run's or pool's river name.</summary>
+    private string RiverOf(Collider col)
+    {
+        if (_riverCache.TryGetValue(col, out string cached))
+            return cached;
+
+        string river = null;
+
+        var run = col.GetComponentInParent<RiverRunMesh>();
+        if (run != null) river = run.riverName;
+        else
+        {
+            var pool = col.GetComponentInParent<RiverPoolMesh>();
+            if (pool != null) river = pool.riverName;
+        }
+
+        if (string.IsNullOrEmpty(river)) river = null;
+
+        _riverCache[col] = river;
+        return river;
     }
 
     private Renderer[] GetRenderers(Collider col)
@@ -221,5 +279,7 @@ public class CameraOccluderFader : MonoBehaviour
         _fades.Clear();
         _blocking.Clear();
         _rendererCache.Clear();
+        _riverCache.Clear();
+        _boatRiver = null;
     }
 }

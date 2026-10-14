@@ -18,7 +18,7 @@ public class FogMapWindow : EditorWindow
     const int GRID_CELLS = 32;      // matches GridData.GridSize
     const int PREVIEW_PX = 40;      // resolution each cloud's outline is rasterised at
 
-    [MenuItem("Waves/Fog Map")]
+    [MenuItem("Tools/Fog/Fog Map", false, 400)]
     public static void Open()
     {
         var w = GetWindow<FogMapWindow>("Fog Map");
@@ -71,16 +71,22 @@ public class FogMapWindow : EditorWindow
     {
         _lastTick = EditorApplication.timeSinceStartup;
         EditorApplication.update += OnEditorTick;
+        SceneView.duringSceneGui += OnSceneGUI;
     }
 
     void OnDisable()
     {
         EditorApplication.update -= OnEditorTick;
+        SceneView.duringSceneGui -= OnSceneGUI;
     }
 
     void OnEditorTick()
     {
         if (_animate && _map != null && _map.windSpeed > 0.0001f) Repaint();
+
+        // The Scene view does not redraw on its own while the game runs, so live gizmos would
+        // freeze on whatever frame it last happened to draw.
+        if (AnyGizmo && Application.isPlaying) SceneView.RepaintAll();
     }
 
     /// <summary>
@@ -183,6 +189,7 @@ public class FogMapWindow : EditorWindow
         EditorGUILayout.BeginHorizontal();
         DrawPanel();
         if (_so.ApplyModifiedProperties()) EditorUtility.SetDirty(_map);
+
         DrawSplitter();
         DrawArena();
         EditorGUILayout.EndHorizontal();
@@ -429,279 +436,318 @@ public class FogMapWindow : EditorWindow
         Handles.EndGUI();
     }
 
+    // Every main section is a dropdown, closed when the window opens. Plain window fields, so the
+    // open/closed state rides through recompiles the same way the rest of the window's state does.
+    bool _openBlob, _openDistribution, _openWind, _openBoatMask, _openFogScale,
+         _openSimulation, _openRepellers, _openLook, _openGizmos;
+
+    // Gizmos section toggles, each a separate layer drawn in the Scene view.
+    bool _gizmoMasses, _gizmoBoatMask, _gizmoSpawnCull, _gizmoPaintedArea, _gizmoWind,
+         _gizmoRange, _gizmoRepellers, _gizmoLabels;
+
+    bool AnyGizmo => _gizmoMasses || _gizmoBoatMask || _gizmoSpawnCull || _gizmoPaintedArea ||
+                     _gizmoWind || _gizmoRange || _gizmoRepellers;
+
+    static GUIStyle _sectionStyle;
+
+    bool Section(ref bool open, string title)
+    {
+        _sectionStyle ??= new GUIStyle(EditorStyles.foldout) { fontStyle = FontStyle.Bold };
+        EditorGUILayout.Space(4);
+        open = EditorGUILayout.Foldout(open, title, true, _sectionStyle);
+        return open;
+    }
+
     void DrawPanel()
     {
         LoadPanelWidth();
         EditorGUILayout.BeginVertical(GUILayout.Width(_panelWidth));
         _scroll = EditorGUILayout.BeginScrollView(_scroll);
 
-        EditorGUILayout.LabelField("Optimisation", EditorStyles.boldLabel);
-        Field("obstacleRange", "Obstacle Range");
-        Field("repelLimit", "Repel Limit");
-        Field("maskLimit", "Mask Limit");
-        EditorGUILayout.HelpBox(
-            "Obstacle Range is how far from the boat an obstacle's centre may be and still count. " +
-            "Of those, the nearest Repel Limit push fog (CPU) and the nearest Mask Limit cut the " +
-            "clear edge (GPU). Nearest is measured to each obstacle's edge.", MessageType.None);
-        if (Application.isPlaying)
+        if (Section(ref _openBlob, "Blob"))
+        {
+            // The mass itself, drawn once at a readable size. With a list of blobs there was nothing
+            // sensible to show here and the only view of a shape was as one of a dozen scattered
+            // across the canvas at whatever size the distribution gave it.
+            DrawBlobPortrait();
+
+            Field("properties");
+        }
+
+        if (Section(ref _openDistribution, "Distribution"))
+        {
+            Field("blobCount", "Blob Count");
+            Field("spacing", "Spacing");
+
+            // Spacing is world units now and measured between masses, so it can be read against blob
+            // size directly — the pairing that decides whether fog reads as a bank or as separate puffs.
+            var sz = _map.WorldBlobScale;
             EditorGUILayout.LabelField(" ",
-                $"in range {FogFieldManager.NearRepellerCount}  ·  pushing {FogFieldManager.PushingCount}" +
-                $"  ·  masked {FogFieldManager.MaskedCount} / {_map.maskLimit}",
+                $"masses are {sz.x:0.##}–{sz.y:0.##} across, kept {_map.spacing:0.##} apart",
                 EditorStyles.miniLabel);
 
-        EditorGUILayout.Space(8);
-        EditorGUILayout.LabelField("Blob", EditorStyles.boldLabel);
-
-        // The mass itself, drawn once at a readable size. With a list of blobs there was nothing
-        // sensible to show here and the only view of a shape was as one of a dozen scattered
-        // across the canvas at whatever size the distribution gave it.
-        DrawBlobPortrait();
-
-        Field("properties");
-
-        EditorGUILayout.Space(8);
-        EditorGUILayout.LabelField("Distribution", EditorStyles.boldLabel);
-        Field("blobCount", "Blob Count");
-        Field("spacing", "Spacing");
-
-        // Spacing is world units now and measured between masses, so it can be read against blob
-        // size directly — the pairing that decides whether fog reads as a bank or as separate puffs.
-        var sz = _map.WorldBlobScale;
-        EditorGUILayout.LabelField(" ",
-            $"masses are {sz.x:0.##}–{sz.y:0.##} across, kept {_map.spacing:0.##} apart",
-            EditorStyles.miniLabel);
-
-        EditorGUILayout.BeginHorizontal();
-        GUILayout.Label("Preview", EditorStyles.miniLabel, GUILayout.Width(60));
-        if (GUILayout.Button(new GUIContent("Resample",
-                "Throw another set. The canvas shows ONE outcome of the spawner, not a stored " +
-                "arrangement — nothing on the asset decides where masses land any more, so this " +
-                "changes nothing on disk."), GUILayout.Width(80)))
-        {
-            _previewSeed = Random.Range(1, int.MaxValue);
-            Repaint();
-        }
-        EditorGUILayout.EndHorizontal();
-
-        // The count asked for and the count achieved are different numbers whenever spacing is too
-        // wide to fit them all, and silently getting fewer masses than you typed is the kind of
-        // thing you would otherwise chase for an hour.
-        EnsureSample();
-        int want = _map.blobCount;
-        if (_sample.Count < want)
-            EditorGUILayout.HelpBox(
-                $"Asked for {want} masses, fitted {_sample.Count}. Spacing is too wide for the " +
-                "water inside the cull radius — lower Spacing, or widen the mask to give them room.",
-                MessageType.Warning);
-
-        EditorGUILayout.Space(6);
-        EditorGUILayout.LabelField("Wind", EditorStyles.boldLabel);
-        Field("windAngle");
-        Field("windSpeed");
-        EditorGUILayout.HelpBox(
-            "The wind carries the masses and the whole tiled arrangement together, so fog travels " +
-            "without the pattern emptying out behind it. It is now the ONLY motion fog has. " +
-            "These are the starting values. On level load they are copied to the FogFieldManager, " +
-            "which is what the fog then reads — but editing them here during play pushes straight " +
-            "through to it, so either end works.", MessageType.None);
-
-
-        EditorGUILayout.Space(8);
-        EditorGUILayout.LabelField("Boat Mask", EditorStyles.boldLabel);
-        Field("fogOpacity", "Overall Opacity");
-        Field("maskRadius");
-        Field("maskFeather");
-
-        Field("spawnRadius", "Spawn Radius");
-        Field("cullRadius", "Cull Radius");
-        EditorGUILayout.HelpBox(
-            "Three radii, one job each. Spawn Radius is where masses are born. Cull Radius is " +
-            "where they are deleted. Mask Radius is where they are faded out, on the material. " +
-            "None of them reads either of the others.", MessageType.None);
-        EditorGUILayout.HelpBox(
-            "The blue rings. How far from the boat fog is drawn at all, and how much of that is a " +
-            "fade band rather than a hard edge. Starting values — copied to the FogFieldManager " +
-            "on level load, and editing them here during play pushes straight through, so either " +
-            "end works. " +
-            "The radius carries more than it looks: cull is derived from it, the painted texture " +
-            "window from cull, and masses may only be born outside it. Widening it widens all " +
-            "three together.", MessageType.None);
-
-        EditorGUILayout.Space(8);
-        EditorGUILayout.LabelField("Boat Push", EditorStyles.boldLabel);
-        Field("boatRepelRadius", "Repel Radius");
-        Field("boatRepelStrength", "Repel Strength");
-        Field("boatMaskRadius", "Mask Radius");
-        Field("boatMaskFeather", "Mask Feather");
-        EditorGUILayout.LabelField(" ",
-            $"push holds {_map.boatRepelRadius:0.##} u, mask cuts at {_map.boatMaskRadius:0.##} u",
-            EditorStyles.miniLabel);
-        EditorGUILayout.HelpBox(
-            "How fog parts around the hull. On the arena rather than on the boat, because how " +
-            "readily fog gives way is a property of the weather — thin haze barely notices a " +
-            "hull, a thick bank shoulders well clear. Strength 0 lets fog close straight over you.",
-            MessageType.None);
-        EditorGUILayout.HelpBox(
-            "Two distances, on purpose. Repel Radius is how far the SKELETON is pushed, which " +
-            "shapes fog but cannot hold an exact edge. Mask Radius is where the fog is CUT, with " +
-            "its own feather, which holds the edge exactly at no cost in motion. Set the mask to " +
-            "0 to let fog close over you visually while the push still holds it off.",
-            MessageType.None);
-
-        EditorGUILayout.Space(8);
-        EditorGUILayout.LabelField("Fog Scale", EditorStyles.boldLabel);
-        // blobScale is a C# property over blobScaleMin/Max, so it has no SerializedProperty of
-        // its own — asking for one returns null and PropertyField throws.
-        Field("blobScaleMin", "Min");
-        Field("blobScaleMax", "Max");
-        EditorGUILayout.LabelField(" ",
-            $"world units, against {_map.spacing:0.##} of spacing", EditorStyles.miniLabel);
-        EditorGUILayout.HelpBox(
-            "Spine length in world units. Starting values: copied to the FogFieldManager on level " +
-            "load, and editing them here during play pushes straight through, so either end works." +
-            "\n\nRead these against Spacing. Sizes near the spacing give a continuous bank; sizes " +
-            "well under it give separate puffs with water between them.", MessageType.None);
-
-        if (_map.blobScaleMax > _viewSpan)
-            EditorGUILayout.HelpBox(
-                $"A mass is {_map.blobScaleMax:0} units across — wider than the {_viewSpan:0}-unit " +
-                "view. Zoom out, or check this is the size you meant.", MessageType.Warning);
-
-        EditorGUILayout.Space(8);
-        EditorGUILayout.LabelField("Simulation", EditorStyles.boldLabel);
-        Field("unitsPerTexel", "Detail (u/texel)");
-        Field("maxGridResolution", "Max Resolution");
-
-        // Resolution is derived from the detail figure and how much water the mask covers, so
-        // widening the mask allocates a bigger texture rather than coarsening the fog. Shown
-        // because it is the number that actually costs, and because hitting the cap is silent.
-        float window = _map.cullRadius * 2f * 1.45f;
-        int wanted = Mathf.CeilToInt(window / Mathf.Max(_map.unitsPerTexel, 0.001f));
-        int cap    = Mathf.Clamp(_map.maxGridResolution, 32, 2048);
-        int capped = Mathf.Clamp(wanted, 32, cap);
-        EditorGUILayout.LabelField(" ",
-            $"{capped} px across {window:0.#} u" + (capped < wanted ? "   (capped)" : ""),
-            EditorStyles.miniLabel);
-        if (capped < wanted)
-            EditorGUILayout.HelpBox(
-                $"This mask wants {wanted} px at {_map.unitsPerTexel:0.###} u/texel but the cap is " +
-                $"{cap}, so the fog is coarser than asked for. Raise the cap, or the detail figure.",
-                MessageType.Warning);
-
-        Field("heaviness", "Heaviness");
-        Field("blurRadius", "Blur");
-        Field("heightMapQuality", "Height Map Quality");
-        using (new EditorGUI.DisabledScope(_map.heightMapQuality == FogHeightQuality.Off))
-            Field("heightBlurRadius", "Height Blur");
-
-        EditorGUILayout.Space(8);
-        EditorGUILayout.LabelField("Pushing", EditorStyles.boldLabel);
-        Field("globalRepelStrength", "Global Strength");
-        EditorGUILayout.HelpBox(
-            "Scales every repeller at once. The per-obstacle strengths below may go past 1, which " +
-            "is how one kind of obstacle reaches full push while this is held low for the rest — " +
-            "the PRODUCT is what gets clamped, never either number on its own.", MessageType.None);
-
-        EditorGUILayout.LabelField("Rocks", EditorStyles.miniBoldLabel);
-        Field("rockRepelRadius", "Repel Radius");
-        Field("rockRepelStrength", "Repel Strength");
-        Field("rockMaskRadius", "Mask Radius");
-        Field("rockMaskFeather", "Mask Feather");
-        Field("rockRescanInterval", "Rock Rescan");
-
-        EditorGUILayout.LabelField("Street Lights", EditorStyles.miniBoldLabel);
-        Field("lampClearFraction", "Clear Fraction");
-        Field("lampRepelRadius", "Repel Radius");
-        Field("lampRepelStrength", "Repel Strength");
-        Field("lampMaskRadius", "Mask Radius");
-        Field("lampMaskFeather", "Mask Feather");
-        EditorGUILayout.HelpBox(
-            "Repel Radius shapes fog as it flows past; Mask Radius is the hard edge it is drawn " +
-            "to, with its own feather. A wide gentle push with a tight mask gives fog that leans " +
-            "away from an obstacle and is still cut cleanly at it.", MessageType.None);
-
-        EditorGUILayout.LabelField("River Runs", EditorStyles.miniBoldLabel);
-        Field("runsRepel", "Runs Repel");
-        Field("runChainSpacing", "Chain Spacing");
-        Field("runRepelRadius", "Repel Radius");
-        Field("runRepelStrength", "Repel Strength");
-        Field("runMaskRadius", "Mask Radius");
-        Field("runMaskFeather", "Mask Feather");
-        EditorGUILayout.HelpBox(
-            "The elevated runs, strung with a chain of circles so fog has to get past the " +
-            "structures instead of sliding through them. Purely a look — nothing is cleared and " +
-            "nothing is scored. " +
-            "Chain Spacing is the budget: every circle is one of the 32 obstacle slots, shared " +
-            "with the rocks, and the runs are handed out first. Select a run in the scene to " +
-            "read its chain length off the gizmo, and keep the total well under 32 or the rocks " +
-            "lose their mask.", MessageType.None);
-
-        EditorGUILayout.LabelField("Pools", EditorStyles.miniBoldLabel);
-        Field("poolsRepel", "Pools Repel");
-        Field("poolRepelRadius", "Repel Radius");
-        Field("poolRepelStrength", "Repel Strength");
-        Field("poolMaskRadius", "Mask Radius");
-        Field("poolMaskFeather", "Mask Feather");
-
-        EditorGUILayout.LabelField("Arenas", EditorStyles.miniBoldLabel);
-        Field("arenasRepel", "Arenas Repel");
-        Field("arenaRepelRadius", "Repel Radius");
-        Field("arenaRepelStrength", "Repel Strength");
-        Field("arenaMaskRadius", "Mask Radius");
-        Field("arenaMaskFeather", "Mask Feather");
-        EditorGUILayout.HelpBox(
-            "One circle per pool or arena, sized off the pool's water radius or the arena wall's " +
-            "outer face — the radii here are measured beyond that. Each spends one of the 32 " +
-            "obstacle slots, whatever its size.", MessageType.None);
-
-        EditorGUILayout.Space(8);
-        EditorGUILayout.LabelField("Look", EditorStyles.boldLabel);
-        Field("fogMaterial");
-        Field("overrideLook");
-
-        using (new EditorGUI.DisabledScope(_map.fogMaterial == null))
-            if (GUILayout.Button(new GUIContent("Pull From Material",
-                    "Read every Look value off the material and into this map. For when the " +
-                    "material is ahead — one press and the map matches what is on screen.")))
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Label("Preview", EditorStyles.miniLabel, GUILayout.Width(60));
+            if (GUILayout.Button(new GUIContent("Resample",
+                    "Throw another set. The canvas shows ONE outcome of the spawner, not a stored " +
+                    "arrangement — nothing on the asset decides where masses land any more, so this " +
+                    "changes nothing on disk."), GUILayout.Width(80)))
             {
-                Undo.RecordObject(_map, "Pull Fog Look From Material");
-                _map.PullFromMaterial();
-                EditorUtility.SetDirty(_map);
-
-                // Re-read, do NOT drop the SerializedObject. Nulling it mid-draw left every later
-                // Field() in this same pass dereferencing null, which threw inside the layout and
-                // took the window's Begin/End balance down with it.
-                _so.Update();
+                _previewSeed = Random.Range(1, int.MaxValue);
+                Repaint();
             }
+            EditorGUILayout.EndHorizontal();
 
-        if (_map.fogMaterial == null)
-            EditorGUILayout.HelpBox("No material assigned, so the Look values reach nothing.",
-                                    MessageType.Warning);
-
-        if (_map.overrideLook)
-        {
-            if (_map.fogMaterial == null)
+            // The count asked for and the count achieved are different numbers whenever spacing is too
+            // wide to fit them all, and silently getting fewer masses than you typed is the kind of
+            // thing you would otherwise chase for an hour.
+            EnsureSample();
+            int want = _map.blobCount;
+            if (_sample.Count < want)
                 EditorGUILayout.HelpBox(
-                    "Override is on but no material is assigned, so nothing is pushed.",
+                    $"Asked for {want} masses, fitted {_sample.Count}. Spacing is too wide for the " +
+                    "water inside the cull radius — lower Spacing, or widen the mask to give them room.",
+                    MessageType.Warning);
+        }
+
+        if (Section(ref _openWind, "Wind"))
+        {
+            Field("windAngle");
+            Field("windSpeed");
+            EditorGUILayout.HelpBox(
+                "The wind carries the masses and the whole tiled arrangement together, so fog travels " +
+                "without the pattern emptying out behind it. It is now the ONLY motion fog has. " +
+                "These are the starting values. On level load they are copied to the FogFieldManager, " +
+                "which is what the fog then reads — but editing them here during play pushes straight " +
+                "through to it, so either end works.", MessageType.None);
+        }
+
+        if (Section(ref _openBoatMask, "Boat Mask"))
+        {
+            Field("fogOpacity", "Overall Opacity");
+            Field("maskRadius");
+            Field("maskFeather");
+
+            Field("spawnRadius", "Spawn Radius");
+            Field("cullRadius", "Cull Radius");
+            EditorGUILayout.HelpBox(
+                "Three radii, one job each. Spawn Radius is where masses are born. Cull Radius is " +
+                "where they are deleted. Mask Radius is where they are faded out, on the material. " +
+                "None of them reads either of the others.", MessageType.None);
+            EditorGUILayout.HelpBox(
+                "The blue rings. How far from the boat fog is drawn at all, and how much of that is a " +
+                "fade band rather than a hard edge. Starting values — copied to the FogFieldManager " +
+                "on level load, and editing them here during play pushes straight through, so either " +
+                "end works. " +
+                "The radius carries more than it looks: cull is derived from it, the painted texture " +
+                "window from cull, and masses may only be born outside it. Widening it widens all " +
+                "three together.", MessageType.None);
+        }
+
+        if (Section(ref _openFogScale, "Fog Scale"))
+        {
+            // blobScale is a C# property over blobScaleMin/Max, so it has no SerializedProperty of
+            // its own — asking for one returns null and PropertyField throws.
+            Field("blobScaleMin", "Min");
+            Field("blobScaleMax", "Max");
+            EditorGUILayout.LabelField(" ",
+                $"world units, against {_map.spacing:0.##} of spacing", EditorStyles.miniLabel);
+            EditorGUILayout.HelpBox(
+                "Spine length in world units. Starting values: copied to the FogFieldManager on level " +
+                "load, and editing them here during play pushes straight through, so either end works." +
+                "\n\nRead these against Spacing. Sizes near the spacing give a continuous bank; sizes " +
+                "well under it give separate puffs with water between them.", MessageType.None);
+
+            if (_map.blobScaleMax > _viewSpan)
+                EditorGUILayout.HelpBox(
+                    $"A mass is {_map.blobScaleMax:0} units across — wider than the {_viewSpan:0}-unit " +
+                    "view. Zoom out, or check this is the size you meant.", MessageType.Warning);
+        }
+
+        if (Section(ref _openSimulation, "Simulation"))
+        {
+            Field("unitsPerTexel", "Detail (u/texel)");
+            Field("maxGridResolution", "Max Resolution");
+
+            // Resolution is derived from the detail figure and how much water the mask covers, so
+            // widening the mask allocates a bigger texture rather than coarsening the fog. Shown
+            // because it is the number that actually costs, and because hitting the cap is silent.
+            float window = _map.cullRadius * 2f * 1.45f;
+            int wanted = Mathf.CeilToInt(window / Mathf.Max(_map.unitsPerTexel, 0.001f));
+            int cap    = Mathf.Clamp(_map.maxGridResolution, 32, 2048);
+            int capped = Mathf.Clamp(wanted, 32, cap);
+            EditorGUILayout.LabelField(" ",
+                $"{capped} px across {window:0.#} u" + (capped < wanted ? "   (capped)" : ""),
+                EditorStyles.miniLabel);
+            if (capped < wanted)
+                EditorGUILayout.HelpBox(
+                    $"This mask wants {wanted} px at {_map.unitsPerTexel:0.###} u/texel but the cap is " +
+                    $"{cap}, so the fog is coarser than asked for. Raise the cap, or the detail figure.",
                     MessageType.Warning);
 
-            foreach (var name in new[] {
-                "threshold", "edgeSoftness", "undulationAmount", "undulationScale",
-                "lipWidth", "lipLighting", "lipCurvature", "heightScale",
-                "fogColour", "litColour", "ambient", "interiorFill", "transparencyFalloff" })
-                Field(name);
+            Field("heaviness", "Heaviness");
+            Field("blurRadius", "Blur");
+            Field("heightMapQuality", "Height Map Quality");
+            using (new EditorGUI.DisabledScope(_map.heightMapQuality == FogHeightQuality.Off))
+                Field("heightBlurRadius", "Height Blur");
+        }
 
-            EditorGUILayout.LabelField("Grain (world-space, drifts on the wind)", EditorStyles.miniBoldLabel);
-            Field("grainAmount", "Grain Amount");
-            Field("grainScale", "Grain Scale");
-
-            EditorGUILayout.LabelField("Edge Shadow (under the lighting)", EditorStyles.miniBoldLabel);
-            Field("edgeShadowWidth", "Edge Shadow Width");
-            Field("edgeShadowStrength", "Edge Shadow Strength");
-
+        // Every repeller setting lives here: the limits on how many count, the global scale, and
+        // each kind of obstacle that pushes fog — the boat included.
+        if (Section(ref _openRepellers, "Repellers"))
+        {
+            EditorGUILayout.LabelField("Limits", EditorStyles.miniBoldLabel);
+            Field("obstacleRange", "Obstacle Range");
+            Field("repelLimit", "Repel Limit");
+            Field("maskLimit", "Mask Limit");
             EditorGUILayout.HelpBox(
-                "Pushed to the material on Refresh Preview and at level start — not every frame, " +
-                "so the material stays tunable while you look at it.", MessageType.None);
+                "Obstacle Range is how far from the boat an obstacle's centre may be and still count. " +
+                "Of those, the nearest Repel Limit push fog (CPU) and the nearest Mask Limit cut the " +
+                "clear edge (GPU). Nearest is measured to each obstacle's edge.", MessageType.None);
+            if (Application.isPlaying)
+                EditorGUILayout.LabelField(" ",
+                    $"in range {FogFieldManager.NearRepellerCount}  ·  pushing {FogFieldManager.PushingCount}" +
+                    $"  ·  masked {FogFieldManager.MaskedCount} / {_map.maskLimit}",
+                    EditorStyles.miniLabel);
+
+            EditorGUILayout.Space(4);
+            EditorGUILayout.LabelField("Global", EditorStyles.miniBoldLabel);
+            Field("globalRepelStrength", "Global Strength");
+            EditorGUILayout.HelpBox(
+                "Scales every repeller at once. The per-obstacle strengths below may go past 1, which " +
+                "is how one kind of obstacle reaches full push while this is held low for the rest — " +
+                "the PRODUCT is what gets clamped, never either number on its own.", MessageType.None);
+
+            EditorGUILayout.Space(4);
+            EditorGUILayout.LabelField("Boat", EditorStyles.miniBoldLabel);
+            Field("boatRepelRadius", "Repel Radius");
+            Field("boatRepelStrength", "Repel Strength");
+            Field("boatMaskRadius", "Mask Radius");
+            Field("boatMaskFeather", "Mask Feather");
+            EditorGUILayout.LabelField(" ",
+                $"push holds {_map.boatRepelRadius:0.##} u, mask cuts at {_map.boatMaskRadius:0.##} u",
+                EditorStyles.miniLabel);
+            EditorGUILayout.HelpBox(
+                "How fog parts around the hull. On the arena rather than on the boat, because how " +
+                "readily fog gives way is a property of the weather — thin haze barely notices a " +
+                "hull, a thick bank shoulders well clear. Strength 0 lets fog close straight over you.",
+                MessageType.None);
+            EditorGUILayout.HelpBox(
+                "Two distances, on purpose. Repel Radius is how far the SKELETON is pushed, which " +
+                "shapes fog but cannot hold an exact edge. Mask Radius is where the fog is CUT, with " +
+                "its own feather, which holds the edge exactly at no cost in motion. Set the mask to " +
+                "0 to let fog close over you visually while the push still holds it off.",
+                MessageType.None);
+
+            EditorGUILayout.Space(4);
+            EditorGUILayout.LabelField("Rocks", EditorStyles.miniBoldLabel);
+            Field("rocksRepel", "Rocks Repel");
+            Field("rockRepelRadius", "Repel Radius");
+            Field("rockRepelStrength", "Repel Strength");
+            Field("rockMaskRadius", "Mask Radius");
+            Field("rockMaskFeather", "Mask Feather");
+            Field("rockRescanInterval", "Rock Rescan");
+
+            EditorGUILayout.Space(4);
+            EditorGUILayout.LabelField("Street Lights", EditorStyles.miniBoldLabel);
+            Field("lampClearFraction", "Clear Fraction");
+            Field("lampRepelRadius", "Repel Radius");
+            Field("lampRepelStrength", "Repel Strength");
+            Field("lampMaskRadius", "Mask Radius");
+            Field("lampMaskFeather", "Mask Feather");
+            EditorGUILayout.HelpBox(
+                "Repel Radius shapes fog as it flows past; Mask Radius is the hard edge it is drawn " +
+                "to, with its own feather. A wide gentle push with a tight mask gives fog that leans " +
+                "away from an obstacle and is still cut cleanly at it.", MessageType.None);
+
+            EditorGUILayout.Space(4);
+            EditorGUILayout.LabelField("River Runs", EditorStyles.miniBoldLabel);
+            Field("runsRepel", "Runs Repel");
+            Field("naturalRunsRepel", "Natural Runs Repel");
+            Field("runChainSpacing", "Chain Spacing");
+            Field("runRepelRadius", "Repel Radius");
+            Field("runRepelStrength", "Repel Strength");
+            Field("runMaskRadius", "Mask Radius");
+            Field("runMaskFeather", "Mask Feather");
+            EditorGUILayout.HelpBox(
+                "The elevated runs, strung with a chain of circles so fog has to get past the " +
+                "structures instead of sliding through them. Purely a look — nothing is cleared and " +
+                "nothing is scored. " +
+                "Chain Spacing is the budget: every circle is one of the 32 obstacle slots, shared " +
+                "with the rocks, and the runs are handed out first. Select a run in the scene to " +
+                "read its chain length off the gizmo, and keep the total well under 32 or the rocks " +
+                "lose their mask.", MessageType.None);
+
+            EditorGUILayout.Space(4);
+            EditorGUILayout.LabelField("Pools", EditorStyles.miniBoldLabel);
+            Field("poolsRepel", "Pools Repel");
+            Field("poolRepelRadius", "Repel Radius");
+            Field("poolRepelStrength", "Repel Strength");
+            Field("poolMaskRadius", "Mask Radius");
+            Field("poolMaskFeather", "Mask Feather");
+
+            EditorGUILayout.Space(4);
+            EditorGUILayout.LabelField("Arenas", EditorStyles.miniBoldLabel);
+            Field("arenasRepel", "Arenas Repel");
+            Field("arenaRepelRadius", "Repel Radius");
+            Field("arenaRepelStrength", "Repel Strength");
+            Field("arenaMaskRadius", "Mask Radius");
+            Field("arenaMaskFeather", "Mask Feather");
+            EditorGUILayout.HelpBox(
+                "One circle per pool or arena, sized off the pool's water radius or the arena wall's " +
+                "outer face — the radii here are measured beyond that. Each spends one of the 32 " +
+                "obstacle slots, whatever its size.", MessageType.None);
+        }
+
+        if (Section(ref _openLook, "Look"))
+        {
+            Field("fogMaterial");
+            Field("overrideLook");
+
+            using (new EditorGUI.DisabledScope(_map.fogMaterial == null))
+                if (GUILayout.Button(new GUIContent("Pull From Material",
+                        "Read every Look value off the material and into this map. For when the " +
+                        "material is ahead — one press and the map matches what is on screen.")))
+                {
+                    Undo.RecordObject(_map, "Pull Fog Look From Material");
+                    _map.PullFromMaterial();
+                    EditorUtility.SetDirty(_map);
+
+                    // Re-read, do NOT drop the SerializedObject. Nulling it mid-draw left every later
+                    // Field() in this same pass dereferencing null, which threw inside the layout and
+                    // took the window's Begin/End balance down with it.
+                    _so.Update();
+                }
+
+            if (_map.fogMaterial == null)
+                EditorGUILayout.HelpBox("No material assigned, so the Look values reach nothing.",
+                                        MessageType.Warning);
+
+            if (_map.overrideLook)
+            {
+                if (_map.fogMaterial == null)
+                    EditorGUILayout.HelpBox(
+                        "Override is on but no material is assigned, so nothing is pushed.",
+                        MessageType.Warning);
+
+                foreach (var name in new[] {
+                    "threshold", "edgeSoftness", "undulationAmount", "undulationScale",
+                    "lipWidth", "lipLighting", "lipCurvature", "heightScale",
+                    "fogColour", "litColour", "ambient", "interiorFill", "transparencyFalloff" })
+                    Field(name);
+
+                EditorGUILayout.LabelField("Grain (world-space, drifts on the wind)", EditorStyles.miniBoldLabel);
+                Field("grainAmount", "Grain Amount");
+                Field("grainScale", "Grain Scale");
+
+                EditorGUILayout.LabelField("Edge Shadow (under the lighting)", EditorStyles.miniBoldLabel);
+                Field("edgeShadowWidth", "Edge Shadow Width");
+                Field("edgeShadowStrength", "Edge Shadow Strength");
+
+                EditorGUILayout.HelpBox(
+                    "Pushed to the material on Refresh Preview and at level start — not every frame, " +
+                    "so the material stays tunable while you look at it.", MessageType.None);
+            }
         }
 
         EditorGUILayout.Space(8);
@@ -730,8 +776,218 @@ public class FogMapWindow : EditorWindow
             }
         }
 
+        if (Section(ref _openGizmos, "Gizmos"))
+        {
+            EditorGUI.BeginChangeCheck();
+            _gizmoMasses      = EditorGUILayout.Toggle("Masses", _gizmoMasses);
+            _gizmoBoatMask    = EditorGUILayout.Toggle("Boat Mask", _gizmoBoatMask);
+            _gizmoSpawnCull   = EditorGUILayout.Toggle("Spawn & Cull", _gizmoSpawnCull);
+            _gizmoPaintedArea = EditorGUILayout.Toggle("Painted Area", _gizmoPaintedArea);
+            _gizmoWind        = EditorGUILayout.Toggle("Wind", _gizmoWind);
+            _gizmoRange       = EditorGUILayout.Toggle("Obstacle Range", _gizmoRange);
+            _gizmoRepellers   = EditorGUILayout.Toggle("Repellers", _gizmoRepellers);
+            _gizmoLabels      = EditorGUILayout.Toggle("Labels", _gizmoLabels);
+            if (EditorGUI.EndChangeCheck()) SceneView.RepaintAll();
+
+            EditorGUILayout.HelpBox(
+                "Drawn in the Scene view while this window is open, off the running fog field.\n" +
+                "Masses: cream, solid while painting, hollow grey when alive but faded out.\n" +
+                "Boat Mask: blue — where fog stops drawing, and the fainter ring where the fade begins.\n" +
+                "Spawn & Cull: green where masses are born, orange where they are dropped.\n" +
+                "Painted Area: the texture's world window. Fog is hard-clipped at its edge.\n" +
+                "Wind: the way everything drifts, from the boat.\n" +
+                "Obstacle Range: grey ring round the boat — only repellers inside it count.\n" +
+                "Repellers: orange push, blue mask cut, bright when doing it this frame. The " +
+                "centre dot is white inside Obstacle Range, grey outside it or switched off.",
+                MessageType.None);
+
+            var mgr = FogFieldManager.Instance;
+            if (mgr == null)
+                EditorGUILayout.LabelField(" ", "No FogFieldManager in the open scene.",
+                                           EditorStyles.miniLabel);
+            else
+                EditorGUILayout.LabelField(" ",
+                    $"{FogFieldManager.RegisteredRepellers.Count} registered  ·  " +
+                    $"{mgr.AdoptedRocks.Count} rocks  ·  + boat",
+                    EditorStyles.miniLabel);
+        }
+
         EditorGUILayout.EndScrollView();
         EditorGUILayout.EndVertical();
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Gizmos section: drawn in the Scene view, read straight off the running fog field.
+    readonly System.Collections.Generic.HashSet<IFogRepeller> _gzNear    = new System.Collections.Generic.HashSet<IFogRepeller>();
+    readonly System.Collections.Generic.HashSet<IFogRepeller> _gzPushing = new System.Collections.Generic.HashSet<IFogRepeller>();
+    readonly System.Collections.Generic.HashSet<IFogRepeller> _gzMasked  = new System.Collections.Generic.HashSet<IFogRepeller>();
+
+    static readonly Color GzPush  = new Color(0.95f, 0.45f, 0.30f);
+    static readonly Color GzMask  = new Color(0.35f, 0.72f, 1f);
+    static readonly Color GzRange = new Color(0.75f, 0.75f, 0.78f);
+    static readonly Color GzCull  = new Color(0.95f, 0.55f, 0.35f);
+    static readonly Color GzSpawn = new Color(0.55f, 0.90f, 0.55f);
+    static readonly Color GzMass  = new Color(1f, 0.95f, 0.75f);
+    static readonly Color GzArea  = new Color(0.65f, 0.75f, 0.9f);
+    static readonly Color GzWind  = new Color(0.7f, 0.9f, 1f);
+
+    void OnSceneGUI(SceneView view)
+    {
+        if (!AnyGizmo || Event.current.type != EventType.Repaint) return;
+
+        var mgr = FogFieldManager.Instance;
+        if (mgr == null) return;
+
+        // Same opacity pref as the fog's own gizmos, so the Gizmo Manager slider thins these too.
+        float opacity = Mathf.Clamp01(EditorPrefs.GetFloat("FogTools.GizmoManager.Opacity", 1f));
+        float y = mgr.GizmoY;
+        Vector2 b2 = mgr.BoatCentreXZ;
+        Vector3 boat = new Vector3(b2.x, y, b2.y);
+
+        using (new Handles.DrawingScope())
+        {
+            if (_gizmoPaintedArea)
+            {
+                float cov = mgr.GizmoCoverage, h = cov * 0.5f;
+                Vector3 fc = new Vector3(mgr.FieldCentre.x, y, mgr.FieldCentre.y);
+                Color fill = GzArea; fill.a = 0.04f * opacity;
+                Color edge = GzArea; edge.a = 0.30f * opacity;
+                Handles.DrawSolidRectangleWithOutline(new[]
+                {
+                    fc + new Vector3(-h, 0f, -h), fc + new Vector3(-h, 0f,  h),
+                    fc + new Vector3( h, 0f,  h), fc + new Vector3( h, 0f, -h),
+                }, fill, edge);
+                if (_gizmoLabels)
+                    GizmoLabel(fc + new Vector3(-h, 0f, h),
+                        $"painted area {cov:0.#} u  @ {cov / Mathf.Max(mgr.GizmoFieldPx, 1):0.####} u/texel", opacity);
+            }
+
+            if (_gizmoSpawnCull)
+            {
+                DrawGizmoRing(boat, mgr.GizmoSpawnRadius, GzSpawn, 0.75f * opacity);
+                DrawGizmoRing(boat, mgr.CullRadius,       GzCull,  0.75f * opacity);
+                if (_gizmoLabels)
+                {
+                    GizmoLabel(boat + new Vector3(0f, 0f, mgr.GizmoSpawnRadius), $"spawn {mgr.GizmoSpawnRadius:0.##}", opacity);
+                    GizmoLabel(boat + new Vector3(mgr.CullRadius, 0f, 0f),       $"cull {mgr.CullRadius:0.##}", opacity);
+                }
+            }
+
+            if (_gizmoBoatMask)
+            {
+                float mask = mgr.GizmoMaskRadius;
+                DrawGizmoRing(boat, mask, GzMask, 0.95f * opacity);
+                // (1 - feather), matching FogMask.hlsl — where the fade begins.
+                DrawGizmoRing(boat, mask * (1f - mgr.LodFeather), GzMask, 0.45f * opacity);
+                if (_gizmoLabels)
+                    GizmoLabel(boat + new Vector3(-mask, 0f, 0f), $"mask {mask:0.##}", opacity);
+            }
+
+            if (_gizmoRange)
+            {
+                DrawGizmoRing(boat, mgr.ObstacleRange, GzRange, 0.5f * opacity);
+                if (_gizmoLabels)
+                    GizmoLabel(boat + new Vector3(0f, 0f, -mgr.ObstacleRange),
+                               $"obstacle range {mgr.ObstacleRange:0.##}", opacity);
+            }
+
+            if (_gizmoMasses)
+            {
+                var blobs = mgr.LiveBlobs;
+                for (int i = 0; i < blobs.Count; i++)
+                {
+                    var blob = blobs[i];
+                    if (blob == null || !blob.Alive) continue;
+
+                    // Hollow when faded: alive, drifting, holding a slot, painting nothing.
+                    bool painting = blob.LodFade > 0.001f;
+                    Vector3 bc = new Vector3(blob.Centre.x, y, blob.Centre.y);
+                    float rad = Mathf.Max(blob.ReachRadius, 0.1f);
+                    if (painting)
+                    {
+                        Color fill = GzMass; fill.a = (0.10f + 0.25f * blob.LodFade) * opacity;
+                        Handles.color = fill;
+                        Handles.DrawSolidDisc(bc, Vector3.up, rad);
+                    }
+                    DrawGizmoRing(bc, rad, painting ? GzMass : GzRange, (painting ? 0.7f : 0.5f) * opacity);
+                }
+            }
+
+            if (_gizmoWind)
+            {
+                float speed = mgr.GizmoWindSpeed;
+                if (speed > 0.0001f)
+                {
+                    Vector2 w = mgr.WindVector;
+                    Vector3 dir = new Vector3(w.x, 0f, w.y).normalized;
+                    float len = Mathf.Max(mgr.GizmoMaskRadius, HandleUtility.GetHandleSize(boat));
+                    Color c = GzWind; c.a = 0.8f * opacity;
+                    Handles.color = c;
+                    Handles.DrawLine(boat, boat + dir * len, 2f);
+                    Handles.ConeHandleCap(0, boat + dir * len, Quaternion.LookRotation(dir),
+                                          HandleUtility.GetHandleSize(boat) * 0.15f, EventType.Repaint);
+                    if (_gizmoLabels)
+                        GizmoLabel(boat + dir * len, $"wind {mgr.GizmoWindAngle:0}°  {speed:0.##} u/s", opacity);
+                }
+            }
+
+            if (_gizmoRepellers)
+            {
+                _gzNear.Clear(); _gzPushing.Clear(); _gzMasked.Clear();
+                foreach (var r in mgr.NearRepellers)    _gzNear.Add(r);
+                foreach (var r in mgr.PushingRepellers) _gzPushing.Add(r);
+                foreach (var r in mgr.MaskedRepellers)  _gzMasked.Add(r);
+
+                DrawRepellerGizmo(mgr.BoatRepeller, y, opacity);
+                foreach (var r in FogFieldManager.RegisteredRepellers) DrawRepellerGizmo(r, y, opacity);
+                foreach (var r in mgr.AdoptedRocks)                   DrawRepellerGizmo(r, y, opacity);
+            }
+        }
+    }
+
+    static GUIStyle _gizmoLabelStyle;
+
+    static void GizmoLabel(Vector3 at, string text, float opacity)
+    {
+        _gizmoLabelStyle ??= new GUIStyle(EditorStyles.miniLabel);
+        _gizmoLabelStyle.normal.textColor = new Color(1f, 1f, 1f, Mathf.Max(opacity, 0.2f));
+        Handles.Label(at, text, _gizmoLabelStyle);
+    }
+
+    void DrawRepellerGizmo(IFogRepeller r, float y, float opacity)
+    {
+        // A destroyed component still sits in the list until it unregisters.
+        if (r == null || (r is Object o && o == null)) return;
+
+        Vector3 c = r.RepelCentre; c.y = y;
+        bool active  = r.RepelActive;
+        bool inRange = active && _gzNear.Contains(r);
+        bool pushing = _gzPushing.Contains(r);
+        bool masked  = _gzMasked.Contains(r);
+
+        float push = r.RepelRadius + r.RepelClearRadius;
+        float mask = r.RepelRadius + r.MaskClearRadius;
+
+        if (pushing && push > 0.001f)
+        {
+            Handles.color = new Color(GzPush.r, GzPush.g, GzPush.b, 0.12f * opacity);
+            Handles.DrawSolidDisc(c, Vector3.up, push);
+        }
+        DrawGizmoRing(c, push, GzPush, (pushing ? 0.9f : 0.25f) * opacity);
+        DrawGizmoRing(c, mask, GzMask, (masked  ? 0.9f : 0.25f) * opacity);
+
+        Color dot = inRange ? Color.white : GzRange;
+        dot.a = (inRange ? 0.95f : 0.5f) * opacity;
+        Handles.color = dot;
+        Handles.DrawSolidDisc(c, Vector3.up, HandleUtility.GetHandleSize(c) * 0.04f);
+    }
+
+    static void DrawGizmoRing(Vector3 centre, float radius, Color colour, float alpha)
+    {
+        if (radius <= 0.001f) return;
+        colour.a = alpha;
+        Handles.color = colour;
+        Handles.DrawWireDisc(centre, Vector3.up, radius, 2f);
     }
 
     // ────────────────────────────────────────────────────────────────────────

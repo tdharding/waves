@@ -1,15 +1,16 @@
 using UnityEngine;
 
-/// <summary>Which of the landscape's three stone variants a part wears.</summary>
+/// <summary>Which of the landscape's four stone variants a part wears.</summary>
 public enum LandscapeVariant
 {
     A = 0,
     B = 1,
     C = 2,
+    D = 3,
 }
 
 /// <summary>
-/// How the level select's landscape hills are shaded: three stone variants, each a colour with its
+/// How the level select's landscape hills are shaded: four stone variants, each a colour with its
 /// own grain, and three parts of the landscape — Holes, NoiseUp and NoiseDown — each wearing one.
 ///
 /// Nothing is judged by steepness or height above the base any more: away from Holes, the hills
@@ -21,8 +22,8 @@ public enum LandscapeVariant
 /// <see cref="LevelSelectLandscapePreset"/>, and tuned in Tools > Waves > Level Select Landscape
 /// Tuner. Unlike the runs' part colours nothing here is baked — every change is live.
 ///
-/// The light's POSITION is not here: it is the world's, authored in the designer's Aesthetics and
-/// shared with the river runs. Only its strength on the hills is.
+/// The light is not here at all: it is the scene's <see cref="LevelSelectLight"/>, position and
+/// strength both, shared with the river runs.
 /// </summary>
 [System.Serializable]
 public class LandscapeShadingSettings
@@ -48,6 +49,13 @@ public class LandscapeShadingSettings
     [Tooltip("How far the grain pulls either side of the colour. 0 leaves it clean.")]
     [Range(0f, 1f)] public float grainStrengthC = 0.3f;
 
+    [Header("Variant D")]
+    public Color colourD = new Color(0.45f, 0.45f, 0.45f, 1f);
+    [Tooltip("How wide one cell of the grain is, in metres. 0 turns it off.")]
+    [Min(0f)] public float grainSizeD = 0.2f;
+    [Tooltip("How far the grain pulls either side of the colour. 0 leaves it clean.")]
+    [Range(0f, 1f)] public float grainStrengthD = 0.3f;
+
     [Header("Parts")]
     [Tooltip("Everything deeper than Hole Depth below the tile base.")]
     public LandscapeVariant holes  = LandscapeVariant.C;
@@ -57,8 +65,9 @@ public class LandscapeShadingSettings
     public LandscapeVariant noiseDown = LandscapeVariant.B;
 
     [Header("Where The Parts Split")]
-    [Tooltip("Metres below the tile base past which everything counts as Holes.")]
-    [Min(0f)] public float holeDepth = 0.5f;
+    [Tooltip("Metres below the tile base past which everything counts as Holes. Negative " +
+             "puts the line above the base instead.")]
+    public float holeDepth = 0.5f;
     [Tooltip("How wide the blend into Holes is, as a fraction of Hole Depth. 0 is a hard line.")]
     [Range(0f, 1f)] public float softness = 0.2f;
     [Tooltip("How wide the blend between NoiseUp and NoiseDown is, as a fraction of the noise's " +
@@ -78,11 +87,8 @@ public class LandscapeShadingSettings
              "wrapped on. 0 = smooth.")]
     [Min(0f)] public float spikeGrooveResolution = 256f;
 
-    [Header("Light")]
-    [Tooltip("How hard the hills are turned against the world's light (its position is in the " +
-             "designer's Aesthetics). 0 leaves them flat and unlit; past 1 the lit result is " +
-             "multiplied, up to 10x brighter.")]
-    [Range(0f, 10f)] public float lightStrength = 0.6f;
+    // The light — where it stands and how strong it is — is not here: it is the scene's
+    // LevelSelectLight, shared with the river runs, so the two can never be lit differently.
 
     // ─────────────────────────────────────────────────────────────
     // PUSHING
@@ -98,20 +104,20 @@ public class LandscapeShadingSettings
     private static readonly LandscapeShadingSettings None =
         new LandscapeShadingSettings
         {
-            grainStrengthA = 0f, grainStrengthB = 0f, grainStrengthC = 0f,
-            holes = LandscapeVariant.A, noiseDown = LandscapeVariant.A, lightStrength = 0f,
+            grainStrengthA = 0f, grainStrengthB = 0f, grainStrengthC = 0f, grainStrengthD = 0f,
+            holes = LandscapeVariant.A, noiseDown = LandscapeVariant.A,
         };
 
     private static readonly int ColourAId        = Shader.PropertyToID("_LandscapeColourA");
     private static readonly int ColourBId        = Shader.PropertyToID("_LandscapeColourB");
     private static readonly int ColourCId        = Shader.PropertyToID("_LandscapeColourC");
+    private static readonly int ColourDId        = Shader.PropertyToID("_LandscapeColourD");
     private static readonly int GrainSizeId      = Shader.PropertyToID("_LandscapeGrainSizes");
     private static readonly int GrainStrengthId  = Shader.PropertyToID("_LandscapeGrainStrengths");
     private static readonly int PartVariantsId   = Shader.PropertyToID("_LandscapePartVariants");
     private static readonly int HoleDepthId      = Shader.PropertyToID("_LandscapeHoleDepth");
     private static readonly int SoftnessId       = Shader.PropertyToID("_LandscapeSoftness");
     private static readonly int NoiseSoftnessId  = Shader.PropertyToID("_LandscapeNoiseSoftness");
-    private static readonly int LightStrengthId  = Shader.PropertyToID("_LandscapeLightStrength");
     private static readonly int SpikeVariantId   = Shader.PropertyToID("_LandscapeSpikeVariant");
     private static readonly int SpikeGrooveId    = Shader.PropertyToID("_LandscapeSpikeGroove");
     private static readonly int BaseYId          = Shader.PropertyToID("_LandscapeBaseY");
@@ -136,9 +142,10 @@ public class LandscapeShadingSettings
         Shader.SetGlobalColor(ColourAId, colourA);
         Shader.SetGlobalColor(ColourBId, colourB);
         Shader.SetGlobalColor(ColourCId, colourC);
+        Shader.SetGlobalColor(ColourDId, colourD);
 
-        Shader.SetGlobalVector(GrainSizeId,     new Vector4(grainSizeA,     grainSizeB,     grainSizeC,     0f));
-        Shader.SetGlobalVector(GrainStrengthId, new Vector4(grainStrengthA, grainStrengthB, grainStrengthC, 0f));
+        Shader.SetGlobalVector(GrainSizeId,     new Vector4(grainSizeA,     grainSizeB,     grainSizeC,     grainSizeD));
+        Shader.SetGlobalVector(GrainStrengthId, new Vector4(grainStrengthA, grainStrengthB, grainStrengthC, grainStrengthD));
 
         // x Holes, y NoiseUp, z NoiseDown.
         Shader.SetGlobalVector(PartVariantsId,
@@ -147,7 +154,6 @@ public class LandscapeShadingSettings
         Shader.SetGlobalFloat(HoleDepthId,     holeDepth);
         Shader.SetGlobalFloat(SoftnessId,      softness);
         Shader.SetGlobalFloat(NoiseSoftnessId, noiseSoftness);
-        Shader.SetGlobalFloat(LightStrengthId, lightStrength);
 
         Shader.SetGlobalFloat(SpikeVariantId, (float)spikes);
         // x Softness, y Darkness, z Resolution.
@@ -163,6 +169,7 @@ public class LandscapeShadingSettings
         colourA = other.colourA; grainSizeA = other.grainSizeA; grainStrengthA = other.grainStrengthA;
         colourB = other.colourB; grainSizeB = other.grainSizeB; grainStrengthB = other.grainStrengthB;
         colourC = other.colourC; grainSizeC = other.grainSizeC; grainStrengthC = other.grainStrengthC;
+        colourD = other.colourD; grainSizeD = other.grainSizeD; grainStrengthD = other.grainStrengthD;
 
         holes     = other.holes;
         noiseUp   = other.noiseUp;
@@ -171,7 +178,6 @@ public class LandscapeShadingSettings
         holeDepth     = other.holeDepth;
         softness      = other.softness;
         noiseSoftness = other.noiseSoftness;
-        lightStrength = other.lightStrength;
 
         spikes                = other.spikes;
         spikeGrooveSoftness   = other.spikeGrooveSoftness;

@@ -131,7 +131,7 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: {x: 109.868, y: -56.833008, z: -110.33099}
+        value: {x: 126.546005, y: -48.892, z: -98.449005}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
         tangentMode: 0
@@ -147,7 +147,7 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: {x: 70.132, y: -123.167, z: -69.669}
+        value: {x: 72.53, y: -16.014, z: 84.467}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
         tangentMode: 0
@@ -163,7 +163,7 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: {x: 37.722, y: 0.937, z: 1.532}
+        value: {x: 146.356, y: -210.932, z: -245.383}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
         tangentMode: 0
@@ -179,7 +179,7 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: {x: 37.722, y: -0.937, z: -1.531}
+        value: {x: 109.713, y: 19.352997, z: 120.169}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
         tangentMode: 0
@@ -462,6 +462,22 @@ AnimationClip:
       m_PostInfinity: 2
       m_RotationOrder: 4
     path: Armature/WAISTbone/CHESTbone/R.Wing1.bone/R.Wing2.bone/R.Wing3.bone/R.Wing4.bone/R.Wing5.bone/R.Wing5.bone_end
+  - curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: {x: 5.036, y: -1.095, z: -0.096}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: {x: 0, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0, y: 0.33333334, z: 0.33333334}
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    path: Armature/WAISTbone/CHESTbone/Neck.Bone/Head.bone
   m_PositionCurves:
   - curve:
       serializedVersion: 2
@@ -548,7 +564,7 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: {x: -0.00000000239379, y: 0.013424581, z: 0.00000012200326}
+        value: {x: -0.0023129415, y: 0.012987062, z: -0.0011757389}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
         tangentMode: 0
@@ -788,7 +804,7 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: {x: -0.00000081630424, y: 0.013423992, z: 0.0000014547259}
+        value: {x: -0.0000009019859, y: 0.013423373, z: 0.0000029457733}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
         tangentMode: 0
@@ -927,6 +943,22 @@ AnimationClip:
       m_PostInfinity: 2
       m_RotationOrder: 4
     path: Armature/WAISTbone/CHESTbone/R.Wing1.bone/R.Wing2.bone/R.Wing3.bone/R.Wing4.bone/R.Wing5.bone/R.Wing5.bone_end
+  - curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: {x: 0.0000012105618, y: 0.009366992, z: 0.000000010011718}
+        inSlope: {x: 0, y: 0, z: 0}
+        outSlope: {x: 0, y: 0, z: 0}
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: {x: 0, y: 0.33333334, z: 0.33333334}
+        outWeight: {x: 0, y: 0.33333334, z: 0.33333334}
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    path: Armature/WAISTbone/CHESTbone/Neck.Bone/Head.bone
   m_ScaleCurves:
   - curve:
       serializedVersion: 2
@@ -1009,27 +1041,6 @@ AnimationClip:
       m_RotationOrder: 4
     path: Armature/R.hip.bone/R.thigh.bone/R.lowleg.bone/R.foot.bone
   m_FloatCurves:
-  - serializedVersion: 2
-    curve:
-      serializedVersion: 2
-      m_Curve:
-      - serializedVersion: 3
-        time: 0
-        value: 0.433
-        inSlope: 0
-        outSlope: 0
-        tangentMode: 136
-        weightedMode: 0
-        inWeight: 0
-        outWeight: 0
-      m_PreInfinity: 2
-      m_PostInfinity: 2
-      m_RotationOrder: 4
-    attribute: widestPoint
-    path: AngelFeathers
-    classID: 114
-    script: {fileID: 11500000, guid: cb8a09a80ca43b4418bc125ac7c43256, type: 3}
-    flags: 0
   - serializedVersion: 2
     curve:
       serializedVersion: 2
@@ -1350,6 +1361,16 @@ AnimationClip:
       isSerializeReferenceCurve: 0
       metaData: 0
     - serializedVersion: 2
+      path: 4246854245
+      attribute: 1
+      script: {fileID: 0}
+      typeID: 4
+      customType: 0
+      isPPtrCurve: 0
+      isIntCurve: 0
+      isSerializeReferenceCurve: 0
+      metaData: 0
+    - serializedVersion: 2
       path: 1438222615
       attribute: 4
       script: {fileID: 0}
@@ -1630,6 +1651,16 @@ AnimationClip:
       isSerializeReferenceCurve: 0
       metaData: 0
     - serializedVersion: 2
+      path: 4246854245
+      attribute: 4
+      script: {fileID: 0}
+      typeID: 4
+      customType: 4
+      isPPtrCurve: 0
+      isIntCurve: 0
+      isSerializeReferenceCurve: 0
+      metaData: 0
+    - serializedVersion: 2
       path: 2034555909
       attribute: 3
       script: {fileID: 0}
@@ -1674,16 +1705,6 @@ AnimationClip:
       attribute: 3
       script: {fileID: 0}
       typeID: 4
-      customType: 0
-      isPPtrCurve: 0
-      isIntCurve: 0
-      isSerializeReferenceCurve: 0
-      metaData: 0
-    - serializedVersion: 2
-      path: 3346485384
-      attribute: 4120709389
-      script: {fileID: 11500000, guid: cb8a09a80ca43b4418bc125ac7c43256, type: 3}
-      typeID: 114
       customType: 0
       isPPtrCurve: 0
       isIntCurve: 0
@@ -2546,7 +2567,7 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: 109.868
+        value: 126.546005
         inSlope: 0
         outSlope: 0
         tangentMode: 136
@@ -2567,7 +2588,7 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: -56.833008
+        value: -48.892
         inSlope: 0
         outSlope: 0
         tangentMode: 136
@@ -2588,7 +2609,7 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: -110.33099
+        value: -98.449005
         inSlope: 0
         outSlope: 0
         tangentMode: 136
@@ -2609,7 +2630,7 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: 70.132
+        value: 72.53
         inSlope: 0
         outSlope: 0
         tangentMode: 136
@@ -2630,7 +2651,7 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: -123.167
+        value: -16.014
         inSlope: 0
         outSlope: 0
         tangentMode: 136
@@ -2651,7 +2672,7 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: -69.669
+        value: 84.467
         inSlope: 0
         outSlope: 0
         tangentMode: 136
@@ -2672,7 +2693,7 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: -0.00000000239379
+        value: -0.0023129415
         inSlope: 0
         outSlope: 0
         tangentMode: 136
@@ -2693,7 +2714,7 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: 0.013424581
+        value: 0.012987062
         inSlope: 0
         outSlope: 0
         tangentMode: 136
@@ -2714,7 +2735,7 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: 0.00000012200326
+        value: -0.0011757389
         inSlope: 0
         outSlope: 0
         tangentMode: 136
@@ -2735,7 +2756,7 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: 37.722
+        value: 146.356
         inSlope: 0
         outSlope: 0
         tangentMode: 136
@@ -2756,7 +2777,7 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: 0.937
+        value: -210.932
         inSlope: 0
         outSlope: 0
         tangentMode: 136
@@ -2777,7 +2798,7 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: 1.532
+        value: -245.383
         inSlope: 0
         outSlope: 0
         tangentMode: 136
@@ -2798,7 +2819,7 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: 37.722
+        value: 109.713
         inSlope: 0
         outSlope: 0
         tangentMode: 136
@@ -2819,7 +2840,7 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: -0.937
+        value: 19.352997
         inSlope: 0
         outSlope: 0
         tangentMode: 136
@@ -2840,7 +2861,7 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: -1.531
+        value: 120.169
         inSlope: 0
         outSlope: 0
         tangentMode: 136
@@ -4562,7 +4583,7 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: -0.00000081630424
+        value: -0.0000009019859
         inSlope: 0
         outSlope: 0
         tangentMode: 136
@@ -4583,7 +4604,7 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: 0.013423992
+        value: 0.013423373
         inSlope: 0
         outSlope: 0
         tangentMode: 136
@@ -4604,7 +4625,7 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: 0.0000014547259
+        value: 0.0000029457733
         inSlope: 0
         outSlope: 0
         tangentMode: 136
@@ -5633,27 +5654,6 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: 0.433
-        inSlope: 0
-        outSlope: 0
-        tangentMode: 136
-        weightedMode: 0
-        inWeight: 0
-        outWeight: 0
-      m_PreInfinity: 2
-      m_PostInfinity: 2
-      m_RotationOrder: 4
-    attribute: widestPoint
-    path: AngelFeathers
-    classID: 114
-    script: {fileID: 11500000, guid: cb8a09a80ca43b4418bc125ac7c43256, type: 3}
-    flags: 0
-  - serializedVersion: 2
-    curve:
-      serializedVersion: 2
-      m_Curve:
-      - serializedVersion: 3
-        time: 0
         value: 2
         inSlope: 0
         outSlope: 0
@@ -5669,6 +5669,132 @@ AnimationClip:
     classID: 114
     script: {fileID: 11500000, guid: cb8a09a80ca43b4418bc125ac7c43256, type: 3}
     flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.0000012105618
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.x
+    path: Armature/WAISTbone/CHESTbone/Neck.Bone/Head.bone
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.009366992
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.y
+    path: Armature/WAISTbone/CHESTbone/Neck.Bone/Head.bone
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.000000010011718
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalPosition.z
+    path: Armature/WAISTbone/CHESTbone/Neck.Bone/Head.bone
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 5.036
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.x
+    path: Armature/WAISTbone/CHESTbone/Neck.Bone/Head.bone
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: -1.095
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.y
+    path: Armature/WAISTbone/CHESTbone/Neck.Bone/Head.bone
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: -0.096
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 136
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: localEulerAnglesRaw.z
+    path: Armature/WAISTbone/CHESTbone/Neck.Bone/Head.bone
+    classID: 4
+    script: {fileID: 0}
+    flags: 16
   m_EulerEditorCurves:
   - serializedVersion: 2
     curve:
@@ -6037,8 +6163,8 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    attribute: m_LocalEulerAngles.x
-    path: Armature/WAISTbone/CHESTbone/L.Shoulder.Bone/L.uparm.bone/L.lowarm.bone
+    attribute: m_LocalEulerAngles.z
+    path: Armature/WAISTbone/CHESTbone/L.Shoulder.Bone/L.uparm.bone
     classID: 4
     script: {fileID: 0}
     flags: 0
@@ -6050,7 +6176,7 @@ AnimationClip:
       m_PostInfinity: 2
       m_RotationOrder: 4
     attribute: m_LocalEulerAngles.y
-    path: Armature/WAISTbone/CHESTbone/L.Shoulder.Bone/L.uparm.bone/L.lowarm.bone
+    path: Armature/WAISTbone/CHESTbone/L.Shoulder.Bone/L.uparm.bone
     classID: 4
     script: {fileID: 0}
     flags: 0
@@ -6061,8 +6187,8 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    attribute: m_LocalEulerAngles.z
-    path: Armature/WAISTbone/CHESTbone/L.Shoulder.Bone/L.uparm.bone/L.lowarm.bone
+    attribute: m_LocalEulerAngles.x
+    path: Armature/WAISTbone/CHESTbone/L.Shoulder.Bone/L.uparm.bone
     classID: 4
     script: {fileID: 0}
     flags: 0
@@ -6398,7 +6524,7 @@ AnimationClip:
       m_PostInfinity: 2
       m_RotationOrder: 4
     attribute: m_LocalEulerAngles.z
-    path: Armature/WAISTbone/CHESTbone/L.Shoulder.Bone/L.uparm.bone
+    path: Armature/WAISTbone/CHESTbone/Neck.Bone/Head.bone
     classID: 4
     script: {fileID: 0}
     flags: 0
@@ -6410,7 +6536,7 @@ AnimationClip:
       m_PostInfinity: 2
       m_RotationOrder: 4
     attribute: m_LocalEulerAngles.y
-    path: Armature/WAISTbone/CHESTbone/L.Shoulder.Bone/L.uparm.bone
+    path: Armature/WAISTbone/CHESTbone/Neck.Bone/Head.bone
     classID: 4
     script: {fileID: 0}
     flags: 0
@@ -6422,7 +6548,7 @@ AnimationClip:
       m_PostInfinity: 2
       m_RotationOrder: 4
     attribute: m_LocalEulerAngles.x
-    path: Armature/WAISTbone/CHESTbone/L.Shoulder.Bone/L.uparm.bone
+    path: Armature/WAISTbone/CHESTbone/Neck.Bone/Head.bone
     classID: 4
     script: {fileID: 0}
     flags: 0
@@ -6542,7 +6668,7 @@ AnimationClip:
       m_PostInfinity: 2
       m_RotationOrder: 4
     attribute: m_LocalEulerAngles.z
-    path: Armature/WAISTbone/CHESTbone/R.Shoulder.Bone/R.uparm.bone/R.lowarm.bone
+    path: Armature/WAISTbone/CHESTbone/R.Wing1.bone/R.Wing2.bone/R.Wing3.bone/R.Wing4.bone/R.Wing5.bone/R.Wing5.bone_end
     classID: 4
     script: {fileID: 0}
     flags: 0
@@ -6554,7 +6680,7 @@ AnimationClip:
       m_PostInfinity: 2
       m_RotationOrder: 4
     attribute: m_LocalEulerAngles.y
-    path: Armature/WAISTbone/CHESTbone/R.Shoulder.Bone/R.uparm.bone/R.lowarm.bone
+    path: Armature/WAISTbone/CHESTbone/R.Wing1.bone/R.Wing2.bone/R.Wing3.bone/R.Wing4.bone/R.Wing5.bone/R.Wing5.bone_end
     classID: 4
     script: {fileID: 0}
     flags: 0
@@ -6566,7 +6692,7 @@ AnimationClip:
       m_PostInfinity: 2
       m_RotationOrder: 4
     attribute: m_LocalEulerAngles.x
-    path: Armature/WAISTbone/CHESTbone/R.Shoulder.Bone/R.uparm.bone/R.lowarm.bone
+    path: Armature/WAISTbone/CHESTbone/R.Wing1.bone/R.Wing2.bone/R.Wing3.bone/R.Wing4.bone/R.Wing5.bone/R.Wing5.bone_end
     classID: 4
     script: {fileID: 0}
     flags: 0
@@ -6649,8 +6775,8 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    attribute: m_LocalEulerAngles.x
-    path: Armature/WAISTbone/CHESTbone/R.Wing1.bone/R.Wing2.bone/R.Wing3.bone/R.Wing4.bone/R.Wing5.bone/R.Wing5.bone_end
+    attribute: m_LocalEulerAngles.z
+    path: Armature/WAISTbone/CHESTbone/L.Shoulder.Bone/L.uparm.bone/L.lowarm.bone
     classID: 4
     script: {fileID: 0}
     flags: 0
@@ -6662,7 +6788,43 @@ AnimationClip:
       m_PostInfinity: 2
       m_RotationOrder: 4
     attribute: m_LocalEulerAngles.y
-    path: Armature/WAISTbone/CHESTbone/R.Wing1.bone/R.Wing2.bone/R.Wing3.bone/R.Wing4.bone/R.Wing5.bone/R.Wing5.bone_end
+    path: Armature/WAISTbone/CHESTbone/L.Shoulder.Bone/L.uparm.bone/L.lowarm.bone
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.x
+    path: Armature/WAISTbone/CHESTbone/L.Shoulder.Bone/L.uparm.bone/L.lowarm.bone
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.x
+    path: Armature/WAISTbone/CHESTbone/R.Shoulder.Bone/R.uparm.bone/R.lowarm.bone
+    classID: 4
+    script: {fileID: 0}
+    flags: 0
+  - serializedVersion: 2
+    curve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    attribute: m_LocalEulerAngles.y
+    path: Armature/WAISTbone/CHESTbone/R.Shoulder.Bone/R.uparm.bone/R.lowarm.bone
     classID: 4
     script: {fileID: 0}
     flags: 0
@@ -6674,7 +6836,7 @@ AnimationClip:
       m_PostInfinity: 2
       m_RotationOrder: 4
     attribute: m_LocalEulerAngles.z
-    path: Armature/WAISTbone/CHESTbone/R.Wing1.bone/R.Wing2.bone/R.Wing3.bone/R.Wing4.bone/R.Wing5.bone/R.Wing5.bone_end
+    path: Armature/WAISTbone/CHESTbone/R.Shoulder.Bone/R.uparm.bone/R.lowarm.bone
     classID: 4
     script: {fileID: 0}
     flags: 0

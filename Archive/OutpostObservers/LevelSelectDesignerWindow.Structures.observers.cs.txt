@@ -1,0 +1,56 @@
+// Archived from Assets/Editor/LevelSelectDesignerWindow.Structures.cs (2026-10-12) — observer slices only.
+
+    /// <summary>The floor an outpost top's observers stand and walk on.</summary>
+    private static ObserverFloor StructureFloor(LevelSelectDesignerData.DesignerStructure s)
+    {
+        SyncStructureOutpost(s);
+        if (IsRound(s))
+            return new ObserverFloor
+            {
+                centre = new Vector3(0f, s.height, 0f),
+                radius = Mathf.Max(0.001f, RoundStructureMesh.FloorRadius(s.radius, StructureWallThickness(s),
+                                                                          StructureWallHeight(s))),
+            };
+        return OutpostFloor(s.outpost);
+    }
+
+            if (HasOutpostTop(s)) DrawStructureObservers(s, tower);
+
+    private void DrawStructureObservers(LevelSelectDesignerData.DesignerStructure s, Color color)
+    {
+        var observers = s.outpost.observers;
+        if (observers == null || observers.Count == 0) return;
+
+        var floor = StructureFloor(s);
+        Handles.color = color;
+        foreach (var observer in observers)
+        {
+            var o = observer.Clone();
+            floor.Clamp(o);
+            Vector3 stand = floor.centre + new Vector3(o.offsetAlong, 0f, o.offsetAway);
+            // Facing 0 looks out of the structure's front, its -z.
+            Vector3 face  = Quaternion.AngleAxis(o.facing, Vector3.up) * Vector3.back;
+
+            Vector2 at  = WorldToCanvas(StructureLocalToWorldFlat(s, stand));
+            Vector2 dir = WorldToCanvas(StructureLocalToWorldFlat(s, stand + face)) - at;
+            if (dir.sqrMagnitude > 1e-8f) DrawSolidLine(2f, at, at + dir.normalized * 8f);
+            Handles.DrawSolidDisc(at, Vector3.forward, 2.5f);
+        }
+
+    private static void ClampStructureObservers(LevelSelectDesignerData.DesignerStructure s)
+    {
+        if (s.outpost?.observers == null) return;
+        var floor = StructureFloor(s);
+        foreach (var o in s.outpost.observers) floor.Clamp(o);
+    }
+
+        if (outpost)
+        {
+            ClampStructureObservers(s);
+            SpawnObservers(o, go, go.transform.right, go.transform.forward, StructureFloor(s));
+        }
+        else
+        {
+            var observers = go.transform.Find(ObserversChild);
+            if (observers != null) Undo.DestroyObjectImmediate(observers.gameObject);
+        }

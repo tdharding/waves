@@ -21,7 +21,7 @@ public class MapIconLibraryWindow : EditorWindow
         (MapIcon.StreetLight, "streetLight"),
     };
 
-    [MenuItem("WaveGrid/Map Icon Library")]
+    [MenuItem("Tools/Level Design/Map Icon Library", false, 102)]
     public static void Open()
     {
         var w = GetWindow<MapIconLibraryWindow>("Map Icons");

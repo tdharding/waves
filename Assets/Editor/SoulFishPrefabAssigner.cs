@@ -10,7 +10,7 @@ public static class SoulFishPrefabAssigner
     private const string DefaultFishPrefabPath = "Assets/Prefab/SoulFish/SoulFish.prefab";
     private const string SoulsFolder           = "Assets/Resources/Souls";
 
-    [MenuItem("Tools/Soul System/Assign Fish Prefab to All Souls")]
+    [MenuItem("Tools/Souls/Assign Fish Prefab to All Souls", false, 801)]
     public static void AssignFishPrefabs()
     {
         // Load the default fish prefab

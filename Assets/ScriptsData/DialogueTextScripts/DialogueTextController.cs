@@ -32,6 +32,20 @@ public class DialogueTextController : MonoBehaviour
 
     private Coroutine currentRoutine;
 
+    // Press-any-key lines of the running sequence not yet pressed past, and the frame the last one
+    // was — so whoever else is waiting on a key (a Press Any Key shot) knows that press was taken.
+    private int keyLinesLeft;
+    private int lastKeyAdvanceFrame = -1;
+
+    /// <summary>True while the running sequence still has lines waiting on a key press.</summary>
+    public bool KeyLinesPending => keyLinesLeft > 0;
+
+    /// <summary>True on the frame a key press moved a line on — that press belongs to the line.</summary>
+    public bool KeyTakenThisFrame => lastKeyAdvanceFrame == Time.frameCount;
+
+    /// <summary>True once the running fading sequence's last line has faded out (before the panel lowers).</summary>
+    public bool LinesDone { get; private set; }
+
     // The generated panel. Replaces the hand-built dialogueBackground, which is kept hidden.
     private CanvasGroup fadePanelGroup;
     private RectTransform fadePanelRect;
@@ -172,20 +186,41 @@ public class DialogueTextController : MonoBehaviour
         );
     }
 
-    public void PlaySequence(string[] lines, float[] holdDurations)
+    /// <param name="textFades">Off: each line appears and vanishes at once instead of fading.</param>
+    public void PlaySequence(string[] lines, float[] holdDurations, bool textFades = true)
+    {
+        PlaySequence(lines, holdDurations, null, textFades);
+    }
+
+    /// <param name="waitForKey">Per line, optional. On: the line holds until any key is pressed instead of for its hold.</param>
+    /// <param name="textFades">Off: each line appears and vanishes at once instead of fading.</param>
+    public void PlaySequence(string[] lines, float[] holdDurations, bool[] waitForKey, bool textFades = true)
+    {
+        PlaySequence(lines, holdDurations, waitForKey, null, null, textFades);
+    }
+
+    /// <param name="fadeIns">Per line, optional. Off: that line appears at once instead of fading in. Only used when textFades is on.</param>
+    /// <param name="fadeOuts">Per line, optional. Off: that line vanishes at once instead of fading out. Only used when textFades is on.</param>
+    /// <param name="lowerPanel">Off: the black panel stays up after the last line, for the next sequence to carry on over.</param>
+    public void PlaySequence(string[] lines, float[] holdDurations, bool[] waitForKey,
+                             bool[] fadeIns, bool[] fadeOuts, bool textFades = true, bool lowerPanel = true)
     {
         if (lines == null || holdDurations == null)
             return;
 
-        if (lines.Length != holdDurations.Length)
+        if (lines.Length != holdDurations.Length
+            || (waitForKey != null && waitForKey.Length != lines.Length)
+            || (fadeIns    != null && fadeIns.Length    != lines.Length)
+            || (fadeOuts   != null && fadeOuts.Length   != lines.Length))
         {
             Debug.LogWarning("DialogueTextController: Line and duration counts do not match.");
             return;
         }
 
         StopCurrentRoutine();
+        keyLinesLeft = CountKeyLines(lines, waitForKey, textFades);
         currentRoutine = StartCoroutine(
-            SequenceRoutine(lines, holdDurations)
+            SequenceRoutine(lines, holdDurations, waitForKey, fadeIns, fadeOuts, textFades, lowerPanel)
         );
     }
 
@@ -193,6 +228,14 @@ public class DialogueTextController : MonoBehaviour
     {
         StopCurrentRoutine();
         currentRoutine = StartCoroutine(FadeOutRoutine(defaultFadeOut));
+    }
+
+    /// <summary>Take the text down and leave the black panel where it is.</summary>
+    public void HideText(bool textFades = true)
+    {
+        if (dialogueText == null) return;
+        StopCurrentRoutine();
+        currentRoutine = StartCoroutine(FadeOutRoutine(textFades ? defaultFadeOut : 0f));
     }
 
     /// <summary>
@@ -214,10 +257,10 @@ public class DialogueTextController : MonoBehaviour
     /// itself once it is done), but would leave the panel stranded on screen when dialogue is
     /// ended early. Anything that opens with ShowHeld should close with this.
     /// </summary>
-    public void HideAll()
+    public void HideAll(bool textFades = true)
     {
         StopCurrentRoutine();
-        currentRoutine = StartCoroutine(HideAllRoutine());
+        currentRoutine = StartCoroutine(HideAllRoutine(textFades));
     }
 
     private IEnumerator ShowHeldRoutine(string message)
@@ -234,12 +277,13 @@ public class DialogueTextController : MonoBehaviour
         currentRoutine = null;
     }
 
-    private IEnumerator HideAllRoutine()
+    private IEnumerator HideAllRoutine(bool textFades)
     {
-        if (dialogueText != null)
-            yield return FadeOutRoutine(defaultFadeOut);
+        // Text already gone (a sequence that ran to its end) — straight on to the panel.
+        if (dialogueText != null && dialogueText.color.a > 0f)
+            yield return FadeOutRoutine(textFades ? defaultFadeOut : 0f);
 
-        yield return FadeOutBackground(backgroundFadeDuration);
+        yield return FadeOutBackground(textFades ? backgroundFadeDuration : 0f);
         currentRoutine = null;
     }
 
@@ -265,23 +309,109 @@ public class DialogueTextController : MonoBehaviour
         yield return FadeOutBackground(backgroundFadeDuration);
     }
 
-    private IEnumerator SequenceRoutine(string[] lines, float[] holdDurations)
+    private IEnumerator SequenceRoutine(string[] lines, float[] holdDurations, bool[] waitForKey,
+                                        bool[] fadeIns, bool[] fadeOuts, bool textFades, bool lowerPanel)
     {
-        yield return FadeInBackground(backgroundFadeDuration);
+        if (!textFades)
+        {
+            yield return HeldSequenceRoutine(lines, holdDurations, waitForKey);
+            yield break;
+        }
 
+        // Skip the raise if the panel is already up (left there by a no-fade sequence) — FadeInBackground
+        // lerps from 0 and would drop it to transparent first.
+        if (fadePanelGroup == null || fadePanelGroup.alpha < 0.999f)
+            yield return FadeInBackground(backgroundFadeDuration);
+
+        int last = -1;
         for (int i = 0; i < lines.Length; i++)
+            if (!string.IsNullOrEmpty(lines[i].Trim())) last = i;
+
+        for (int i = 0; i <= last; i++)
         {
             string line = lines[i].Trim();
             if (string.IsNullOrEmpty(line))
                 continue;
 
-            yield return FadeInRoutine(line, defaultFadeIn);
-            yield return new WaitForSeconds(holdDurations[i]);
-            yield return FadeOutRoutine(defaultFadeOut);
-            yield return new WaitForSeconds(0.25f);
+            // A zero duration sets the text straight to shown / hidden.
+            float fadeIn  = fadeIns  == null || fadeIns[i]  ? defaultFadeIn  : 0f;
+            float fadeOut = fadeOuts == null || fadeOuts[i] ? defaultFadeOut : 0f;
+
+            yield return FadeInRoutine(line, fadeIn);
+            yield return HoldLine(i, holdDurations, waitForKey);
+            yield return FadeOutRoutine(fadeOut);
+            if (i < last)
+                yield return new WaitForSeconds(0.25f);
         }
 
-        yield return FadeOutBackground(backgroundFadeDuration);
+        LinesDone = true;
+        if (lowerPanel)
+            yield return FadeOutBackground(backgroundFadeDuration);
+        currentRoutine = null;
+    }
+
+    /// <summary>
+    /// No-fade sequence: the panel snaps up, each line replaces the last once its hold is up, and
+    /// the final line (and panel) stays on screen until the next PlaySequence or HideAll.
+    /// </summary>
+    private IEnumerator HeldSequenceRoutine(string[] lines, float[] holdDurations, bool[] waitForKey)
+    {
+        if (fadePanelGroup != null) fadePanelGroup.alpha = 1f;
+
+        int last = -1;
+        for (int i = 0; i < lines.Length; i++)
+            if (!string.IsNullOrEmpty(lines[i].Trim())) last = i;
+
+        for (int i = 0; i <= last; i++)
+        {
+            string line = lines[i].Trim();
+            if (string.IsNullOrEmpty(line))
+                continue;
+
+            yield return FadeInRoutine(line, 0f);
+            if (i < last)
+                yield return HoldLine(i, holdDurations, waitForKey);
+        }
+
+        currentRoutine = null;
+    }
+
+    /// <summary>Keep line i up for its hold, or until any key when it is a press-any-key line.</summary>
+    private IEnumerator HoldLine(int i, float[] holdDurations, bool[] waitForKey)
+    {
+        if (waitForKey == null || !waitForKey[i])
+        {
+            yield return new WaitForSeconds(holdDurations[i]);
+            yield break;
+        }
+
+        // A frame first, so the key that brought this line on (or ended the last one) doesn't end it too.
+        yield return null;
+        while (!Input.anyKeyDown)
+            yield return null;
+
+        lastKeyAdvanceFrame = Time.frameCount;
+        keyLinesLeft = Mathf.Max(0, keyLinesLeft - 1);
+    }
+
+    /// <summary>Lines that will actually wait on a key — blank lines are skipped, and a no-fade
+    /// sequence's last line stays up without waiting.</summary>
+    private static int CountKeyLines(string[] lines, bool[] waitForKey, bool textFades)
+    {
+        if (waitForKey == null) return 0;
+
+        int last = -1;
+        for (int i = 0; i < lines.Length; i++)
+            if (!string.IsNullOrEmpty(lines[i].Trim())) last = i;
+
+        int count = 0;
+        for (int i = 0; i <= last; i++)
+        {
+            if (!waitForKey[i] || string.IsNullOrEmpty(lines[i].Trim())) continue;
+            if (!textFades && i == last) continue;
+            count++;
+        }
+        return count;
     }
 
     // ---------------------------------------------------------
@@ -330,11 +460,14 @@ public class DialogueTextController : MonoBehaviour
     {
         if (fadePanelGroup == null) yield break;
 
+        // Carry on from wherever the panel is, so a raise cut short and restarted doesn't flicker.
+        float start = fadePanelGroup.alpha;
+        duration *= 1f - start;
         float t = 0f;
         while (t < duration)
         {
             t += Time.deltaTime;
-            fadePanelGroup.alpha = Mathf.Lerp(0f, 1f, t / duration);
+            fadePanelGroup.alpha = Mathf.Lerp(start, 1f, t / duration);
             yield return null;
         }
 
@@ -372,5 +505,7 @@ public class DialogueTextController : MonoBehaviour
             StopCoroutine(currentRoutine);
             currentRoutine = null;
         }
+        keyLinesLeft = 0;
+        LinesDone = false;
     }
 }

@@ -78,7 +78,7 @@ public partial class LevelSelectDesignerWindow
             return;
         }
 
-        var profile = _data.ProfileFor(path.riverName);
+        var profile = RunProfileFor(path, path.riverName);
         var rim     = _data.RimNodeAt(_selectedNodeId);
 
         // None, then the three sides.
@@ -96,9 +96,17 @@ public partial class LevelSelectDesignerWindow
         float width        = rim?.width ?? 0f;
         float plinthRadius = rim?.plinthRadius ?? 0f;
         float plinthHeight = rim?.plinthHeight ?? 0.01f;
+        var   shape        = rim?.shape ?? LevelSelectDesignerData.RimNodeShape.Rounded;
         var   toppings = new List<(int side, LevelSelectDesignerData.RimNodeTopping topping)>();
         if (rim != null)
         {
+            shape = (LevelSelectDesignerData.RimNodeShape)EditorGUILayout.EnumPopup(
+                new GUIContent("Shape", "Rounded: round ends. Slanted: square ends, the " +
+                                        "river-side one a flat face leaning out into the river " +
+                                        "at the channel wall's lean above the water — no plinth."),
+                shape);
+            bool slanted = shape == LevelSelectDesignerData.RimNodeShape.Slanted;
+
             radius = EditorGUILayout.Slider(
                 new GUIContent("Radius", "Radius of the platform — both sides the same."),
                 radius, RiverMeshBuilder.RimNodeMinRadius(profile),
@@ -113,12 +121,13 @@ public partial class LevelSelectDesignerWindow
                                         "stands out in the water."),
                 width, 0f, RiverMeshBuilder.RimNodeMaxWidth(profile));
 
-            plinthRadius = EditorGUILayout.Slider(
-                new GUIContent("Plinth Radius", "An extra round plinth standing on the top, " +
-                                                "centred on the river-side circle — what stands " +
-                                                "on the rim node stands on it. Zero for none."),
-                plinthRadius, 0f, radius);
-            if (plinthRadius > RiverMeshBuilder.RimNodePlinthMinRadius)
+            if (!slanted)
+                plinthRadius = EditorGUILayout.Slider(
+                    new GUIContent("Plinth Radius", "An extra round plinth standing on the top, " +
+                                                    "centred on the river-side circle — what stands " +
+                                                    "on the rim node stands on it. Zero for none."),
+                    plinthRadius, 0f, radius);
+            if (!slanted && plinthRadius > RiverMeshBuilder.RimNodePlinthMinRadius)
                 plinthHeight = Mathf.Max(RiverMeshBuilder.RimNodeMinHeight,
                     EditorGUILayout.FloatField(
                         new GUIContent("Plinth Height",
@@ -170,10 +179,12 @@ public partial class LevelSelectDesignerWindow
             rim.width        = width;
             rim.plinthRadius = Mathf.Min(plinthRadius, radius);
             rim.plinthHeight = plinthHeight;
+            rim.shape        = shape;
         }
 
         MarkDirty();
-        RebuildRimNodesAt(_selectedNodeId);
+        string rimNodeId = _selectedNodeId;
+        RebuildAfterTowerEdit("RimNode:" + rimNodeId, () => RebuildRimNodesAt(rimNodeId));
         Repaint();
     }
 
@@ -194,7 +205,7 @@ public partial class LevelSelectDesignerWindow
             if (rim == null || !CanHoldRimNode(rim.nodeId, out _)) continue;
 
             var path    = _data.paths.Find(p => p.nodeIds.Contains(rim.nodeId));
-            var profile = _data.ProfileFor(path.riverName);
+            var profile = RunProfileFor(path, path.riverName);
             int at      = path.nodeIds.IndexOf(rim.nodeId);
 
             Vector3 here = _data.NodeWorldPosition(rim.nodeId);
@@ -225,6 +236,21 @@ public partial class LevelSelectDesignerWindow
                 Vector3 far    = centre + axis * halfWidth;
 
                 Handles.color = shade;
+
+                // Slanted: the rectangle over the two circles, seen from above at its top.
+                if (rim.shape == LevelSelectDesignerData.RimNodeShape.Slanted)
+                {
+                    Vector3 farEnd  = centre + axis * (halfWidth + radius);
+                    Vector3 nearEnd = centre - axis * (halfWidth + radius);
+                    Vector3 side3   = along * radius;
+                    Handles.DrawAAConvexPolygon(
+                        (Vector3)WorldToCanvas(nearEnd + side3), (Vector3)WorldToCanvas(farEnd + side3),
+                        (Vector3)WorldToCanvas(farEnd - side3),  (Vector3)WorldToCanvas(nearEnd - side3));
+
+                    if (selected) DrawInteractReach(rim.ToppingOn(side), centre);
+                    continue;
+                }
+
                 Handles.DrawSolidDisc(WorldToCanvas(near), Vector3.forward, drawn);
                 Handles.DrawSolidDisc(WorldToCanvas(far),  Vector3.forward, drawn);
 
@@ -309,6 +335,9 @@ public partial class LevelSelectDesignerWindow
         var rims = new List<RiverMeshBuilder.RimNode>();
         if (record?.pathNodes == null || _data.rimNodes == null) return rims;
 
+        float lean = RiverMeshBuilder.RimNodeSlantLean(RunProfileFor(record),
+                                                       _data.waterLevel);
+
         foreach (var node in record.pathNodes)
         {
             var rim = _data.RimNodeAt(node.nodeId);
@@ -325,6 +354,8 @@ public partial class LevelSelectDesignerWindow
                     width        = rim.width,
                     plinthRadius = rim.plinthRadius,
                     plinthHeight = rim.plinthHeight,
+                    slanted      = rim.shape == LevelSelectDesignerData.RimNodeShape.Slanted,
+                    lean         = lean,
                 });
                 sources?.Add(rim);
             }
@@ -393,6 +424,7 @@ public partial class LevelSelectDesignerWindow
     private static readonly GUIContent[] RimNodeTopperLabels =
     {
         new GUIContent("None"), new GUIContent("Lollipop Tower"), new GUIContent("Vert Display Point"),
+        new GUIContent("Turret Tower"),
     };
 
     /// <summary>
@@ -411,16 +443,30 @@ public partial class LevelSelectDesignerWindow
         EditorGUI.indentLevel++;
         if (edited.topper == LevelSelectDesignerData.RimNodeTopper.LollipopTower)
         {
-            // The preset row writes straight onto the rim node (Save as New does it a frame
-            // later), so the tower is read back after it rather than off the copy.
+            // The preset row writes straight onto the rim node (New does it a frame later), so
+            // the tower is read back after it rather than off the copy.
             DrawLollipopPresetRow(edited.towerPreset, edited.tower,
                 p => { var t = rim.ToppingOn(side); t.towerPreset = p; rim.SetToppingOn(side, t); },
                 w => { var t = rim.ToppingOn(side); t.tower       = w; rim.SetToppingOn(side, t); });
 
             var fresh = rim.ToppingOn(side);
             edited.towerPreset = fresh.towerPreset;
-            edited.tower       = DrawLollipopTowerFields(fresh.tower);
+            edited.tower       = fresh.tower;
+            edited.towerScale  = DrawLollipopScaleField(edited.towerScale);
             edited.perch       = DrawPerchBlock(edited.perch);
+        }
+        else if (edited.topper == LevelSelectDesignerData.RimNodeTopper.TurretTower)
+        {
+            // Read back after the preset row, as the lollipop is above.
+            DrawTurretPresetRow(edited.turretPreset, edited.turret,
+                p => { var t = rim.ToppingOn(side); t.turretPreset = p; rim.SetToppingOn(side, t); },
+                w => { var t = rim.ToppingOn(side); t.turret       = w; rim.SetToppingOn(side, t); });
+
+            var fresh = rim.ToppingOn(side);
+            edited.turretPreset = fresh.turretPreset;
+            edited.turret       = fresh.turret;
+            edited.towerScale   = DrawLollipopScaleField(edited.towerScale);
+            edited.perch        = DrawPerchBlock(edited.perch);
         }
         else if (edited.topper == LevelSelectDesignerData.RimNodeTopper.VertDisplayPoint)
         {
@@ -473,7 +519,7 @@ public partial class LevelSelectDesignerWindow
             {
                 case LevelSelectDesignerData.RimNodeTopper.LollipopTower:
                 {
-                    var tower = topping.tower ?? new LollipopTower();
+                    var tower = (topping.tower ?? new LollipopTower()).Scaled(topping.towerScale);
 
                     var mesh = SaveGeneratedMesh($"RimNodeTower_{label}", tower.Build(StoneShadingForBuild));
                     if (mesh == null) break;
@@ -484,6 +530,18 @@ public partial class LevelSelectDesignerWindow
                     // Her feet go on the top of the orb, which the tower works out from the sizes
                     // this mesh was just built to — resize it and she moves with it.
                     ApplyPerch(go, topping.perch, Vector3.up * tower.TopY);
+                    break;
+                }
+
+                case LevelSelectDesignerData.RimNodeTopper.TurretTower:
+                {
+                    var turret = (topping.turret ?? new TurretTower()).Scaled(topping.towerScale);
+
+                    var go = PlaceTurret(container.transform, $"RimNodeTurret_{label}", turret, _data.riverMaterial);
+                    if (go == null) break;
+
+                    go.transform.SetPositionAndRotation(at, Quaternion.LookRotation(toRiver, Vector3.up));
+                    ApplyPerch(go, topping.perch, Vector3.up * turret.TopY);
                     break;
                 }
 
@@ -566,7 +624,7 @@ public partial class LevelSelectDesignerWindow
             if (record.pathNodes == null || !record.pathNodes.Exists(n => n.nodeId == nodeId)) continue;
             if (record.knots.Count < 2) continue;
 
-            var profile = _data.ProfileFor(record.riverName);
+            var profile = RunProfileFor(record);
             var notches = ToNotches(record.mouths);
             if (!SampleRun(record.ToSpline(), MeshEdge, profile, notches,
                            out var centres, out var forwards)) continue;

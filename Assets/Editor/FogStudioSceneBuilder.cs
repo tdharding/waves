@@ -32,7 +32,7 @@ public static class FogStudioSceneBuilder
     // Matches the measured arena: radius ~20, so 40 across, 32 grid cells at 1.25 units each.
     const float COVERAGE = 40f;
 
-    [MenuItem("Waves/Fog Studio Scene/Build Rig")]
+    [MenuItem("Tools/Fog/Build Fog Studio Rig", false, 401)]
     public static void Build()
     {
         var existing = GameObject.Find(ROOT);

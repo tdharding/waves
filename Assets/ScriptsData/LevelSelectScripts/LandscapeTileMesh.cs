@@ -17,7 +17,13 @@ public class LandscapeTileMesh : MonoBehaviour
 
     private MeshFilter _meshFilter;
 
-    void Awake() => GenerateMesh();
+    // Under a LandscapeTool the tile's mesh is its baked one, saved as an asset — never replaced
+    // with a flat grid on load, which would throw the bake away (in a build, for good).
+    void Awake()
+    {
+        if (_meshFilter == null) _meshFilter = GetComponent<MeshFilter>();
+        if (_meshFilter != null && _meshFilter.sharedMesh == null) GenerateMesh();
+    }
 
 #if UNITY_EDITOR
     void OnValidate()
@@ -31,8 +37,15 @@ public class LandscapeTileMesh : MonoBehaviour
     }
 #endif
 
+    /// <summary>
+    /// Rebuilds the tile at its current size and subdivisions: re-baked by its LandscapeTool if it
+    /// has one (with the hills in it), otherwise a flat grid.
+    /// </summary>
     public void GenerateMesh()
     {
+        var tool = GetComponentInParent<LandscapeTool>();
+        if (tool != null) { tool.MarkDirty(); return; }
+
         if (_meshFilter == null) _meshFilter = GetComponent<MeshFilter>();
         if (_meshFilter == null) return;
 

@@ -81,13 +81,11 @@ public class LevelExitController : MonoBehaviour
         if (gridData != null)
         {
             GameProgressData.IncrementCompletionCount(gridData.levelID);
-            LevelSelectionCache.JustExitedLevelID       = gridData.levelID;
-            LevelSelectionCache.JustExitedEntranceIndex = portalIndex;
-            Debug.Log($"[LevelExitController] Exiting level — levelID='{gridData.levelID}'  portalIndex={portalIndex}  → JustExitedLevelID set");
+            Debug.Log($"[LevelExitController] Exiting level — levelID='{gridData.levelID}'  portalIndex={portalIndex}");
         }
         else
         {
-            Debug.LogWarning("[LevelExitController] SelectedGridData is NULL — JustExitedLevelID will not be set. River exit extrusion will not trigger.");
+            Debug.LogWarning("[LevelExitController] SelectedGridData is NULL — the boat cannot be put out at this door, and goes back where it went in.");
         }
 
         SaveBoatStateForPortal();
@@ -116,29 +114,16 @@ public class LevelExitController : MonoBehaviour
                 : sceneToLoad);
     }
 
+    // The door this level is left by, which the level select finds when it loads and puts the
+    // boat out in front of. The spot the boat went in from is written first, so it is still
+    // there to fall back on if the map has no such door.
     private void SaveBoatStateForPortal()
     {
-        GridData gd = LevelSelectionCache.SelectedGridData;
-
-        // Use routing pushed into this entrance by LevelSelectArenaController
-        if (gd != null && portalIndex >= 0 &&
-            gd.entrances != null && portalIndex < gd.entrances.Count)
-        {
-            var entrance = gd.entrances[portalIndex];
-            if (!string.IsNullOrEmpty(entrance.targetSegmentID))
-            {
-                GameProgressData.SaveBoatState(
-                    entrance.targetSegmentID,
-                    entrance.targetProgress,
-                    entrance.targetIsLeftPath,
-                    entrance.targetIsRightPath
-                );
-                return;
-            }
-        }
-
-        // Fallback: return boat to the river position it entered from
         SaveBoatStateFromCache();
+
+        GridData gd = LevelSelectionCache.SelectedGridData;
+        if (gd != null && !string.IsNullOrEmpty(gd.levelID) && portalIndex >= 0)
+            GameProgressData.SaveBoatDoor(gd.levelID, portalIndex);
     }
 
     // No door routing to follow, so the boat goes back to the spot on the map it left from.

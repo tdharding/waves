@@ -31,7 +31,7 @@ public partial class LevelSelectDesignerWindow
     private bool   _isDraggingPipe;
     private Vector2 _pipeDragOffset;
 
-    private const float PipeNodeRadius  = 4.5f;
+    private static float PipeNodeRadius => LevelSelectDesignerSettings.PipeNodeSize;
     private const float PipeHitReach    = 7f;
 
     private LevelSelectDesignerData.DesignerPipe SelectedPipe =>
@@ -71,10 +71,10 @@ public partial class LevelSelectDesignerWindow
         foreach (var pipe in _data.pipes)
         {
             if (pipe == null || pipe.nodes.Count == 0) continue;
-            bool selected = pipe.pipeId == _selectedPipeId;
+            bool selected = pipe.pipeId == _selectedPipeId || IsPipePicked(pipe.pipeId);
 
-            var body = selected ? new Color(0.92f, 0.92f, 0.92f, 0.95f) : new Color(0.55f, 0.72f, 0.78f, 0.9f);
-            var bore = selected ? new Color(0.45f, 0.45f, 0.45f, 0.95f) : new Color(0.22f, 0.3f, 0.33f, 0.9f);
+            var body = selected ? LevelSelectDesignerSettings.PipeSelBodyColour : LevelSelectDesignerSettings.PipeBodyColour;
+            var bore = selected ? LevelSelectDesignerSettings.PipeSelBoreColour : LevelSelectDesignerSettings.PipeBoreColour;
 
             // The pipe as a solid band its own thickness, rounded where it will be rounded, with
             // a darker line down the middle for the hollow.
@@ -85,12 +85,12 @@ public partial class LevelSelectDesignerWindow
                 float width = Mathf.Max(3f, pipe.pipeThickness * _zoom);
 
                 Handles.color = body;
-                Handles.DrawAAPolyLine(width, canvas);
+                DrawSolidLine(width, canvas);
                 float hollow = Mathf.Max(0f, pipe.pipeThickness - pipe.wallThickness * 2f) * _zoom;
                 if (hollow > 1f)
                 {
                     Handles.color = bore;
-                    Handles.DrawAAPolyLine(Mathf.Max(1f, hollow), canvas);
+                    DrawSolidLine(Mathf.Max(1f, hollow), canvas);
                 }
 
                 DrawPipeSupports(pipe, line, selected);
@@ -100,10 +100,10 @@ public partial class LevelSelectDesignerWindow
             for (int i = 0; i < pipe.nodes.Count; i++)
             {
                 Vector2 at = WorldToCanvas(PipeNodeWorldFlat(pipe.nodes[i]));
-                Handles.color = new Color(0.1f, 0.1f, 0.1f, 0.9f);
+                Handles.color = LevelSelectDesignerSettings.PipeOutlineColour;
                 Handles.DrawSolidDisc(at, Vector3.forward, PipeNodeRadius + 1.5f);
-                Handles.color = selected && i == _selectedPipeNode ? Color.yellow
-                              : pipe.nodes[i].overrideHeight       ? new Color(1f, 0.6f, 0.15f)
+                Handles.color = selected && i == _selectedPipeNode ? LevelSelectDesignerSettings.PipeSelColour
+                              : pipe.nodes[i].overrideHeight       ? LevelSelectDesignerSettings.PipeOwnHeightColour
                               : body;
                 Handles.DrawSolidDisc(at, Vector3.forward, PipeNodeRadius);
             }
@@ -113,7 +113,7 @@ public partial class LevelSelectDesignerWindow
         var drawing = _isDrawingPipe ? SelectedPipe : null;
         if (drawing != null && drawing.nodes.Count > 0 && _canvasRect.Contains(Event.current.mousePosition))
         {
-            Handles.color = new Color(1f, 1f, 1f, 0.3f);
+            Handles.color = LevelSelectDesignerSettings.PipeGhostColour;
             Handles.DrawDottedLine(WorldToCanvas(PipeNodeWorldFlat(drawing.nodes[drawing.nodes.Count - 1])),
                                    Event.current.mousePosition, 5f);
         }
@@ -130,10 +130,11 @@ public partial class LevelSelectDesignerWindow
             float half  = Mathf.Max(8f, (pipe.pipeThickness * 0.5f + pipe.ringOverhang) * _zoom + 3f);
             float thick = Mathf.Max(2.5f, pipe.supportThickness * _zoom);
 
-            Handles.color = new Color(0.1f, 0.1f, 0.1f, 0.9f);
-            Handles.DrawAAPolyLine(thick + 2f, at - across * (half + 1f), at + across * (half + 1f));
-            Handles.color = selected && i == _selectedPipeSupport ? Color.yellow : new Color(1f, 0.85f, 0.4f);
-            Handles.DrawAAPolyLine(thick, at - across * half, at + across * half);
+            Handles.color = LevelSelectDesignerSettings.PipeOutlineColour;
+            DrawSolidLine(thick + 2f, at - across * (half + 1f), at + across * (half + 1f));
+            Handles.color = selected && i == _selectedPipeSupport ? LevelSelectDesignerSettings.PipeSelColour
+                                                                   : LevelSelectDesignerSettings.PipeSupportColour;
+            DrawSolidLine(thick, at - across * half, at + across * half);
         }
     }
 
@@ -604,7 +605,7 @@ public partial class LevelSelectDesignerWindow
                 if (nodeOverride) node.height = Mathf.Max(0f, nodeHeight);
             }
             MarkDirty();
-            RebuildPipe(pipe);
+            RebuildAfterEdit(pipe, () => RebuildPipe(pipe));
         }
 
         if (hasNode)

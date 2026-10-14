@@ -27,11 +27,16 @@ public partial class LevelSelectDesignerWindow
     // the shader's points, with a note in the console when it has to be.
     private const float RiverEdgeTolerance = 0.02f;
 
+    // The river's Landscape Influence dropdown; closed each time the window opens.
+    [System.NonSerialized] private bool _foldPathLandscapeInfluence;
+
     private class RiverEdgeLine
     {
         public List<Vector3> points;
         public float         half;
         public float         reach;   // negative: cut only
+        public float         strength = 1f;
+        public float         shelf    = -1f;   // walls-off run: held level this far past the edge
     }
 
     /// <summary>
@@ -41,7 +46,12 @@ public partial class LevelSelectDesignerWindow
     private bool DrawPathLandscapeInfluence(LevelSelectDesignerData.DesignerPath path)
     {
         EditorGUILayout.Space(4);
+        _foldPathLandscapeInfluence = EditorGUILayout.Foldout(
+            _foldPathLandscapeInfluence, "Landscape Influence Settings", true);
+        if (!_foldPathLandscapeInfluence) return false;
+
         EditorGUI.BeginChangeCheck();
+        EditorGUI.indentLevel++;
 
         path.landscapeInfluence = EditorGUILayout.Toggle(
             new GUIContent("Landscape Influence",
@@ -57,13 +67,41 @@ public partial class LevelSelectDesignerWindow
                 path.landscapeToOuterRim);
 
             using (new EditorGUI.DisabledScope(!path.landscapeToOuterRim))
+            {
                 path.influenceDistance = Mathf.Max(0f, EditorGUILayout.FloatField(
                     new GUIContent("Influence Distance",
                         "How far out past the run's outer edge the landscape is shaped, before " +
                         "it eases back to its own hills."),
                     path.influenceDistance));
+
+                path.influenceStrength = EditorGUILayout.Slider(
+                    new GUIContent("Influence Strength",
+                        "How far the landscape is drawn up toward the rim top: 1 meets it, 0.5 " +
+                        "goes halfway, 0 leaves the hills as they are."),
+                    path.influenceStrength, 0f, 1f);
+
+                path.influenceCancelledNodes ??= new List<string>();
+                EditorGUI.indentLevel++;
+                EditorGUILayout.LabelField("Cancel Influence At", EditorStyles.miniBoldLabel);
+                for (int i = 0; i < path.nodeIds.Count; i++)
+                {
+                    string id        = path.nodeIds[i];
+                    bool   cancelled = path.influenceCancelledNodes.Contains(id);
+                    bool   now       = EditorGUILayout.Toggle(
+                        new GUIContent($"Node {i + 1}",
+                            "Cancels the influence on the stretch of run nearest this node — " +
+                            "cut only, never lifted."),
+                        cancelled);
+
+                    if (now == cancelled) continue;
+                    if (now) path.influenceCancelledNodes.Add(id);
+                    else     path.influenceCancelledNodes.Remove(id);
+                }
+                EditorGUI.indentLevel--;
+            }
             EditorGUI.indentLevel--;
         }
+        EditorGUI.indentLevel--;
 
         return EditorGUI.EndChangeCheck();
     }
@@ -87,15 +125,19 @@ public partial class LevelSelectDesignerWindow
             TracePools(lines);
         }
 
-        PackRiverEdges(lines, out var points, out var reach);
+        PackRiverEdges(lines, out var points, out var reach, out var strength, out var shelf);
 
-        tool.SetRiverEdges(points, reach);
+        tool.SetRiverEdges(points, reach, strength, shelf);
         EditorUtility.SetDirty(tool);
         EditorApplication.QueuePlayerLoopUpdate();
         SceneView.RepaintAll();
 
-        // Spikes stand on the ground, so they rise with it.
-        if (placeSpikes) PlaceAllSpikes();
+        // Spikes and structures stand on the ground, so they rise with it.
+        if (placeSpikes)
+        {
+            PlaceAllSpikes();
+            PlaceAllStructures();
+        }
 
         if (any)
             Debug.Log($"[LevelSelectDesigner] Landscape influence: {lines.Count(l => l.reach >= 0f)} " +
@@ -112,11 +154,13 @@ public partial class LevelSelectDesignerWindow
     // Each run along the same curve it is swept on, carried into its arena as the mesh is.
     private void TraceRuns(List<RiverEdgeLine> lines)
     {
+        float landscapeShelf = LandscapeShelf(FindLandscapeTool());
+
         foreach (var record in FindObjectsOfType<RiverRunMesh>())
         {
             if (record.knots.Count < 2) continue;
 
-            var profile = _data.ProfileFor(record.riverName);
+            var profile = RunProfileFor(record);
             if (!SampleRun(record.ToSpline(), MeshEdge, profile, ToNotches(record.mouths),
                            out var centres, out var forwards)) continue;
 
@@ -137,27 +181,83 @@ public partial class LevelSelectDesignerWindow
 
             var path = PathForRun(record);
             bool lifts = path != null && path.landscapeInfluence && path.landscapeToOuterRim;
+            float half  = profile.OuterWidth * 0.5f;
+            float reach = lifts ? Mathf.Max(0f, path.influenceDistance) : -1f;
+            float strength = lifts ? Mathf.Clamp01(path.influenceStrength) : 1f;
 
-            lines.Add(new RiverEdgeLine
+            // A run with no outer walls has the ground run straight onto its rim.
+            float shelf = RunWallsOff(path) ? landscapeShelf : -1f;
+
+            if (!lifts || path.influenceCancelledNodes == null || path.influenceCancelledNodes.Count == 0)
             {
-                points = world,
-                half   = profile.OuterWidth * 0.5f,
-                reach  = lifts ? Mathf.Max(0f, path.influenceDistance) : -1f,
-            });
+                lines.Add(new RiverEdgeLine { points = world, half = half, reach = reach, strength = strength, shelf = shelf });
+                continue;
+            }
+
+            // Each point belongs to the path node it lies nearest; where that node's influence is
+            // cancelled the run is cut only. The line is split where that changes, the two halves
+            // sharing the point so the cut runs on unbroken; the lifted half eases off round its end.
+            var nodes = path.nodeIds
+                .Select(id => _data.nodes.Find(n => n.id == id))
+                .Where(n => n != null)
+                .ToList();
+
+            bool Cancelled(Vector3 p)
+            {
+                LevelSelectDesignerData.DesignerNode nearest = null;
+                float best = float.MaxValue;
+                foreach (var n in nodes)
+                {
+                    float dx = n.worldPosition.x - p.x, dz = n.worldPosition.z - p.z;
+                    float d  = dx * dx + dz * dz;
+                    if (d < best) { best = d; nearest = n; }
+                }
+                return nearest != null && path.influenceCancelledNodes.Contains(nearest.id);
+            }
+
+            int  start = 0;
+            bool off   = Cancelled(world[0]);
+            for (int i = 1; i <= world.Count; i++)
+            {
+                bool here = i < world.Count ? Cancelled(world[i]) : !off;
+                if (here == off) continue;
+
+                int end = Mathf.Min(i, world.Count - 1);
+                lines.Add(new RiverEdgeLine
+                {
+                    points = world.GetRange(start, end - start + 1),
+                    half   = half,
+                    reach  = off ? -1f : reach,
+                    strength = strength,
+                    shelf    = shelf,
+                });
+                start = end;
+                off   = here;
+            }
         }
     }
 
-    // A pool is a disc: its centre and outer radius. Cut only — a pool has no path of its own.
+    // A pool is a disc: its centre and outer radius. A pool has no path of its own, so a
+    // Landscape Natural River Run pool lifts the ground by its river's path, as that river's
+    // runs do; any other pool is cut only.
     private void TracePools(List<RiverEdgeLine> lines)
     {
+        float landscapeShelf = LandscapeShelf(FindLandscapeTool());
+
         foreach (var record in FindObjectsOfType<RiverPoolMesh>())
         {
-            var profile = _data.ProfileFor(record.riverName);
+            var  pool    = PoolForRecord(record);
+            var  path    = pool != null ? PoolPath(pool) : PathForRiver(record.riverName);
+            var  profile = RunProfileFor(path, record.riverName);
+            bool lifts   = IsNaturalRun(path) && path.landscapeInfluence && path.landscapeToOuterRim;
+
             lines.Add(new RiverEdgeLine
             {
-                points = new List<Vector3> { record.transform.position },
-                half   = record.poolRadius + profile.rimWidth,
-                reach  = -1f,
+                points   = new List<Vector3> { record.transform.position },
+                half     = record.poolRadius + profile.rimWidth,
+                reach    = lifts ? Mathf.Max(0f, path.influenceDistance) : -1f,
+                strength = lifts ? Mathf.Clamp01(path.influenceStrength) : 1f,
+                shelf    = RunWallsOff(path) ? landscapeShelf : -1f,
             });
         }
     }
@@ -192,16 +292,21 @@ public partial class LevelSelectDesignerWindow
 
     // Into the shader's layout (see LandscapeTool.riverEdgePoints), thinned until it fits.
     private static void PackRiverEdges(List<RiverEdgeLine> lines,
-                                       out List<Vector4> points, out List<float> reach)
+                                       out List<Vector4> points, out List<float> reach,
+                                       out List<float> strength, out List<float> shelf)
     {
-        points = new List<Vector4>();
-        reach  = new List<float>();
+        points   = new List<Vector4>();
+        reach    = new List<float>();
+        strength = new List<float>();
+        shelf    = new List<float>();
 
         float tolerance = RiverEdgeTolerance;
         for (int attempt = 0; attempt < 16; attempt++)
         {
             points.Clear();
             reach.Clear();
+            strength.Clear();
+            shelf.Clear();
 
             foreach (var line in lines)
             {
@@ -212,6 +317,8 @@ public partial class LevelSelectDesignerWindow
                     float   w = i == thin.Count - 1 ? -line.half : line.half;
                     points.Add(new Vector4(p.x, p.y, p.z, w));
                     reach.Add(line.reach);
+                    strength.Add(line.strength);
+                    shelf.Add(line.shelf);
                 }
             }
 
@@ -229,6 +336,8 @@ public partial class LevelSelectDesignerWindow
                              $"points, only the first {LandscapeTool.MaxRiverEdgePoints} are used.");
             points.RemoveRange(LandscapeTool.MaxRiverEdgePoints, points.Count - LandscapeTool.MaxRiverEdgePoints);
             reach.RemoveRange(LandscapeTool.MaxRiverEdgePoints, reach.Count - LandscapeTool.MaxRiverEdgePoints);
+            strength.RemoveRange(LandscapeTool.MaxRiverEdgePoints, strength.Count - LandscapeTool.MaxRiverEdgePoints);
+            shelf.RemoveRange(LandscapeTool.MaxRiverEdgePoints, shelf.Count - LandscapeTool.MaxRiverEdgePoints);
             var last = points[points.Count - 1];
             points[points.Count - 1] = new Vector4(last.x, last.y, last.z, -Mathf.Abs(last.w));
         }

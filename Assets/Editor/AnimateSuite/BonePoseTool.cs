@@ -193,7 +193,8 @@ public class BonePoseTool : AnimateTool
 
         if (resettable.Count == 0)
         {
-            Debug.LogWarning("[Animate Suite] None of the selected bones are skinned to the mesh.");
+            Debug.LogWarning("[Animate Suite] None of the selected bones are skinned to the mesh " +
+                             "(the Armature object itself has no mesh default — use Reset Whole Armature).");
             return;
         }
 
@@ -347,6 +348,17 @@ public class BonePoseTool : AnimateTool
 
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Rest Pose", EditorStyles.boldLabel);
+
+        // Whole rig: every bone back to where the mesh was skinned. Order does not matter — each
+        // bone is worked out against its parent's bind matrix, not the parent's current pose.
+        using (new EditorGUI.DisabledScope(rig.root == null))
+        {
+            if (GUILayout.Button("Reset Whole Armature to Mesh Default"))
+            {
+                rig.Refresh();
+                ResetToBind(rig, rig.bones);
+            }
+        }
 
         var picked = rig.SelectedBones();
         using (new EditorGUI.DisabledScope(picked.Count == 0))

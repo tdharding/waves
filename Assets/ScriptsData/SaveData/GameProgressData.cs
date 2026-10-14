@@ -75,75 +75,14 @@ public static class GameProgressData
         return SaveManager.Load().levelCompletions.Find(e => e.levelID == levelID);
     }
 
-    // ─────────────────────────────────────────────
-    // BOAT SPLINE PROGRESS
-    // ─────────────────────────────────────────────
-
-    public static float GetBoatProgress(float defaultValue = 0f)
-    {
-        float saved = SaveManager.Load().boatSplineProgress;
-        return saved == 0f ? defaultValue : saved;
-    }
-
-    public static void SaveBoatProgress(float progress)
-    {
-        SaveManager.Load().boatSplineProgress = progress;
-        SaveManager.Write();
-    }
-
-    public static string GetBoatSegmentID()
-    {
-        return SaveManager.Load().boatSegmentID;
-    }
-
-    public static void SaveBoatSegmentID(string segmentID)
-    {
-        SaveManager.Load().boatSegmentID = segmentID;
-        SaveManager.Write();
-    }
-
-    public static bool GetBoatIsLeftPath()
-    {
-        return SaveManager.Load().boatIsLeftPath;
-    }
-
-    public static bool GetBoatIsRightPath()
-    {
-        return SaveManager.Load().boatIsRightPath;
-    }
-
-    public static float GetRiverProgress(float defaultValue = 0f)
-    {
-        float saved = SaveManager.Load().riverExtrudeProgress;
-        return saved == 0f ? defaultValue : saved;
-    }
-
-    public static void SaveRiverProgress(float progress)
-    {
-        SaveManager.Load().riverExtrudeProgress = progress;
-        SaveManager.Write();
-    }
-
-    public static void SaveBoatState(string segmentID, float progress,
-                                     bool isLeftPath = false, bool isRightPath = false)
-    {
-        var data            = SaveManager.Load();
-        data.boatSegmentID      = segmentID;
-        data.boatSplineProgress = progress;
-        data.boatIsLeftPath      = isLeftPath;
-        data.boatIsRightPath   = isRightPath;
-
-        // A river and a distance along it is a door saying where the boat comes out. That
-        // beats wherever the boat had got to before it went through, so the pose goes.
-        data.boatHasPose = false;
-        SaveManager.Write();
-    }
-
     // ──────────────────────────────
     // WHERE THE BOAT GOT TO
     // ──────────────────────────────
 
-    /// <summary>Writes down where the boat stood on the map and which way it faced.</summary>
+    /// <summary>
+    /// Writes down where the boat stood on the map and which way it faced. The boat has moved
+    /// since any door it last came out of, so that door is forgotten.
+    /// </summary>
     public static void SaveBoatPose(Vector3 position, float heading)
     {
         var data = SaveManager.Load();
@@ -152,6 +91,22 @@ public static class GameProgressData
         data.boatPoseY       = position.y;
         data.boatPoseZ       = position.z;
         data.boatPoseHeading = heading;
+        data.boatDoorLevelID       = string.Empty;
+        data.boatDoorEntranceIndex = -1;
+        SaveManager.Write();
+    }
+
+    /// <summary>
+    /// Writes down the door the boat is coming out of a level by: the level, and the index into
+    /// its GridData.entrances. The level select puts the boat out in front of that door when it
+    /// loads. Any pose already written is left alone, as the fallback for a door the map cannot
+    /// find.
+    /// </summary>
+    public static void SaveBoatDoor(string levelID, int entranceIndex)
+    {
+        var data = SaveManager.Load();
+        data.boatDoorLevelID       = levelID ?? string.Empty;
+        data.boatDoorEntranceIndex = entranceIndex;
         SaveManager.Write();
     }
 
@@ -162,11 +117,10 @@ public static class GameProgressData
     public static bool HasBoatBeenPlaced()
     {
         var data = SaveManager.Load();
-        return data.boatHasPose || !string.IsNullOrEmpty(data.boatSegmentID);
+        return data.boatHasPose || TryGetBoatDoor(out _, out _);
     }
 
-    /// <summary>Reads it back. False when the boat has never been anywhere, or a door has
-    /// since said where it comes out instead.</summary>
+    /// <summary>Reads it back. False when the boat has never been anywhere.</summary>
     public static bool TryGetBoatPose(out Vector3 position, out float heading)
     {
         var data = SaveManager.Load();
@@ -176,14 +130,23 @@ public static class GameProgressData
         return data.boatHasPose;
     }
 
+    /// <summary>The door the boat last came out of a level by. False when the boat has moved
+    /// on since, or has never come out of one.</summary>
+    public static bool TryGetBoatDoor(out string levelID, out int entranceIndex)
+    {
+        var data = SaveManager.Load();
+
+        levelID       = data.boatDoorLevelID;
+        entranceIndex = data.boatDoorEntranceIndex;
+        return !string.IsNullOrEmpty(levelID) && entranceIndex >= 0;
+    }
+
     public static void ClearBoatProgress()
     {
-        var data            = SaveManager.Load();
-        data.boatSplineProgress = 0f;
-        data.boatSegmentID      = string.Empty;
-        data.boatIsLeftPath      = false;
-        data.boatIsRightPath   = false;
-        data.boatHasPose       = false;
+        var data = SaveManager.Load();
+        data.boatHasPose           = false;
+        data.boatDoorLevelID       = string.Empty;
+        data.boatDoorEntranceIndex = -1;
         SaveManager.Write();
     }
 
@@ -433,22 +396,22 @@ public static class GameProgressData
     }
 
     // ─────────────────────────────────────────────
-    // EXIT-UNLOCKED RIVER SEGMENTS
+    // CAMERA SEQUENCES
     // ─────────────────────────────────────────────
 
-    public static bool IsSegmentExitUnlocked(string segmentID)
+    public static bool HasSequencePlayed(string key)
     {
-        if (string.IsNullOrEmpty(segmentID)) return false;
-        return SaveManager.Load().exitUnlockedSegments.Contains(segmentID);
+        if (string.IsNullOrEmpty(key)) return false;
+        return SaveManager.Load().playedSequences.Contains(key);
     }
 
-    public static void UnlockSegmentOnExit(string segmentID)
+    public static void MarkSequencePlayed(string key)
     {
-        if (string.IsNullOrEmpty(segmentID)) return;
+        if (string.IsNullOrEmpty(key)) return;
         var data = SaveManager.Load();
-        if (!data.exitUnlockedSegments.Contains(segmentID))
+        if (!data.playedSequences.Contains(key))
         {
-            data.exitUnlockedSegments.Add(segmentID);
+            data.playedSequences.Add(key);
             SaveManager.Write();
         }
     }

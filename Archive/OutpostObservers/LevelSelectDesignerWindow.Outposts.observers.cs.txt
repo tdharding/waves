@@ -1,0 +1,260 @@
+// Archived from Assets/Editor/LevelSelectDesignerWindow.Outposts.cs (2026-10-12) — observer slices only.
+
+// --- canvas: in the outpost drawing loop ---
+            DrawOutpostObservers(outpost, bank, wall);
+
+    /// <summary>A solid dot where each observer stands, with a short line the way it faces.</summary>
+    private void DrawOutpostObservers(LevelSelectDesignerData.DesignerOutpost outpost,
+                                      LevelSelectDesignerData.OutpostSide bank, Color color)
+    {
+        var s = outpost.OnBank(bank);
+        if (s.observers == null || s.observers.Count == 0) return;
+
+        var path = _data.paths.Find(p => p.pathId == outpost.pathId);
+        if (path == null || path.nodeIds.Count < 2) return;
+
+        PathFrameAt(path, outpost.pathT, out Vector3 centre, out Vector3 forward);
+        Vector3 away    = OutpostAway(forward, bank);
+        Vector3 edge    = centre + away * OutpostStandOff(outpost, path, bank);
+        Vector3 toRiver = -away;
+
+        Handles.color = color;
+        foreach (var observer in s.observers)
+        {
+            var o = observer.Clone();
+            ClampObserverToFloor(s, o);
+            Vector3 stand = edge + forward * o.offsetAlong + away * (s.depth * 0.5f + o.offsetAway);
+            Vector3 face  = Quaternion.AngleAxis(o.facing, Vector3.up) * toRiver;
+
+            Vector2 at  = WorldToCanvas(stand);
+            Vector2 dir = WorldToCanvas(stand + face) - at;
+            if (dir.sqrMagnitude > 1e-8f) DrawSolidLine(2f, at, at + dir.normalized * 8f);
+            Handles.DrawSolidDisc(at, Vector3.forward, 2.5f);
+
+// --- preset load (DrawOutpostPresetRow) ---
+                foreach (var o in outpost.observers) ClampObserverToFloor(outpost, o);
+
+    /// <summary>
+    /// How many observers, and where each stands and faces. Hands back an edited copy, so the
+    /// caller writes it only inside its own change check. A new observer copies the one before it.
+    /// </summary>
+    internal static List<LevelSelectDesignerData.OutpostObserver> DrawOutpostObserverFields(
+        List<LevelSelectDesignerData.OutpostObserver> observers, bool onRiver = true)
+    {
+        // A freestanding structure's outpost has no river: its offsets run along its own x and z,
+        // and facing 0 looks out of its front.
+        string along   = onRiver ? "Moves it along the river from the floor's centre."
+                                 : "Moves it along the structure's x from the floor's centre.";
+        string away    = onRiver ? "Moves it away from the river from the floor's centre."
+                                 : "Moves it along the structure's z from the floor's centre.";
+        string zeroWay = onRiver ? "facing the river" : "facing out of the structure's front (its -z)";
+
+        var edited = (observers ?? new List<LevelSelectDesignerData.OutpostObserver>())
+                     .Select(o => o.Clone()).ToList();
+
+        int count = Mathf.Max(0, EditorGUILayout.IntField(
+            new GUIContent("Count", "How many observers stand on this outpost."), edited.Count));
+        while (edited.Count > count) edited.RemoveAt(edited.Count - 1);
+        while (edited.Count < count)
+            edited.Add(edited.Count > 0 ? edited[edited.Count - 1].Clone()
+                                        : new LevelSelectDesignerData.OutpostObserver());
+
+        for (int i = 0; i < edited.Count; i++)
+        {
+            var o = edited[i];
+            EditorGUILayout.LabelField($"Observer {i + 1}", EditorStyles.miniLabel);
+            EditorGUI.indentLevel++;
+            o.offsetAlong = EditorGUILayout.FloatField(
+                new GUIContent(onRiver ? "Offset Along" : "Offset X", along), o.offsetAlong);
+            o.offsetAway = EditorGUILayout.FloatField(
+                new GUIContent(onRiver ? "Offset Away" : "Offset Z", away), o.offsetAway);
+            o.facing = EditorGUILayout.Slider(
+                new GUIContent("Facing", $"Which way it faces. 0 = {zeroWay}, clockwise seen from above."),
+                o.facing, 0f, 360f);
+            o.height = Mathf.Max(0.001f, EditorGUILayout.FloatField(
+                new GUIContent("Height", "How tall it stands, feet to the top marker on its prefab."), o.height));
+            EditorGUI.indentLevel--;
+        }
+
+        return edited;
+    }
+
+// --- end of BuildOutpostBlocks ---
+        SpawnObservers(s, go, forward, away);
+
+    // ─────────────────────────────────────────────
+    // OBSERVERS
+    // ─────────────────────────────────────────────
+
+    /// <summary>
+    /// Keeps an observer's offsets on the floor inside the walls. Measured the same way the mesh
+    /// measures its wall: thickness capped just short of half the width or depth, and no wall at
+    /// all when the wall has no height — then the whole top is floor.
+    /// </summary>
+    private static void ClampObserverToFloor(LevelSelectDesignerData.DesignerOutpost outpost,
+                                             LevelSelectDesignerData.OutpostObserver o)
+    {
+        Vector2 half = FloorHalfSize(outpost);
+        o.offsetAlong = Mathf.Clamp(o.offsetAlong, -half.x, half.x);
+        o.offsetAway  = Mathf.Clamp(o.offsetAway,  -half.y, half.y);
+    }
+
+    /// <summary>Half the floor inside the walls: x along the river, y away from it.</summary>
+    private static Vector2 FloorHalfSize(LevelSelectDesignerData.DesignerOutpost outpost)
+    {
+        float halfW  = outpost.width * 0.5f;
+        float halfD  = outpost.depth * 0.5f;
+        float t      = Mathf.Clamp(outpost.wallThickness, 0f, Mathf.Min(halfW, halfD) - 0.001f);
+        bool  walled = t > 0.0001f && outpost.wallHeight > 0.0001f;
+        if (walled) { halfW -= t; halfD -= t; }
+
+        return new Vector2(Mathf.Max(0f, halfW), Mathf.Max(0f, halfD));
+    }
+
+    /// <summary>
+    /// The floor observers stand and walk on, in the block's own space: a rectangle round its
+    /// centre, or — with a radius — the round floor inside a ring wall.
+    /// </summary>
+    private struct ObserverFloor
+    {
+        public Vector3 centre;
+        public Vector2 halfSize;
+        public float   radius;   // above 0 = round
+
+        public void Clamp(LevelSelectDesignerData.OutpostObserver o)
+        {
+            if (radius > 0f)
+            {
+                var at = Vector2.ClampMagnitude(new Vector2(o.offsetAlong, o.offsetAway), radius);
+                o.offsetAlong = at.x;
+                o.offsetAway  = at.y;
+                return;
+            }
+            o.offsetAlong = Mathf.Clamp(o.offsetAlong, -halfSize.x, halfSize.x);
+            o.offsetAway  = Mathf.Clamp(o.offsetAway,  -halfSize.y, halfSize.y);
+        }
+    }
+
+    // An outpost's floor: the rectangle inside its walls, centred halfway out from the river.
+    private static ObserverFloor OutpostFloor(LevelSelectDesignerData.DesignerOutpost outpost)
+        => new ObserverFloor
+        {
+            centre   = new Vector3(0f, outpost.height, outpost.depth * 0.5f),
+            halfSize = FloorHalfSize(outpost),
+        };
+
+    internal const string ObserverPrefabPath = "Assets/Prefab/NPCPrefabs/ObserverManNPC.prefab";
+    private const string ObserversChild     = "Observers";
+
+    internal static GameObject LoadObserverPrefab()
+        => AssetDatabase.LoadAssetAtPath<GameObject>(ObserverPrefabPath);
+
+    /// <summary>
+    /// Stands the outpost's observers on its floor, offset from its centre, under an "Observers" child of
+    /// the block. Instances already there are reused in order; extras are removed.
+    ///
+    /// Placed off the prefab's PrefabBaselineAlignment: its disc is where the feet meet the floor,
+    /// its forward override is the way the figure faces, and its top marker is what Height
+    /// measures, so Height is scaled against it.
+    /// </summary>
+    private void SpawnObservers(LevelSelectDesignerData.DesignerOutpost outpost, GameObject block,
+                                Vector3 forward, Vector3 away, ObserverFloor? floorOverride = null)
+    {
+        var floor = floorOverride ?? OutpostFloor(outpost);
+        Transform container = block.transform.Find(ObserversChild);
+        var       observers = outpost.observers ?? new List<LevelSelectDesignerData.OutpostObserver>();
+        var       prefab    = LoadObserverPrefab();
+
+        if (observers.Count == 0 || prefab == null)
+        {
+            if (observers.Count > 0)
+                Debug.LogWarning($"[LevelSelectDesigner] No observer prefab at {ObserverPrefabPath} — " +
+                                 $"outpost '{outpost.outpostId}' has no observers spawned.");
+            if (container != null) Undo.DestroyObjectImmediate(container.gameObject);
+            return;
+        }
+
+        if (container == null)
+        {
+            var c = new GameObject(ObserversChild);
+            Undo.RegisterCreatedObjectUndo(c, "Spawn Observers");
+            c.transform.SetParent(block.transform, false);
+            container = c.transform;
+        }
+
+        // What the prefab's aligner says, in the prefab root's own frame.
+        var       aligner  = prefab.GetComponentInChildren<PrefabBaselineAlignment>(true);
+        Transform root     = prefab.transform;
+        Vector3   contact  = Vector3.zero;
+        Vector3   faceWay  = Vector3.forward;
+        float     topHeight = 0f;
+        if (aligner != null)
+        {
+            contact   = Quaternion.Inverse(root.rotation) * (aligner.transform.position - root.position);
+            faceWay   = Quaternion.Inverse(root.rotation) * aligner.transform.TransformDirection(aligner.LocalForward);
+            topHeight = aligner.PrefabTopHeight;
+        }
+        else
+        {
+            Debug.LogWarning($"[LevelSelectDesigner] {prefab.name} has no PrefabBaselineAlignment — " +
+                             "observers are placed off its root.");
+        }
+        faceWay.y = 0f;
+        if (faceWay.sqrMagnitude < 1e-8f) faceWay = Vector3.forward;
+        if (topHeight <= 0f)
+            Debug.LogWarning($"[LevelSelectDesigner] {prefab.name} has no top marker — observer Height " +
+                             "is ignored and they spawn at the prefab's own size.");
+
+        // The floor's centre, and which way along the block's x runs down the path.
+        float   alongSign = Vector3.Dot(block.transform.right, forward) >= 0f ? 1f : -1f;
+        Vector3 toRiver   = -away;
+
+        for (int i = 0; i < observers.Count; i++)
+        {
+            var o = observers[i].Clone();
+            floor.Clamp(o);
+
+            GameObject figure = null;
+            if (i < container.childCount)
+            {
+                var child = container.GetChild(i).gameObject;
+                if (PrefabUtility.GetCorrespondingObjectFromSource(child) == prefab) figure = child;
+                else Undo.DestroyObjectImmediate(child);
+            }
+            if (figure == null)
+            {
+                figure = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+                Undo.RegisterCreatedObjectUndo(figure, "Spawn Observer");
+                figure.transform.SetParent(container, false);
+                figure.transform.SetSiblingIndex(i);
+            }
+
+            float   scale = topHeight > 0f ? o.height / topHeight : 1f;
+            Vector3 stand = block.transform.TransformPoint(
+                floor.centre + new Vector3(o.offsetAlong * alongSign, 0f, o.offsetAway));
+            Vector3 face  = Quaternion.AngleAxis(o.facing, Vector3.up) * toRiver;
+            var     rot  = Quaternion.LookRotation(face, Vector3.up) *
+                            Quaternion.Inverse(Quaternion.LookRotation(faceWay, Vector3.up));
+
+            Undo.RecordObject(figure.transform, "Place Observer");
+            figure.name                    = $"Observer_{i + 1}";
+            figure.transform.localScale    = root.localScale * scale;
+            figure.transform.rotation      = rot;
+            figure.transform.position      = stand - rot * (contact * scale);
+
+            // The floor it may walk about on, in the block's own space.
+            var npc = figure.GetComponent<ObserverManNPCController>();
+            if (npc != null)
+            {
+                Undo.RecordObject(npc, "Place Observer");
+                if (floor.radius > 0f) npc.SetFloorRound(block.transform, floor.centre, floor.radius);
+                else                   npc.SetFloor(block.transform, floor.centre, floor.halfSize);
+                PrefabUtility.RecordPrefabInstancePropertyModifications(npc);
+                EditorUtility.SetDirty(npc);
+            }
+        }
+
+        for (int i = container.childCount - 1; i >= observers.Count; i--)
+            Undo.DestroyObjectImmediate(container.GetChild(i).gameObject);
+    }
+

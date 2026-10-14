@@ -7,7 +7,7 @@ public class ReplaceWithPrefab : EditorWindow
     private bool matchScale = true;
     private bool matchRotation = true;
 
-    [MenuItem("Tools/Replace Selected with Prefab")]
+    [MenuItem("Tools/Scene and Assets/Replace Selected with Prefab", false, 1020)]
     static void Init()
     {
         ReplaceWithPrefab window = (ReplaceWithPrefab)EditorWindow.GetWindow(typeof(ReplaceWithPrefab));

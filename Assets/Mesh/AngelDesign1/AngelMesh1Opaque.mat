@@ -46,8 +46,8 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _AddLighting: 0
-    - _AddWhiteFade: 0
+    - _AddLighting: 1
+    - _AddWhiteFade: 1
     - _DoubleSided: 1
     - _NoiseScale: 40
     - _NoiseStrength: 0.5

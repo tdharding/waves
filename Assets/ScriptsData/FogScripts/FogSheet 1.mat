@@ -51,21 +51,21 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _Ambient: 0.609
+    - _Ambient: 0.74
     - _Curvature: 0.55
-    - _EdgeShadowStrength: 2.05
+    - _EdgeShadowStrength: 2.76
     - _EdgeShadowWidth: 0.687
     - _EdgeSoftness: 0.1434
-    - _GrainAmount: 0.23
-    - _GrainScale: 1
-    - _HeightScale: 1.6
+    - _GrainAmount: 0.56
+    - _GrainScale: 1.1
+    - _HeightScale: 1.07
     - _LipLight: 1.92
     - _LipWidth: 0.132
     - _Opacity: 1
     - _QueueControl: 0
     - _QueueOffset: 0
-    - _Threshold: 0.274
-    - _Transparency: 0.57
+    - _Threshold: 0.178
+    - _Transparency: 0.29
     - _UndulationAmount: 0
     - _UndulationScale: 0.05
     m_Colors:

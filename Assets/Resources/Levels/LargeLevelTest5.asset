@@ -102,10 +102,13 @@ MonoBehaviour:
     streetLights:
     - nodeIndex: 3
       poolRadius: 1.28
+      startsLit: 0
     - nodeIndex: 8
       poolRadius: 1.96
+      startsLit: 0
     - nodeIndex: 14
       poolRadius: 1.61
+      startsLit: 0
   entrances:
   - id: entrance_0
     prefab: {fileID: 3508056878682996915, guid: 77af702830b8e23408f27c9076ad6151, type: 3}
@@ -118,10 +121,6 @@ MonoBehaviour:
     lockHubAngle: 0
     tubePath: []
     tubeSubdivisions: 3
-    targetSegmentID: Branch_04
-    targetProgress: 0.88621664
-    targetIsLeftPath: 0
-    targetIsRightPath: 1
   - id: entrance_1
     prefab: {fileID: 3508056878682996915, guid: 02d35998e30eece4199c26b9e7c7e393, type: 3}
     soulPrefab: {fileID: 0}
@@ -138,10 +137,6 @@ MonoBehaviour:
     - {x: 17, y: 0}
     - {x: 17, y: 0}
     tubeSubdivisions: 3
-    targetSegmentID: 
-    targetProgress: 0
-    targetIsLeftPath: 0
-    targetIsRightPath: 0
   arenaWaterModifiers: []
   orbCellIndices: 
   orbPositions:
@@ -229,7 +224,7 @@ MonoBehaviour:
   slotNotes:
   - 
   slotColors: []
-  arenaRadius: 13.02
+  arenaRadius: 30.1
   waterlineY: 0
   arenaWallHeight: 2
   arenaWallThickness: 1

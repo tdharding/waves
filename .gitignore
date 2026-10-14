@@ -28,6 +28,7 @@ crashlytics-build.properties
 # Build output directories
 OldBuilds/
 LocalBuildWindows*/
+BUILDS2026/
 
 # Packaged build archives (too large for GitHub)
 August2026Build.zip

@@ -1,7 +1,7 @@
 // How the level select's landscape hills are shaded.
 //
-// The same idea as the river runs' stone, kept entirely separate from it: three stone VARIANTS
-// (A, B, C), each a colour with its own grain, and three PARTS of the landscape that each wear one
+// The same idea as the river runs' stone, kept entirely separate from it: four stone VARIANTS
+// (A, B, C, D), each a colour with its own grain, and three PARTS of the landscape that each wear one
 // of them — Holes, NoiseUp and NoiseDown.
 //
 // A run's parts are baked into its mesh as it is built. The hills are not built — they are raised
@@ -20,20 +20,21 @@
 #ifndef LANDSCAPE_SHADING_INCLUDED
 #define LANDSCAPE_SHADING_INCLUDED
 
-// The three variants' colours. Alpha is ignored.
+// The four variants' colours. Alpha is ignored.
 float4 _LandscapeColourA;
 float4 _LandscapeColourB;
 float4 _LandscapeColourC;
+float4 _LandscapeColourD;
 
-// x A, y B, z C. Grain size is metres per noise cell, 0 turns it off.
+// x A, y B, z C, w D. Grain size is metres per noise cell, 0 turns it off.
 float4 _LandscapeGrainSizes;
 float4 _LandscapeGrainStrengths;
 
-// Which variant each part wears: 0 A, 1 B, 2 C. x Holes, y NoiseUp, z NoiseDown.
+// Which variant each part wears: 0 A, 1 B, 2 C, 3 D. x Holes, y NoiseUp, z NoiseDown.
 float4 _LandscapePartVariants;
 
-// Where Holes split off. Hole Depth is metres below the tile base, and Softness is how wide the
-// blend is as a fraction of it.
+// Where Holes split off. Hole Depth is metres below the tile base (negative is above it), and
+// Softness is how wide the blend is as a fraction of it.
 float  _LandscapeHoleDepth;
 float  _LandscapeSoftness;
 
@@ -45,10 +46,10 @@ float  _LandscapeNoiseSoftness;
 // designer's landscape World Y + Height Offset, not tuned.
 float  _LandscapeBaseY;
 
-// The light. The position is the world's, shared with the river runs; the strength is the
-// landscape's own.
+// The light — the scene's LevelSelectLight object, shared with the river runs: where it stands
+// and how strong it is.
 float4 _LevelSelectLightPosition;
-float  _LandscapeLightStrength;
+float  _LevelSelectLightStrength;
 
 // Which way the noise leans in the cell at p — arithmetic rather than a sine, so every machine
 // agrees where the grain is.
@@ -103,23 +104,24 @@ float LandscapeSplit(float value, float threshold)
     return smoothstep(threshold - band, threshold + band, value);
 }
 
-// How much of a pixel one part hands to each of the three variants — all of its weight to the one
-// it wears, nothing to the other two. Parts are added up this way before any colour is worked out,
+// How much of a pixel one part hands to each of the four variants — all of its weight to the one
+// it wears, nothing to the others. Parts are added up this way before any colour is worked out,
 // so a variant's grain costs the same whether one part wears it or all three do.
-float3 LandscapeShare(float variant, float weight)
+float4 LandscapeShare(float variant, float weight)
 {
     int v = (int)(variant + 0.5);
-    return float3(v == 0 ? weight : 0.0, v == 1 ? weight : 0.0, v == 2 ? weight : 0.0);
+    return float4(v == 0 ? weight : 0.0, v == 1 ? weight : 0.0,
+                  v == 2 ? weight : 0.0, v == 3 ? weight : 0.0);
 }
 
-// The grained colour of variant 0 (A), 1 (B) or 2 (C).
+// The grained colour of variant 0 (A), 1 (B), 2 (C) or 3 (D).
 float3 LandscapeVariant(float variant, float3 worldPos, float3 n)
 {
     int v = (int)(variant + 0.5);
 
-    float4 colour   = v == 1 ? _LandscapeColourB : v == 2 ? _LandscapeColourC : _LandscapeColourA;
-    float  size     = v == 1 ? _LandscapeGrainSizes.y     : v == 2 ? _LandscapeGrainSizes.z     : _LandscapeGrainSizes.x;
-    float  strength = v == 1 ? _LandscapeGrainStrengths.y : v == 2 ? _LandscapeGrainStrengths.z : _LandscapeGrainStrengths.x;
+    float4 colour   = v == 1 ? _LandscapeColourB : v == 2 ? _LandscapeColourC : v == 3 ? _LandscapeColourD : _LandscapeColourA;
+    float  size     = v == 1 ? _LandscapeGrainSizes.y     : v == 2 ? _LandscapeGrainSizes.z     : v == 3 ? _LandscapeGrainSizes.w     : _LandscapeGrainSizes.x;
+    float  strength = v == 1 ? _LandscapeGrainStrengths.y : v == 2 ? _LandscapeGrainStrengths.z : v == 3 ? _LandscapeGrainStrengths.w : _LandscapeGrainStrengths.x;
 
     return colour.rgb * LandscapeGrain(worldPos, n, size, strength);
 }
@@ -142,8 +144,8 @@ float LandscapeLight(float3 n, float3 worldPos)
     toLight = dot(toLight, toLight) > 1e-8 ? normalize(toLight) : float3(0.0, 1.0, 0.0);
 
     float ndl = dot(n, toLight) * 0.5 + 0.5;
-    return lerp(1.0, saturate(ndl), saturate(_LandscapeLightStrength))
-         * max(_LandscapeLightStrength, 1.0);
+    return lerp(1.0, saturate(ndl), saturate(_LevelSelectLightStrength))
+         * max(_LevelSelectLightStrength, 1.0);
 }
 
 // Normal : the smooth hill normal, from CalculateHills' Normal output. The mesh's own normal is
@@ -168,13 +170,14 @@ void LandscapeShading_float(float3 Normal, float3 WorldPos, float2 Noise, out fl
     float wUp   = (1.0 - hole) * up;
     float wDown = (1.0 - hole) * (1.0 - up);
 
-    float3 share = LandscapeShare(_LandscapePartVariants.x, wHole)
+    float4 share = LandscapeShare(_LandscapePartVariants.x, wHole)
                  + LandscapeShare(_LandscapePartVariants.y, wUp)
                  + LandscapeShare(_LandscapePartVariants.z, wDown);
 
     float3 stone = LandscapeVariant(0.0, WorldPos, n) * share.x
                  + LandscapeVariant(1.0, WorldPos, n) * share.y
-                 + LandscapeVariant(2.0, WorldPos, n) * share.z;
+                 + LandscapeVariant(2.0, WorldPos, n) * share.z
+                 + LandscapeVariant(3.0, WorldPos, n) * share.w;
 
     Colour = stone * LandscapeLight(n, WorldPos);
 }

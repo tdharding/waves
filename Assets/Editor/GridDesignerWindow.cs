@@ -593,7 +593,7 @@ public class GridDesignerWindow : EditorWindow
     }
     public static string[] LevelSortOptionLabels => LevelSortLabels;
 
-    [MenuItem("Tools/Waves/Grid Designer #4")]
+    [MenuItem("Tools/Level Design/Grid Designer #4", false, 100)]
     static void Open() => GetWindow<GridDesignerWindow>("Grid Designer");
 
     void OnEnable()
@@ -10192,7 +10192,7 @@ public class GridDesignerWindow : EditorWindow
                                     "sets how big the rock is, the preset sets what shape it is. " +
                                     "Climbable fits the creepy guy's rings to that shape at spawn.", MessageType.None);
             if (GUILayout.Button("Spike\nStudio…", GUILayout.Width(64), GUILayout.Height(38)))
-                EditorApplication.ExecuteMenuItem("Tools/Waves/Spike Studio");
+                EditorApplication.ExecuteMenuItem("Tools/Studios/Spike Studio");
         }
 
         EnsureSpikePresetsCache();

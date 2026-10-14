@@ -1,0 +1,158 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f44cd2d0e385f404abfa3e649b725329, type: 3}
+  m_Name: LevelSelectWorld2_ObserverManNPC
+  m_EditorClassIdentifier: Assembly-CSharp::NPCTravelPath
+  points:
+  - {x: 65.37831, y: 17.6, z: 31.574118}
+  - {x: 65.218254, y: 17.6, z: 30.846277}
+  - {x: 64.64096, y: 17.6, z: 30.323298}
+  - {x: 64.62952, y: 17.6, z: 29.5315}
+  - {x: 62.92299, y: 17, z: 29.501812}
+  - {x: 62.809082, y: 16.999928, z: 28.692709}
+  - {x: 65.120476, y: 17, z: 28.51878}
+  - {x: 65.13429, y: 17, z: 29.343178}
+  - {x: 66.16949, y: 17, z: 29.373928}
+  - {x: 66.15161, y: 17.9, z: 27.645664}
+  - {x: 65.871574, y: 17.9, z: 26.580116}
+  - {x: 66.13592, y: 17.9, z: 25.50831}
+  - {x: 66.11689, y: 17, z: 24.143734}
+  - {x: 66.142494, y: 17, z: 23.784285}
+  - {x: 63.88628, y: 18.6, z: 23.83541}
+  - {x: 63.794994, y: 18.6, z: 21.953163}
+  - {x: 65.43055, y: 18.6, z: 21.854872}
+  - {x: 65.456154, y: 18.6, z: 22.826204}
+  walk: 1
+  ground:
+  - ground: []
+  - ground: []
+  - ground: []
+  - ground:
+    - {x: 64.35427, y: 17.6, z: 29.526712}
+    - {x: 64.29922, y: 17.584166, z: 29.525753}
+    - {x: 63.308334, y: 17.023254, z: 29.508516}
+    - {x: 63.253284, y: 17, z: 29.507559}
+  - ground: []
+  - ground: []
+  - ground: []
+  - ground: []
+  - ground:
+    - {x: 66.16624, y: 17, z: 29.059698}
+    - {x: 66.165695, y: 17.022957, z: 29.007326}
+    - {x: 66.15757, y: 17.85469, z: 28.221752}
+    - {x: 66.15703, y: 17.9, z: 28.16938}
+  - ground: []
+  - ground: []
+  - ground:
+    - {x: 66.13184, y: 17.9, z: 25.2159}
+    - {x: 66.131165, y: 17.887684, z: 25.167166}
+    - {x: 66.119606, y: 17.010523, z: 24.338673}
+    - {x: 66.11893, y: 17, z: 24.289938}
+  - ground: []
+  - ground:
+    - {x: 65.51843, y: 17, z: 23.798426}
+    - {x: 65.47043, y: 17.011257, z: 23.799513}
+    - {x: 64.0783, y: 18.6, z: 23.831059}
+  - ground: []
+  - ground: []
+  - ground: []
+  - ground:
+    - {x: 65.45403, y: 18.6, z: 23.064243}
+    - {x: 65.45351, y: -3.6120205, z: 23.123753}
+    - {x: 65.45192, y: -3.5995808, z: 23.30228}
+    - {x: 65.4498, y: -3.5659542, z: 23.54032}
+    - {x: 65.44927, y: 17.036354, z: 23.599829}
+    - {x: 65.44503, y: 17.039013, z: 24.075907}
+    - {x: 65.4445, y: 17, z: 24.135416}
+    - {x: 65.4355, y: 17, z: 25.14708}
+    - {x: 65.434975, y: 16.953442, z: 25.206589}
+    - {x: 65.43233, y: 16.520002, z: 25.504137}
+    - {x: 65.411674, y: 16.520002, z: 27.825012}
+    - {x: 65.41114, y: 16.566576, z: 27.884521}
+    - {x: 65.40849, y: 17, z: 28.18207}
+    - {x: 65.394196, y: 17, z: 29.78883}
+    - {x: 65.39367, y: 17.82, z: 29.84834}
+    - {x: 65.39049, y: 17.82, z: 30.205397}
+    - {x: 65.38996, y: 17.6, z: 30.264906}
+  pauses:
+  - pause: 1
+    seconds: 5
+    face: 1
+    faceAngle: 95
+  - pause: 0
+    seconds: 0
+    face: 0
+    faceAngle: 0
+  - pause: 0
+    seconds: 0
+    face: 0
+    faceAngle: 0
+  - pause: 0
+    seconds: 0
+    face: 0
+    faceAngle: 0
+  - pause: 0
+    seconds: 0
+    face: 0
+    faceAngle: 0
+  - pause: 0
+    seconds: 0
+    face: 0
+    faceAngle: 0
+  - pause: 0
+    seconds: 0
+    face: 0
+    faceAngle: 0
+  - pause: 0
+    seconds: 0
+    face: 0
+    faceAngle: 0
+  - pause: 0
+    seconds: 0
+    face: 0
+    faceAngle: 0
+  - pause: 0
+    seconds: 0
+    face: 0
+    faceAngle: 0
+  - pause: 1
+    seconds: 10
+    face: 1
+    faceAngle: 278
+  - pause: 0
+    seconds: 0
+    face: 0
+    faceAngle: 0
+  - pause: 0
+    seconds: 0
+    face: 0
+    faceAngle: 0
+  - pause: 0
+    seconds: 0
+    face: 0
+    faceAngle: 0
+  - pause: 1
+    seconds: 5
+    face: 1
+    faceAngle: 0
+  - pause: 0
+    seconds: 0
+    face: 0
+    faceAngle: 0
+  - pause: 0
+    seconds: 0
+    face: 0
+    faceAngle: 0
+  - pause: 1
+    seconds: 5
+    face: 0
+    faceAngle: 0

@@ -6,8 +6,6 @@ using UnityEditor.SceneManagement;
 using UnityEditor.UIElements;
 using UnityEditorInternal;
 using UnityEngine;
-using UnityEngine.Rendering;
-using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
 using UnityEngine.UIElements;
 
@@ -24,14 +22,13 @@ public class CinemachineViewWindow : EditorWindow
     const string WatchedIdKey = "Waves.CinemachineView.WatchedId";
     const string SplitKey     = "Waves.CinemachineView.Split";
     const string ViewMoveKey  = "Waves.CinemachineView.ViewMove";
-    const int    MaxTargetSize = 4096;
     const float  PanelStartWidth = 320f;
 
     [SerializeField] CinemachineVirtualCameraBase watched;
 
-    Camera        previewCam;
-    RenderTexture target;
-    GUIStyle      messageStyle;
+    CinemachinePreviewRig rig;
+    RenderTexture         target;
+    GUIStyle              messageStyle;
 
     // The view is drawn in IMGUI, the panel in UI Toolkit: Cinemachine's own editors are UI Toolkit
     // editors, and drawn through IMGUI they fall back to bare default fields.
@@ -43,16 +40,19 @@ public class CinemachineViewWindow : EditorWindow
     readonly List<Component>     panelComponents = new();
     readonly List<FloatField>    viewMoveFields  = new();
 
-    // The renderer index lives in a serialized field with no public getter, so it costs a
-    // SerializedObject to read. Cached against the camera it was read from.
-    int cachedRendererIndex = -1;
-    UniversalAdditionalCameraData cachedRendererSource;
-
-    [MenuItem("Tools/Waves/Cinemachine View")]
+    [MenuItem("Tools/Camera/Cinemachine View", false, 701)]
     static void Open()
     {
         var window = GetWindow<CinemachineViewWindow>("Cm View");
         window.minSize = new Vector2(180f, 140f);
+    }
+
+    // Opens the window (or brings it forward) watching the given camera.
+    public static void Watch(CinemachineVirtualCameraBase cam)
+    {
+        var window = GetWindow<CinemachineViewWindow>("Cm View");
+        window.minSize = new Vector2(180f, 140f);
+        window.SetWatched(cam);
     }
 
     void OnEnable()
@@ -199,6 +199,12 @@ public class CinemachineViewWindow : EditorWindow
             var picked = (CinemachineVirtualCameraBase)EditorGUILayout.ObjectField(
                 watched, typeof(CinemachineVirtualCameraBase), true, GUILayout.MinWidth(80f));
             if (EditorGUI.EndChangeCheck()) SetWatched(picked);
+
+            var sequence = CameraSequenceFogPreview.SequenceFor(watched);
+            if (sequence != null)
+                GUILayout.Label(new GUIContent($"Fog: {sequence.name} ({CameraSequenceFogPreview.CentreFor(sequence, watched)})",
+                    "This camera is a shot in that Camera Sequence, so the view wears its Override Fog."),
+                    EditorStyles.miniLabel, GUILayout.ExpandWidth(false));
         }
     }
 
@@ -355,178 +361,24 @@ public class CinemachineViewWindow : EditorWindow
     {
         if (view.width < 4f || view.height < 4f) return false;
 
-        // Scaled displays draw more pixels than points, so the texture is sized in pixels or the
-        // view comes out soft.
-        float perPoint = Mathf.Max(1f, EditorGUIUtility.pixelsPerPoint);
-        int width  = Mathf.Clamp(Mathf.RoundToInt(view.width  * perPoint), 4, MaxTargetSize);
-        int height = Mathf.Clamp(Mathf.RoundToInt(view.height * perPoint), 4, MaxTargetSize);
+        CinemachinePreviewRig.EnsureTarget(ref target, view, "Cinemachine View Target");
+        rig ??= new CinemachinePreviewRig();
 
-        EnsureTarget(width, height);
-        EnsureRig();
-        if (previewCam == null || target == null) return false;
-
-        CopySettingsFrom(SourceCamera());
-        bool isolated = PlaceRigForWatched();
-        ApplyWatchedState(isolated);
-
-        previewCam.targetTexture = target;
-        previewCam.aspect        = (float)width / height;
-
-        var request = new UniversalRenderPipeline.SingleCameraRequest { destination = target };
-        if (RenderPipeline.SupportsRenderRequest(previewCam, request))
-            RenderPipeline.SubmitRenderRequest(previewCam, request);
-        else
-            previewCam.Render();
-
-        return true;
-    }
-
-    void EnsureTarget(int width, int height)
-    {
-        if (target != null && target.width == width && target.height == height) return;
-
-        ReleaseTarget();
-
-        var readWrite = QualitySettings.activeColorSpace == ColorSpace.Linear
-            ? RenderTextureReadWrite.sRGB
-            : RenderTextureReadWrite.Default;
-
-        target = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32, readWrite)
+        // A Camera Sequence shot camera shows that sequence's fog, when it overrides the world's.
+        var sequence = CameraSequenceFogPreview.SequenceFor(watched);
+        var saved    = default(CameraSequenceFogPreview.Saved);
+        try
         {
-            name         = "Cinemachine View Target",
-            hideFlags    = HideFlags.HideAndDontSave,
-            antiAliasing = 1
-        };
-        target.Create();
-    }
-
-    // The hidden camera is disabled on purpose: it must never join the game's rendering, only render
-    // when this window asks it to. It is rebuilt whenever a scene load takes it away.
-    void EnsureRig()
-    {
-        if (previewCam != null) return;
-
-        var go = EditorUtility.CreateGameObjectWithHideFlags(
-            "Cinemachine View Preview Camera", HideFlags.HideAndDontSave, typeof(Camera));
-
-        previewCam            = go.GetComponent<Camera>();
-        previewCam.enabled    = false;
-        previewCam.cameraType = CameraType.Game;
-        previewCam.GetUniversalAdditionalCameraData().renderType = CameraRenderType.Base;
-    }
-
-    // Prefab Mode keeps the open prefab in a preview scene of its own, which cameras in the open level
-    // cannot see - left there, the rig would frame the LEVEL from the prefab camera's position, which
-    // is exactly the wrong picture. Moving it into that scene and pointing it at that scene (the same
-    // pair of steps Unity's own PreviewRenderUtility takes) is what makes it render the prefab.
-    // Returns true when the watched camera lives in such a scene.
-    bool PlaceRigForWatched()
-    {
-        var stage = PrefabStageUtility.GetPrefabStage(watched.gameObject);
-        var scene = stage != null ? stage.scene : watched.gameObject.scene;
-        bool isolated = scene.IsValid() && EditorSceneManager.IsPreviewScene(scene);
-
-        if (scene.IsValid() && previewCam.gameObject.scene != scene)
-            SceneManager.MoveGameObjectToScene(previewCam.gameObject, scene);
-
-        previewCam.scene = isolated ? scene : default;
-        return isolated;
-    }
-
-    Camera SourceCamera()
-    {
-        if (watched != null)
-        {
-            var brain = CinemachineCore.FindPotentialTargetBrain(watched);
-            if (brain != null && brain.OutputCamera != null) return brain.OutputCamera;
+            return rig.Render(watched, target, previewCam =>
+            {
+                if (sequence != null) saved = CameraSequenceFogPreview.Wear(sequence, watched, previewCam);
+            });
         }
-        return Camera.main;
-    }
-
-    // Matching the game camera's own settings is what makes this a preview of the game rather than of
-    // a bare camera - same layers, same clear, same post stack and renderer.
-    void CopySettingsFrom(Camera source)
-    {
-        if (source == null) return;
-
-        previewCam.clearFlags          = source.clearFlags;
-        previewCam.backgroundColor     = source.backgroundColor;
-        previewCam.cullingMask         = source.cullingMask;
-        previewCam.useOcclusionCulling = source.useOcclusionCulling;
-        previewCam.allowHDR            = source.allowHDR;
-        previewCam.allowMSAA           = source.allowMSAA;
-        previewCam.depthTextureMode    = source.depthTextureMode;
-
-        if (!source.TryGetComponent(out UniversalAdditionalCameraData sourceData)) return;
-
-        var data = previewCam.GetUniversalAdditionalCameraData();
-        data.renderType           = CameraRenderType.Base;
-        data.renderShadows        = sourceData.renderShadows;
-        data.renderPostProcessing = sourceData.renderPostProcessing;
-        data.antialiasing         = sourceData.antialiasing;
-        data.antialiasingQuality  = sourceData.antialiasingQuality;
-        data.volumeLayerMask      = sourceData.volumeLayerMask;
-        data.volumeTrigger        = sourceData.volumeTrigger;
-        data.requiresDepthTexture = sourceData.requiresDepthTexture;
-        data.requiresColorTexture = sourceData.requiresColorTexture;
-        data.SetRenderer(RendererIndexOf(sourceData));
-    }
-
-    int RendererIndexOf(UniversalAdditionalCameraData data)
-    {
-        if (ReferenceEquals(data, cachedRendererSource)) return cachedRendererIndex;
-
-        var property = new SerializedObject(data).FindProperty("m_RendererIndex");
-        cachedRendererIndex  = property != null ? property.intValue : -1;
-        cachedRendererSource = data;
-        return cachedRendererIndex;
-    }
-
-    void ApplyWatchedState(bool isolated)
-    {
-        // An enabled vcam has its state refreshed every frame by the brain, in edit mode as well as
-        // play mode. A disabled one never updates - and neither does one in a prefab stage, where
-        // there is no brain to drive it - so in both cases the transform is the only truth left.
-        bool live  = watched.isActiveAndEnabled && !isolated;
-        var  state = watched.State;
-
-        var position = live ? state.GetFinalPosition()    : watched.transform.position;
-        var rotation = live ? state.GetFinalOrientation() : watched.transform.rotation;
-        previewCam.transform.SetPositionAndRotation(position, rotation);
-
-        var lens = live ? state.Lens : LensOf(watched);
-        if (lens.FieldOfView <= 0.01f) lens = LensSettings.Default;
-
-        previewCam.orthographic          = lens.Orthographic;
-        previewCam.nearClipPlane         = Mathf.Max(0.001f, lens.NearClipPlane);
-        previewCam.farClipPlane          = Mathf.Max(previewCam.nearClipPlane + 0.01f, lens.FarClipPlane);
-        previewCam.orthographicSize      = Mathf.Max(0.001f, lens.OrthographicSize);
-        previewCam.usePhysicalProperties = lens.IsPhysicalCamera;
-
-        if (lens.IsPhysicalCamera)
+        finally
         {
-            var physical = lens.PhysicalProperties;
-            previewCam.sensorSize     = physical.SensorSize;
-            previewCam.gateFit        = physical.GateFit;
-            previewCam.focalLength    = Camera.FieldOfViewToFocalLength(lens.FieldOfView, physical.SensorSize.y);
-            previewCam.lensShift      = physical.LensShift;
-            previewCam.focusDistance  = physical.FocusDistance;
-            previewCam.iso            = physical.Iso;
-            previewCam.shutterSpeed   = physical.ShutterSpeed;
-            previewCam.aperture       = physical.Aperture;
-            previewCam.bladeCount     = physical.BladeCount;
-            previewCam.curvature      = physical.Curvature;
-            previewCam.barrelClipping = physical.BarrelClipping;
-            previewCam.anamorphism    = physical.Anamorphism;
-        }
-        else
-        {
-            previewCam.fieldOfView = Mathf.Clamp(lens.FieldOfView, 1f, 179f);
+            CameraSequenceFogPreview.Restore(saved);
         }
     }
-
-    static LensSettings LensOf(CinemachineVirtualCameraBase cam)
-        => cam is CinemachineCamera cinemachineCamera ? cinemachineCamera.Lens : LensSettings.Default;
 
     // -------------------------------------------------------------------------
     // Teardown
@@ -534,25 +386,8 @@ public class CinemachineViewWindow : EditorWindow
 
     void ReleaseRig()
     {
-        if (previewCam != null)
-        {
-            previewCam.targetTexture = null;
-            DestroyImmediate(previewCam.gameObject);
-            previewCam = null;
-        }
-
-        cachedRendererSource = null;
-        cachedRendererIndex  = -1;
-
-        ReleaseTarget();
-    }
-
-    void ReleaseTarget()
-    {
-        if (target == null) return;
-
-        target.Release();
-        DestroyImmediate(target);
-        target = null;
+        rig?.Dispose();
+        rig = null;
+        CinemachinePreviewRig.ReleaseTarget(ref target);
     }
 }

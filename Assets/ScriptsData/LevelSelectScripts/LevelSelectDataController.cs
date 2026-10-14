@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
-using UnityEngine.Splines;
 
 [DefaultExecutionOrder(-50)]
 public class LevelSelectDataController : MonoBehaviour
@@ -66,9 +65,8 @@ public class LevelSelectDataController : MonoBehaviour
     void Start()
     {
         RestoreBoatPosition();
-        WireCameraFollowTarget();   // after RestoreBoatPosition so camera locks on to the correct spline position
+        WireCameraFollowTarget();   // after RestoreBoatPosition so the camera locks on where the boat now is
         ApplyWorldFog();            // also after RestoreBoatPosition — the first fill lands around the boat
-        NotifyExitIfReturningFromLevel();
     }
 
     /// <summary>
@@ -140,10 +138,10 @@ public class LevelSelectDataController : MonoBehaviour
     /// <summary>
     /// Puts the boat back where the player left it.
     ///
-    /// Three answers, in order. Where the boat actually got to, if it has been anywhere. Then
-    /// the river and distance a door names, which is how coming out of a level places it —
-    /// and which clears the pose when it is written, so it wins on that trip. Then the head of
-    /// the main river, for a save that has never seen the map.
+    /// Three answers, in order. The door it has just come out of a level by, if that is the
+    /// last thing written: out in front of that door, facing away from it. Then where the boat
+    /// actually got to, if it has been anywhere. Then the start — the hand-set start node, or
+    /// the head of the main river — for a save that has never seen the map.
     /// </summary>
     void RestoreBoatPosition()
     {
@@ -153,6 +151,25 @@ public class LevelSelectDataController : MonoBehaviour
             return;
         }
 
+#if UNITY_EDITOR
+        if (TryPlaceAtPlaytestPosition()) return;
+#endif
+
+        if (GameProgressData.TryGetBoatDoor(out string doorLevelID, out int doorIndex))
+        {
+            if (LevelSelectArenaController.TryFindBoatExit(doorLevelID, doorIndex,
+                                                           out Vector3 exitPos, out Quaternion exitRot))
+            {
+                boatControl.PlaceAt(exitPos, exitRot);
+                Debug.Log($"LevelSelectDataController: Boat put out at door {doorIndex} of " +
+                          $"'{doorLevelID}', {exitPos}.");
+                return;
+            }
+            Debug.LogWarning($"LevelSelectDataController: No door {doorIndex} of '{doorLevelID}' " +
+                             "with a boat exit in this scene (Generate in the Level Select Designer " +
+                             "writes them) — falling back to where the boat went in.");
+        }
+
         if (GameProgressData.TryGetBoatPose(out Vector3 pose, out float heading))
         {
             boatControl.PlaceAt(pose, Quaternion.Euler(0f, heading, 0f));
@@ -160,42 +177,53 @@ public class LevelSelectDataController : MonoBehaviour
             return;
         }
 
-        string savedSegmentID = GameProgressData.GetBoatSegmentID();
-        float  savedProgress  = GameProgressData.GetBoatProgress(0f);
-
-        if (!string.IsNullOrEmpty(savedSegmentID))
-        {
-            if (boatControl.PlaceOnSegment(savedSegmentID, savedProgress))
-            {
-                Debug.Log($"LevelSelectDataController: Boat placed on '{savedSegmentID}' at {savedProgress}.");
-                return;
-            }
-            Debug.LogWarning($"LevelSelectDataController: Segment '{savedSegmentID}' not in the registry — falling back to the main river.");
-        }
-
         // A main river that begins in a pool never has its head on the water the pool holds:
-        // the run is cut off outside that pool's rim, so the head of its curve stands out on
-        // the river with the pool still ahead of it. The designer knows where the pool is, so
+        // the run is cut off outside that pool's rim. The designer knows where the pool is, so
         // a boat that has never been anywhere is put straight on it.
         if (designerData != null &&
             designerData.TryGetBoatStart(out Vector3 startPos, out Vector3 startForward,
-                                         out bool startInPool) &&
-            (startInPool || designerData.HasBoatStartNode))
+                                         out bool startInPool))
         {
             boatControl.PlaceAt(startPos, Quaternion.LookRotation(startForward, Vector3.up));
-            Debug.Log($"LevelSelectDataController: Nothing saved — boat placed at the start " +
-                      $"node '{designerData.boatStartNodeId}' (in pool: {startInPool}), {startPos}.");
+            Debug.Log($"LevelSelectDataController: Nothing saved — boat placed at its start " +
+                      $"(set node: {designerData.HasBoatStartNode}, in pool: {startInPool}), {startPos}.");
             return;
         }
 
-        if (boatControl.PlaceOnSegment("MainRiver", 0f))
-        {
-            Debug.Log("LevelSelectDataController: Nothing saved — boat placed at the head of MainRiver.");
-            return;
-        }
-
-        Debug.LogWarning("LevelSelectDataController: No saved place and no MainRiver — boat stays where the scene put it.");
+        Debug.LogWarning("LevelSelectDataController: No saved place and no start node or main river — boat stays where the scene put it.");
     }
+
+#if UNITY_EDITOR
+    /// <summary>
+    /// Set by the Level Select Designer's "Play From Playtest Position" just before it enters play
+    /// mode: the node the boat starts on this once, ahead of anything the save says.
+    /// </summary>
+    public const string PlaytestBoatNodeKey = "LevelSelectDesigner_PlaytestBoatNode";
+
+    /// <summary>
+    /// The designer's playtest start, read once and forgotten — so coming back out of a level in
+    /// the same play puts the boat where the save says, as usual. The save itself is not touched.
+    /// </summary>
+    bool TryPlaceAtPlaytestPosition()
+    {
+        string nodeId = UnityEditor.SessionState.GetString(PlaytestBoatNodeKey, "");
+        if (string.IsNullOrEmpty(nodeId)) return false;
+        UnityEditor.SessionState.EraseString(PlaytestBoatNodeKey);
+
+        if (designerData == null ||
+            !designerData.TryGetBoatPoseAtNode(nodeId, out Vector3 pos, out Vector3 forward, out bool inPool))
+        {
+            Debug.LogWarning($"LevelSelectDataController: Playtest node '{nodeId}' is not on a river " +
+                             "in this world's designer data — starting from the save instead.");
+            return false;
+        }
+
+        boatControl.PlaceAt(pos, Quaternion.LookRotation(forward, Vector3.up));
+        Debug.Log($"LevelSelectDataController: Playtest — boat placed at node '{nodeId}' " +
+                  $"(in pool: {inPool}), {pos}.");
+        return true;
+    }
+#endif
 
     void ResetTime()
     {
@@ -228,19 +256,6 @@ public class LevelSelectDataController : MonoBehaviour
 #else
         es.AddComponent<StandaloneInputModule>();
 #endif
-    }
-
-    void NotifyExitIfReturningFromLevel()
-    {
-        string levelID     = LevelSelectionCache.JustExitedLevelID;
-        int    portalIndex = LevelSelectionCache.JustExitedEntranceIndex;
-        Debug.Log($"[LevelSelectDataController] JustExitedLevelID='{levelID}'  portalIndex={portalIndex}  SplineRiverManager={(SplineRiverManager.Instance != null ? "found" : "NULL")}");
-
-        if (string.IsNullOrEmpty(levelID)) return;
-
-        SplineRiverManager.Instance?.NotifyLevelExited(levelID, portalIndex);
-        LevelSelectionCache.JustExitedLevelID       = string.Empty;
-        LevelSelectionCache.JustExitedEntranceIndex = -1;
     }
 
     void WireSoulFishDisplay()

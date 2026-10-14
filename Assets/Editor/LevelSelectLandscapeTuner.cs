@@ -13,7 +13,7 @@ using UnityEngine;
 /// </summary>
 public class LevelSelectLandscapeTuner : EditorWindow
 {
-    [MenuItem("Tools/Waves/Level Select Landscape Tuner")]
+    [MenuItem("Tools/Tuners/Level Select Landscape Tuner", false, 221)]
     public static void Open() =>
         GetWindow<LevelSelectLandscapeTuner>("Level Select Landscape");
 
@@ -106,16 +106,19 @@ public class LevelSelectLandscapeTuner : EditorWindow
         EditorGUILayout.Space();
         _scroll = EditorGUILayout.BeginScrollView(_scroll);
 
+        DrawMaterials();
+
+        EditorGUILayout.Space();
         EditorGUILayout.LabelField("Landscape Shading", EditorStyles.boldLabel);
         EditorGUILayout.LabelField(
-            "Three stone variants, each a colour with its own grain, and three parts of the " +
+            "Four stone variants, each a colour with its own grain, and three parts of the " +
             "landscape that each wear one. Holes are everything below Hole Depth off the tile " +
             "base; all the rest is NoiseUp or NoiseDown, whichever way the rocky noise leans " +
             "there. Ground flat enough to lean neither way sits on the NoiseDown side, or " +
             "halfway between the two once Noise Softness is up off zero. Hills with no noise " +
             "on them are one flat colour — the noise is the only thing marking the land now. " +
-            "All live — nothing to rebuild. The light's position is in the Level Select " +
-            "Designer's Aesthetics, shared with the river runs.",
+            "All live — nothing to rebuild. The light is in the Light (shared) foldout below, " +
+            "shared with the river runs.",
             EditorStyles.wordWrappedMiniLabel);
 
         EditorGUI.BeginChangeCheck();
@@ -126,7 +129,11 @@ public class LevelSelectLandscapeTuner : EditorWindow
         field.NextVisible(true);
         while (!SerializedProperty.EqualContents(field, end))
         {
-            EditorGUILayout.PropertyField(field, true);
+            // "Softness" alone reads as shared; it is the Holes blend only (Noise has its own).
+            if (field.name == "softness")
+                EditorGUILayout.PropertyField(field, new GUIContent("Hole Softness", field.tooltip), true);
+            else
+                EditorGUILayout.PropertyField(field, true);
             if (!field.NextVisible(false)) break;
         }
 
@@ -137,10 +144,29 @@ public class LevelSelectLandscapeTuner : EditorWindow
         }
 
         EditorGUILayout.Space();
+        LightTunerSection.Draw();
+
+        EditorGUILayout.Space();
         WhiteFadeTunerSection.Draw();
 
         EditorGUILayout.EndScrollView();
         _window.ApplyModifiedProperties();
+    }
+
+    private const string DefaultSpikeMatPath =
+        "Assets/TextureMatShader/LevelSelectMaterials/LevelSelectSpikeMat.mat";
+
+    /// <summary>The landscape's material and the spikes' — both shaded by this window.</summary>
+    private static void DrawMaterials()
+    {
+        var data  = TunerMaterialLinks.WorldData();
+        var spike = data != null && data.spikeMaterial != null
+                  ? data.spikeMaterial
+                  : AssetDatabase.LoadAssetAtPath<Material>(DefaultSpikeMatPath);
+
+        TunerMaterialLinks.Draw("LevelSelectLandscapeTuner_MaterialsOpen",
+            new[] { "Landscape", "Spikes" },
+            new[] { TunerMaterialLinks.LandscapeMaterial(), spike });
     }
 
     private void DrawPresetRow()
@@ -214,7 +240,8 @@ public class LevelSelectLandscapeTuner : EditorWindow
         if (!EditorUtility.DisplayDialog(
                 "Save Landscape Shading",
                 $"Overwrite the landscape shading on '{activePreset.name}' with the current " +
-                "tuner values?",
+                "tuner values?\n\n" +
+                TunerSaveChanges.Describe(activePreset, p => p.landscapeShading.CopyFrom(landscapeShading)),
                 "Save", "Cancel"))
             return;
 

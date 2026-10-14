@@ -16,8 +16,10 @@ MonoBehaviour:
     stemRadius: 1.4
     stemHeight: 4
     orbRadius: 3
-    baseRadius: 1
+    baseRadius: 1.4
     baseHeight: 0
+    lowerRampHeight: 1.76
+    lowerRampRadius: 2.93
     rampHeight: 0
     base2Radius: 1
     base2Height: 0

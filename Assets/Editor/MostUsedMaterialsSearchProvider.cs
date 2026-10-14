@@ -71,7 +71,7 @@ static class MostUsedMaterialsSearchProvider
         return AssetPreview.GetAssetPreview(material) ?? AssetDatabase.GetCachedIcon(path) as Texture2D;
     }
 
-    [MenuItem("Tools/Most Used Materials/Rescan")]
+    [MenuItem("Tools/Scene and Assets/Rescan Most Used Materials", false, 1021)]
     static void Rescan()
     {
         useCounts = new Dictionary<string, int>();

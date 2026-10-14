@@ -1,0 +1,56 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 331b298af9e9e5e41a7750abff499d6a, type: 3}
+  m_Name: Outpost1
+  m_EditorClassIdentifier: Assembly-CSharp::InstallationOutpostPreset
+  width: 3.24
+  depth: 2.54
+  height: 1.6
+  wallThickness: 0.44
+  wallHeight: 0.6
+  tower:
+    stemRadius: 0.32
+    stemHeight: 1.34
+    orbRadius: 0.5
+    baseRadius: 0.62
+    baseHeight: 1.11
+    lowerRampHeight: 0.33
+    lowerRampRadius: 1
+    rampHeight: 0.56
+    base2Radius: 0.29
+    base2Height: 0.17
+  towerOffset: {x: 0.62, y: 0}
+  towerKind: 0
+  turret:
+    body:
+      stemRadius: 0.02
+      stemHeight: 0.35
+      orbRadius: 0.1
+      baseRadius: 0.05
+      baseHeight: 0.03
+      lowerRampHeight: 0
+      lowerRampRadius: 0.08
+      rampHeight: 0
+      base2Radius: 0.03
+      base2Height: 0
+    noseLength: 0.12
+    noseOuterRadius: 0.03
+    noseInnerRadius: 0.018
+    restPitch: 20
+  columnDownstream: 0
+  towerOnDownstream: 1
+  columnUpstream: 1
+  towerOnUpstream: 1
+  columnHeight: 0.96
+  columnRadius: 0.45
+  towerPreset: {fileID: 11400000, guid: a370b7f97b3af794f857163502ab0e74, type: 2}
+  turretPreset: {fileID: 0}

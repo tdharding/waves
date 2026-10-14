@@ -25,6 +25,20 @@ public partial class LevelSelectDesignerWindow
 {
     private string _selectedRouteId;
 
+    // The point new canvas clicks go in after, on _insertRouteId's route — set by a row's + and
+    // moved on one with every click, so points go in in the order clicked. -1 = clicks append.
+    private int    _insertAfterPoint = -1;
+    private string _insertRouteId;
+
+    // Routes Enter has stopped: canvas clicks add no points to them until Continue Route (or a
+    // row's +) is pressed. Editor-session only.
+    private readonly HashSet<string> _stoppedRouteIds = new HashSet<string>();
+
+    // The route whose band is being drawn out on the canvas as it will be in game, and when that
+    // started. Null = no preview running.
+    private string _previewRouteId;
+    private double _previewStartTime;
+
     // ─────────────────────────────────────────────
     // PANEL
     // ─────────────────────────────────────────────
@@ -42,6 +56,7 @@ public partial class LevelSelectDesignerWindow
                 displayName = "Route " + (_data.soulRoutes.Count + 1)
             };
             _data.soulRoutes.Add(route);
+            ClearSelectionForSouls();
             _selectedRouteId = route.routeId;
             MarkDirty();
         }
@@ -58,6 +73,7 @@ public partial class LevelSelectDesignerWindow
             if (GUILayout.Button($"{route.displayName}  ({route.points.Count} points)",
                                  EditorStyles.miniButton))
             {
+                ClearSelectionForSouls();
                 _selectedRouteId = selected ? null : route.routeId;
             }
             GUI.backgroundColor = bg;
@@ -84,16 +100,35 @@ public partial class LevelSelectDesignerWindow
         route.displayName  = EditorGUILayout.TextField("Name", route.displayName);
         route.editorColor  = EditorGUILayout.ColorField("Colour", route.editorColor);
         route.bandWidth    = EditorGUILayout.Slider("Band Width", route.bandWidth, 0.05f, 5f);
-        route.originRadius = EditorGUILayout.Slider("Origin Pool", route.originRadius, 0.25f, 10f);
 
-        EditorGUILayout.LabelField(string.IsNullOrEmpty(route.originNodeId)
-            ? "Origin: unset — click a node on the canvas"
-            : $"Origin: {NodeLabel(route.originNodeId)}", EditorStyles.miniLabel);
+        DrawRouteOriginTower(route);
+
+        // A tower's bowl is the pool now, so the old origin radius only means something while
+        // the route has no tower to start from. The saved value is left alone either way.
+        if (!_data.RouteStartsAtSoulsTower(route))
+            route.originRadius = EditorGUILayout.Slider("Origin Pool", route.originRadius, 0.25f, 10f);
 
         DrawOriginPoolSouls(route);
 
         EditorGUILayout.Space(4);
         EditorGUILayout.LabelField("Points the fish take, in order", EditorStyles.miniBoldLabel);
+
+        // Plays the band drawing out from the origin, at the water preset's Draw Speed, so the
+        // route can be watched the way it opens in game.
+        bool previewing = _previewRouteId == route.routeId;
+        if (GUILayout.Button(previewing ? "■ Stop Preview" : "▶ Preview Path Drawing",
+                             EditorStyles.miniButton, GUILayout.Height(20)))
+        {
+            _previewRouteId   = previewing ? null : route.routeId;
+            _previewStartTime = EditorApplication.timeSinceStartup;
+            Repaint();
+        }
+
+        // The origin pool heads the list so every pool the band touches has a row. It is set by the
+        // Origin Tower field (or shift-click), so the row has no + or x of its own.
+        if (!string.IsNullOrEmpty(route.originNodeId))
+            EditorGUILayout.LabelField($"Start. POOL  {NodeLabel(route.originNodeId)}  (origin tower)",
+                                       EditorStyles.miniLabel);
 
         if (route.points.Count == 0)
             EditorGUILayout.LabelField("None — click points on the canvas in travel order.",
@@ -107,18 +142,21 @@ public partial class LevelSelectDesignerWindow
 
             EditorGUILayout.LabelField(PointRowLabel(route, i), EditorStyles.miniLabel);
 
-            GUI.enabled = i > 0;
-            if (GUILayout.Button("Up", EditorStyles.miniButton, GUILayout.Width(26)))
+            // + : the next canvas clicks go in after this point. Done puts clicks back on the end.
+            bool inserting = InsertingAfter(route) == i;
+            if (GUILayout.Button(inserting ? "Done" : "+", EditorStyles.miniButton,
+                                 GUILayout.Width(inserting ? 40 : 20)))
             {
-                route.points.RemoveAt(i);
-                route.points.Insert(i - 1, point);
-                MarkDirty();
+                _insertAfterPoint = inserting ? -1 : i;
+                _insertRouteId    = route.routeId;
+                _stoppedRouteIds.Remove(route.routeId);
             }
-            GUI.enabled = true;
 
             if (GUILayout.Button("x", EditorStyles.miniButton, GUILayout.Width(20)))
             {
+                Undo.RecordObject(_data, "Remove Soul Route Point");
                 route.points.RemoveAt(i);
+                _insertAfterPoint = -1;
                 MarkDirty();
                 EditorGUILayout.EndHorizontal();
                 break;
@@ -126,9 +164,7 @@ public partial class LevelSelectDesignerWindow
 
             EditorGUILayout.EndHorizontal();
 
-            // Gate is authored now and read later — see the plan's "deliberately not in v1".
             EditorGUI.indentLevel++;
-            point.gateCondition = EditorGUILayout.TextField("Gate", point.gateCondition);
             if (point.kind == LevelSelectDesignerData.SoulRoutePoint.PointKind.Arena)
             {
                 point.entranceIn  = EditorGUILayout.IntField("Door In",  point.entranceIn);
@@ -137,11 +173,24 @@ public partial class LevelSelectDesignerWindow
             EditorGUI.indentLevel--;
         }
 
+        if (_stoppedRouteIds.Contains(route.routeId) &&
+            GUILayout.Button("Continue Route", EditorStyles.miniButton, GUILayout.Height(20)))
+        {
+            _stoppedRouteIds.Remove(route.routeId);
+            _insertAfterPoint = -1;
+        }
+
         EditorGUI.indentLevel--;
     }
 
+    /// <summary>The point canvas clicks on this route go in after, or -1 when they go on the end.</summary>
+    private int InsertingAfter(LevelSelectDesignerData.SoulRoute route)
+        => route != null && route.routeId == _insertRouteId &&
+           _insertAfterPoint >= 0 && _insertAfterPoint < route.points.Count
+         ? _insertAfterPoint : -1;
+
     /// <summary>
-    /// One row of the order list. Names the point, says whether it is an arena or a junction, and
+    /// One row of the order list. Names the point, says whether it is an arena, a pool or a junction, and
     /// warns when the step into it has no river connecting it to the point before.
     /// </summary>
     private string PointRowLabel(LevelSelectDesignerData.SoulRoute route, int index)
@@ -151,7 +200,9 @@ public partial class LevelSelectDesignerWindow
         if (point.kind == LevelSelectDesignerData.SoulRoutePoint.PointKind.Arena)
             return $"{index + 1}. ARENA  {ArenaLabel(point.nodeId)}";
 
-        string label = $"{index + 1}. {NodeLabel(point.nodeId)}";
+        string label = _data.PoolAt(point.nodeId) != null
+            ? $"{index + 1}. POOL  {NodeLabel(point.nodeId)}"
+            : $"{index + 1}. {NodeLabel(point.nodeId)}";
 
         var node = _data.nodes.Find(n => n.id == point.nodeId);
         if (node != null && node.type == LevelSelectDesignerData.NodeType.JunctionSplit)
@@ -164,6 +215,56 @@ public partial class LevelSelectDesignerWindow
         return label;
     }
 
+    /// <summary>
+    /// The route's origin: one of the pools standing a souls pool tower. A route begins nowhere
+    /// else — its souls wait in that bowl until something releases them. With no tower picked (or
+    /// the tower since removed or changed kind) the route shows why it can't start; nothing is
+    /// cleared, so putting the tower back puts the route back as it was.
+    /// </summary>
+    private void DrawRouteOriginTower(LevelSelectDesignerData.SoulRoute route)
+    {
+        var towers = _data.pools.FindAll(p => p != null && _data.SoulsTowerPoolAt(p.nodeId) != null);
+
+        if (towers.Count == 0)
+        {
+            EditorGUILayout.HelpBox("Place a Souls Pool tower on a pool first — a route has to begin at one.",
+                                    MessageType.Warning);
+            return;
+        }
+
+        var labels = new GUIContent[towers.Count + 1];
+        labels[0] = new GUIContent("— none —");
+        int current = 0;
+        for (int i = 0; i < towers.Count; i++)
+        {
+            labels[i + 1] = new GUIContent($"Tower at {NodeLabel(towers[i].nodeId)}");
+            if (towers[i].nodeId == route.originNodeId) current = i + 1;
+        }
+
+        int picked = EditorGUILayout.Popup(
+            new GUIContent("Origin Tower", "The souls pool tower this route's souls begin in. They stay in its " +
+                                           "bowl until they are released onto the route."),
+            current, labels);
+
+        if (picked != current && picked > 0)
+        {
+            Undo.RecordObject(_data, "Set Soul Route Origin");
+            route.originNodeId = towers[picked - 1].nodeId;
+            MarkDirty();
+        }
+
+        if (!_data.RouteStartsAtSoulsTower(route))
+            EditorGUILayout.HelpBox(string.IsNullOrEmpty(route.originNodeId)
+                    ? "No origin tower — this route can't start. Pick one above."
+                    : $"The origin ({NodeLabel(route.originNodeId)}) has no Souls Pool tower — this route " +
+                      "can't start. Pick a tower above, or put one back on that pool.",
+                MessageType.Warning);
+        else if (route.points.Count > 0 &&
+                 _data.FindPathContaining(route.originNodeId, route.points[0].nodeId) == null)
+            EditorGUILayout.LabelField("⚠ The first point isn't on a river leaving this pool.",
+                                       EditorStyles.miniLabel);
+    }
+
     private string NodeLabel(string nodeId)
     {
         var arena = _data.arenas.Find(a => a.nodeId == nodeId);
@@ -173,7 +274,7 @@ public partial class LevelSelectDesignerWindow
         if (path != null)
         {
             string river = string.IsNullOrEmpty(path.riverName) ? path.pathId : path.riverName;
-            return $"{river} [{path.nodeIds.IndexOf(nodeId)}]";
+            return $"{river} node {path.nodeIds.IndexOf(nodeId)}";
         }
 
         return nodeId;
@@ -409,17 +510,42 @@ public partial class LevelSelectDesignerWindow
 
     private void HandleSoulRouteMode(Event e)
     {
-        if (e.type != EventType.MouseDown || e.button != 0) return;
-
         var route = _data.soulRoutes.Find(r => r.routeId == _selectedRouteId);
         if (route == null) return;
+
+        // Enter stops the route: clicks add no more points until Continue Route is pressed.
+        if (e.type == EventType.KeyDown &&
+            (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter))
+        {
+            _stoppedRouteIds.Add(route.routeId);
+            _insertAfterPoint = -1;
+            Repaint();
+            e.Use();
+            return;
+        }
+
+        if (e.type != EventType.MouseDown || e.button != 0) return;
 
         string nodeId = FindNodeAtCanvas(e.mousePosition);
         if (string.IsNullOrEmpty(nodeId)) return;
 
-        // Shift-click sets the origin pool; a plain click appends the next point on the journey.
+        if (!e.shift && _stoppedRouteIds.Contains(route.routeId))
+        {
+            ShowNotification(new GUIContent("Route stopped — press Continue Route to add points"));
+            e.Use();
+            return;
+        }
+
+        // Shift-click sets the origin — only onto a souls pool tower, since a route begins nowhere
+        // else; a plain click appends the next point on the journey.
         if (e.shift)
         {
+            if (_data.SoulsTowerPoolAt(nodeId) == null)
+            {
+                ShowNotification(new GUIContent("A route has to begin at a Souls Pool tower"));
+                e.Use();
+                return;
+            }
             route.originNodeId = nodeId;
         }
         else
@@ -427,7 +553,7 @@ public partial class LevelSelectDesignerWindow
             bool isArena = _data.arenas.Exists(a => a.nodeId == nodeId);
             var  arena   = isArena ? _data.arenas.Find(a => a.nodeId == nodeId) : null;
 
-            route.points.Add(new LevelSelectDesignerData.SoulRoutePoint
+            var point = new LevelSelectDesignerData.SoulRoutePoint
             {
                 kind = isArena
                     ? LevelSelectDesignerData.SoulRoutePoint.PointKind.Arena
@@ -435,7 +561,20 @@ public partial class LevelSelectDesignerWindow
                 nodeId      = nodeId,
                 entranceIn  = arena != null ? arena.entranceIndex : -1,
                 entranceOut = -1
-            });
+            };
+
+            Undo.RecordObject(_data, "Add Soul Route Point");
+
+            int after = InsertingAfter(route);
+            if (after >= 0)
+            {
+                route.points.Insert(after + 1, point);
+                _insertAfterPoint = after + 1;
+            }
+            else
+            {
+                route.points.Add(point);
+            }
         }
 
         MarkDirty();
@@ -451,17 +590,23 @@ public partial class LevelSelectDesignerWindow
     {
         if (Event.current.type != EventType.Repaint) return;
         if (_data.soulRoutes == null || _data.soulRoutes.Count == 0) return;
+        if (!LevelSelectDesignerSettings.SoulShow) return;
+
+        Color dotCol = LevelSelectDesignerSettings.SoulDotColour;
 
         foreach (var route in _data.soulRoutes)
         {
             bool selected = route.routeId == _selectedRouteId;
 
             // Unselected routes sit back so they don't fight the river for attention.
-            Color band = route.editorColor;
-            band.a = selected ? 0.5f : 0.22f;
+            Color band = LevelSelectDesignerSettings.SoulRouteColours ? route.editorColor : LevelSelectDesignerSettings.SoulRouteColour;
+            band.a = selected ? LevelSelectDesignerSettings.SoulSelBandOpacity : LevelSelectDesignerSettings.SoulBandOpacity;
 
             var   pixelPath = BuildRoutePixelPath(route);
             float halfWidth = Mathf.Max(route.bandWidth * _zoom, 1f);
+
+            if (route.routeId == _previewRouteId)
+                pixelPath = PreviewDrawnPath(pixelPath);
 
             // Band — filled quads along the path, discs at the joints keep it gapless.
             Handles.color = band;
@@ -479,30 +624,42 @@ public partial class LevelSelectDesignerWindow
                 if (i > 0) Handles.DrawSolidDisc(a, Vector3.forward, halfWidth);
             }
 
-            // Origin pool — where this route's souls begin.
+            // Origin — where this route's souls begin. At a souls pool tower that is its water; a
+            // route without one keeps its old marker, drawn grey so it reads as not able to start.
             if (!string.IsNullOrEmpty(route.originNodeId))
             {
-                Vector2 origin = WorldToCanvas(WorldPosOfNode(route.originNodeId));
-                Handles.color = band;
-                Handles.DrawSolidDisc(origin, Vector3.forward,
-                                      Mathf.Max(route.originRadius * _zoom, 4f));
-                Handles.color = Color.black;
-                Handles.DrawSolidDisc(origin, Vector3.forward,
-                                      Mathf.Max(route.originRadius * _zoom * 0.35f, 2f));
+                Vector2 origin    = WorldToCanvas(WorldPosOfNode(route.originNodeId));
+                var     towerPool = _data.SoulsTowerPoolAt(route.originNodeId);
+
+                float radius = towerPool != null
+                    ? towerPool.soulsPool.Scaled(towerPool.towerScale).WaterRadius
+                    : route.originRadius;
+
+                Color fill = band;
+                if (towerPool == null) fill = new Color(0.5f, 0.5f, 0.5f, band.a);
+
+                Handles.color = fill;
+                Handles.DrawSolidDisc(origin, Vector3.forward, Mathf.Max(radius * _zoom, 4f));
+                Handles.color = dotCol;
+                Handles.DrawSolidDisc(origin, Vector3.forward, Mathf.Max(radius * _zoom * 0.35f, 2f));
             }
 
             // Solid disc + black dot at every authored point.
             float dotR = Mathf.Max(halfWidth * 0.45f, 3f);
-            foreach (var point in route.points)
+            if (LevelSelectDesignerSettings.SoulPoints)
             {
-                Vector2 p = WorldToCanvas(WorldPosOfNode(point.nodeId));
-                Handles.color = band;
-                Handles.DrawSolidDisc(p, Vector3.forward, halfWidth);
-                Handles.color = Color.black;
-                Handles.DrawSolidDisc(p, Vector3.forward, dotR);
+                foreach (var point in route.points)
+                {
+                    Vector2 p = WorldToCanvas(WorldPosOfNode(point.nodeId));
+                    Handles.color = band;
+                    Handles.DrawSolidDisc(p, Vector3.forward, halfWidth);
+                    Handles.color = dotCol;
+                    Handles.DrawSolidDisc(p, Vector3.forward, dotR);
+                }
             }
 
-            if (selected) DrawRouteFlowArrows(pixelPath, halfWidth);
+            if (LevelSelectDesignerSettings.SoulArrows && (selected || LevelSelectDesignerSettings.SoulArrowsAll))
+                DrawRouteFlowArrows(pixelPath, halfWidth);
         }
     }
 
@@ -520,13 +677,67 @@ public partial class LevelSelectDesignerWindow
         foreach (string id in ids)
             pts.Add(WorldToCanvas(WorldPosOfNode(id)));
 
+        // DEBUG [SoulRouteStale] — which route nodes draw at a position held over from the last
+        // Generate rather than where the node now stands. Remove once confirmed.
+        var stale = new System.Text.StringBuilder();
+        foreach (string id in ids)
+        {
+            if (!_correctedNodePositions.TryGetValue(id, out var held)) continue;
+            var live = _data.nodes.Find(n => n.id == id);
+            if (live == null) continue;
+            float gap = Vector2.Distance(new Vector2(held.x, held.z),
+                                         new Vector2(live.worldPosition.x, live.worldPosition.z));
+            if (gap > 0.05f) stale.Append($" {NodeLabel(id)} ({live.type}) off by {gap:0.00};");
+        }
+        string staleKey = route.routeId + stale;
+        if (stale.Length > 0 && staleKey != _debugStaleKey)
+            Debug.Log($"[SoulRouteStale] '{route.displayName}':{stale}");
+        if (stale.Length > 0) _debugStaleKey = staleKey;
+
         return pts;
+    }
+
+    private string _debugStaleKey;
+
+    /// <summary>
+    /// The part of the route drawn so far in a preview: as far from the origin as the scene's
+    /// Travelling Soul Fish Controller's Zone Draw Speed has carried it since Preview was pressed.
+    /// Keeps the window repainting until the band reaches the end, then ends the preview.
+    /// </summary>
+    private List<Vector2> PreviewDrawnPath(List<Vector2> pixelPath)
+    {
+        var   fish   = UnityEngine.Object.FindFirstObjectByType<TravellingSoulFishController>();
+        float draw   = fish != null ? fish.ZoneDrawSpeed : 1.2f;
+        float speed  = Mathf.Max(draw, 0.01f) * _zoom;   // world units/s → canvas pixels/s
+        float length = (float)(EditorApplication.timeSinceStartup - _previewStartTime) * speed;
+
+        var drawn = new List<Vector2>(pixelPath.Count);
+        if (pixelPath.Count > 0) drawn.Add(pixelPath[0]);
+
+        float travelled = 0f;
+        for (int i = 0; i < pixelPath.Count - 1; i++)
+        {
+            float seg = Vector2.Distance(pixelPath[i], pixelPath[i + 1]);
+            if (travelled + seg >= length)
+            {
+                float t = seg > 0.0001f ? (length - travelled) / seg : 1f;
+                drawn.Add(Vector2.Lerp(pixelPath[i], pixelPath[i + 1], t));
+                Repaint();
+                return drawn;
+            }
+            travelled += seg;
+            drawn.Add(pixelPath[i + 1]);
+        }
+
+        _previewRouteId = null;
+        Repaint();
+        return drawn;
     }
 
     private bool PointsShareAPath(LevelSelectDesignerData.SoulRoutePoint a,
                                   LevelSelectDesignerData.SoulRoutePoint b)
     {
-        return _data.FindPathContaining(a.nodeId, b.nodeId) != null;
+        return _data.NodesBetween(a.nodeId, b.nodeId) != null;
     }
 
     /// <summary>
@@ -537,9 +748,10 @@ public partial class LevelSelectDesignerWindow
     {
         if (pixelPath == null || pixelPath.Count < 2) return;
 
-        float spacing = Mathf.Max(halfWidth * 3f, 28f);
-        float size    = Mathf.Clamp(halfWidth * 0.8f, 5f, 16f);
-        Handles.color = new Color(0f, 0f, 0f, 0.6f);
+        float scale   = LevelSelectDesignerSettings.SoulArrowScale;
+        float spacing = Mathf.Max(halfWidth * 3f, 28f) * Mathf.Max(scale, 0.1f);
+        float size    = Mathf.Clamp(halfWidth * 0.8f, 5f, 16f) * scale;
+        Handles.color = LevelSelectDesignerSettings.SoulArrowColour;
 
         float next        = spacing * 0.5f;
         float accumulated = 0f;

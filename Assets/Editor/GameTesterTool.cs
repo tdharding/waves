@@ -78,7 +78,7 @@ public class GameTesterTool : EditorWindow
     // Open / Enable / Disable
     // ─────────────────────────────────────────────
 
-    [MenuItem("Tools/GameTesterTool")]
+    [MenuItem("Tools/Testing/GameTesterTool", false, 901)]
     public static void Open()
     {
         var window = GetWindow<GameTesterTool>("GameTesterTool");
@@ -400,11 +400,10 @@ public class GameTesterTool : EditorWindow
 
         SaveData data = LoadData();
 
-        DrawRow("Segment ID",       data?.boatSegmentID      ?? "—");
-        DrawRow("Spline Progress",  data?.boatSplineProgress.ToString("F4") ?? "—");
-        DrawRow("River Progress",   data?.riverExtrudeProgress.ToString("F4") ?? "—");
-        DrawRow("Is Left Path",     data?.boatIsLeftPath.ToString()    ?? "—");
-        DrawRow("Is Right Path",    data?.boatIsRightPath.ToString()   ?? "—");
+        DrawRow("Door Level",       string.IsNullOrEmpty(data?.boatDoorLevelID) ? "—" : data.boatDoorLevelID);
+        DrawRow("Door Entrance",    data != null && data.boatDoorEntranceIndex >= 0
+                                        ? data.boatDoorEntranceIndex.ToString() : "—");
+        DrawRow("Has Pose",         data?.boatHasPose.ToString() ?? "—");
 
         EditorGUILayout.Space(4);
 

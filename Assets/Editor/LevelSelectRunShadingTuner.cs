@@ -1,6 +1,8 @@
 using UnityEditor;
 using UnityEngine;
 
+using System.Collections.Generic;
+
 /// <summary>
 /// Drives how the level select's stone rivers are shaded — dark along the seams, white off the
 /// waterline — and saves what you land on to a <see cref="LevelSelectRiverStructurePreset"/> for the
@@ -15,7 +17,7 @@ using UnityEngine;
 /// </summary>
 public class LevelSelectRunShadingTuner : EditorWindow
 {
-    [MenuItem("Tools/Waves/Level Select Run Shading Tuner")]
+    [MenuItem("Tools/Tuners/Level Select Run Shading Tuner", false, 222)]
     public static void Open() =>
         GetWindow<LevelSelectRunShadingTuner>("Level Select Run Shading");
 
@@ -24,6 +26,7 @@ public class LevelSelectRunShadingTuner : EditorWindow
     [SerializeField] private LevelSelectRiverStructurePreset  activePreset;
     [SerializeField] private bool                    applyLive  = true;
     [SerializeField] private RiverRunShadingSettings runShading = new RiverRunShadingSettings();
+    [SerializeField] private int                     designation;
 
     private SerializedObject _window;
     private Vector2          _scroll;
@@ -105,6 +108,7 @@ public class LevelSelectRunShadingTuner : EditorWindow
     private void OnGUI()
     {
         if (_window == null) _window = new SerializedObject(this);
+        runShading.EnsureStoneTypes();
         _window.Update();
 
         DrawToolbar();
@@ -113,6 +117,9 @@ public class LevelSelectRunShadingTuner : EditorWindow
         EditorGUILayout.Space();
         _scroll = EditorGUILayout.BeginScrollView(_scroll);
 
+        DrawMaterials();
+
+        EditorGUILayout.Space();
         DrawSeamDataRow();
 
         EditorGUILayout.Space();
@@ -121,18 +128,18 @@ public class LevelSelectRunShadingTuner : EditorWindow
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Run Shading", EditorStyles.boldLabel);
         EditorGUILayout.LabelField(
-            "Five things, all off the same numbers. The stone itself — a colour each for the " +
-            "outer faces, the rim lip and the inside of the channel, each with its own noise " +
-            "grain. Dark gathered along every seam of it — the rim's two edges, the foot of the " +
-            "outer wall, the joints between pieces. White rising off the waterline up the inside " +
+            "Five things, all off the same numbers. The stone itself — stone types A, B, C, D " +
+            "and any added after, each a colour or a gradient across the whole piece, with its " +
+            "own noise grain and its own seams — dark gathered along every corner of it: the rim's " +
+            "two edges, the foot of the outer wall, the joints between pieces. White rising off the waterline up the inside " +
             "of the channel. Hand-drawn decals scattered over the lot. And the made-up " +
             "light the stone is shaped by, which is what replaced " +
             "Simulated Lighting Basic on the run shader. Grain size, the decal spacing " +
             "and scales, and the waterline extent are " +
             "metres; the seam extent is a percentage of the width of each surface, so every piece " +
-            "is shaded in proportion to its own size. The sections below choose which of the three " +
-            "stone colours each part of an outpost, tower, arena wall and archway takes — those " +
-            "are baked into the meshes, so rebuild after changing them.",
+            "is shaded in proportion to its own size. The Designation dropdown picks which " +
+            "piece's parts are shown, and which stone type each takes. River Runs is live; the " +
+            "rest are baked into the meshes, so rebuild after changing them.",
             EditorStyles.wordWrappedMiniLabel);
 
         EditorGUI.BeginChangeCheck();
@@ -140,10 +147,21 @@ public class LevelSelectRunShadingTuner : EditorWindow
         var shading = _window.FindProperty("runShading");
         var end     = shading.GetEndProperty();
         var field   = shading.Copy();
+        int section = -1;   // -1 = the every-piece settings, above the first designation
         field.NextVisible(true);
         while (!SerializedProperty.EqualContents(field, end))
         {
-            EditorGUILayout.PropertyField(field, true);
+            int starts = System.Array.FindIndex(Designations, d => d.firstField == field.name);
+            if (starts >= 0)
+            {
+                if (section < 0) DrawDesignationPicker();
+                section = starts;
+            }
+
+            // The stone types are a list with rules of its own — A to D always there, only the
+            // last one added removable — so they are drawn here rather than as a bare list.
+            if (field.name == nameof(RiverRunShadingSettings.stoneTypes)) DrawStoneTypes(field);
+            else if (section < 0 || section == designation) EditorGUILayout.PropertyField(field, true);
             if (!field.NextVisible(false)) break;
         }
 
@@ -166,10 +184,308 @@ public class LevelSelectRunShadingTuner : EditorWindow
             MessageType.None);
 
         EditorGUILayout.Space();
+        LightTunerSection.Draw();
+
+        EditorGUILayout.Space();
         WhiteFadeTunerSection.Draw();
 
         EditorGUILayout.EndScrollView();
         _window.ApplyModifiedProperties();
+        ApplyStoneListChange();
+    }
+
+    /// <summary>
+    /// The pieces whose parts each take a stone type, in the order their sections sit in
+    /// <see cref="RiverRunShadingSettings"/> — each named with the field its section starts at.
+    /// Only the one picked in the Designation dropdown is shown.
+    /// </summary>
+    private static readonly (string label, string firstField)[] Designations =
+    {
+        ("River Runs",      nameof(RiverRunShadingSettings.runOuterFaces)),
+        ("Outposts",        nameof(RiverRunShadingSettings.outpostOutsideWalls)),
+        ("Freestanding Structures", nameof(RiverRunShadingSettings.structureSides)),
+        ("River Walkways",  nameof(RiverRunShadingSettings.walkwayTop)),
+        ("Lollipop Towers", nameof(RiverRunShadingSettings.towerOrb)),
+        ("Walls",           nameof(RiverRunShadingSettings.wallSides)),
+        ("Arena",           nameof(RiverRunShadingSettings.arenaInnerFace)),
+        ("Arena Archways",  nameof(RiverRunShadingSettings.archwayInside)),
+        ("Arena Doors",     nameof(RiverRunShadingSettings.doorSheet)),
+    };
+
+    private static GUIStyle _designationCaption, _designationPopup;
+
+    private void DrawDesignationPicker()
+    {
+        if (_designationPopup == null)
+        {
+            _designationCaption = new GUIStyle(EditorStyles.boldLabel)
+                { alignment = TextAnchor.MiddleCenter, fontSize = 13 };
+            _designationPopup = new GUIStyle(EditorStyles.popup)
+                { alignment = TextAnchor.MiddleCenter, fontSize = 16, fontStyle = FontStyle.Bold, fixedHeight = 30f };
+        }
+
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Designation", _designationCaption);
+        var labels = System.Array.ConvertAll(Designations, d => d.label);
+        designation = EditorGUILayout.Popup(Mathf.Clamp(designation, 0, labels.Length - 1), labels,
+                                            _designationPopup, GUILayout.Height(30f));
+        EditorGUILayout.Space();
+    }
+
+    private static readonly GUIContent[] GradientDirections =
+    {
+        new GUIContent("Bottom → Top", "From the foot of the piece up to its top."),
+        new GUIContent("Top → Bottom", "From the top of the piece down to its foot."),
+        new GUIContent("Left → Right", "Across the piece along the world's X."),
+        new GUIContent("Right → Left", "Across the piece along the world's X, the other way."),
+    };
+
+    /// <summary>
+    /// Stone A, B, C, D and any added after: each a colour, or a gradient across the whole piece
+    /// in its place, with its own grain. A to D are always there; one added after can be taken
+    /// away again only while it is the last, so no part is left pointing at a letter that has
+    /// moved.
+    /// </summary>
+    private void DrawStoneTypes(SerializedProperty list)
+    {
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Stone Types — every piece", EditorStyles.boldLabel);
+
+        bool removeLast = false;
+        var  usage      = StoneUsage();
+
+        for (int i = 0; i < list.arraySize; i++)
+        {
+            var type = list.GetArrayElementAtIndex(i);
+            var useGradient = type.FindPropertyRelative(nameof(StoneType.useGradient));
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    type.isExpanded = EditorGUILayout.Foldout(
+                        type.isExpanded, "Stone " + RiverRunShadingSettings.StoneLetter(i), true,
+                        EditorStyles.foldoutHeader);
+
+                    if (i == list.arraySize - 1 && i >= RiverRunShadingSettings.FixedStoneTypes &&
+                        GUILayout.Button("Remove", GUILayout.Width(70f)))
+                        removeLast = true;
+                }
+
+                if (!type.isExpanded) continue;
+
+                EditorGUI.indentLevel++;
+
+                DrawStoneUsage(i, usage[i + 1]);
+
+                if (!useGradient.boolValue)
+                    EditorGUILayout.PropertyField(type.FindPropertyRelative(nameof(StoneType.colour)));
+
+                EditorGUILayout.PropertyField(type.FindPropertyRelative(nameof(StoneType.grainSize)));
+                EditorGUILayout.PropertyField(type.FindPropertyRelative(nameof(StoneType.grainStrength)));
+                EditorGUILayout.PropertyField(useGradient);
+
+                if (useGradient.boolValue)
+                {
+                    EditorGUILayout.PropertyField(type.FindPropertyRelative(nameof(StoneType.gradient)));
+
+                    var direction = type.FindPropertyRelative(nameof(StoneType.gradientDirection));
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        EditorGUILayout.PrefixLabel("Direction");
+                        int indent = EditorGUI.indentLevel;
+                        EditorGUI.indentLevel = 0;
+                        direction.enumValueIndex = GUILayout.Toolbar(
+                            direction.enumValueIndex, GradientDirections, EditorStyles.miniButton);
+                        EditorGUI.indentLevel = indent;
+                    }
+                }
+
+                EditorGUILayout.LabelField("Seams", EditorStyles.miniBoldLabel);
+                EditorGUILayout.PropertyField(type.FindPropertyRelative(nameof(StoneType.seamColour)));
+                EditorGUILayout.PropertyField(type.FindPropertyRelative(nameof(StoneType.seamStrength)));
+                EditorGUILayout.PropertyField(type.FindPropertyRelative(nameof(StoneType.seamExtentPercent)));
+
+                EditorGUILayout.LabelField("Decals", EditorStyles.miniBoldLabel);
+                EditorGUILayout.PropertyField(type.FindPropertyRelative(nameof(StoneType.decalAmount)),
+                                              new GUIContent("Amount"));
+                EditorGUILayout.PropertyField(type.FindPropertyRelative(nameof(StoneType.decalOpacity)),
+                                              new GUIContent("Opacity"));
+                EditorGUILayout.PropertyField(type.FindPropertyRelative(nameof(StoneType.decalSpacing)),
+                                              new GUIContent("Spacing"));
+                EditorGUILayout.PropertyField(type.FindPropertyRelative(nameof(StoneType.decalScaleMin)),
+                                              new GUIContent("Scale Min"));
+                EditorGUILayout.PropertyField(type.FindPropertyRelative(nameof(StoneType.decalScaleMax)),
+                                              new GUIContent("Scale Max"));
+                var rotate = type.FindPropertyRelative(nameof(StoneType.decalRotate));
+                EditorGUILayout.PropertyField(rotate, new GUIContent("Random 90° Rotation"));
+                using (new EditorGUI.DisabledScope(!rotate.boolValue))
+                    EditorGUILayout.PropertyField(type.FindPropertyRelative(nameof(StoneType.decalRotateAmount)),
+                                                  new GUIContent("Rotation Amount"));
+
+                EditorGUI.indentLevel--;
+            }
+        }
+
+        using (new EditorGUI.DisabledScope(list.arraySize >= RiverRunShadingSettings.MaxStoneTypes))
+        {
+            if (GUILayout.Button("Add Stone " + RiverRunShadingSettings.StoneLetter(list.arraySize)))
+                _stoneListChange = +1;
+        }
+
+        if (removeLast) _stoneListChange = -1;
+
+        EditorGUILayout.Space();
+    }
+
+    // Which stones have their Used By list open. Only for this window's session — a view, not a setting.
+    private readonly HashSet<int> _usageOpen = new HashSet<int>();
+
+    private void DrawStoneUsage(int stone, List<string> users)
+    {
+        bool open = _usageOpen.Contains(stone);
+        bool now  = EditorGUILayout.Foldout(open, users.Count == 0 ? "Used By — nothing" : "Used By", true);
+        if (now != open)
+        {
+            if (now) _usageOpen.Add(stone);
+            else     _usageOpen.Remove(stone);
+        }
+        if (!now) return;
+
+        EditorGUI.indentLevel++;
+        if (users.Count == 0)
+            EditorGUILayout.LabelField("No part of any piece is set to this stone.",
+                                       EditorStyles.wordWrappedMiniLabel);
+        foreach (var user in users)
+            EditorGUILayout.LabelField(user, EditorStyles.wordWrappedMiniLabel);
+        EditorGUI.indentLevel--;
+    }
+
+    /// <summary>
+    /// For each stone (indexed by its kind number, A = 1), the parts set to it across every
+    /// Designation — read off the window's own copy, so it follows the dropdowns as they change.
+    /// These are the settings, not what is built: a baked piece shows them only once rebuilt.
+    /// Auto parts are sorted by the builder face by face — outer A, rim B, inner C — so they are
+    /// listed under all three, gathered one line per piece.
+    /// </summary>
+    private List<string>[] StoneUsage()
+    {
+        var usage = new List<string>[RiverRunShadingSettings.MaxStoneTypes + 1];
+        for (int i = 0; i < usage.Length; i++) usage[i] = new List<string>();
+
+        var autoParts = new List<string>[Designations.Length];
+
+        var shading = _window.FindProperty("runShading");
+        var end     = shading.GetEndProperty();
+        var field   = shading.Copy();
+        int section = -1;
+        field.NextVisible(true);
+        while (!SerializedProperty.EqualContents(field, end))
+        {
+            int starts = System.Array.FindIndex(Designations, d => d.firstField == field.name);
+            if (starts >= 0) section = starts;
+
+            if (section >= 0 && field.propertyType == SerializedPropertyType.Enum)
+            {
+                // The section's own word leads every field's name ("Outpost Floor") — drop it.
+                string name = field.displayName;
+                int    gap  = name.IndexOf(' ');
+                string part = gap > 0 ? name.Substring(gap + 1) : name;
+
+                int kind = field.intValue;
+                if (kind == 0) kind = WallAuto(field.name);
+
+                if (kind > 0)
+                {
+                    if (kind < usage.Length) usage[kind].Add(Designations[section].label + " — " + part);
+                }
+                else
+                {
+                    if (autoParts[section] == null) autoParts[section] = new List<string>();
+                    autoParts[section].Add(part);
+                }
+            }
+
+            if (!field.NextVisible(false)) break;
+        }
+
+        string[] sorted = { "outer", "rim", "inner" };
+        for (int s = 0; s < Designations.Length; s++)
+        {
+            if (autoParts[s] == null) continue;
+            for (int k = 0; k < sorted.Length; k++)
+                usage[k + 1].Add($"{Designations[s].label} — {string.Join(", ", autoParts[s])} " +
+                                 $"(Auto: the faces that sit as {sorted[k]})");
+        }
+
+        return usage;
+    }
+
+    /// <summary>
+    /// What a wall part left on Auto is built with — walls are not sorted face by face, so their
+    /// Auto is a fixed letter. Mirrors the fall-backs in WallMesh.Build's shading choice; 0 for
+    /// anything that is not a wall part.
+    /// </summary>
+    private int WallAuto(string field)
+    {
+        int SetOr(string other, StoneFaceKind fallback)
+        {
+            int k = _window.FindProperty("runShading." + other).intValue;
+            return k > 0 ? k : (int)fallback;
+        }
+
+        switch (field)
+        {
+            case nameof(RiverRunShadingSettings.wallSides):
+            case nameof(RiverRunShadingSettings.wallEnds):
+            case nameof(RiverRunShadingSettings.wallOpenings):
+            case nameof(RiverRunShadingSettings.wallColumnSides):
+                return (int)StoneFaceKind.A;
+            case nameof(RiverRunShadingSettings.wallTop):
+            case nameof(RiverRunShadingSettings.wallColumnTop):
+                return (int)StoneFaceKind.B;
+            case nameof(RiverRunShadingSettings.wallLipTop):
+                return SetOr(nameof(RiverRunShadingSettings.wallTop), StoneFaceKind.B);
+            case nameof(RiverRunShadingSettings.wallLipSides):
+            case nameof(RiverRunShadingSettings.wallLipUnderside):
+                return SetOr(nameof(RiverRunShadingSettings.wallSides), StoneFaceKind.A);
+        }
+        return 0;
+    }
+
+    // An Add or Remove pressed this repaint, carried out once the window has finished drawing —
+    // changing the list's length mid-draw would pull it out from under the fields still to come.
+    private int _stoneListChange;
+
+    private void ApplyStoneListChange()
+    {
+        if (_stoneListChange == 0) return;
+
+        Undo.RecordObject(this, _stoneListChange > 0 ? "Add Stone Type" : "Remove Stone Type");
+        if (_stoneListChange > 0) runShading.stoneTypes.Add(new StoneType());
+        else if (runShading.stoneTypes.Count > RiverRunShadingSettings.FixedStoneTypes)
+            runShading.stoneTypes.RemoveAt(runShading.stoneTypes.Count - 1);
+
+        _stoneListChange = 0;
+        _window = new SerializedObject(this);
+        TakeOver();
+        Repaint();
+    }
+
+    /// <summary>
+    /// The run's material, and the arena wall and door ones — each falling back the way the
+    /// designer falls back when it builds them, so what shows is what is on the stone.
+    /// </summary>
+    private static void DrawMaterials()
+    {
+        var data = TunerMaterialLinks.WorldData();
+        var run  = data != null ? data.riverMaterial : null;
+        var wall = data != null && data.arenaWallMaterial != null ? data.arenaWallMaterial : run;
+        var door = data != null && data.arenaDoorMaterial != null ? data.arenaDoorMaterial : wall;
+
+        TunerMaterialLinks.Draw("LevelSelectRunShadingTuner_MaterialsOpen",
+            new[] { "Runs", "Arena", "Arena Doors" },
+            new[] { run, wall, door });
     }
 
     private void DrawToolbar()
@@ -228,8 +544,8 @@ public class LevelSelectRunShadingTuner : EditorWindow
                              "face kinds"
                            : noSeams > 0
                            ? $"{noSeams} of {runs} runs carry no seams"
-                           : $"{noKinds} of {runs} runs carry no face kinds, so the three stone " +
-                             "colours cannot reach them";
+                           : $"{noKinds} of {runs} runs carry no face kinds, so the stone types " +
+                             "cannot reach them";
 
             EditorGUILayout.HelpBox(
                 missing + ". Press Rebuild Runs in the Level Select Designer — both are baked " +
@@ -316,12 +632,12 @@ public class LevelSelectRunShadingTuner : EditorWindow
                 "— anything drawn on transparency, any size, any shape — and rebuild the sheet.",
                 MessageType.None);
         }
-        else if (runShading.decalAmount <= 0f)
+        else if (!runShading.stoneTypes.Exists(t => t != null && t.decalAmount > 0f))
         {
             EditorGUILayout.HelpBox(
                 "The sheet holds " + runShading.decalSheetHeld + " of the folder's " +
-                decals.Count + ", and Amount is 0, so none of them is drawn. Turn Amount up, " +
-                "below.",
+                decals.Count + ", and every stone type's decal Amount is 0, so none of them is " +
+                "drawn. Turn Amount up on a stone type, below.",
                 MessageType.None);
         }
         else
@@ -472,7 +788,8 @@ public class LevelSelectRunShadingTuner : EditorWindow
                 "Save Level Select Run Shading",
                 $"Overwrite the run shading on '{activePreset.name}' with the current tuner " +
                 "values?\n\nThe water lines saved on the same preset are left alone.\n\n" +
-                "This cannot be undone from disk.",
+                "This cannot be undone from disk.\n\n" +
+                TunerSaveChanges.Describe(activePreset, p => p.runShading.CopyFrom(runShading)),
                 "Save", "Cancel"))
             return;
 

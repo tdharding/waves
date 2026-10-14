@@ -13,8 +13,10 @@ using UnityEngine;
 ///         |       <- stem (stem radius, stem height)
 ///        _|_
 ///       |___|     <- second base (base 2 radius, base 2 height), 0 height = none
-///      /_____\    <- ramp (base radius in to base 2 radius, ramp height), 0 height = none
-///     |_______|   <- base (base radius, base height), standing at y = 0
+///      /_____\    <- upper ramp (base radius in to base 2 radius, ramp height), 0 height = none
+///     |_______|   <- base (base radius, base height)
+///    /_________\  <- lower ramp (lower ramp radius in to base radius, lower ramp height),
+///                    standing at y = 0; 0 height = none
 ///
 /// The orb is seated where the stem's top edge meets its surface, so the stem runs its full
 /// height into the orb with no ledge and no gap.
@@ -37,11 +39,18 @@ public class LollipopTower
     [Tooltip("Height of the round base. 0 = no base, and the stem stands on the ground.")]
     [Min(0f)] public float baseHeight = 0.03f;
 
-    [Tooltip("Height of the ramp on top of the base, sloping in from the base's radius to the " +
-             "second base's radius. 0 = no ramp.")]
+    [Tooltip("Height of the lower ramp under the base, flaring out from the base's radius to the " +
+             "lower ramp radius on the ground. 0 = no lower ramp.")]
+    [Min(0f)] public float lowerRampHeight = 0f;
+
+    [Tooltip("Radius of the lower ramp's foot on the ground — the radius it flares out to from the base.")]
+    [Min(0.001f)] public float lowerRampRadius = 0.08f;
+
+    [Tooltip("Height of the upper ramp on top of the base, sloping in from the base's radius to the " +
+             "second base's radius. 0 = no upper ramp.")]
     [Min(0f)] public float rampHeight = 0f;
 
-    [Tooltip("Radius of the second base, on top of the ramp — and the radius the ramp slopes in to.")]
+    [Tooltip("Radius of the second base, on top of the upper ramp — and the radius the upper ramp slopes in to.")]
     [Min(0.001f)] public float base2Radius = 0.03f;
 
     [Tooltip("Height of the second base, on top of the ramp. 0 = no second base.")]
@@ -59,14 +68,45 @@ public class LollipopTower
             float r = Mathf.Max(0.001f, stemRadius);
             float R = Mathf.Max(0.001f, orbRadius);
 
-            float tiers = Mathf.Max(0f, baseHeight) + Mathf.Max(0f, rampHeight) + Mathf.Max(0f, base2Height);
+            float tiers = Mathf.Max(0f, lowerRampHeight) + Mathf.Max(0f, baseHeight) + Mathf.Max(0f, rampHeight) + Mathf.Max(0f, base2Height);
             float seat  = Mathf.Sqrt(Mathf.Max(0f, R * R - r * r));
 
             return tiers + Mathf.Max(0f, stemHeight) + seat + R;
         }
     }
 
+    /// <summary>
+    /// How far the tower reaches out at its foot — the lower ramp's radius when there is one and it
+    /// is wider, otherwise the base's.
+    /// </summary>
+    public float FootRadius
+        => lowerRampHeight > 0f ? Mathf.Max(baseRadius, lowerRampRadius) : baseRadius;
+
     public LollipopTower Clone() => (LollipopTower)MemberwiseClone();
+
+    /// <summary>
+    /// A copy with every size multiplied by <paramref name="scale"/> — the placement's own scale,
+    /// which is kept on the placement and never saved into a preset. 0 or below counts as 1, so
+    /// placements saved before the scale existed keep their size.
+    /// </summary>
+    public LollipopTower Scaled(float scale)
+    {
+        var copy = Clone();
+        if (scale <= 0f || Mathf.Approximately(scale, 1f)) return copy;
+        float s = scale;
+
+        copy.stemRadius  *= s;
+        copy.stemHeight  *= s;
+        copy.orbRadius   *= s;
+        copy.lowerRampHeight *= s;
+        copy.lowerRampRadius *= s;
+        copy.baseRadius  *= s;
+        copy.baseHeight  *= s;
+        copy.rampHeight  *= s;
+        copy.base2Radius *= s;
+        copy.base2Height *= s;
+        return copy;
+    }
 
     const int Sides = 24;
     const int OrbRings = 16;
@@ -103,12 +143,12 @@ public class LollipopTower
     /// <paramref name="tris"/> — any triangles already there get Auto (worked out as usual), and the
     /// tower's own get the stone colour <paramref name="shading"/> names for their part.
     /// <paramref name="parts"/>, when given, is filled the same way with which tier each face is
-    /// on — base, ramp, second base — so the stone shading draws a seam at every join between
+    /// on — lower ramp, base, upper ramp, second base — so the stone shading draws a seam at every join between
     /// them, however steep the ramp. Faces already there, and the stem and orb, are part 0.
     /// </summary>
     public void Append(List<Vector3> verts, List<Vector3> norms, List<Vector2> uvs, List<int> tris,
                        Vector3 basePos, List<float> kinds = null, RiverRunShadingSettings shading = null,
-                       List<int> parts = null)
+                       List<int> parts = null, bool withOrb = true)
     {
         var sideKind = shading != null ? shading.towerBaseSides : StoneFaceKind.Auto;
         var capKind  = shading != null ? shading.towerBaseTop   : StoneFaceKind.Auto;
@@ -122,17 +162,26 @@ public class LollipopTower
         float h = Mathf.Max(0f, stemHeight);
         float R = Mathf.Max(0.001f, orbRadius);
 
-        // ── Base, ramp and second base, bottom up — each off at zero height. A tier is capped
-        //    unless the one on it covers its whole top ──
+        // ── Lower ramp, base, upper ramp and second base, bottom up — each off at zero height. A
+        //    tier is capped unless the one on it covers its whole top ──
+        float lh  = Mathf.Max(0f, lowerRampHeight);
+        float lr  = Mathf.Max(0.001f, lowerRampRadius);
         float bh  = Mathf.Max(0f, baseHeight);
         float br  = Mathf.Max(0.001f, baseRadius);
         float rh  = Mathf.Max(0f, rampHeight);
         float b2h = Mathf.Max(0f, base2Height);
         float b2r = Mathf.Max(0.001f, base2Radius);
 
+        // The base's top is open only when the upper ramp, or a second base at least as wide,
+        // stands on it — and the lower ramp's top the same, when there is no base between.
+        bool baseCapped = rh <= 0f && (b2h <= 0f || b2r < br);
+
+        if (lh > 0f)
+            AppendRing(verts, norms, uvs, tris, kinds, parts, 4, ref basePos, lr, br, lh,
+                       bh <= 0f && baseCapped, sideKind, capKind);
         if (bh > 0f)
             AppendRing(verts, norms, uvs, tris, kinds, parts, 1, ref basePos, br, br, bh,
-                       rh <= 0f && (b2h <= 0f || b2r < br), sideKind, capKind);
+                       baseCapped, sideKind, capKind);
         if (rh > 0f)
             AppendRing(verts, norms, uvs, tris, kinds, parts, 2, ref basePos, br, b2r, rh,
                        b2h <= 0f, sideKind, capKind);
@@ -179,9 +228,27 @@ public class LollipopTower
             StoneFaces.Part(parts, tris, 0);
         }
 
-        // ── Orb: seated so the stem's top edge lies on its surface ──
-        Vector3 orbCentre = basePos + Vector3.up * (h + Mathf.Sqrt(Mathf.Max(0f, R * R - r * r)));
+        // ── Orb: seated so the stem's top edge lies on its surface. A turret builds its own,
+        //    as a separate piece that turns ──
+        if (!withOrb) return;
 
+        Vector3 orbCentre = basePos + Vector3.up * (h + Mathf.Sqrt(Mathf.Max(0f, R * R - r * r)));
+        AppendOrb(verts, norms, uvs, tris, orbCentre, R);
+
+        StoneFaces.Tag(kinds, tris, orbKind);
+        StoneFaces.Part(parts, tris, 0);
+    }
+
+    /// <summary>
+    /// The orb's centre, measured up from the tower's base — where the stem's top edge meets its
+    /// surface. A turret's head turns about this point.
+    /// </summary>
+    public float OrbCentreY => TopY - Mathf.Max(0.001f, orbRadius);
+
+    /// <summary>A sphere of radius <paramref name="R"/> round <paramref name="centre"/>.</summary>
+    public static void AppendOrb(List<Vector3> verts, List<Vector3> norms, List<Vector2> uvs, List<int> tris,
+                                 Vector3 centre, float R)
+    {
         int orbStart = verts.Count;
         for (int ring = 0; ring <= OrbRings; ring++)
         {
@@ -191,7 +258,7 @@ public class LollipopTower
                 float   lon = i * Mathf.PI * 2f / Sides;
                 Vector3 n   = new Vector3(Mathf.Sin(lat) * Mathf.Cos(lon), Mathf.Cos(lat),
                                           Mathf.Sin(lat) * Mathf.Sin(lon));
-                verts.Add(orbCentre + n * R);
+                verts.Add(centre + n * R);
                 norms.Add(n);
                 uvs.Add(new Vector2(lon * R, (Mathf.PI - lat) * R));
             }
@@ -207,9 +274,6 @@ public class LollipopTower
                 if (ring < OrbRings - 1) AddTri(tris, verts, norms, a, d, c);
             }
         }
-
-        StoneFaces.Tag(kinds, tris, orbKind);
-        StoneFaces.Part(parts, tris, 0);
     }
 
     // One round tier of the base: sides running from the bottom radius to the top radius (a
@@ -262,7 +326,7 @@ public class LollipopTower
 
     // One triangle, wound so its face points the way its vertices' normals do — Unity's front
     // face is the winding whose Cross(v1-v0, v2-v0) points along the normal.
-    static void AddTri(List<int> tris, List<Vector3> verts, List<Vector3> norms, int a, int b, int c)
+    internal static void AddTri(List<int> tris, List<Vector3> verts, List<Vector3> norms, int a, int b, int c)
     {
         Vector3 face = Vector3.Cross(verts[b] - verts[a], verts[c] - verts[a]);
         Vector3 n    = norms[a] + norms[b] + norms[c];

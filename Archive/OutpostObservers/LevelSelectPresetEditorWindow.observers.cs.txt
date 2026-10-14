@@ -1,0 +1,10 @@
+// Archived from Assets/Editor/LevelSelectPresetEditorWindow.cs (2026-10-12).
+
+        EditorGUILayout.Space(2);
+        EditorGUILayout.LabelField("Observers", EditorStyles.miniBoldLabel);
+        if (LevelSelectDesignerWindow.LoadObserverPrefab() == null)
+            EditorGUILayout.HelpBox($"No prefab at {LevelSelectDesignerWindow.ObserverPrefabPath} — observers won't be spawned.",
+                                    MessageType.Warning);
+        var observers = LevelSelectDesignerWindow.DrawOutpostObserverFields(p.observers);
+        ClearDesignerTowerFlag();
+                p.observers         = observers;

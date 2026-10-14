@@ -26,18 +26,23 @@ public class AnimateSuiteWindow : EditorWindow
     bool            lastRecording;
     AnimationClip   lastRecordClip;
 
+    // Set when a bone of the rig moves while nothing is recording; the warning pops once the drag
+    // is let go, so it never lands mid-drag and only comes up once per move.
+    bool unrecordedMove;
+
     static readonly Color RecordColor = new Color(1f, 0.35f, 0.35f, 1f);
 
     AnimateTool[] Tools => tools ??= new AnimateTool[] { pose, easing, looper };
     AnimateTool   Active => Tools[Mathf.Clamp(tab, 0, Tools.Length - 1)];
 
-    [MenuItem("Tools/Waves/Animate Suite")]
+    [MenuItem("Tools/Characters/Animate Suite", false, 600)]
     static void Open() => GetWindow<AnimateSuiteWindow>("Animate");
 
     void OnEnable()
     {
         SceneView.duringSceneGui += OnSceneGUI;
         EditorApplication.update += OnUpdate;
+        Undo.postprocessModifications += OnModifications;
         if (rig.root == null) rig.RootFromSelection();
         rig.Refresh();
     }
@@ -46,6 +51,7 @@ public class AnimateSuiteWindow : EditorWindow
     {
         SceneView.duringSceneGui -= OnSceneGUI;
         EditorApplication.update -= OnUpdate;
+        Undo.postprocessModifications -= OnModifications;
     }
 
     // Tabs name the selected bone in their buttons, so the window has to redraw on selection.
@@ -68,6 +74,42 @@ public class AnimateSuiteWindow : EditorWindow
             lastRecordClip = clip;
             Repaint();
         }
+
+        if (unrecordedMove && GUIUtility.hotControl == 0)
+        {
+            unrecordedMove = false;
+            ShowUnrecordedWarning();
+        }
+    }
+
+    // Every bone move — scene handles, the inspector, the Pose tab's own buttons — passes through
+    // here, the same hook the Animation window keys from. Nothing is changed, only noticed.
+    UndoPropertyModification[] OnModifications(UndoPropertyModification[] mods)
+    {
+        if (unrecordedMove || rig.root == null || EditorApplication.isPlaying) return mods;
+
+        var aw = FindAnimationWindow(true);
+        if (aw != null && aw.recording) return mods;
+
+        foreach (var m in mods)
+            if (m.currentValue?.target is Transform t && rig.boneSet.Contains(t))
+            {
+                unrecordedMove = true;
+                break;
+            }
+        return mods;
+    }
+
+    void ShowUnrecordedWarning()
+    {
+        var aw = FindAnimationWindow(true);
+        if (aw != null && aw.recording) return;   // switched on while the drag was still held
+        var clip = aw != null ? aw.animationClip : null;
+
+        string msg = aw == null   ? "The Animation window isn't open, so that bone move wasn't recorded."
+                   : clip == null ? "The Animation window has no clip, so that bone move wasn't recorded."
+                                  : $"Record isn't enabled, so that bone move wasn't saved into {clip.name}.";
+        EditorUtility.DisplayDialog("Not Recording", msg, "OK");
     }
 
     AnimationWindow FindAnimationWindow(bool force)

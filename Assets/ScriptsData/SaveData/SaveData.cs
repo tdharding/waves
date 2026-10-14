@@ -7,21 +7,21 @@ public class SaveData
 // ─────────────────────────────────────────────
 // BOAT / WORLD MAP
 // ─────────────────────────────────────────────
-public float boatSplineProgress;
-public float riverExtrudeProgress;
-public string boatSegmentID = string.Empty;
-public bool boatIsLeftPath;
-public bool boatIsRightPath; // ← add this
 
-// Where the boat actually stood when the map was last left. The segment and progress above
-// still name a place — a door says which river it lets out onto — but the boat is no longer
-// on rails, so where it got to is a position and a heading. A pose written here wins; a door
-// writing a segment clears it, because the door is saying where to come out.
+// Where the boat actually stood when the map was last left: a position and a heading.
 public bool    boatHasPose;
 public float   boatPoseX;
 public float   boatPoseY;
 public float   boatPoseZ;
 public float   boatPoseHeading;
+
+// The door the boat last came out of a level by — that level's GridData.levelID and the index
+// into its GridData.entrances. The level select finds that door when it loads and puts the boat
+// out in front of it. Whichever of this and the pose was written last wins: writing a pose clears
+// the door, and the door is written after the pose, so a pose is left behind it as the fallback
+// for a door the map can no longer find.
+public string  boatDoorLevelID       = string.Empty;
+public int     boatDoorEntranceIndex = -1;
 
 // ─────────────────────────────────────────────
 // SETTINGS
@@ -78,13 +78,6 @@ public float ui3DCameraX = float.MaxValue; // sentinel — slider reads camera p
     public List<string> purchasedShopItems = new List<string>();
 
     // ─────────────────────────────────────────────
-    // EXIT-UNLOCKED RIVER SEGMENTS
-    // Segments with ExtrudeOnExit=true that have been permanently unlocked
-    // after the player exited an arena. Persisted so they stay extruded on reload.
-    // ─────────────────────────────────────────────
-    public List<string> exitUnlockedSegments = new List<string>();
-
-    // ─────────────────────────────────────────────
     // SOUL JOURNEYS
     // Where each soul is on its journey across the map. Keyed by soulDataIdentity —
     // the only ID that stays true when a soul moves between levels. Additive: the boat
@@ -96,6 +89,13 @@ public float ui3DCameraX = float.MaxValue; // sentinel — slider reads camera p
     /// How far each authored soul route has been opened by the player.
     /// </summary>
     public List<RouteOpenEntry> routeProgress = new List<RouteOpenEntry>();
+
+    // ─────────────────────────────────────────────
+    // CAMERA SEQUENCES
+    // Scene cinematics that have played to the end on this save ("Scene/Object" keys),
+    // so coming back into the world doesn't play them again. New Game clears them.
+    // ─────────────────────────────────────────────
+    public List<string> playedSequences = new List<string>();
 }
 
 [Serializable]

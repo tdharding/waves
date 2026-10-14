@@ -5,8 +5,9 @@ using UnityEngine;
 // The angel who travels with you. She flies high over the boat, comes down onto rocks as you reach
 // them, and can be talked to once she is settled.
 //
-//   flying ....... She holds a position above the boat, smoothed so she trails as you sail and
-//                  settles as you slow. AngelFlying1.
+//   flying ....... She flies a figure of eight in the sky above the boat, the whole eight
+//                  trailing the boat as you sail — or, in Follow Boat, holds the point straight
+//                  above it, smoothed so she trails as you sail and settles as you slow. AngelFlying1.
 //   swooping ..... The boat has entered a perch's radius, so she leaves the flight and curves down
 //                  onto the tip of that rock. AngelLanding, tweened to at the start of the descent.
 //   perched ...... Stood on the point, turned to face the boat. She stays for as long as you are
@@ -57,16 +58,42 @@ public class AngelCompanion : MonoBehaviour
     [Tooltip("Blend time between states, in seconds.")]
     [SerializeField] float crossFadeTime = 0.35f;
 
+    public enum FlightMode { FigureEight, FollowBoat }
+
     [Header("Flight")]
+    [Tooltip("Figure Eight: she flies a figure of eight in the sky above the boat, and the whole " +
+             "eight follows the boat. Follow Boat: she holds the point straight above the boat.")]
+    [SerializeField] FlightMode flightMode = FlightMode.FigureEight;
+
     [Tooltip("How far above the boat she flies.")]
     [SerializeField] float flyHeight = 6f;
 
     [Tooltip("How long she takes to catch up to the point above the boat. Larger = she trails " +
-             "further behind while you are sailing and drifts in as you slow.")]
+             "further behind while you are sailing and drifts in as you slow. In Figure Eight it " +
+             "is the whole eight that trails.")]
     [SerializeField] float followSmoothTime = 1.2f;
 
     [Tooltip("Fastest she will chase the boat, in units per second. 0 = no limit.")]
     [SerializeField] float followMaxSpeed = 0f;
+
+    [Header("Figure Eight")]
+    [Tooltip("Smallest the left loop of the eight gets — how far it reaches out from the middle. " +
+             "A new size between min and max is picked each time she starts the loop.")]
+    [SerializeField] float leftLoopSizeMin = 3f;
+
+    [Tooltip("Largest the left loop of the eight gets.")]
+    [SerializeField] float leftLoopSizeMax = 5f;
+
+    [Tooltip("Smallest the right loop of the eight gets — how far it reaches out from the middle. " +
+             "A new size between min and max is picked each time she starts the loop.")]
+    [SerializeField] float rightLoopSizeMin = 3f;
+
+    [Tooltip("Largest the right loop of the eight gets.")]
+    [SerializeField] float rightLoopSizeMax = 5f;
+
+    [Tooltip("How fast she flies along the eight, in units per second — the same pace on a big " +
+             "loop as a small one.")]
+    [SerializeField] float loopSpeed = 2f;
 
     [Header("Facing")]
     [Tooltip("How fast she turns, in degrees per second.")]
@@ -79,7 +106,7 @@ public class AngelCompanion : MonoBehaviour
     [SerializeField] float minTurnSpeed = 0.15f;
 
     [Tooltip("A bone in her armature that turns about its own Y axis to face the boat while she is " +
-             "perched or talking, instead of the whole prefab turning. Left empty, the whole prefab " +
+             "perched, instead of the whole prefab turning. Talking, she keeps the animation's own pose. Left empty, the whole prefab " +
              "turns as before. In flight her whole body still faces the way she is going.")]
     [SerializeField] Transform faceBoatBone;
 
@@ -159,10 +186,19 @@ public class AngelCompanion : MonoBehaviour
     Transform       _boat;
     bool            _placed;    // has she been put on her flight line yet?
 
+    // The figure eight. Its middle trails the boat in the sky whatever she is doing, so a take-off
+    // climbs to where the eight is now; where she is ON it only moves while she is flying it.
+    Vector3 _eightCentre;
+    Vector3 _eightCentreVelocity;
+    bool    _eightPlaced;
+    float   _eightPhase;      // 0..2π round the eight: 0..π the right loop, π..2π the left
+    float   _eightLeftSize;
+    float   _eightRightSize;
+
     // The face-the-boat bone, turned on top of whatever the animation posed it at this frame.
     float      _boneYaw;         // degrees it is turned now
     float      _boneYawWanted;   // degrees it is heading for; 0 = back to the animation's pose
-    bool       _boneLooking;     // perched or talking asked it to face the boat this frame
+    bool       _boneLooking;     // perched asked it to face the boat this frame
     Vector3    _boneLookAt;      // flat direction to the boat when it did
     bool       _boneTurned;      // has a turn been written to it yet?
     Quaternion _boneBase;        // its local rotation before this frame's turn
@@ -267,6 +303,7 @@ public class AngelCompanion : MonoBehaviour
         if (!_placed)
         {
             _placed = true;
+            PlaceEight(boat);
 
             // A scene can open with her already stood somewhere — the level select map does, so
             // she is part of the view before the boat has gone anywhere. Taken here rather than in
@@ -293,9 +330,14 @@ public class AngelCompanion : MonoBehaviour
         // mid-sentence with her head turned wherever it happened to be.
         float dt = _externalTalk ? Time.unscaledDeltaTime : Time.deltaTime;
 
-        // Back to the animation's own pose unless perched or talking asks for a turn this frame.
+        // Back to the animation's own pose unless perched asks for a turn this frame.
         _boneYawWanted = 0f;
         _boneLooking   = false;
+
+        // The eight trails the boat whatever she is doing — except while a turret holds her in
+        // flight, when she is held where she is and the eight she is riding has to hold with her.
+        if (flightMode == FlightMode.FigureEight && !(_mood == Mood.Flying && TurretTowerController.AnyActive))
+            FollowEightCentre(boat, dt);
 
         switch (_mood)
         {
@@ -313,11 +355,27 @@ public class AngelCompanion : MonoBehaviour
 
     void UpdateFlying(Transform boat, float dt)
     {
+        // An active turret holds her where she is — no following, no coming down to a perch.
+        if (TurretTowerController.AnyActive)
+        {
+            _followVelocity = Vector3.zero;
+            return;
+        }
+
         Vector3 before = transform.position;
-        transform.position = Vector3.SmoothDamp(before, FlightPoint(boat), ref _followVelocity,
-                                                followSmoothTime,
-                                                followMaxSpeed <= 0f ? Mathf.Infinity : followMaxSpeed,
-                                                dt);
+        if (flightMode == FlightMode.FigureEight)
+        {
+            // On the eight itself — the trailing is already in where the eight is.
+            AdvanceEight(dt);
+            transform.position = FlightPoint(boat);
+        }
+        else
+        {
+            transform.position = Vector3.SmoothDamp(before, FlightPoint(boat), ref _followVelocity,
+                                                    followSmoothTime,
+                                                    followMaxSpeed <= 0f ? Mathf.Infinity : followMaxSpeed,
+                                                    dt);
+        }
         FaceTravel(transform.position - before, dt);
 
         // The timer only governs the rocks she is WATCHING. A priority perch is checked every
@@ -329,9 +387,77 @@ public class AngelCompanion : MonoBehaviour
         if (perch != null) BeginSwoop(perch);
     }
 
-    // The point she holds: straight above the boat. The smoothing is what turns that into a
-    // trailing follow, so there is no authored lag distance to keep in step with boat speed.
-    Vector3 FlightPoint(Transform boat) => boat.position + Vector3.up * flyHeight;
+    // Where she flies: her place on the eight, or — following the boat — straight above it. The
+    // smoothing is what turns "above the boat" into a trailing follow, so there is no authored lag
+    // distance to keep in step with boat speed.
+    Vector3 FlightPoint(Transform boat)
+    {
+        if (flightMode != FlightMode.FigureEight) return AboveBoat(boat);
+        if (!_eightPlaced) PlaceEight(boat);
+        return _eightCentre + EightOffset(_eightPhase);
+    }
+
+    Vector3 AboveBoat(Transform boat) => boat.position + Vector3.up * flyHeight;
+
+    // ── The figure eight ──
+    //
+    // Fixed in the sky: it lies along world X whichever way the boat is heading. Its two loops
+    // cross at the middle, and each loop's size is picked afresh as she starts it — at the
+    // crossing, the one point on a loop its size does not move, so a new size never jolts her.
+
+    void PlaceEight(Transform boat)
+    {
+        _eightCentre         = AboveBoat(boat);
+        _eightCentreVelocity = Vector3.zero;
+        _eightPhase          = 0f;
+        _eightRightSize      = LoopSize(rightLoopSizeMin, rightLoopSizeMax);
+        _eightLeftSize       = LoopSize(leftLoopSizeMin,  leftLoopSizeMax);
+        _eightPlaced         = true;
+    }
+
+    static float LoopSize(float min, float max) => Mathf.Max(0f, RandomBetween(min, max));
+
+    void FollowEightCentre(Transform boat, float dt)
+    {
+        if (!_eightPlaced) { PlaceEight(boat); return; }
+
+        _eightCentre = Vector3.SmoothDamp(_eightCentre, AboveBoat(boat), ref _eightCentreVelocity,
+                                          followSmoothTime,
+                                          followMaxSpeed <= 0f ? Mathf.Infinity : followMaxSpeed,
+                                          dt);
+    }
+
+    // The right loop runs 0..π, the left π..2π: x = size·sin t, z = size·sin t·cos t. Both loops
+    // pass through the middle at t = 0 and π, crossing there on the diagonal.
+    Vector3 EightOffset(float t)
+    {
+        float size = t < Mathf.PI ? _eightRightSize : _eightLeftSize;
+        float s    = Mathf.Sin(t);
+        return new Vector3(size * s, 0f, size * s * Mathf.Cos(t));
+    }
+
+    void AdvanceEight(float dt)
+    {
+        // Stepped by how fast the curve itself is moving here, so she holds one pace along it.
+        float size = _eightPhase < Mathf.PI ? _eightRightSize : _eightLeftSize;
+        float c    = Mathf.Cos(_eightPhase);
+        float c2   = Mathf.Cos(2f * _eightPhase);
+        float rate = size * Mathf.Sqrt(c * c + c2 * c2);
+        if (rate < 1e-4f) return;   // a loop sized 0 — she waits in the middle
+
+        // Capped at a quarter turn, so even a tiny loop or a long frame cannot skip one.
+        float before = _eightPhase;
+        _eightPhase += Mathf.Min(Mathf.Max(0f, loopSpeed) * dt / rate, Mathf.PI * 0.5f);
+
+        if (before < Mathf.PI && _eightPhase >= Mathf.PI)
+            _eightLeftSize = LoopSize(leftLoopSizeMin, leftLoopSizeMax);
+
+        if (_eightPhase >= Mathf.PI * 2f)
+        {
+            _eightPhase    -= Mathf.PI * 2f;
+            _eightRightSize = LoopSize(rightLoopSizeMin, rightLoopSizeMax);
+        }
+    }
 
     /// <summary>
     /// The rock she should come down to, if any. Each rock carries its own radius, so this asks
@@ -445,7 +571,7 @@ public class AngelCompanion : MonoBehaviour
     {
         // The rock could go while she is on her way down (a level rebuild, say) — back to the
         // flight rather than diving at a position that no longer belongs to anything.
-        if (_perch == null) { ReturnToFlight(); return; }
+        if (_perch == null) { LeaveVanishedPerch(); return; }
 
         _tween += dt / Mathf.Max(0.01f, swoopDuration);
 
@@ -515,7 +641,7 @@ public class AngelCompanion : MonoBehaviour
 
     void UpdatePerched(Transform boat, float dt)
     {
-        if (_perch == null) { ReturnToFlight(); return; }
+        if (_perch == null) { LeaveVanishedPerch(); return; }
 
         transform.position = PerchPoint(_perch);
         FaceBoat(boat, dt);
@@ -532,6 +658,9 @@ public class AngelCompanion : MonoBehaviour
             if (distance > _perch.PerchRadius) return;
             _holdingStart = false;
         }
+
+        // An active turret keeps her on the perch however far off the boat goes.
+        if (TurretTowerController.AnyActive) return;
 
         // She stays for as long as you are here. The margin is measured OUTSIDE the radius that
         // brought her down, so drifting on the line cannot make her land and leave repeatedly.
@@ -609,10 +738,10 @@ public class AngelCompanion : MonoBehaviour
     {
         if (_perch == null) { EndTalking(); return; }
 
-        // Held on the point and facing you. The boat is anchored, so there is no leaving to check
-        // for — the conversation ends on the key and nothing else.
+        // Held on the point, in the talking animation's own pose — no turn toward the boat, so the
+        // face-the-boat bone eases back to how the animation has it. The boat is anchored, so there
+        // is no leaving to check for — the conversation ends on the key and nothing else.
         transform.position = PerchPoint(_perch);
-        FaceBoat(boat, dt);
 
         // The scene's own conversation: it owns the key, the lines and the closing, so there is
         // nothing here but standing still and talking.
@@ -699,7 +828,7 @@ public class AngelCompanion : MonoBehaviour
             PlayState(perchedState);
             _mood = Mood.Perched;
         }
-        else ReturnToFlight();
+        else LeaveVanishedPerch();
     }
 
     // ── Her camera ──
@@ -831,12 +960,23 @@ public class AngelCompanion : MonoBehaviour
         _tween += dt / Mathf.Max(0.01f, takeOffDuration);
 
         // Aimed at where the flight is NOW, recomputed each frame, so a boat that sails on during
-        // the climb is followed rather than left behind.
+        // the climb is followed rather than left behind. On the eight she climbs to a point that
+        // is already travelling round it, so she arrives moving with it.
+        if (flightMode == FlightMode.FigureEight) AdvanceEight(dt);
+
         Vector3 before = transform.position;
         transform.position = ArcPoint(_tweenFrom, FlightPoint(boat), Mathf.Clamp01(_tween));
         FaceTravel(transform.position - before, dt);
 
         if (_tween >= 1f) ReturnToFlight();
+    }
+
+    // Following the boat she simply eases back to it. The eight is somewhere else in the sky by
+    // now and she rides it exactly rather than easing onto it, so she climbs to it as from a rock.
+    void LeaveVanishedPerch()
+    {
+        if (flightMode == FlightMode.FigureEight) BeginTakeOff();
+        else                                      ReturnToFlight();
     }
 
     void ReturnToFlight()
@@ -867,7 +1007,7 @@ public class AngelCompanion : MonoBehaviour
         transform.rotation = Quaternion.RotateTowards(transform.rotation, want, turnSpeed * dt);
     }
 
-    // Perched or talking: the face-the-boat bone turns if one is set, otherwise her whole body.
+    // Perched: the face-the-boat bone turns if one is set, otherwise her whole body.
     void FaceBoat(Transform boat, float dt)
     {
         Vector3 toBoat = boat.position - transform.position;
@@ -972,14 +1112,55 @@ public class AngelCompanion : MonoBehaviour
 #if UNITY_EDITOR
     void OnDrawGizmosSelected()
     {
-        var       ldc  = LevelDataController.Instance;
-        Transform boat = ldc != null ? ldc.GetBoatRoot() : null;
-        if (boat == null) return;
-
         // The ranges belong to the rocks now, and each AngelPerchPoint draws its own.
-        // The point she holds when flying.
-        Gizmos.color = new Color(1f, 1f, 1f, 0.5f);
-        Gizmos.DrawLine(boat.position, FlightPoint(boat));
+        // In prefab mode the boat found would be the open scene's, nowhere near her — so none.
+        bool      inPrefabMode = UnityEditor.SceneManagement.PrefabStageUtility.GetPrefabStage(gameObject) != null;
+        Transform boat         = inPrefabMode ? null : Boat;
+
+        // The point she holds when flying — the middle of the eight.
+        if (boat != null)
+        {
+            Gizmos.color = new Color(1f, 1f, 1f, 0.5f);
+            Gizmos.DrawLine(boat.position, AboveBoat(boat));
+        }
+
+        if (flightMode != FlightMode.FigureEight) return;
+
+        // Playing: the eight she is actually flying, where it actually is, at this lap's sizes.
+        if (Application.isPlaying && _eightPlaced)
+        {
+            Gizmos.color = new Color(1f, 1f, 1f, 0.9f);
+            DrawEightGizmo(_eightCentre, _eightLeftSize, _eightRightSize);
+            return;
+        }
+
+        // Not playing: the range her laps vary across — smallest faint, largest solid. Over the
+        // boat if the scene has one; with none (prefab mode) she stands in for the middle.
+        Vector3 centre = boat != null ? AboveBoat(boat) : transform.position;
+
+        Gizmos.color = new Color(1f, 1f, 1f, 0.35f);
+        DrawEightGizmo(centre, Mathf.Min(leftLoopSizeMin, leftLoopSizeMax),
+                               Mathf.Min(rightLoopSizeMin, rightLoopSizeMax));
+
+        Gizmos.color = new Color(1f, 1f, 1f, 0.9f);
+        DrawEightGizmo(centre, Mathf.Max(leftLoopSizeMin, leftLoopSizeMax),
+                               Mathf.Max(rightLoopSizeMin, rightLoopSizeMax));
+    }
+
+    // The same curve EightOffset flies: right loop over 0..π, left over π..2π.
+    static void DrawEightGizmo(Vector3 centre, float left, float right)
+    {
+        const int Steps = 96;
+        Vector3 prev = centre;
+        for (int i = 1; i <= Steps; i++)
+        {
+            float   t    = i * Mathf.PI * 2f / Steps;
+            float   size = t <= Mathf.PI ? right : left;
+            float   s    = Mathf.Sin(t);
+            Vector3 p    = centre + new Vector3(size * s, 0f, size * s * Mathf.Cos(t));
+            Gizmos.DrawLine(prev, p);
+            prev = p;
+        }
     }
 #endif
 }

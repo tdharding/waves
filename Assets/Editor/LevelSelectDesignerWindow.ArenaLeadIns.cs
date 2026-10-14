@@ -29,7 +29,8 @@ using UnityEngine;
 public partial class LevelSelectDesignerWindow
 {
     private bool IsLeadInNode(string nodeId)
-        => _data.PoolOfLeadIn(nodeId) != null || _data.ArenaOfLeadIn(nodeId) != null;
+        => _data.PoolOfLeadIn(nodeId) != null || _data.ArenaOfLeadIn(nodeId) != null
+        || _data.JunctionOfLeadIn(nodeId) != null;
 
     // Lead-ins, and entrances of an arena whose entrances are on compass points.
     private bool IsLockedNode(string nodeId)

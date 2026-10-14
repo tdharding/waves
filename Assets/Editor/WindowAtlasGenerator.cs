@@ -38,7 +38,7 @@ public static class WindowAtlasGenerator
     static readonly string[][] TopGlyphs      = { Tee, Plus, Eye, Post, Bars, Aich };
     static readonly string[][] SideGlyphs     = { Post, Eye, Ell, Tee, Bars, Ring };
 
-    [MenuItem("Tools/Waves/Generate Window Atlas")]
+    [MenuItem("Tools/Studios/Generate Window Atlas", false, 321)]
     public static void Generate()
     {
         int w = Cols * Cell, h = Rows * Cell;

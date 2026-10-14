@@ -23,7 +23,7 @@ public class SteppedBuildingStudio : EditorWindow
 
     GameObject preview;
 
-    [MenuItem("Tools/Waves/Stepped Building Studio")]
+    [MenuItem("Tools/Studios/Stepped Building Studio", false, 301)]
     static void Open() => GetWindow<SteppedBuildingStudio>("Stepped Building");
 
     void OnGUI()

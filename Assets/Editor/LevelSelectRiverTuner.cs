@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public class LevelSelectRiverTuner : EditorWindow
 {
-    [MenuItem("Tools/Waves/Level Select River Tuner")]
+    [MenuItem("Tools/Tuners/Level Select River Tuner", false, 220)]
     public static void Open() => GetWindow<LevelSelectRiverTuner>("Level Select River Tuner");
 
     private const string PrefPreset  = "LevelSelectRiverTuner_PresetGUID";
@@ -22,6 +22,7 @@ public class LevelSelectRiverTuner : EditorWindow
     [SerializeField] private LevelSelectRiverWaterPreset  activePreset;
     [SerializeField] private bool                    applyLive = true;
     [SerializeField] private RiverEdgeRippleSettings edgeRipples = new RiverEdgeRippleSettings();
+    [SerializeField] private RiverSoulZoneSettings   soulZone    = new RiverSoulZoneSettings();
 
     // Not part of the preset and never saved with one: it is a way of READING the water, not a
     // way the water is meant to look. The world holds its own on the designer data; this is the
@@ -69,6 +70,7 @@ public class LevelSelectRiverTuner : EditorWindow
     private void TakeOver()
     {
         RiverEdgeRippleSettings.Live      = applyLive ? edgeRipples : null;
+        RiverSoulZoneSettings.Live        = applyLive ? soulZone    : null;
         RiverEdgeRippleSettings.LiveDebug = debugView;
         SceneView.RepaintAll();
     }
@@ -94,6 +96,7 @@ public class LevelSelectRiverTuner : EditorWindow
     private void HandBack()
     {
         if (RiverEdgeRippleSettings.Live == edgeRipples) RiverEdgeRippleSettings.Live = null;
+        if (RiverSoulZoneSettings.Live   == soulZone)    RiverSoulZoneSettings.Live   = null;
         SceneView.RepaintAll();
     }
 
@@ -112,6 +115,7 @@ public class LevelSelectRiverTuner : EditorWindow
         if (!applyLive) return;
 
         RiverEdgeRippleSettings.Push(edgeRipples);
+        RiverSoulZoneSettings.Push(soulZone);
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -130,6 +134,12 @@ public class LevelSelectRiverTuner : EditorWindow
 
         _scroll = EditorGUILayout.BeginScrollView(_scroll);
 
+        var data = TunerMaterialLinks.WorldData();
+        TunerMaterialLinks.Draw("LevelSelectRiverTuner_MaterialsOpen",
+            new[] { "Water" },
+            new[] { data != null ? data.waterMaterial : null });
+
+        EditorGUILayout.Space();
         DrawDebugRow();
 
         EditorGUILayout.Space();
@@ -160,6 +170,25 @@ public class LevelSelectRiverTuner : EditorWindow
 
         EditorGUILayout.Space();
 
+        EditorGUILayout.LabelField("Soul Zone", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField(
+            "The band drawn along a soul route when its souls are released. It draws out from the " +
+            "route's origin at Zone Draw Speed (on the Travelling Soul Fish Controller) and the fish " +
+            "follow behind it. Its width is each route's " +
+            "Band Width in the Level Select Designer. Nothing shows until the TravellingSoulZone " +
+            "subgraph is wired into the water graph.",
+            EditorStyles.wordWrappedMiniLabel);
+
+        EditorGUI.BeginChangeCheck();
+        DrawChildren(_window.FindProperty("soulZone"));
+        if (EditorGUI.EndChangeCheck())
+        {
+            _window.ApplyModifiedProperties();
+            TakeOver();
+        }
+
+        EditorGUILayout.Space();
+
         // The one thing in the effect that is NOT a global. Where two waters lap over each other
         // is geometry, so it is authored on the world and needs a rebuild — saying so here is
         // what stops it being hunted for among the sliders above.
@@ -176,6 +205,18 @@ public class LevelSelectRiverTuner : EditorWindow
         EditorGUILayout.EndScrollView();
 
         _window.ApplyModifiedProperties();
+    }
+
+    private static void DrawChildren(SerializedProperty parent)
+    {
+        var end   = parent.GetEndProperty();
+        var field = parent.Copy();
+        field.NextVisible(true);
+        while (!SerializedProperty.EqualContents(field, end))
+        {
+            EditorGUILayout.PropertyField(field, true);
+            if (!field.NextVisible(false)) break;
+        }
     }
 
     private void DrawToolbar()
@@ -290,6 +331,7 @@ public class LevelSelectRiverTuner : EditorWindow
         if (activePreset == null) return;
 
         edgeRipples.CopyFrom(activePreset.edgeRipples);
+        soulZone.CopyFrom(activePreset.soulZone);
         _window = new SerializedObject(this);
         TakeOver();
         Repaint();
@@ -302,16 +344,23 @@ public class LevelSelectRiverTuner : EditorWindow
         if (!EditorUtility.DisplayDialog(
                 "Save Level Select River Water Preset",
                 $"Overwrite '{activePreset.name}' with the current tuner values?\n\n" +
-                "This cannot be undone from disk.",
+                "This cannot be undone from disk.\n\n" +
+                TunerSaveChanges.Describe(activePreset, WriteTo),
                 "Save", "Cancel"))
             return;
 
         Undo.RecordObject(activePreset, "Save Level Select River Water Preset");
-        activePreset.edgeRipples.CopyFrom(edgeRipples);
+        WriteTo(activePreset);
         EditorUtility.SetDirty(activePreset);
         AssetDatabase.SaveAssetIfDirty(activePreset);
 
         Debug.Log($"[LevelSelectRiverTuner] Saved to {activePreset.name}");
+    }
+
+    private void WriteTo(LevelSelectRiverWaterPreset preset)
+    {
+        preset.edgeRipples.CopyFrom(edgeRipples);
+        preset.soulZone.CopyFrom(soulZone);
     }
 
     private void SaveAsNewPreset()
@@ -323,6 +372,7 @@ public class LevelSelectRiverTuner : EditorWindow
 
         var preset = CreateInstance<LevelSelectRiverWaterPreset>();
         preset.edgeRipples.CopyFrom(edgeRipples);
+        preset.soulZone.CopyFrom(soulZone);
 
         AssetDatabase.CreateAsset(preset, path);
         AssetDatabase.SaveAssets();

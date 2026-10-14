@@ -12,11 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 62a877791e9312444a218bdc460321c9, type: 3}
   m_Name: LevelSelectFogMap1
   m_EditorClassIdentifier: Assembly-CSharp::FogMap
-  obstacleRange: 30
-  repelLimit: 64
+  obstacleRange: 28.2
+  repelLimit: 59
   maskLimit: 128
   properties:
-    spineBend1: -0.368
+    spineBend1: -0.099
     spineBend2: 0.36
     spineStiffness: 0.302
     limbification: 1
@@ -36,15 +36,15 @@ MonoBehaviour:
     radiusVariation: 0.22
     heightUndulation: 0.25
     heightUndulationScale: 2
-  blobCount: 48
-  spacing: 1.9
-  blobScaleMin: 5.8
-  blobScaleMax: 7.2
+  blobCount: 53
+  spacing: 5.79
+  blobScaleMin: 2.1
+  blobScaleMax: 5.8
   fogOpacity: 1
   maskRadius: 26.7
   maskFeather: 0.75
-  windAngle: 20
-  windSpeed: 0.4
+  windAngle: 257
+  windSpeed: 2.71
   unitsPerTexel: 0.3
   maxGridResolution: 128
   heightMapQuality: 0
@@ -54,10 +54,11 @@ MonoBehaviour:
   spawnRadius: 25.9
   cullRadius: 27.2
   globalRepelStrength: 1
-  rockRepelRadius: 0.7
-  rockRepelStrength: 1
-  rockMaskRadius: 2.2
-  rockMaskFeather: 0.12
+  rocksRepel: 1
+  rockRepelRadius: 1.27
+  rockRepelStrength: 3.17
+  rockMaskRadius: 1.48
+  rockMaskFeather: 0.84
   rockRescanInterval: 2
   lampClearFraction: 0.35
   lampRepelRadius: 0.34
@@ -65,9 +66,10 @@ MonoBehaviour:
   lampMaskRadius: 0.34
   lampMaskFeather: 0.2
   runsRepel: 1
+  naturalRunsRepel: 0
   runChainSpacing: 3.1
-  runRepelRadius: 1.04
-  runRepelStrength: 0.5
+  runRepelRadius: 2.15
+  runRepelStrength: 2.95
   runMaskRadius: 1.18
   runMaskFeather: 0.6
   poolsRepel: 1
@@ -86,20 +88,20 @@ MonoBehaviour:
   boatMaskFeather: 0.4
   fogMaterial: {fileID: 2100000, guid: 46e2e25193da1f44e8078d278e21e7f9, type: 2}
   overrideLook: 1
-  threshold: 0.274
+  threshold: 0.178
   edgeSoftness: 0.1434
   undulationAmount: 0
   undulationScale: 0.05
   lipWidth: 0.132
   lipLighting: 1.92
   lipCurvature: 0.55
-  heightScale: 1.6
+  heightScale: 1.07
   fogColour: {r: 0.4433962, g: 0.4433962, b: 0.4433962, a: 1}
   litColour: {r: 1, g: 1, b: 1, a: 1}
-  ambient: 0.609
+  ambient: 0.74
   interiorFill: 1
-  transparencyFalloff: 0.57
-  grainAmount: 0.23
-  grainScale: 1
+  transparencyFalloff: 0.29
+  grainAmount: 0.56
+  grainScale: 1.1
   edgeShadowWidth: 0.687
-  edgeShadowStrength: 2.05
+  edgeShadowStrength: 2.76

@@ -4,18 +4,161 @@ using UnityEngine.Serialization;
 using System.Collections.Generic;
 
 /// <summary>
-/// Which of the three stone colours a part of a piece takes. Auto leaves it to RiverMeshBuilder to
-/// work out from where the face sits, which is what every part got before it could be chosen. The
-/// numbers are what RiverMeshBuilder bakes into UV2.x and RiverRunShading.hlsl reads, so they must
-/// not change.
+/// Which stone type a part of a piece takes — A, B, C, D, and any added after them (E is 5, F is
+/// 6 and so on, cast from the number; only the four every world has are named). Auto leaves it to
+/// RiverMeshBuilder to work out from where the face sits: outer faces A, the rim lip B, the inside
+/// of a channel C. The numbers are what RiverMeshBuilder bakes into UV2.x and RiverRunShading.hlsl
+/// reads, so they must not change — A, B and C are the 1, 2 and 3 that outer, rim and inner were
+/// baked as before there were stone types, so a piece built then still takes the same colours.
 /// </summary>
 public enum StoneFaceKind
 {
-    Auto  = 0,
-    Outer = 1,
-    Rim   = 2,
-    Inner = 3,
+    Auto = 0,
+    A    = 1,
+    B    = 2,
+    C    = 3,
+    D    = 4,
 }
+
+/// <summary>Which way a stone type's gradient runs across the piece it is on.</summary>
+public enum StoneGradientDirection
+{
+    BottomToTop = 0,
+    TopToBottom = 1,
+    LeftToRight = 2,
+    RightToLeft = 3,
+}
+
+/// <summary>
+/// A stone type's own look: its colour, or a gradient across the whole piece in its place, and the
+/// noise grain laid over it. The world holds a list of these — A, B, C, D and any added after —
+/// and every part of every piece picks one.
+/// </summary>
+[System.Serializable]
+public class StoneType
+{
+    [Tooltip("The stone's colour. Replaced by the gradient while Use Gradient is on.")]
+    public Color colour = new Color(0.786f, 0.786f, 0.786f, 1f);
+
+    [Tooltip("How wide one cell of the grain is, in metres. 0 turns it off.")]
+    [Min(0f)] public float grainSize = 0.02f;
+
+    [Tooltip("How far the grain pulls either side of the colour. 0 leaves it clean.")]
+    [Range(0f, 1f)] public float grainStrength = 0.3f;
+
+    [Tooltip("Colour the stone with the gradient instead of the one colour, run across the " +
+             "whole of each piece this stone type is on.")]
+    public bool useGradient;
+
+    [Tooltip("The colours run across the piece, from where the direction starts to where it ends.")]
+    public Gradient gradient = Grey();
+
+    [Tooltip("Which way the gradient runs. Up and down go from the foot of the piece to its top; " +
+             "left and right go across it along the world's X, which is left to right on screen " +
+             "from the level select camera.")]
+    public StoneGradientDirection gradientDirection = StoneGradientDirection.BottomToTop;
+
+    [Tooltip("The colour gathered along the seams of this stone — every hard corner it has, " +
+             "inner or outer. Where two stone types meet, each side draws its own.")]
+    public Color seamColour = Color.black;
+
+    [Tooltip("How much of that colour sits on the seam itself. 0 turns this stone's seams off " +
+             "and gives it back exactly as it was.")]
+    [Min(0f)] public float seamStrength = 1f;
+
+    [Tooltip("How far the gradient reaches off each seam, as a percentage of the width of the " +
+             "surface it runs across — a rim strip's width, a wall's height, a channel's width. " +
+             "50 has the two edges of a surface meeting in the middle. 0 turns the seams off.")]
+    [Range(0f, 100f)] public float seamExtentPercent = 20f;
+
+    // Whether the seams above have been set on this stone at all. Off on a stone saved before
+    // seams were per stone, which EnsureStoneTypes then hands the world's old shared seams.
+    [HideInInspector] public bool seamsSet;
+
+    [Tooltip("How many of the scatter's places on this stone actually hold a decal, 0 to 1. It " +
+             "thins the scatter out without moving what is left, so turning it down opens gaps " +
+             "rather than pulling the decals closer together. 0 draws none on this stone.")]
+    [Range(0f, 1f)] public float decalAmount = 0f;
+
+    [Tooltip("How much of this stone each decal hides, 0 to 1. A different question from " +
+             "Amount: that is how MANY marks there are, this is how far each of them sinks " +
+             "into the stone. 0 draws none.")]
+    [Range(0f, 1f)] public float decalOpacity = 1f;
+
+    [Tooltip("How far apart the places a decal can stand are on this stone, in metres. Two " +
+             "stones with the same spacing share one scatter, so a decal crossing from one to " +
+             "the other carries on unbroken while their scales match.")]
+    [Min(0f)] public float decalSpacing = 0.15f;
+
+    [Tooltip("The smallest a decal is drawn on this stone, in metres across its longest side.")]
+    [Min(0f)] public float decalScaleMin = 0.04f;
+
+    [Tooltip("The largest a decal is drawn on this stone, in metres across its longest side. " +
+             "Past about six times the spacing the biggest decals start being cut off square.")]
+    [Min(0f)] public float decalScaleMax = 0.09f;
+
+    [Tooltip("Turn some of this stone's decals by a random quarter turn — 90, 180 or 270 " +
+             "degrees, never mirrored.")]
+    public bool decalRotate;
+
+    [Tooltip("How many of this stone's decals are turned, 0 to 1. The rest stand as drawn. " +
+             "Only read while Random 90° Rotation is on.")]
+    [Range(0f, 1f)] public float decalRotateAmount = 0.5f;
+
+    // Whether the decals above have been set on this stone at all. Off on a stone saved before
+    // decals were per stone, which EnsureStoneTypes then hands the world's old shared decals.
+    [HideInInspector] public bool decalsSet;
+
+    /// <summary>The default gradient: grey to grey, because the game is black and white.</summary>
+    public static Gradient Grey()
+    {
+        var g = new Gradient();
+        g.SetKeys(
+            new[] { new GradientColorKey(new Color(0.5f, 0.5f, 0.5f), 0f),
+                    new GradientColorKey(new Color(0.786f, 0.786f, 0.786f), 1f) },
+            new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(1f, 1f) });
+        return g;
+    }
+
+    public void CopyFrom(StoneType other)
+    {
+        if (other == null) return;
+
+        colour            = other.colour;
+        grainSize         = other.grainSize;
+        grainStrength     = other.grainStrength;
+        useGradient       = other.useGradient;
+        gradientDirection = other.gradientDirection;
+        seamColour        = other.seamColour;
+        seamStrength      = other.seamStrength;
+        seamExtentPercent = other.seamExtentPercent;
+        seamsSet          = other.seamsSet;
+        decalAmount       = other.decalAmount;
+        decalOpacity      = other.decalOpacity;
+        decalSpacing      = other.decalSpacing;
+        decalScaleMin     = other.decalScaleMin;
+        decalScaleMax     = other.decalScaleMax;
+        decalRotate       = other.decalRotate;
+        decalRotateAmount = other.decalRotateAmount;
+        decalsSet         = other.decalsSet;
+
+        // A Gradient is a reference, so it is copied key by key — sharing one would have the
+        // tuner's working copy edit the preset's gradient underneath it.
+        var g = new Gradient();
+        if (other.gradient != null)
+        {
+            g.mode = other.gradient.mode;
+            g.SetKeys(other.gradient.colorKeys, other.gradient.alphaKeys);
+        }
+        gradient = g;
+    }
+}
+
+/// <summary>
+/// On a <see cref="StoneFaceKind"/> field: the dropdown lists only the stone types, no Auto —
+/// for a choice that is always one of them, like which stone a river run's outer faces take.
+/// </summary>
+public class StoneTypeOnlyAttribute : PropertyAttribute { }
 
 /// <summary>Tagging the triangles of a piece with the stone colour each part takes.</summary>
 public static class StoneFaces
@@ -43,8 +186,8 @@ public static class StoneFaces
 }
 
 /// <summary>
-/// How the level select's stone rivers are shaded: the stone's own colour, one for each part of a
-/// run and grained with a noise, dark gathered along every seam, white rising off the waterline
+/// How the level select's stone rivers are shaded: the stone's own colour, a stone type for each
+/// part of a piece and grained with a noise, dark gathered along every seam, white rising off the waterline
 /// up the inside of the channel, and hand-drawn decals scattered over the lot.
 ///
 /// These are bare $Globals in the shader, not properties on the run material — one set of numbers
@@ -60,9 +203,9 @@ public static class StoneFaces
 /// on a preset of their own — they are a different material on different geometry, tuned in a
 /// different window, and holding the two on one asset only gave them somewhere to drift apart.
 ///
-/// The seam extent is a PERCENTAGE of the width of the surface a face belongs to — one number for
-/// every piece, so a wide river, a thin one, an outpost wall and a tower stem each get a gradient
-/// in proportion to themselves. The waterline extent is metres. The seams, the surface widths and
+/// The seams are set per stone type. Their extent is a PERCENTAGE of the width of the surface a
+/// face belongs to, so a wide river, a thin one, an outpost wall and a tower stem each get a
+/// gradient in proportion to themselves. The waterline extent is metres. The seams, the surface widths and
 /// which colour each face takes are worked out as each piece is generated and baked into UV1/UV2 —
 /// so the numbers here are live, while the part colour choices need the pieces rebuilt.
 ///
@@ -77,84 +220,85 @@ public class RiverRunShadingSettings
     // ─────────────────────────────────────────────────────────────
     // THE STONE
     //
-    // Three colours rather than one, because a run shows three quite different things: the OUTER
-    // faces it turns to the world — the outer walls, the underside, the open ends — the RIM lip
-    // laid flat round the top, and the INNER faces of the channel the water runs down.
+    // A list of stone types — A, B, C, D, and any added after them — each a colour (or a gradient
+    // across the whole piece in its place) with its own noise grain. Every part of every piece
+    // picks one: a river run's outer faces, rim and channel below, every part of an outpost, a
+    // tower, a wall or a door in the sections further down.
     //
-    // Which of the three a face is cannot be worked out in the shader. A steep channel wall and
-    // an outer wall are both very nearly vertical, and telling them apart needs to know which
-    // side of the piece a face is on — so RiverMeshBuilder settles it as the piece is generated
-    // and bakes it into UV2, exactly as it does the seams. A run built before that needs a
-    // Rebuild Runs before any of these three can reach it, and until then it keeps the one
-    // colour the run graph hands it.
-    // ─────────────────────────────────────────────────────────────
-
-    // Each of the three carries its own grain. Grain size is how wide one cell of the noise is,
-    // in metres — the rivers are small out here, so a couple of centimetres is already coarse —
-    // and 0 turns it off. Strength is how far the grain pulls either side of the colour: it
-    // darkens and lightens by as much as each other, so it grains a colour without dragging it
-    // down, and it goes on last, over the seams and the waterline too. 0 leaves the stone clean.
+    // Grain size is how wide one cell of the noise is, in metres — the rivers are small out here,
+    // so a couple of centimetres is already coarse — and 0 turns it off. Strength is how far the
+    // grain pulls either side of the colour: it darkens and lightens by as much as each other, so
+    // it grains a colour without dragging it down, and it goes on last, over the seams and the
+    // waterline too. 0 leaves the stone clean.
     //
-    // The grains were one shared pair before, so each of the three picks up that pair from a
-    // preset saved then.
-
-    [Header("Stone — every piece")]
-    [Header("Outer")]
-    [Tooltip("The outer walls, the underside, and the open ends where one piece butts onto the " +
-             "next — everything the run turns to the world rather than to the water.")]
-    public Color outerColour = new Color(0.786f, 0.786f, 0.786f, 1f);
-
-    [Tooltip("How wide one cell of the grain is on outer faces, in metres. 0 turns it off.")]
-    [FormerlySerializedAs("grainSize")]
-    [Min(0f)] public float outerGrainSize = 0.02f;
-
-    [Tooltip("How far the grain pulls either side of the outer colour. 0 leaves it clean.")]
-    [FormerlySerializedAs("grainStrength")]
-    [Range(0f, 1f)] public float outerGrainStrength = 0.3f;
-
-    [Header("Rim")]
-    [Tooltip("The flat lip laid round the top of the run, between the outer wall and the channel.")]
-    public Color rimColour = new Color(0.786f, 0.786f, 0.786f, 1f);
-
-    [Tooltip("How wide one cell of the grain is on rim faces, in metres. 0 turns it off.")]
-    [FormerlySerializedAs("grainSize")]
-    [Min(0f)] public float rimGrainSize = 0.02f;
-
-    [Tooltip("How far the grain pulls either side of the rim colour. 0 leaves it clean.")]
-    [FormerlySerializedAs("grainStrength")]
-    [Range(0f, 1f)] public float rimGrainStrength = 0.3f;
-
-    [Header("Inner")]
-    [Tooltip("The inside of the channel — the faces the water runs down, above the surface and " +
-             "below it.")]
-    public Color innerColour = new Color(0.786f, 0.786f, 0.786f, 1f);
-
-    [Tooltip("How wide one cell of the grain is on inner faces, in metres. 0 turns it off.")]
-    [FormerlySerializedAs("grainSize")]
-    [Min(0f)] public float innerGrainSize = 0.02f;
-
-    [Tooltip("How far the grain pulls either side of the inner colour. 0 leaves it clean.")]
-    [FormerlySerializedAs("grainStrength")]
-    [Range(0f, 1f)] public float innerGrainStrength = 0.3f;
-
-    // ─────────────────────────────────────────────────────────────
-    // THE SEAMS
+    // Before there were stone types there were three fixed colours — outer, rim and inner — and
+    // a preset saved then carries them in the hidden legacy fields at the bottom of this class.
+    // They become A, B and C the first time the list is asked for (see EnsureStoneTypes), which
+    // is also what a mesh built then reads: its faces were baked 1, 2 and 3.
     // ─────────────────────────────────────────────────────────────
 
-    [Header("Seams — every piece")]
-    [Tooltip("The colour gathered along the seams — every hard corner, inner or outer: a rim's " +
-             "two edges, the foot and top of a wall, where a tower's stem meets its base and orb.")]
-    public Color seamColour = Color.black;
+    /// <summary>The most stone types a world can hold — the length of the shader's arrays.</summary>
+    public const int MaxStoneTypes = 16;
 
-    [Tooltip("How much of that colour sits on the seam itself. 0 turns the seams off entirely " +
-             "and gives the stone back exactly as it was.")]
-    [Min(0f)] public float seamStrength = 1f;
+    /// <summary>A, B, C and D: every world has these, and they cannot be removed.</summary>
+    public const int FixedStoneTypes = 4;
 
-    [Tooltip("How far the gradient reaches off each seam, as a percentage of the width of the " +
-             "surface it runs across — a rim strip's width, a wall's height, a channel's width. " +
-             "One number for every piece, so each is shaded in proportion to its own size. 50 " +
-             "has the two edges of a surface meeting in the middle. 0 turns the seams off.")]
-    [Range(0f, 100f)] public float seamExtentPercent = 20f;
+    [Header("Stone Types — every piece")]
+    [Tooltip("A, B, C, D and any added after them. Every part of every piece picks one.")]
+    public List<StoneType> stoneTypes = new List<StoneType>();
+
+    /// <summary>The letter a stone type is called by — A for the first.</summary>
+    public static string StoneLetter(int index) => ((char)('A' + index)).ToString();
+
+    /// <summary>
+    /// Brings the list up to at least A–D. An empty list is a preset saved before stone types
+    /// existed (or a fresh one), so A, B and C are taken from the old outer, rim and inner.
+    /// Called before anything reads the list rather than from a serialization callback, where
+    /// Unity forbids most of its own API.
+    /// </summary>
+    public void EnsureStoneTypes()
+    {
+        if (stoneTypes == null) stoneTypes = new List<StoneType>();
+
+        if (stoneTypes.Count == 0)
+        {
+            stoneTypes.Add(new StoneType
+                { colour = outerColour, grainSize = outerGrainSize, grainStrength = outerGrainStrength });
+            stoneTypes.Add(new StoneType
+                { colour = rimColour,   grainSize = rimGrainSize,   grainStrength = rimGrainStrength });
+            stoneTypes.Add(new StoneType
+                { colour = innerColour, grainSize = innerGrainSize, grainStrength = innerGrainStrength });
+        }
+
+        while (stoneTypes.Count < FixedStoneTypes) stoneTypes.Add(new StoneType());
+
+        foreach (var type in stoneTypes)
+        {
+            if (type == null) continue;
+            if (type.gradient == null) type.gradient = StoneType.Grey();
+
+            // A stone saved before seams were per stone — or one just added — starts from the
+            // seams the whole world shared, so nothing changes until it is tuned on its own.
+            if (!type.seamsSet)
+            {
+                type.seamColour        = seamColour;
+                type.seamStrength      = seamStrength;
+                type.seamExtentPercent = seamExtentPercent;
+                type.seamsSet          = true;
+            }
+
+            // Likewise the decals, from the one scatter the whole world shared before.
+            if (!type.decalsSet)
+            {
+                type.decalAmount   = decalAmount;
+                type.decalOpacity  = decalOpacity;
+                type.decalSpacing  = decalSpacing;
+                type.decalScaleMin = decalScaleMin;
+                type.decalScaleMax = decalScaleMax;
+                type.decalsSet     = true;
+            }
+        }
+    }
 
     // ─────────────────────────────────────────────────────────────
     // THE WATERLINE
@@ -203,32 +347,8 @@ public class RiverRunShadingSettings
     [HideInInspector] public int       decalSheetHeld;
     [HideInInspector] public int       decalSheetCellPixels;
 
-    [Header("Decals — every piece")]
-    [Tooltip("How many of the scatter's places actually hold a decal, 0 to 1. It thins the " +
-             "scatter out without moving what is left, so turning it down opens gaps rather " +
-             "than pulling the decals closer together. 0 draws none at all.")]
-    [Range(0f, 1f)] public float decalAmount = 0f;
-
-    [Tooltip("How much of the stone each decal hides, 0 to 1. A different question from " +
-             "Amount: that is how MANY marks there are, this is how far each of them sinks " +
-             "into the stone. Turned down, every decal stays exactly where it was and the " +
-             "size it was — the stone simply shows through it. 0 draws none.")]
-    [Range(0f, 1f)] public float decalOpacity = 1f;
-
-    [Tooltip("How far apart the places a decal can stand are, in metres. One candidate place " +
-             "every this far across the surface, with each decal standing anywhere inside its " +
-             "own square of that, so the grid they were picked on never shows as a grid.")]
-    [Min(0f)] public float decalSpacing = 0.15f;
-
-    [Tooltip("The smallest a decal is drawn, in metres across its longest side — whatever " +
-             "shape it was drawn, the long way of it comes out this big.")]
-    [Min(0f)] public float decalScaleMin = 0.04f;
-
-    [Tooltip("The largest a decal is drawn, in metres across its longest side. Every place " +
-             "draws its own size somewhere between the two. Past about six times the " +
-             "spacing the biggest decals start being cut off square, because each pixel " +
-             "only looks so far out for a decal that might be reaching it.")]
-    [Min(0f)] public float decalScaleMax = 0.09f;
+    // The scatter itself — amount, opacity, spacing and scales — is set per stone type, on
+    // StoneType. Each face scatters with its own stone's numbers.
 
     // ─────────────────────────────────────────────────────────────
     // THE LIGHT
@@ -244,26 +364,36 @@ public class RiverRunShadingSettings
     // same answer, which is a sun, and a sun cannot be aimed at anything.
     // ─────────────────────────────────────────────────────────────
 
-    // Where the light STANDS is not here: it is the world's, authored in the designer's Aesthetics
-    // and shared with the landscape hills, so the two can never be lit from two places.
-
-    [Header("Light — every piece")]
-    [Tooltip("How hard the stone is turned against the world's light (its position is in the " +
-             "designer's Aesthetics). 0 leaves it flat and unlit — the " +
-             "colour exactly as it came in — and 1 is the full turn, darkest on the faces backing " +
-             "away from the light. There is no falloff with distance: the position says which way " +
-             "the light comes from, this says how much of it there is. Past 1 the lit result is " +
-             "multiplied, up to 10x brighter on the faces toward the light.")]
-    [Range(0f, 10f)] public float lightStrength = 0.6f;
+    // The light itself — where it stands and how strong it is — is not here: it is the scene's
+    // LevelSelectLight, shared with the landscape hills, so the two can never be lit differently.
 
     // ─────────────────────────────────────────────────────────────
     // PIECE COLOURS
     //
-    // Which of the three stone colours each part of each kind of piece takes. A run's way of
-    // sorting its faces — outer walls, a flat lip, a channel — does not fit an outpost or a tower,
-    // so each part is told instead. Auto keeps what the builder worked out before this existed.
-    // Baked into the meshes, so a change here needs the pieces rebuilt.
+    // Which stone type each part of each kind of piece takes.
+    //
+    // A river run sorts its own faces — outer walls, a flat lip, a channel — and the River Runs
+    // three say which stone each of those is. They are NOT baked: the run carries which of the
+    // three a face is, and the shader looks the stone up live, so they need no rebuild (beyond
+    // the one a run built before this needs to carry the mark that says so).
+    //
+    // That way of sorting does not fit an outpost or a tower, so each of their parts is told
+    // instead. Auto keeps what the builder worked out — outer A, rim B, inner C. Those ARE baked
+    // into the meshes, so a change there needs the pieces rebuilt.
     // ─────────────────────────────────────────────────────────────
+
+    [Header("River Runs")]
+    [Tooltip("The outer walls, the underside, and the open ends where one piece butts onto the " +
+             "next — everything a run or a pool turns to the world rather than to the water.")]
+    [StoneTypeOnly] public StoneFaceKind runOuterFaces = StoneFaceKind.A;
+
+    [Tooltip("The flat lip laid round the top of a run or a pool, between the outer wall and the " +
+             "channel.")]
+    [StoneTypeOnly] public StoneFaceKind runRim = StoneFaceKind.B;
+
+    [Tooltip("The inside of the channel — the faces the water runs down, above the surface and " +
+             "below it.")]
+    [StoneTypeOnly] public StoneFaceKind runInnerChannel = StoneFaceKind.C;
 
     [Header("Outposts — needs rebuild")]
     [Tooltip("The four walls round the outside of the block, from the top of its wall down.")]
@@ -277,6 +407,33 @@ public class RiverRunShadingSettings
 
     [Tooltip("The floor inside the wall — or the whole flat top of an outpost with no wall.")]
     public StoneFaceKind outpostFloor = StoneFaceKind.Auto;
+
+    [Header("Freestanding Structures — needs rebuild")]
+    [Tooltip("The sides of the block or round column, from its top down — and the sides of its " +
+             "columns.")]
+    public StoneFaceKind structureSides = StoneFaceKind.Auto;
+
+    [Tooltip("The top of the wall round an outpost top — and the tops of its columns.")]
+    public StoneFaceKind structureWallTop = StoneFaceKind.Auto;
+
+    [Tooltip("The inside faces of an outpost top's wall, facing in across the floor.")]
+    public StoneFaceKind structureInsideWalls = StoneFaceKind.Auto;
+
+    [Tooltip("The flat top of the structure — the floor inside the wall when it has an outpost top.")]
+    public StoneFaceKind structureTop = StoneFaceKind.Auto;
+
+    [Header("River Walkways — needs rebuild")]
+    [Tooltip("The top of the walkway along the outside of the run.")]
+    public StoneFaceKind walkwayTop = StoneFaceKind.Auto;
+
+    [Tooltip("The walkway's outside face, away from the river, from its top down.")]
+    public StoneFaceKind walkwayOuterWall = StoneFaceKind.Auto;
+
+    [Tooltip("The step up from the rim to the walkway's top, when it stands above the rim.")]
+    public StoneFaceKind walkwayStep = StoneFaceKind.Auto;
+
+    [Tooltip("The square ends of each stretch of walkway.")]
+    public StoneFaceKind walkwayEnds = StoneFaceKind.Auto;
 
     [Header("Lollipop Towers — needs rebuild")]
     [Tooltip("The orb on top of every lollipop tower, on outposts, pools or anywhere else.")]
@@ -293,7 +450,35 @@ public class RiverRunShadingSettings
     [FormerlySerializedAs("towerBase")]
     public StoneFaceKind towerBaseTop = StoneFaceKind.Auto;
 
-    [Header("Arena Walls — needs rebuild")]
+    [Header("Walls — needs rebuild")]
+    [Tooltip("Both long faces of every wall, from its top down.")]
+    public StoneFaceKind wallSides = StoneFaceKind.Auto;
+
+    [Tooltip("The top of the wall.")]
+    public StoneFaceKind wallTop = StoneFaceKind.Auto;
+
+    [Tooltip("The flat ends where a wall stops, or breaks off at a gap.")]
+    public StoneFaceKind wallEnds = StoneFaceKind.Auto;
+
+    [Tooltip("Inside the archways and portholes cut through the wall — their sides, roofs and floors.")]
+    public StoneFaceKind wallOpenings = StoneFaceKind.Auto;
+
+    [Tooltip("The round side of a column standing on a wall node.")]
+    public StoneFaceKind wallColumnSides = StoneFaceKind.Auto;
+
+    [Tooltip("The flat top of a column standing on a wall node.")]
+    public StoneFaceKind wallColumnTop = StoneFaceKind.Auto;
+
+    [Tooltip("The top of a wall's lip. Auto = the same as the wall's top.")]
+    public StoneFaceKind wallLipTop = StoneFaceKind.Auto;
+
+    [Tooltip("Both long faces of a wall's lip, and its flat ends. Auto = the same as the wall's sides.")]
+    public StoneFaceKind wallLipSides = StoneFaceKind.Auto;
+
+    [Tooltip("Under a wall's lip, where it overhangs the wall. Auto = the same as the wall's sides.")]
+    public StoneFaceKind wallLipUnderside = StoneFaceKind.Auto;
+
+    [Header("Arena — needs rebuild")]
     [Tooltip("The face of the wall looking in toward the arena.")]
     public StoneFaceKind arenaInnerFace = StoneFaceKind.Auto;
 
@@ -336,6 +521,40 @@ public class RiverRunShadingSettings
     public StoneFaceKind doorEdges = StoneFaceKind.Auto;
 
     // ─────────────────────────────────────────────────────────────
+    // LEGACY
+    //
+    // The three fixed stone colours there were before stone types. Read once, by
+    // EnsureStoneTypes, to give a preset saved then its A, B and C; nothing else reads them.
+    // Kept under their old names so that preset still has somewhere to land.
+    // ─────────────────────────────────────────────────────────────
+
+    [HideInInspector] public Color outerColour = new Color(0.786f, 0.786f, 0.786f, 1f);
+    [HideInInspector, FormerlySerializedAs("grainSize")]     public float outerGrainSize     = 0.02f;
+    [HideInInspector, FormerlySerializedAs("grainStrength")] public float outerGrainStrength = 0.3f;
+
+    [HideInInspector] public Color rimColour = new Color(0.786f, 0.786f, 0.786f, 1f);
+    [HideInInspector, FormerlySerializedAs("grainSize")]     public float rimGrainSize     = 0.02f;
+    [HideInInspector, FormerlySerializedAs("grainStrength")] public float rimGrainStrength = 0.3f;
+
+    [HideInInspector] public Color innerColour = new Color(0.786f, 0.786f, 0.786f, 1f);
+    [HideInInspector, FormerlySerializedAs("grainSize")]     public float innerGrainSize     = 0.02f;
+    [HideInInspector, FormerlySerializedAs("grainStrength")] public float innerGrainStrength = 0.3f;
+
+    // The one set of seams every stone shared before each stone type carried its own. Read by
+    // EnsureStoneTypes to give a stone that has none yet its starting seams.
+    [HideInInspector] public Color seamColour        = Color.black;
+    [HideInInspector] public float seamStrength      = 1f;
+    [HideInInspector] public float seamExtentPercent = 20f;
+
+    // The one decal scatter every stone shared before each stone type carried its own. Read by
+    // EnsureStoneTypes to give a stone that has none yet its starting decals.
+    [HideInInspector] public float decalAmount   = 0f;
+    [HideInInspector] public float decalOpacity  = 1f;
+    [HideInInspector] public float decalSpacing  = 0.15f;
+    [HideInInspector] public float decalScaleMin = 0.04f;
+    [HideInInspector] public float decalScaleMax = 0.09f;
+
+    // ─────────────────────────────────────────────────────────────
     // PUSHING
     // ─────────────────────────────────────────────────────────────
 
@@ -350,38 +569,42 @@ public class RiverRunShadingSettings
     public static RiverRunShadingSettings Live;
 
     /// <summary>
-    /// No shading at all — what a world with no preset assigned gets. The three face colours are
+    /// No shading at all — what a world with no preset assigned gets. The stone types' colours are
     /// left at the plain stone they default to, which is the colour the run graph carries anyway,
     /// so a world with nothing authored draws bare unlit stone.
     /// </summary>
-    private static readonly RiverRunShadingSettings None =
-        new RiverRunShadingSettings
+    private static RiverRunShadingSettings None
+    {
+        get
         {
-            outerGrainStrength = 0f, rimGrainStrength = 0f, innerGrainStrength = 0f,
-            seamStrength  = 0f, waterlineStrength = 0f, lightStrength = 0f,
-        };
+            // Made on first use, so its stone types are brought up to A–D like any other's.
+            if (_none != null) return _none;
 
-    private static readonly int OuterColourId     = Shader.PropertyToID("_RiverRunOuterColour");
-    private static readonly int RimColourId       = Shader.PropertyToID("_RiverRunRimColour");
-    private static readonly int InnerColourId     = Shader.PropertyToID("_RiverRunInnerColour");
-    private static readonly int GrainSizeId       = Shader.PropertyToID("_RiverRunGrainSizes");
-    private static readonly int GrainStrengthId   = Shader.PropertyToID("_RiverRunGrainStrengths");
-    private static readonly int SeamColourId      = Shader.PropertyToID("_RiverRunSeamColour");
-    private static readonly int SeamStrengthId    = Shader.PropertyToID("_RiverRunSeamStrength");
-    private static readonly int SeamExtentId      = Shader.PropertyToID("_RiverRunSeamExtent");
+            _none = new RiverRunShadingSettings { waterlineStrength = 0f };
+            _none.EnsureStoneTypes();
+            foreach (var type in _none.stoneTypes) { type.grainStrength = 0f; type.seamStrength = 0f; }
+            return _none;
+        }
+    }
+    private static RiverRunShadingSettings _none;
+
+    private static readonly int StoneColoursId    = Shader.PropertyToID("_RiverRunStoneColours");
+    private static readonly int StoneGrainsId     = Shader.PropertyToID("_RiverRunStoneGrains");
+    private static readonly int StoneGradientsId  = Shader.PropertyToID("_RiverRunStoneGradients");
+    private static readonly int RunStonesId       = Shader.PropertyToID("_RiverRunRunStones");
+    private static readonly int StoneSeamsId      = Shader.PropertyToID("_RiverRunStoneSeams");
     private static readonly int WaterColourId     = Shader.PropertyToID("_RiverRunWaterlineColour");
     private static readonly int WaterStrengthId   = Shader.PropertyToID("_RiverRunWaterlineStrength");
     private static readonly int WaterExtentId     = Shader.PropertyToID("_RiverRunWaterlineExtent");
     private static readonly int WaterDepthId      = Shader.PropertyToID("_RiverRunWaterDepth");
-    private static readonly int LightStrengthId   = Shader.PropertyToID("_RiverRunLightStrength");
 
     private static readonly int DecalSheetId    = Shader.PropertyToID("_RiverRunDecalSheet");
     private static readonly int DecalLayoutId   = Shader.PropertyToID("_RiverRunDecalLayout");
-    private static readonly int DecalSpacingId  = Shader.PropertyToID("_RiverRunDecalSpacing");
-    private static readonly int DecalScaleMinId = Shader.PropertyToID("_RiverRunDecalScaleMin");
-    private static readonly int DecalScaleMaxId = Shader.PropertyToID("_RiverRunDecalScaleMax");
-    private static readonly int DecalAmountId   = Shader.PropertyToID("_RiverRunDecalAmount");
-    private static readonly int DecalOpacityId  = Shader.PropertyToID("_RiverRunDecalOpacity");
+    private static readonly int StoneDecalsId   = Shader.PropertyToID("_RiverRunStoneDecals");
+    private static readonly int StoneDecalOpacitiesId =
+        Shader.PropertyToID("_RiverRunStoneDecalOpacities");
+    private static readonly int StoneDecalRotationsId =
+        Shader.PropertyToID("_RiverRunStoneDecalRotations");
 
     /// <summary>
     /// Publishes one set of shading numbers to the shaders — the tuner's if it is driving, this
@@ -403,6 +626,23 @@ public class RiverRunShadingSettings
         Live ?? settings;
 
     /// <summary>
+    /// These settings as a freestanding structure is built from them: a copy with the Freestanding
+    /// Structures parts standing in the outpost's places, because a structure's body is built by
+    /// the outpost's own mesh builders. Only read, so the copy is shallow. Null stays null.
+    /// </summary>
+    public static RiverRunShadingSettings ForStructure(RiverRunShadingSettings settings)
+    {
+        if (settings == null) return null;
+
+        var copy = (RiverRunShadingSettings)settings.MemberwiseClone();
+        copy.outpostOutsideWalls = settings.structureSides;
+        copy.outpostWallTop      = settings.structureWallTop;
+        copy.outpostInsideWalls  = settings.structureInsideWalls;
+        copy.outpostFloor        = settings.structureTop;
+        return copy;
+    }
+
+    /// <summary>
     /// How far the water lies beneath the rim top, which is what places the waterline band.
     ///
     /// Not one of the numbers above and not the tuner's to set: it is a FACT about the world
@@ -417,30 +657,11 @@ public class RiverRunShadingSettings
 
     private void Apply()
     {
-        // Alpha is not a colour on these three. There is no property block behind a bare global,
-        // so a shader reimport leaves all four channels at zero, and the shader reads an alpha of
-        // nothing as "nobody has pushed this yet" and gives the stone back to the run graph's own
-        // colour rather than painting it black for the tick it takes to be pushed again. So it
-        // goes over solid whatever was picked in the colour field.
-        Shader.SetGlobalColor(OuterColourId,   Opaque(outerColour));
-        Shader.SetGlobalColor(RimColourId,     Opaque(rimColour));
-        Shader.SetGlobalColor(InnerColourId,   Opaque(innerColour));
-
-        // x outer, y rim, z inner — the same order as the face kinds.
-        Shader.SetGlobalVector(GrainSizeId,
-            new Vector4(outerGrainSize, rimGrainSize, innerGrainSize, 0f));
-        Shader.SetGlobalVector(GrainStrengthId,
-            new Vector4(outerGrainStrength, rimGrainStrength, innerGrainStrength, 0f));
-
-        Shader.SetGlobalColor(SeamColourId,    seamColour);
-        Shader.SetGlobalFloat(SeamStrengthId,  seamStrength);
-        Shader.SetGlobalFloat(SeamExtentId,    seamExtentPercent);
+        ApplyStoneTypes();
 
         Shader.SetGlobalColor(WaterColourId,   waterlineColour);
         Shader.SetGlobalFloat(WaterStrengthId, waterlineStrength);
         Shader.SetGlobalFloat(WaterExtentId,   waterlineExtent);
-
-        Shader.SetGlobalFloat(LightStrengthId,  lightStrength);
 
         ApplyDecals();
     }
@@ -466,11 +687,11 @@ public class RiverRunShadingSettings
             ? new Vector4(decalSheetColumns, decalSheetRows, decalSheetHeld, decalSheetCellPixels)
             : Vector4.zero);
 
-        Shader.SetGlobalFloat(DecalSpacingId,  decalSpacing);
-        Shader.SetGlobalFloat(DecalScaleMinId, decalScaleMin);
-        Shader.SetGlobalFloat(DecalScaleMaxId, decalScaleMax);
-        Shader.SetGlobalFloat(DecalAmountId,   decalAmount);
-        Shader.SetGlobalFloat(DecalOpacityId,  decalOpacity);
+        // The scatter, per stone type — filled alongside the rest of each stone's look in
+        // ApplyStoneTypes, which has already run.
+        Shader.SetGlobalVectorArray(StoneDecalsId,        StoneDecals);
+        Shader.SetGlobalFloatArray(StoneDecalOpacitiesId, StoneDecalOpacities);
+        Shader.SetGlobalFloatArray(StoneDecalRotationsId, StoneDecalRotations);
     }
 
     /// <summary>
@@ -483,6 +704,128 @@ public class RiverRunShadingSettings
     /// solid would paint the stone black rather than leaving it to the run graph, which is what
     /// having nothing to say ought to do.
     /// </summary>
+    // One slot per stone type the shader can hold, filled every push. The arrays are always sent
+    // at full length — a global array's length is fixed by the first push it ever gets.
+    private static readonly Vector4[] StoneColours = new Vector4[MaxStoneTypes];
+    private static readonly Vector4[] StoneGrains  = new Vector4[MaxStoneTypes];
+    private static readonly Vector4[] StoneSeams   = new Vector4[MaxStoneTypes];
+    private static readonly Vector4[] StoneDecals  = new Vector4[MaxStoneTypes];
+    private static readonly float[]   StoneDecalOpacities = new float[MaxStoneTypes];
+    private static readonly float[]   StoneDecalRotations = new float[MaxStoneTypes];
+
+    /// <summary>How many steps across one stone type's row of the gradient sheet.</summary>
+    public const int GradientWidth = 128;
+
+    // Every stone type's gradient on one sheet, a row each, rebuilt only when a gradient changes.
+    // Made here rather than saved: it is nothing but what the gradients already say.
+    private static Texture2D _gradientSheet;
+    private static int       _gradientSheetHash;
+
+    /// <summary>
+    /// The stone types: a colour, a grain, a gradient direction and seams each, and the sheet the
+    /// gradients are drawn from. A slot past the last stone type takes A's look, so a part still
+    /// pointing at a stone type that was removed draws as A rather than as nothing.
+    /// </summary>
+    private void ApplyStoneTypes()
+    {
+        EnsureStoneTypes();
+
+        for (int i = 0; i < MaxStoneTypes; i++)
+        {
+            var type = stoneTypes[i < stoneTypes.Count ? i : 0] ?? new StoneType();
+
+            // Alpha is not a colour here. There is no property block behind a bare global, so a
+            // shader reimport leaves every channel at zero, and the shader reads an alpha of
+            // nothing as "nobody has pushed this yet" and gives the stone back to the run graph's
+            // own colour rather than painting it black for the tick it takes to be pushed again.
+            // So it goes over solid whatever was picked in the colour field.
+            StoneColours[i] = Opaque(type.colour);
+
+            // z is the gradient: 0 off, otherwise 1 + the direction. w the seam extent percent.
+            StoneGrains[i] = new Vector4(
+                type.grainSize, type.grainStrength,
+                type.useGradient ? 1f + (int)type.gradientDirection : 0f, type.seamExtentPercent);
+
+            // The seam colour, with its strength where the alpha would be.
+            StoneSeams[i] = new Vector4(
+                type.seamColour.r, type.seamColour.g, type.seamColour.b, type.seamStrength);
+
+            // The decal scatter: x spacing, y smallest scale, z largest, w amount; opacity apart.
+            StoneDecals[i] = new Vector4(
+                type.decalSpacing, type.decalScaleMin, type.decalScaleMax, type.decalAmount);
+            StoneDecalOpacities[i] = type.decalOpacity;
+
+            // The share of decals given a quarter turn; 0 with the rotation off.
+            StoneDecalRotations[i] = type.decalRotate ? type.decalRotateAmount : 0f;
+        }
+
+        Shader.SetGlobalVectorArray(StoneColoursId, StoneColours);
+        Shader.SetGlobalVectorArray(StoneGrainsId,  StoneGrains);
+        Shader.SetGlobalVectorArray(StoneSeamsId,   StoneSeams);
+        Shader.SetGlobalTexture(StoneGradientsId, GradientSheet());
+
+        // Which stone a river run's outer faces, rim and channel take — 1-based, like the kinds
+        // baked into the meshes. Auto can only arrive here from a hand-edited preset; it reads as
+        // the A, B and C the three always were.
+        Shader.SetGlobalVector(RunStonesId, new Vector4(
+            runOuterFaces   > StoneFaceKind.Auto ? (float)runOuterFaces   : 1f,
+            runRim          > StoneFaceKind.Auto ? (float)runRim          : 2f,
+            runInnerChannel > StoneFaceKind.Auto ? (float)runInnerChannel : 3f,
+            0f));
+    }
+
+    /// <summary>
+    /// The sheet of gradients: one row per stone type slot, sRGB like the colours picked for
+    /// them, clamped so neither end of a gradient wraps round into the other.
+    /// </summary>
+    private Texture2D GradientSheet()
+    {
+        int hash = 17;
+        for (int i = 0; i < stoneTypes.Count && i < MaxStoneTypes; i++)
+        {
+            var type = stoneTypes[i];
+            if (type == null || !type.useGradient || type.gradient == null) continue;
+
+            hash = hash * 31 + i;
+            hash = hash * 31 + (int)type.gradient.mode;
+            foreach (var key in type.gradient.colorKeys)
+                hash = hash * 31 + key.color.GetHashCode() * 7 + key.time.GetHashCode();
+        }
+
+        if (_gradientSheet != null && hash == _gradientSheetHash) return _gradientSheet;
+
+        if (_gradientSheet == null)
+        {
+            _gradientSheet = new Texture2D(GradientWidth, MaxStoneTypes, TextureFormat.RGBA32,
+                                           false, false)
+            {
+                name       = "RiverRunStoneGradients",
+                wrapMode   = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+                hideFlags  = HideFlags.HideAndDontSave,
+            };
+        }
+
+        var pixels = new Color32[GradientWidth * MaxStoneTypes];
+        for (int row = 0; row < MaxStoneTypes; row++)
+        {
+            var type = row < stoneTypes.Count ? stoneTypes[row] : null;
+            for (int x = 0; x < GradientWidth; x++)
+            {
+                Color c = type != null && type.gradient != null
+                        ? type.gradient.Evaluate(x / (float)(GradientWidth - 1))
+                        : Color.grey;
+                c.a = 1f;
+                pixels[row * GradientWidth + x] = c;
+            }
+        }
+
+        _gradientSheet.SetPixels32(pixels);
+        _gradientSheet.Apply(false, false);
+        _gradientSheetHash = hash;
+        return _gradientSheet;
+    }
+
     private static Color Opaque(Color c) =>
         c == default ? c : new Color(c.r, c.g, c.b, 1f);
 
@@ -491,15 +834,21 @@ public class RiverRunShadingSettings
     {
         if (other == null) return;
 
-        outerColour       = other.outerColour;
-        rimColour         = other.rimColour;
-        innerColour       = other.innerColour;
-        outerGrainSize     = other.outerGrainSize;
-        outerGrainStrength = other.outerGrainStrength;
-        rimGrainSize       = other.rimGrainSize;
-        rimGrainStrength   = other.rimGrainStrength;
-        innerGrainSize     = other.innerGrainSize;
-        innerGrainStrength = other.innerGrainStrength;
+        // The other side's list is brought up to A–D first, so a preset saved before stone types
+        // copies over as the A, B and C its old three colours become.
+        other.EnsureStoneTypes();
+        if (stoneTypes == null) stoneTypes = new List<StoneType>();
+        while (stoneTypes.Count > other.stoneTypes.Count) stoneTypes.RemoveAt(stoneTypes.Count - 1);
+        for (int i = 0; i < other.stoneTypes.Count; i++)
+        {
+            if (i == stoneTypes.Count) stoneTypes.Add(new StoneType());
+            if (stoneTypes[i] == null) stoneTypes[i] = new StoneType();
+            stoneTypes[i].CopyFrom(other.stoneTypes[i]);
+        }
+
+        runOuterFaces   = other.runOuterFaces;
+        runRim          = other.runRim;
+        runInnerChannel = other.runInnerChannel;
 
         seamColour        = other.seamColour;
         seamStrength      = other.seamStrength;
@@ -508,8 +857,6 @@ public class RiverRunShadingSettings
         waterlineColour   = other.waterlineColour;
         waterlineStrength = other.waterlineStrength;
         waterlineExtent   = other.waterlineExtent;
-
-        lightStrength     = other.lightStrength;
 
         decalSheet           = other.decalSheet;
         decalSheetColumns    = other.decalSheetColumns;
@@ -527,10 +874,30 @@ public class RiverRunShadingSettings
         outpostInsideWalls  = other.outpostInsideWalls;
         outpostFloor        = other.outpostFloor;
 
+        structureSides       = other.structureSides;
+        structureWallTop     = other.structureWallTop;
+        structureInsideWalls = other.structureInsideWalls;
+        structureTop         = other.structureTop;
+
+        walkwayTop       = other.walkwayTop;
+        walkwayOuterWall  = other.walkwayOuterWall;
+        walkwayStep       = other.walkwayStep;
+        walkwayEnds       = other.walkwayEnds;
+
         towerOrb          = other.towerOrb;
         towerStem         = other.towerStem;
         towerBaseSides    = other.towerBaseSides;
         towerBaseTop      = other.towerBaseTop;
+
+        wallSides         = other.wallSides;
+        wallTop           = other.wallTop;
+        wallEnds          = other.wallEnds;
+        wallOpenings      = other.wallOpenings;
+        wallColumnSides   = other.wallColumnSides;
+        wallColumnTop     = other.wallColumnTop;
+        wallLipTop        = other.wallLipTop;
+        wallLipSides      = other.wallLipSides;
+        wallLipUnderside  = other.wallLipUnderside;
 
         arenaInnerFace    = other.arenaInnerFace;
         arenaOuterFace    = other.arenaOuterFace;

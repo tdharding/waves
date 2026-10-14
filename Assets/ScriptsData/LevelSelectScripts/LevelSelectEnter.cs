@@ -34,6 +34,7 @@ public class LevelSelectEnter : MonoBehaviour
             {
                 CommitSelection();
                 CacheBoatState(boatControl);
+                BringInTravellingSouls();
                 LoadScene();
             },
             onCancel: () => { }
@@ -72,6 +73,16 @@ public class LevelSelectEnter : MonoBehaviour
         LevelSelectionCache.BoatHasPose  = true;
         LevelSelectionCache.BoatPosition = boatControl.Position;
         LevelSelectionCache.BoatHeading  = boatControl.Heading;
+    }
+
+    // Souls swimming towards this level on a route whose band has reached it come in with the
+    // boat, rather than each fish having to reach the arena first.
+    private void BringInTravellingSouls()
+    {
+        if (gridData == null || string.IsNullOrEmpty(gridData.levelID)) return;
+
+        var travel = FindObjectOfType<TravellingSoulFishController>();
+        if (travel != null) travel.ArriveWithBoat(gridData.levelID);
     }
 
     private void LoadScene()

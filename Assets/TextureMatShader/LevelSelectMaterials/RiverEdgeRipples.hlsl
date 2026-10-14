@@ -99,6 +99,15 @@ float _RiverEdgeRippleGrainStrength;       // how far the grain pushes the colou
 float _RiverEdgeRippleGrainSize;           // metres across one grain
 float _RiverEdgeRippleGrainAlpha;          // how far the same grain thins the alpha; 0 = none, 1 = clear at its darkest
 
+// Low resolution: the whole effect drawn in square blocks. See RiverEdgeBlocks below.
+float _RiverEdgeRippleBlockSize;           // metres (or screen pixels) across one block; 0 = full resolution
+float _RiverEdgeRippleBlockScreen;         // 1 = blocks are screen pixels; 0 = metres pinned to the world
+float _RiverEdgeRippleLowResStyle;         // 0 = square blocks; 1 = scatter (Block Size is then the radius)
+float _RiverEdgeRippleScatterGrain;        // scatter: size of one grain that reads from its own random point
+
+// Contrast on the water's finished colour — see RiverWaterContrast at the bottom.
+float _RiverEdgeRippleContrast;            // 1 = as it is; higher pulls lights and darks apart
+
 // 0 off. 1 bands, 2 along, 3 fade, 4 both — see the Debug output below.
 float _RiverEdgeRippleDebug;
 
@@ -133,6 +142,80 @@ float RiverEdgeGradientNoise(float2 p)
 
     fp = fp * fp * fp * (fp * (fp * 6.0 - 15.0) + 10.0);
     return lerp(lerp(d00, d10, fp.x), lerp(d01, d11, fp.x), fp.y);
+}
+
+// Two random numbers in 0-1 from a grid cell — the scatter's grain.
+float2 RiverEdgeHash22(float2 p)
+{
+    float3 p3 = frac(float3(p.xyx) * float3(0.1031, 0.1030, 0.0973));
+    p3 += dot(p3, p3.yzx + 33.33);
+    return frac((p3.xx + p3.yz) * p3.zy);
+}
+
+// ── Low resolution ───────────────────────────────────────────────────────────
+// Moves every input to the middle of the block this pixel sits in, so every pixel in a block reads
+// the same numbers and draws the same colour — the whole effect comes out chunky.
+//
+// The world position can simply be snapped, but the frame is baked into the mesh and only exists
+// where the pixel is. So the snap is turned into a step across the SCREEN — how many pixels right
+// and down the block's middle lies — and every input is carried that far on its own screen
+// derivatives. The frame is near-linear over a block, so that lands where the mesh would have.
+//
+// Blocks are metres on the world's XZ (stuck to the water, lined up across every join) or pixels
+// on screen (the same size wherever the water is). Kind and lap length are not moved: they are one
+// number per mesh.
+void RiverEdgeBlocks(inout float4 EdgeData, inout float4 FlowData, inout float3 WorldPos,
+                     inout float4 BankData)
+{
+    float size = _RiverEdgeRippleBlockSize;
+    if (size <= 0.0001) return;
+
+    bool   onScreen = _RiverEdgeRippleBlockScreen > 0.5;
+    float2 q;
+    if (onScreen)
+    {
+        float4 clip = TransformWorldToHClip(WorldPos);
+        q = (clip.xy / clip.w * 0.5 + 0.5) * _ScreenParams.xy;
+    }
+    else
+    {
+        q = WorldPos.xz;
+    }
+
+    // Where this pixel reads from. Blocks: the middle of its square. Scatter: a random point up
+    // to Block Size away, the same for every pixel in one grain, so the effect's edges break up
+    // into sand. The grain is on the same grid as the blocks would be — the world's, or the
+    // screen's — so world scatter holds still on the water as the camera moves.
+    float2 toMiddle;
+    if (_RiverEdgeRippleLowResStyle > 0.5)
+    {
+        float2 cell = floor(q / max(_RiverEdgeRippleScatterGrain, 0.0001));
+        float2 r    = RiverEdgeHash22(cell);
+        float  a    = r.y * RIVER_RIPPLE_TWO_PI;
+        toMiddle    = float2(cos(a), sin(a)) * sqrt(r.x) * size;   // even over the disc
+    }
+    else
+    {
+        toMiddle = (floor(q / size) + 0.5) * size - q;
+    }
+
+    // Solve toMiddle = sx * ddx(q) + sy * ddy(q) for the screen step (sx, sy).
+    float2 qx  = ddx(q);
+    float2 qy  = ddy(q);
+    float  det = qx.x * qy.y - qx.y * qy.x;
+    if (abs(det) < 1e-12) return;   // water seen edge-on: nothing sensible to step across
+
+    float sx = (toMiddle.x * qy.y - toMiddle.y * qy.x) / det;
+    float sy = (toMiddle.y * qx.x - toMiddle.x * qx.y) / det;
+
+    EdgeData.xyz += ddx(EdgeData.xyz) * sx + ddy(EdgeData.xyz) * sy;
+    FlowData.xyz += ddx(FlowData.xyz) * sx + ddy(FlowData.xyz) * sy;
+    BankData.xyz += ddx(BankData.xyz) * sx + ddy(BankData.xyz) * sy;
+    WorldPos     += ddx(WorldPos)     * sx + ddy(WorldPos)     * sy;
+
+    // On the world grid the answer is known exactly; put it back so neighbouring blocks cannot
+    // drift apart by the derivatives' rounding.
+    if (!onScreen) WorldPos.xz = q + toMiddle;
 }
 
 // EdgeData is UV1, straight off a river's generated water — how far this corner lies from the
@@ -201,6 +284,9 @@ void RiverEdgeRipples_float(
     Debug    = float3(0.0, 0.0, 0.0);
     DebugMix = 0.0;
     Grain    = 0.0;
+
+    // First, so everything after — grain, fades, lines and rings — reads the block's numbers.
+    RiverEdgeBlocks(EdgeData, FlowData, WorldPos, BankData);
 
     // ── The grain ────────────────────────────────────────────────────────────
     // Before the pool gate, so pools and rivers take the same grain. The noise runs about ±0.5,
@@ -514,6 +600,23 @@ void RiverEdgeRipples_half(
     Debug    = (half3)d;
     DebugMix = (half)dm;
     Grain    = (half)g;
+}
+
+// ── Final colour ─────────────────────────────────────────────────────────────
+// Contrast on the water's FINISHED colour, so it goes last in the water graph, just before Base
+// Color, and takes everything — the water, the lines, the fish, the wake — together. Pushed out
+// from mid-grey; 1 hands the colour back untouched. Floored at 0 so it cannot go negative into
+// whatever follows. Its own subgraph, River Water Contrast.
+void RiverWaterContrast_float(float3 In, out float3 Out)
+{
+    Out = max((In - 0.5) * _RiverEdgeRippleContrast + 0.5, 0.0);
+}
+
+void RiverWaterContrast_half(half3 In, out half3 Out)
+{
+    float3 o;
+    RiverWaterContrast_float(In, o);
+    Out = (half3)o;
 }
 
 #endif

@@ -332,6 +332,7 @@ public class FogFieldManager : MonoBehaviour
 
         _instance.settings.RepelStrength = from.globalRepelStrength;
 
+        _instance.adoptRocks         = from.rocksRepel;
         _instance.rockRepelRadius    = from.rockRepelRadius;
         _instance.rockRepelStrength  = from.rockRepelStrength;
         _instance.rockMaskRadius     = from.rockMaskRadius;
@@ -345,6 +346,7 @@ public class FogFieldManager : MonoBehaviour
         _instance.lampMaskFeather   = from.lampMaskFeather;
 
         _instance.runsRepel        = from.runsRepel;
+        _instance.naturalRunsRepel = from.naturalRunsRepel;
         _instance.runChainSpacing  = from.runChainSpacing;
         _instance.runRepelRadius   = from.runRepelRadius;
         _instance.runRepelStrength = from.runRepelStrength;
@@ -388,7 +390,8 @@ public class FogFieldManager : MonoBehaviour
 
     [Header("Rocks")]
     [Tooltip("Adopt anything already throwing rock rings, so a level's spikes push fog without " +
-             "being touched.")]
+             "being touched. Also switches level select spikes. Copied from the Fog Map's Rocks " +
+             "Repel whenever a map is applied.")]
     [SerializeField] bool adoptRocks = true;
 
     [Tooltip("Clear water the SKELETON is pushed out of, beyond a rock's own waterline radius.")]
@@ -405,6 +408,14 @@ public class FogFieldManager : MonoBehaviour
 
     [Tooltip("Seconds between rescans for rocks.")]
     [SerializeField] float rockRescanInterval = 2f;
+
+    // Read by SpikeFogRepeller, so a level select spike pushes fog with the same numbers as a
+    // rock adopted in a level.
+    public static bool  AdoptRocks        => _instance != null && _instance.adoptRocks;
+    public static float RockRepelRadius   => _instance != null ? _instance.rockRepelRadius   : 0.7f;
+    public static float RockRepelStrength => _instance != null ? _instance.rockRepelStrength : 1f;
+    public static float RockMaskRadius    => _instance != null ? _instance.rockMaskRadius    : 0.7f;
+    public static float RockMaskFeather   => _instance != null ? _instance.rockMaskFeather   : 0.15f;
 
     [Header("Street Lights")]
     [Tooltip("Fraction of a lamp's light radius that fog is held out of.")]
@@ -433,6 +444,9 @@ public class FogFieldManager : MonoBehaviour
     [Tooltip("Whether the elevated river runs push fog about at all.")]
     [SerializeField] bool runsRepel = true;
 
+    [Tooltip("Whether Landscape Natural River Runs repel too. Off leaves them out of the fog.")]
+    [SerializeField] bool naturalRunsRepel = true;
+
     [Tooltip("How far apart the circles are strung along a run, in world units. The amount on " +
              "a chain, and the whole budget control — every circle is one obstacle slot.")]
     [Range(0.5f, 20f)] [SerializeField] float runChainSpacing = 2.04f;
@@ -452,6 +466,7 @@ public class FogFieldManager : MonoBehaviour
     // Read by RiverRunFogRepellers, which owns no fog numbers of its own — same deal as the
     // lamps above. Spacing is read every rescan so restringing a chain is a slider drag.
     public static bool  RunsRepel        => _instance != null && _instance.runsRepel;
+    public static bool  NaturalRunsRepel => _instance == null || _instance.naturalRunsRepel;
     public static float RunChainSpacing  => _instance != null ? _instance.runChainSpacing  : 2.04f;
     public static float RunRepelRadius   => _instance != null ? _instance.runRepelRadius   : 2.91f;
     public static float RunRepelStrength => _instance != null ? _instance.runRepelStrength : 4f;
@@ -1521,6 +1536,9 @@ public class FogFieldManager : MonoBehaviour
         int cap = Mathf.Max(repelLimit, 1);
 
         _repelDiscCount = 0;
+#if UNITY_EDITOR
+        _gizmoPushing.Clear();
+#endif
         for (int i = 0; i < _near.Count && _repelDiscCount < cap; i++)
         {
             var rep = _near[i];
@@ -1548,6 +1566,9 @@ public class FogFieldManager : MonoBehaviour
                 KeepSq   = keep * keep,
                 Strength = strength,
             };
+#if UNITY_EDITOR
+            _gizmoPushing.Add(rep);
+#endif
         }
     }
 
@@ -1724,6 +1745,9 @@ public class FogFieldManager : MonoBehaviour
         // Mask Limit, nearest first like the push.
         int maskCap = Mathf.Clamp(maskLimit, 0, FOG_OBSTACLE_SLOTS);
         int obstacles = 0;
+#if UNITY_EDITOR
+        _gizmoMasked.Clear();
+#endif
         for (int i = 0; i < _near.Count && obstacles < maskCap; i++)
         {
             var r = _near[i];
@@ -1738,6 +1762,9 @@ public class FogFieldManager : MonoBehaviour
             if (keep <= 0f) continue;
 
             _obstacleBuf[obstacles++] = new Vector4(c.x, c.z, keep, Mathf.Max(r.MaskFeather, 0.001f));
+#if UNITY_EDITOR
+            _gizmoMasked.Add(r);
+#endif
         }
         for (int i = obstacles; i < FOG_OBSTACLE_SLOTS; i++) _obstacleBuf[i] = Vector4.zero;
 
@@ -1758,6 +1785,31 @@ public class FogFieldManager : MonoBehaviour
     }
 
 #if UNITY_EDITOR
+    // For the Fog Map's Gizmos section: every repeller and what it did this frame. Filled where
+    // the push and the mask make their picks, so what is drawn is exactly what they chose.
+    readonly List<IFogRepeller> _gizmoPushing = new List<IFogRepeller>();
+    readonly List<IFogRepeller> _gizmoMasked  = new List<IFogRepeller>();
+
+    public static FogFieldManager Instance => _instance;
+    public static IReadOnlyList<IFogRepeller> RegisteredRepellers => _repellers;
+    public IReadOnlyList<FogRockRepeller> AdoptedRocks     => _rocks;
+    public IFogRepeller                   BoatRepeller     => _boatRepel;
+    public IReadOnlyList<IFogRepeller>    NearRepellers    => _near;
+    public IReadOnlyList<IFogRepeller>    PushingRepellers => _gizmoPushing;
+    public IReadOnlyList<IFogRepeller>    MaskedRepellers  => _gizmoMasked;
+    public Vector2 BoatCentreXZ   => _boatCentre;
+    public float   ObstacleRange  => obstacleRange;
+    public float   GlobalRepelStrength => settings.RepelStrength;
+    public float   GizmoY         => GizmoHeight();
+
+    public IReadOnlyList<FogBlob> LiveBlobs => _blobs;
+    public float   GizmoMaskRadius   => MaskRadius;
+    public float   GizmoSpawnRadius  => spawnRadius;
+    public float   GizmoCoverage     => coverage;
+    public int     GizmoFieldPx      => _field != null ? _field.width : GridResolution;
+    public float   GizmoWindAngle    => windAngle;
+    public float   GizmoWindSpeed    => windSpeed;
+
     /// <summary>
     /// Where the debug rings are drawn. The fog sheet, if there is one, so the rings sit ON the
     /// fog rather than hovering above it — comparing a ring against a mass is the whole point of

@@ -102,6 +102,17 @@ public class BrightnessGlowController : MonoBehaviour
              "point. Set its Opacity to 0 to switch the halo off and go back to one point per lamp.")]
     [SerializeField] GlowSettings streetLightHalo = new() { radius = 0.22f, softness = 0.12f, opacity = 0.22f };
 
+    [Header("Angel Glow")]
+    [Tooltip("Master fade for the outer glow around everything on the Glow rendering layer. 0 = off " +
+             "(and nothing extra is drawn). Settable from code as AngelGlowOpacity for cinematics.")]
+    [SerializeField, Range(0f, 1f)] float angelGlowOpacity = 0f;
+
+    [Tooltip("How far the glow reaches out from the angel, as a fraction of screen height.")]
+    [SerializeField, Range(0f, 0.15f)] float angelGlowSize = 0.04f;
+
+    [Tooltip("How bright and full the glow is. Higher keeps it solid further out before it fades.")]
+    [SerializeField, Range(0f, 4f)] float angelGlowStrength = 1.5f;
+
     // Triggered glow (fish catch, events etc.)
     class TriggerEntry
     {
@@ -129,6 +140,9 @@ public class BrightnessGlowController : MonoBehaviour
     static readonly int GlowPointCountPID      = Shader.PropertyToID("_GlowPointCount");
     static readonly int GlowOpacityPID         = Shader.PropertyToID("_GlowOpacity");
     static readonly int BrightnessIntensityPID = Shader.PropertyToID("_BrightnessIntensity");
+    static readonly int AngelGlowOpacityPID    = Shader.PropertyToID("_AngelGlowOpacity");
+    static readonly int AngelGlowSizePID       = Shader.PropertyToID("_AngelGlowSize");
+    static readonly int AngelGlowStrengthPID   = Shader.PropertyToID("_AngelGlowStrength");
 
     readonly Vector4[] pointBuffer = new Vector4[MAX_POINTS];   // xy = uv, z = radius, w = softness
     readonly Vector4[] paramBuffer = new Vector4[MAX_POINTS];   // x  = per-point opacity
@@ -152,6 +166,13 @@ public class BrightnessGlowController : MonoBehaviour
     {
         get => instance != null ? instance.opacity : 1f;
         set { if (instance != null) instance.opacity = Mathf.Clamp01(value); }
+    }
+
+    /// <summary>Angel glow fade, 0-1. Settable from code for cinematics; mirrors the inspector slider.</summary>
+    public static float AngelGlowOpacity
+    {
+        get => instance != null ? instance.angelGlowOpacity : 0f;
+        set { if (instance != null) instance.angelGlowOpacity = Mathf.Clamp01(value); }
     }
 
     // Domain-reload-safe: statics survive play-mode exit when "Reload Domain" is off.
@@ -373,6 +394,9 @@ public class BrightnessGlowController : MonoBehaviour
         Shader.SetGlobalVectorArray(GlowPointParamsPID, paramBuffer);
         Shader.SetGlobalFloat(GlowPointCountPID, count);
         Shader.SetGlobalFloat(GlowOpacityPID, opacity);
+        Shader.SetGlobalFloat(AngelGlowOpacityPID, angelGlowOpacity);
+        Shader.SetGlobalFloat(AngelGlowSizePID, angelGlowSize);
+        Shader.SetGlobalFloat(AngelGlowStrengthPID, angelGlowStrength);
 
         if (logThisFrame)
             Debug.Log($"[Glow] pushed _GlowPointCount {count}, _GlowOpacity {opacity:0.00}, " +
@@ -386,6 +410,9 @@ public class BrightnessGlowController : MonoBehaviour
             glowMaterial.SetFloat(BrightnessIntensityPID, brightnessIntensity);
             // Bare $Globals uniform: dual-write so a material-scoped read sees the same value.
             glowMaterial.SetFloat(GlowOpacityPID, opacity);
+            glowMaterial.SetFloat(AngelGlowOpacityPID, angelGlowOpacity);
+            glowMaterial.SetFloat(AngelGlowSizePID, angelGlowSize);
+            glowMaterial.SetFloat(AngelGlowStrengthPID, angelGlowStrength);
         }
     }
 
@@ -572,5 +599,7 @@ public class BrightnessGlowController : MonoBehaviour
         Shader.SetGlobalVectorArray(GlowPointParamsPID, paramBuffer);
         Shader.SetGlobalFloat(GlowPointCountPID, 0f);
         Shader.SetGlobalFloat(GlowOpacityPID, 0f);
+        Shader.SetGlobalFloat(AngelGlowOpacityPID, 0f);
+        if (glowMaterial != null) glowMaterial.SetFloat(AngelGlowOpacityPID, 0f);
     }
 }

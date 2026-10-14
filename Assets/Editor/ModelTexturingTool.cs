@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Unity.Collections;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -11,17 +13,18 @@ using UnityEngine.SceneManagement;
 // colour fill. The groups bake into a map with its own layout (see Layout): each group's pieces of the
 // model's generated unique UVs (UV channel 2 — the importer's "Generate Lightmap UVs"), scaled to the
 // group's share of the map on the Map Space bar, so it never depends on how the model was unwrapped:
-// RGB = the group's colour, A = its opacity (0 where no group is). AngelMaterial reads it as _ShadeMap,
+// RGB = the group's colour, A = 1 (0 where no group is). AngelMaterial reads it as _ShadeMap,
 // on the replicant's UV1. Each group's noise is baked into the map too (see Rasterise), and so are its
 // gradients: Select Lines → Group Selected Lines makes one on the face group the lines touch, fading
 // out from them across that group's faces (see GradientFields). Add Decal → click a grouped face
 // stamps an image there, projected along the face and kept to that group (see DecalStamps).
 // The tool only works in its stage: Open in Stage dresses the copy there in the replicant (see
-// ModelTexturingData.replicant), re-split live as group opacities cross full, wearing two materials
+// ModelTexturingData.replicant), re-split live as groups' Transparency boxes change, wearing two materials
 // named from the Material Title: "<title>Opaque" (AngelMaterial graph) and "<title>Transparent"
-// (AngelMaterialTransparent graph), and shows a live, unsaved preview of the map on it. Bake puts the
-// replicant and its materials on the real model.
-// Add Lighting / Add White Fade switch the level select's light and white fade on in both materials;
+// (the model's own copy of the AngelMaterialTransparent graph, with a "<group>_Transparency" property
+// per Transparency group — see EnsureTransparentGraph), and shows a live, unsaved preview of the map
+// on it. Bake puts the replicant and its materials on the real model.
+// Add Lighting / Add White Fade switch the level select's light and white fade on, per material;
 // the stage copy always shows the model without them (see HideLevelSelectEffects).
 // Experimental: groups are stored as triangle indices (see ModelTexturingData).
 public class ModelTexturingTool : EditorWindow
@@ -48,6 +51,7 @@ public class ModelTexturingTool : EditorWindow
     Vector2 _scroll;
     const float LinePickPixels = 10f;   // how near the cursor a line must be to pick it
     const float LineThickness = 4f;
+    const float CreaseThickness = 2.5f;
 
     // The faces currently selected — a working set, not saved, until they are grouped.
     readonly HashSet<int> _selection = new HashSet<int>();
@@ -60,6 +64,10 @@ public class ModelTexturingTool : EditorWindow
     readonly Dictionary<ModelTexturingData.Fill, bool> _expanded = new Dictionary<ModelTexturingData.Fill, bool>();
     readonly Dictionary<ModelTexturingData.LineGradient, bool> _gradientExpanded = new Dictionary<ModelTexturingData.LineGradient, bool>();
     readonly Dictionary<ModelTexturingData.Decal, bool> _decalExpanded = new Dictionary<ModelTexturingData.Decal, bool>();
+    readonly Dictionary<ModelTexturingData.CreaseGroup, bool> _creaseExpanded = new Dictionary<ModelTexturingData.CreaseGroup, bool>();
+    // The crease group whose lines Select Group Lines put in the selection, and the selection then.
+    [System.NonSerialized] ModelTexturingData.CreaseGroup _editingCreaseGroup;
+    [System.NonSerialized] HashSet<int> _editingCreaseSnapshot;
 
     // Mesh cache — rebuilt whenever the target's mesh changes shape or gains/loses its unique UVs.
     // Always the ORIGINAL mesh, even while the stage copy wears the replicant: the two share every
@@ -85,6 +93,7 @@ public class ModelTexturingTool : EditorWindow
     int[] _wireEdges;           // vertex pairs, one per edge, quad diagonals left out
     List<int>[] _wireOwners;    // per wire edge, the triangles either side of it
     List<int>[] _triWires;      // per triangle, the wire edges along its sides
+    Dictionary<long, int> _wireByEdge;   // EdgeKey of two weld ids -> wire edge
     Vector3[] _world;           // posed world positions, refreshed per Scene view event
 
     // Hover / stroke
@@ -99,7 +108,7 @@ public class ModelTexturingTool : EditorWindow
     bool _previewDirty;
 
     // Display — authored in the window's Display foldout, kept in EditorPrefs.
-    Color _selectionColour, _hoverColour, _wireColour;
+    Color _selectionColour, _hoverColour, _wireColour, _creaseColour;
     bool _displayFoldout;
     bool _showWireframe;
     bool _mirror;               // selecting a face/line also selects its twin across X = 0
@@ -134,6 +143,7 @@ public class ModelTexturingTool : EditorWindow
         _expanded.Clear();
         _gradientExpanded.Clear();
         _decalExpanded.Clear();
+        _creaseExpanded.Clear();
         _previewDirty = true;
         Repaint();
     }
@@ -147,6 +157,7 @@ public class ModelTexturingTool : EditorWindow
         _previewDirty = false;
         if (WearsLayout(_target)) ApplyLayout(_data.replicant, false);
         SplitReplicant();
+        if (TransparencyProps().Count > 0 && OwnTransparentMaterial() != null) EnsureTransparentGraph();
         RefreshPreview();
     }
 
@@ -244,12 +255,16 @@ public class ModelTexturingTool : EditorWindow
             MarkChanged();
         }
         DrawMapSpace();
+        DrawSubdivision();
 
         EditorGUILayout.Space();
         DrawSelectTool();
 
         EditorGUILayout.Space();
         DrawGroups();
+
+        EditorGUILayout.Space();
+        DrawCreaseGroups();
 
         EditorGUILayout.Space();
         EditorGUI.BeginDisabledGroup(!HasUV2);
@@ -279,38 +294,14 @@ public class ModelTexturingTool : EditorWindow
 
         int count = seeThrough.Count > 0 ? 2 : 1;
         EditorGUILayout.LabelField($"Materials ({count})", EditorStyles.boldLabel);
-        DrawModelSwitch("Add White Fade", AddWhiteFadeProp,
-            "The level select's white fade round the boat, laid on last. Never shown in the stage.");
-        DrawModelSwitch("Add Lighting", AddLightingProp,
-            "The level select's light (the scene's LevelSelectLight), the same as the river runs and hills. Never shown in the stage.");
         DrawMaterialRow(MaterialTitle + "Opaque", "Opaque", FaceCount(opaque), _data.material, false);
         if (seeThrough.Count > 0)
             DrawMaterialRow(MaterialTitle + "Transparent", "Transparent", FaceCount(seeThrough), _data.transparentMaterial, true);
     }
 
-    // A box for the whole model: the same property on both materials, read off the opaque one. A
-    // transparent material made later copies it from the opaque one (see EnsureMaterial).
-    void DrawModelSwitch(string label, string prop, string tooltip)
-    {
-        var opaque = _data.material;
-        bool exists = opaque != null && AssetDatabase.GetAssetPath(opaque) == MaterialPath(false) && opaque.HasProperty(prop);
-        using (new EditorGUI.DisabledScope(!exists))
-        {
-            bool on = exists && opaque.GetFloat(prop) > 0.5f;
-            EditorGUI.BeginChangeCheck();
-            on = EditorGUILayout.Toggle(new GUIContent(label, tooltip), on);
-            if (!EditorGUI.EndChangeCheck()) return;
-            foreach (bool transparent in new[] { false, true })
-            {
-                var mat = transparent ? _data.transparentMaterial : _data.material;
-                if (mat == null || AssetDatabase.GetAssetPath(mat) != MaterialPath(transparent) || !mat.HasProperty(prop)) continue;
-                Undo.RecordObject(mat, label);
-                mat.SetFloat(prop, on ? 1f : 0f);
-                EditorUtility.SetDirty(mat);
-            }
-        }
-    }
-
+    // One row per material: its own Double Sided, Add White Fade and Add Lighting boxes, so the opaque
+    // and transparent faces can differ. A transparent material starts with the opaque one's settings
+    // (see EnsureMaterial).
     void DrawMaterialRow(string name, string kind, int faces, Material made, bool transparent)
     {
         EditorGUILayout.BeginHorizontal(EditorStyles.helpBox);
@@ -318,23 +309,32 @@ public class ModelTexturingTool : EditorWindow
         EditorGUILayout.LabelField(kind, GUILayout.Width(80));
         EditorGUILayout.LabelField($"{faces} faces", GUILayout.Width(70));
         bool exists = made != null && AssetDatabase.GetAssetPath(made) == MaterialPath(transparent);
-        using (new EditorGUI.DisabledScope(!exists || !made.HasProperty(DoubleSidedProp)))
-        {
-            // The material's own Double Sided box: off, faces seen from behind are not drawn.
-            bool on = exists && made.HasProperty(DoubleSidedProp) && made.GetFloat(DoubleSidedProp) > 0.5f;
-            EditorGUI.BeginChangeCheck();
-            on = GUILayout.Toggle(on, "Double Sided", GUILayout.Width(100));
-            if (EditorGUI.EndChangeCheck())
-            {
-                Undo.RecordObject(made, "Double Sided");
-                made.SetFloat(DoubleSidedProp, on ? 1f : 0f);
-                EditorUtility.SetDirty(made);
-                SceneView.RepaintAll();
-            }
-        }
+        // Off, faces seen from behind are not drawn.
+        DrawMaterialBox(made, exists, DoubleSidedProp, "Double Sided", "Draws the faces from behind too.", 100);
+        DrawMaterialBox(made, exists, AddWhiteFadeProp, "Add White Fade",
+            "The level select's white fade round the boat, laid on last. Never shown in the stage.", 110);
+        DrawMaterialBox(made, exists, AddLightingProp, "Add Lighting",
+            "The level select's light (the scene's LevelSelectLight), the same as the river runs and hills. Never shown in the stage.", 95);
         using (new EditorGUI.DisabledScope(!exists))
             if (GUILayout.Button(exists ? "Ping" : "Not made", GUILayout.Width(70))) EditorGUIUtility.PingObject(made);
         EditorGUILayout.EndHorizontal();
+    }
+
+    // A box for one of the material's Boolean properties.
+    void DrawMaterialBox(Material made, bool exists, string prop, string label, string tooltip, float width)
+    {
+        bool has = exists && made.HasProperty(prop);
+        using (new EditorGUI.DisabledScope(!has))
+        {
+            bool on = has && made.GetFloat(prop) > 0.5f;
+            EditorGUI.BeginChangeCheck();
+            on = GUILayout.Toggle(on, new GUIContent(label, tooltip), GUILayout.Width(width));
+            if (!EditorGUI.EndChangeCheck()) return;
+            Undo.RecordObject(made, label);
+            made.SetFloat(prop, on ? 1f : 0f);
+            EditorUtility.SetDirty(made);
+            SceneView.RepaintAll();
+        }
     }
 
     void DrawSelectTool()
@@ -397,10 +397,225 @@ public class ModelTexturingTool : EditorWindow
         if (GUILayout.Button("Clear Selection", GUILayout.Width(110)))
         {
             _lineSelection.Clear();
+            _editingCreaseGroup = null;
             SceneView.RepaintAll();
         }
         EditorGUI.EndDisabledGroup();
         EditorGUILayout.EndHorizontal();
+
+        // Blender's edge crease: the selected lines kept sharp when Subdivision smooths the model.
+        using (new EditorGUI.DisabledScope(_lineSelection.Count == 0))
+            if (GUILayout.Button(new GUIContent("Group Selected Lines as Crease",
+                    "A new crease group: these lines stay sharp when Subdivision smooths the model, as sharp as the group's Crease.")))
+                GroupCreaseLines();
+    }
+
+    // The Subdivision box and its Levels, after the map's settings.
+    void DrawSubdivision()
+    {
+        EditorGUI.BeginChangeCheck();
+        bool on = EditorGUILayout.Toggle(new GUIContent("Subdivision",
+            "Smooths the replicant the way Blender's Subdivision Surface does, so every model wearing it is smooth. " +
+            "Faces and lines are still picked on the unsmoothed shape. Off, it's the plain replicant again."),
+            _data.subdivision);
+        int levels;
+        using (new EditorGUI.DisabledScope(!on))
+        {
+            EditorGUI.indentLevel++;
+            levels = EditorGUILayout.IntSlider("Levels", Mathf.Clamp(_data.subdivisionLevels, 1, 2), 1, 2);
+            EditorGUI.indentLevel--;
+        }
+        if (!EditorGUI.EndChangeCheck()) return;
+        Undo.RecordObject(_data, "Subdivision");
+        _data.subdivision = on;
+        _data.subdivisionLevels = levels;
+        MarkChanged();
+    }
+
+    // The selected lines become a new crease group at full sharpness. A line is in one crease group:
+    // grouping it again moves it out of the one it was in.
+    void GroupCreaseLines()
+    {
+        Undo.RecordObject(_data, "Crease group");
+        _data.creaseGroups ??= new List<ModelTexturingData.CreaseGroup>();
+        var group = new ModelTexturingData.CreaseGroup { name = "Crease Group " + (_data.creaseGroups.Count + 1) };
+        group.lines.AddRange(CreaseLinesOf(_lineSelection));
+        TakeCreaseLines(_lineSelection, null);
+        _data.creaseGroups.Add(group);
+        // Only the new crease group is left open.
+        _creaseExpanded.Clear();
+        _creaseExpanded[group] = true;
+        _lineSelection.Clear();
+        _editingCreaseGroup = null;
+        MarkChanged();
+        SceneView.RepaintAll();
+    }
+
+    // Lines (wire edges) as crease lines, pinned to the model's corners.
+    List<ModelTexturingData.Crease> CreaseLinesOf(IEnumerable<int> wires)
+    {
+        var lines = new List<ModelTexturingData.Crease>();
+        var sorted = new List<int>(wires);
+        sorted.Sort();
+        foreach (int i in sorted)
+        {
+            int va = _wireEdges[i * 2], vb = _wireEdges[i * 2 + 1];
+            lines.Add(new ModelTexturingData.Crease
+            {
+                cornerA = _weldCorner[_weld[va]],
+                cornerB = _weldCorner[_weld[vb]],
+                a = _rest[va],
+                b = _rest[vb],
+            });
+        }
+        return lines;
+    }
+
+    // Takes these lines out of every crease group but `keep`.
+    void TakeCreaseLines(IEnumerable<int> wires, ModelTexturingData.CreaseGroup keep)
+    {
+        var keys = new HashSet<long>();
+        foreach (int i in wires) keys.Add(EdgeKey(_weld[_wireEdges[i * 2]], _weld[_wireEdges[i * 2 + 1]]));
+        foreach (var g in _data.creaseGroups)
+            if (g != keep) g.lines.RemoveAll(cr => CreaseKey(cr, out long key) && keys.Contains(key));
+    }
+
+    // The group's lines as wire edges (lines no longer on the model are left out).
+    List<int> WiresOf(ModelTexturingData.CreaseGroup g)
+    {
+        var wires = new List<int>();
+        if (_wireByEdge == null) return wires;
+        foreach (var cr in g.lines)
+            if (CreaseKey(cr, out long key) && _wireByEdge.TryGetValue(key, out int i)) wires.Add(i);
+        return wires;
+    }
+
+    // The crease groups, each a foldout like the face groups: Name, Crease, and its lines.
+    void DrawCreaseGroups()
+    {
+        _data.creaseGroups ??= new List<ModelTexturingData.CreaseGroup>();
+        EditorGUILayout.LabelField("Crease Groups", EditorStyles.boldLabel);
+        if (_data.creaseGroups.Count == 0)
+            EditorGUILayout.LabelField("No crease groups yet — select lines and press Group Selected Lines as Crease.", EditorStyles.miniLabel);
+
+        int remove = -1;
+        for (int i = 0; i < _data.creaseGroups.Count; i++)
+        {
+            var g = _data.creaseGroups[i];
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            EditorGUILayout.BeginHorizontal();
+            _creaseExpanded.TryGetValue(g, out bool open);
+            _creaseExpanded[g] = EditorGUILayout.Foldout(open, $"{g.name}   ({g.lines.Count} lines)", true);
+            if (GUILayout.Button("✕", GUILayout.Width(22))) remove = i;
+            EditorGUILayout.EndHorizontal();
+
+            if (_creaseExpanded[g])
+            {
+                EditorGUI.indentLevel++;
+                EditorGUI.BeginChangeCheck();
+                string name = EditorGUILayout.TextField("Name", g.name);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    Undo.RecordObject(_data, "Rename crease group");
+                    g.name = name;
+                    EditorUtility.SetDirty(_data);
+                }
+
+                EditorGUI.BeginChangeCheck();
+                float amount = EditorGUILayout.Slider(new GUIContent("Crease",
+                    "How sharp these lines stay when Subdivision smooths the model: 1 = a hard edge, 0 = no crease."),
+                    g.amount, 0f, 1f);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    Undo.RecordObject(_data, "Crease");
+                    g.amount = amount;
+                    MarkChanged();
+                }
+
+                if (_editingCreaseGroup == g && !_lineSelection.SetEquals(_editingCreaseSnapshot))
+                {
+                    using (new EditorGUI.DisabledScope(_lineSelection.Count == 0))
+                        if (GUILayout.Button("Update Group Lines")) UpdateCreaseLines(g);
+                }
+                else if (GUILayout.Button("Select Group Lines")) SelectCreaseLines(g);
+                EditorGUI.indentLevel--;
+            }
+            EditorGUILayout.EndVertical();
+        }
+
+        if (remove >= 0)
+        {
+            Undo.RecordObject(_data, "Remove crease group");
+            if (_editingCreaseGroup == _data.creaseGroups[remove]) _editingCreaseGroup = null;
+            _data.creaseGroups.RemoveAt(remove);
+            MarkChanged();
+        }
+    }
+
+    // Adds the crease group's lines to the line selection, and starts editing it: once the selection
+    // changes, its button becomes Update Group Lines.
+    void SelectCreaseLines(ModelTexturingData.CreaseGroup g)
+    {
+        if (_target == null || !EnsureCache()) return;
+        foreach (int i in WiresOf(g)) _lineSelection.Add(i);
+        _editingCreaseGroup = g;
+        _editingCreaseSnapshot = new HashSet<int>(_lineSelection);
+        Repaint();
+        SceneView.RepaintAll();
+    }
+
+    // The crease group's lines become the selection; lines taken from other crease groups leave
+    // them. The selection is then cleared.
+    void UpdateCreaseLines(ModelTexturingData.CreaseGroup g)
+    {
+        Undo.RecordObject(_data, "Update crease lines");
+        TakeCreaseLines(_lineSelection, g);
+        g.lines.Clear();
+        g.lines.AddRange(CreaseLinesOf(_lineSelection));
+        _lineSelection.Clear();
+        _editingCreaseGroup = null;
+        MarkChanged();
+        SceneView.RepaintAll();
+    }
+
+    // Every crease group's lines.
+    IEnumerable<ModelTexturingData.Crease> AllCreaseLines()
+    {
+        if (_data == null || _data.creaseGroups == null) yield break;
+        foreach (var g in _data.creaseGroups)
+            foreach (var cr in g.lines)
+                yield return cr;
+    }
+
+    // The crease's line as two welded points, from its corners when it's pinned, else its rest-pose points.
+    bool CreaseKey(ModelTexturingData.Crease cr, out long key)
+    {
+        key = 0;
+        int a, b;
+        if (cr.cornerA >= 0 && cr.cornerB >= 0 && cr.cornerA < _tris.Length && cr.cornerB < _tris.Length)
+        {
+            a = _weld[_tris[cr.cornerA]];
+            b = _weld[_tris[cr.cornerB]];
+        }
+        else if (!_weldLookup.TryGetValue(Quantise(cr.a), out a) || !_weldLookup.TryGetValue(Quantise(cr.b), out b))
+            return false;
+        if (a == b) return false;
+        key = EdgeKey(a, b);
+        return true;
+    }
+
+    // Every creased line (welded points) and how sharp its group makes it.
+    Dictionary<long, float> CreaseEdges()
+    {
+        var edges = new Dictionary<long, float>();
+        if (_data == null || _data.creaseGroups == null) return edges;
+        foreach (var g in _data.creaseGroups)
+        {
+            if (g.amount <= 0f) continue;
+            foreach (var cr in g.lines)
+                if (CreaseKey(cr, out long key)) edges[key] = Mathf.Clamp01(g.amount);
+        }
+        return edges;
     }
 
     void DrawGroups()
@@ -434,26 +649,38 @@ public class ModelTexturingTool : EditorWindow
                 {
                     Undo.RecordObject(_data, "Rename group");
                     g.name = name;
-                    EditorUtility.SetDirty(_data);
+                    MarkChanged();   // a Transparency group's material property is named after it
                 }
 
                 EditorGUI.BeginChangeCheck();
                 var colour = EditorGUILayout.ColorField(new GUIContent("Colour Fill"), g.colour, true, false, false);
-                // Opacity is the colour's alpha: how much the fill covers the base colour underneath.
-                // Unticked, the slider is hidden and the group is fully opaque; its value is kept.
-                bool opacityOn = EditorGUILayout.Toggle("Opacity", !g.opacityOff);
-                if (opacityOn)
-                {
-                    EditorGUI.indentLevel++;
-                    colour.a = EditorGUILayout.Slider(" ", g.colour.a, 0f, 1f);
-                    EditorGUI.indentLevel--;
-                }
                 if (EditorGUI.EndChangeCheck())
                 {
                     Undo.RecordObject(_data, "Group colour");
-                    g.colour = colour;
-                    g.opacityOff = !opacityOn;
+                    g.colour = new Color(colour.r, colour.g, colour.b, g.colour.a);
                     MarkChanged();
+                }
+
+                // Ticked, the group draws with the transparent material, as see-through as the slider
+                // says — the material's "<name>_Transparency", so it can be set there too. Unticked,
+                // the slider is hidden and the group is opaque; its value is kept.
+                EditorGUI.BeginChangeCheck();
+                bool transparentOn = EditorGUILayout.Toggle(new GUIContent("Transparency",
+                    $"Draws this group with the transparent material, exposed there as {TransparencyLabel(g)} (0 = solid, 1 = gone)."),
+                    g.Transparent);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    Undo.RecordObject(_data, "Group transparency");
+                    g.opacityOff = !transparentOn;
+                    MarkChanged();
+                }
+                if (g.Transparent)
+                {
+                    EditorGUI.indentLevel++;
+                    EditorGUI.BeginChangeCheck();
+                    float amount = EditorGUILayout.Slider(" ", TransparencyOf(g), 0f, 1f);
+                    if (EditorGUI.EndChangeCheck()) SetTransparency(g, amount);
+                    EditorGUI.indentLevel--;
                 }
 
                 EditorGUI.BeginChangeCheck();
@@ -777,6 +1004,7 @@ public class ModelTexturingTool : EditorWindow
         _selectionColour = EditorGUILayout.ColorField("Selection", _selectionColour);
         _hoverColour = EditorGUILayout.ColorField("Hover", _hoverColour);
         _wireColour = EditorGUILayout.ColorField("Wireframe", _wireColour);
+        _creaseColour = EditorGUILayout.ColorField(new GUIContent("Crease", "Creased lines on the wireframe — fainter the softer the crease."), _creaseColour);
         if (EditorGUI.EndChangeCheck())
         {
             SaveDisplay();
@@ -877,6 +1105,7 @@ public class ModelTexturingTool : EditorWindow
         _expanded[group] = true;
         _gradientExpanded[gradient] = true;
         _lineSelection.Clear();
+        _editingCreaseGroup = null;
         MarkChanged();
     }
 
@@ -1161,6 +1390,14 @@ public class ModelTexturingTool : EditorWindow
             string error = AssetDatabase.RenameAsset(from, Path.GetFileNameWithoutExtension(MaterialPath(newTitle, transparent)));
             if (!string.IsNullOrEmpty(error)) Debug.LogWarning($"Model Texturing Tool: couldn't rename {from}: {error}");
         }
+        // The model's transparent graph goes with them.
+        string graphFrom = Path.ChangeExtension(MaterialPath(oldTitle, true), ".shadergraph");
+        if (AssetDatabase.LoadAssetAtPath<Shader>(graphFrom) != null)
+        {
+            string error = AssetDatabase.RenameAsset(graphFrom, Path.GetFileNameWithoutExtension(MaterialPath(newTitle, true)));
+            if (!string.IsNullOrEmpty(error)) Debug.LogWarning($"Model Texturing Tool: couldn't rename {graphFrom}: {error}");
+        }
+        _graphKey = null;
         AssetDatabase.SaveAssetIfDirty(_data);
     }
 
@@ -1172,12 +1409,16 @@ public class ModelTexturingTool : EditorWindow
         if (_data == null || MaterialTitle.Length == 0) return null;
         var current = transparent ? _data.transparentMaterial : _data.material;
         string path = MaterialPath(transparent);
-        if (current != null && AssetDatabase.GetAssetPath(current) == path) return current;
+        if (current != null && AssetDatabase.GetAssetPath(current) == path)
+        {
+            if (transparent) EnsureTransparentGraph();   // on the model's own graph, with every group's value
+            return current;
+        }
 
         var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
         if (mat == null)
         {
-            var shader = FindGraph(transparent ? TransparentGraph : OpaqueGraph);
+            var shader = transparent ? EnsureTransparentGraph() : FindGraph(OpaqueGraph);
             if (shader == null)
             {
                 Debug.LogWarning($"Model Texturing Tool: no {(transparent ? TransparentGraph : OpaqueGraph)} shader graph found.");
@@ -1186,7 +1427,12 @@ public class ModelTexturingTool : EditorWindow
             mat = new Material(shader);
             var from = transparent ? _data.material : current ?? BakeMaterial();
             if (from != null) mat.CopyMatchingPropertiesFromMaterial(from);
-            if (transparent) mat.SetFloat(DoubleSidedProp, 1f);   // see-through faces start with both sides showing
+            if (transparent)
+            {
+                mat.SetFloat(DoubleSidedProp, 1f);   // see-through faces start with both sides showing
+                foreach (var p in TransparencyProps())
+                    if (mat.HasProperty(p.reference)) mat.SetFloat(p.reference, p.group.Transparency);
+            }
             if (_data.shadeMap != null) mat.SetTexture(ShadeMapProp, _data.shadeMap);
             AssetDatabase.CreateAsset(mat, path);
         }
@@ -1195,6 +1441,11 @@ public class ModelTexturingTool : EditorWindow
         if (transparent) _data.transparentMaterial = mat;
         else _data.material = mat;
         EditorUtility.SetDirty(_data);
+        if (transparent)
+        {
+            _graphKey = null;   // now it's the data's material, give it the groups' values
+            EnsureTransparentGraph();
+        }
         return mat;
     }
 
@@ -1300,7 +1551,9 @@ public class ModelTexturingTool : EditorWindow
     int _layoutVersion;
     Mesh _layoutMesh;             // the replicant ApplyLayout last wrote, and what it wrote
     long _layoutMeshTopology;
+    long _layoutMeshSubdiv;       // SubdivisionKey it was smoothed with, 0 = not smoothed
     int _layoutMeshVersion = -1;
+    [System.NonSerialized] int _replicantBuilds;   // +1 per rebuild, so the hide copy is remade too
 
     // The model wears the replicant (or its hide copy), so the map's layout is on it.
     bool WearsLayout(Renderer r)
@@ -1316,27 +1569,41 @@ public class ModelTexturingTool : EditorWindow
     {
         if (replicant == null || !EnsureCache()) return;
         var layout = Layout();
-        if (rebuild || replicant != _layoutMesh || replicant.vertexCount != layout.source.Length ||
-            _layoutMeshTopology != layout.topology)
+        long subdivKey = SubdivisionKey(out var creases);
+        bool smooth = subdivKey != 0;
+        int expected = !smooth ? layout.source.Length : _subdiv != null ? _subdiv.vertexCount : -1;
+        if (rebuild || replicant != _layoutMesh || replicant.vertexCount != expected ||
+            _layoutMeshTopology != layout.topology || _layoutMeshSubdiv != subdivKey)
         {
-            Debug.Log($"[ModelTexturingCrash] rebuilding replicant '{replicant.name}': " +
-                      $"{replicant.vertexCount} → {layout.source.Length} vertices, worn by {(_target ? _target.name : "nothing")}");   // DEBUG: native crash hunt
             string name = replicant.name;
             var fresh = BuildLayoutMesh(layout);
+            _subdiv = null;
+            if (smooth)
+            {
+                var smoothed = Subdivide(fresh, layout, Mathf.Clamp(_data.subdivisionLevels, 1, 2), creases);
+                DestroyImmediate(fresh);
+                fresh = smoothed;
+                _subdiv.topology = layout.topology;
+                _subdiv.key = subdivKey;
+            }
+            Debug.Log($"[ModelTexturingCrash] rebuilding replicant '{replicant.name}': " +
+                      $"{replicant.vertexCount} → {fresh.vertexCount} vertices, worn by {(_target ? _target.name : "nothing")}");   // DEBUG: native crash hunt
             EditorUtility.CopySerialized(fresh, replicant);
             DestroyImmediate(fresh);
             replicant.name = name;
             // CopySerialized refills the mesh, but when the vertex count stays the same the GPU keeps
             // drawing its old vertices with the new faces (a blob) until a vertex channel is written
             // through the Mesh API — seen 2026-10-05. Rewriting UV1 is that write.
-            if (layout.uv != null) replicant.SetUVs(1, layout.uv);
+            if (layout.uv != null) replicant.SetUVs(1, DrawnUVs(layout, replicant));
             _layoutMesh = replicant;
             _layoutMeshTopology = layout.topology;
+            _layoutMeshSubdiv = subdivKey;
+            _replicantBuilds++;
             _splitKey = null;
             SplitReplicant(replicant);
         }
         else if (_layoutMeshVersion != layout.version && layout.uv != null)
-            replicant.SetUVs(1, layout.uv);
+            replicant.SetUVs(1, DrawnUVs(layout, replicant));
         else return;
         _layoutMeshVersion = layout.version;
         EditorUtility.SetDirty(replicant);
@@ -1604,6 +1871,671 @@ public class ModelTexturingTool : EditorWindow
         return result;
     }
 
+    // ─────────────────────────────────────────── Subdivision
+    // The replicant smoothed the way Blender's Subdivision Surface does it (Catmull-Clark), while
+    // Subdivision is ticked. Built on top of the layout: positions are smoothed over the welded
+    // shape, so group edges and UV seams never open, and creased lines stay sharp. Every other
+    // per-vertex value — the place on the map above all — is mixed in a straight line from the
+    // corners of the face the vertex came from, so each piece of a face shows that face's own part
+    // of the map (the bake is unchanged). Faces are still picked on the unsmoothed shape; the
+    // triangles each one became are kept, so Transparency and Hide carry over to its pieces.
+
+    class Subdivided
+    {
+        public long topology, key;   // the layout and the SubdivisionKey it was built for
+        public int vertexCount;
+        public int[] triStart;       // original face -> its first corner in tris; triStart[t + 1] ends it
+        public int[] tris;           // the smoothed triangles, grouped by the original face they came from
+        public int[] from;           // smoothed vertex × 4 -> the unsmoothed replicant vertices it mixes
+        public float[] weight;       //   and how much of each
+    }
+
+    [System.NonSerialized] Subdivided _subdiv;
+
+    // 0 while Subdivision is off; else a hash of everything the smoothing depends on beyond the layout.
+    long SubdivisionKey(out Dictionary<long, float> creases)
+    {
+        creases = null;
+        if (_data == null || !_data.subdivision) return 0;
+        creases = CreaseEdges();
+        unchecked
+        {
+            long key = (long)14695981039346656037UL;
+            void Mix(long v) { key = (key ^ v) * 1099511628211L; }
+            Mix(Mathf.Clamp(_data.subdivisionLevels, 1, 2));
+            foreach (var kv in creases)
+            {
+                Mix(kv.Key);
+                Mix(System.BitConverter.SingleToInt32Bits(kv.Value));
+            }
+            return key == 0 ? 1 : key;
+        }
+    }
+
+    // The smoothing as built for the replicant as it is now, or null when it's the plain one.
+    Subdivided DrawnSubdivision(MapLayout layout, Mesh m) =>
+        _subdiv != null && _subdiv.topology == layout.topology && m != null && m.vertexCount == _subdiv.vertexCount
+            ? _subdiv : null;
+
+    // The triangles the replicant draws for face t: its own corners, or the smoothed pieces of it.
+    // (A smoothed quad's pieces all go with its first triangle.)
+    void AddDrawn(MapLayout layout, Mesh m, int t, List<int> into)
+    {
+        var s = DrawnSubdivision(layout, m);
+        if (s == null)
+        {
+            into.Add(layout.corner[t * 3]);
+            into.Add(layout.corner[t * 3 + 1]);
+            into.Add(layout.corner[t * 3 + 2]);
+            return;
+        }
+        for (int c = s.triStart[t]; c < s.triStart[t + 1]; c++) into.Add(s.tris[c]);
+    }
+
+    // The map's layout on the replicant's vertices — mixed from the corners when it's smoothed.
+    Vector2[] DrawnUVs(MapLayout layout, Mesh m)
+    {
+        var s = DrawnSubdivision(layout, m);
+        if (s == null) return layout.uv;
+        var uv = new Vector2[s.vertexCount];
+        for (int v = 0; v < uv.Length; v++)
+            for (int k = 0; k < 4; k++)
+                uv[v] += layout.uv[s.from[v * 4 + k]] * s.weight[v * 4 + k];
+        return uv;
+    }
+
+    // Which group each face is in (-1 for none).
+    int[] FaceGroups()
+    {
+        var groupOf = new int[TriCount];
+        for (int t = 0; t < groupOf.Length; t++) groupOf[t] = -1;
+        for (int g = 0; g < _data.fills.Count; g++)
+            foreach (int t in _data.fills[g].triangles)
+                if (t >= 0 && t < groupOf.Length) groupOf[t] = g;
+        return groupOf;
+    }
+
+    // One round of smoothing's mesh. Points are welded positions (what gets smoothed); corners are
+    // vertices as the mesh splits them (per group, per UV piece), each standing on a point.
+    class SubdivLevel
+    {
+        public int pointCount;
+        public int[] cornerPoint;
+        public List<int[]> faces;              // corners, in winding order
+        public List<int> faceOf;               // the original face (triangle) each came from
+        public Dictionary<long, float> crease; // by EdgeKey of two points
+    }
+
+    // The coarse replicant (BuildLayoutMesh) smoothed `levels` times; fills _subdiv.
+    Mesh Subdivide(Mesh coarse, MapLayout layout, int levels, Dictionary<long, float> creases)
+    {
+        int corners0 = coarse.vertexCount;
+        var level = new SubdivLevel
+        {
+            pointCount = _weldCount,
+            cornerPoint = new int[corners0],
+            faces = new List<int[]>(TriCount),
+            faceOf = new List<int>(TriCount),
+            crease = creases ?? new Dictionary<long, float>(),
+        };
+        for (int r = 0; r < corners0; r++) level.cornerPoint[r] = _weld[layout.source[r]];
+
+        // Faces as Blender has them: a quad's two halves are one face, unless they're in different
+        // groups or the diagonal is a seam (then each half is smoothed as a triangle).
+        int[] groupOf = FaceGroups();
+        var corner = layout.corner;
+        var done = new bool[TriCount];
+        for (int t = 0; t < TriCount; t++)
+        {
+            if (done[t]) continue;
+            done[t] = true;
+            int[] face = { corner[t * 3], corner[t * 3 + 1], corner[t * 3 + 2] };
+            int p = _partner[t];
+            if (p >= 0 && !done[p] && groupOf[p] == groupOf[t] &&
+                QuadOf(face, new[] { corner[p * 3], corner[p * 3 + 1], corner[p * 3 + 2] }, out int[] quad))
+            {
+                face = quad;
+                done[p] = true;
+            }
+            bool degenerate = false;
+            for (int i = 0; i < face.Length && !degenerate; i++)
+                for (int j = i + 1; j < face.Length; j++)
+                    if (level.cornerPoint[face[i]] == level.cornerPoint[face[j]]) { degenerate = true; break; }
+            if (degenerate) continue;   // no area — left out
+            level.faces.Add(face);
+            level.faceOf.Add(t);
+        }
+
+        // Per point: position, skin and blend shapes (from any corner standing on it).
+        var verts = coarse.vertices;
+        var pos = new Vector3[level.pointCount];
+        var anyCorner = new int[level.pointCount];
+        for (int i = 0; i < anyCorner.Length; i++) anyCorner[i] = -1;
+        for (int r = 0; r < corners0; r++)
+        {
+            int pt = level.cornerPoint[r];
+            if (anyCorner[pt] >= 0) continue;
+            anyCorner[pt] = r;
+            pos[pt] = verts[r];
+        }
+
+        var perVertex = coarse.GetBonesPerVertex();
+        var allWeights = coarse.GetAllBoneWeights();
+        bool skinned = perVertex.Length == corners0 && allWeights.Length > 0;
+        int maxBones = 0;
+        int[][] bone = null;
+        float[][] boneW = null;
+        if (skinned)
+        {
+            var first = new int[corners0];
+            for (int v = 0, at = 0; v < corners0; v++)
+            {
+                first[v] = at;
+                at += perVertex[v];
+                maxBones = Mathf.Max(maxBones, perVertex[v]);
+            }
+            bone = new int[level.pointCount][];
+            boneW = new float[level.pointCount][];
+            for (int pt = 0; pt < level.pointCount; pt++)
+            {
+                int r = anyCorner[pt];
+                int n = r >= 0 ? perVertex[r] : 0;
+                bone[pt] = new int[n];
+                boneW[pt] = new float[n];
+                for (int j = 0; j < n; j++)
+                {
+                    bone[pt][j] = allWeights[first[r] + j].boneIndex;
+                    boneW[pt][j] = allWeights[first[r] + j].weight;
+                }
+            }
+        }
+
+        // Blend shapes: each frame's vertex/normal/tangent offsets, per point.
+        var shapeFrames = new List<(string name, float weight, Vector3[] dv, Vector3[] dn, Vector3[] dt)>();
+        if (coarse.blendShapeCount > 0)
+        {
+            var dv = new Vector3[corners0];
+            var dn = new Vector3[corners0];
+            var dt = new Vector3[corners0];
+            for (int s = 0; s < coarse.blendShapeCount; s++)
+                for (int f = 0; f < coarse.GetBlendShapeFrameCount(s); f++)
+                {
+                    coarse.GetBlendShapeFrameVertices(s, f, dv, dn, dt);
+                    var pv = new Vector3[level.pointCount];
+                    var pn = new Vector3[level.pointCount];
+                    var pt3 = new Vector3[level.pointCount];
+                    for (int pt = 0; pt < level.pointCount; pt++)
+                    {
+                        int r = anyCorner[pt];
+                        if (r < 0) continue;
+                        pv[pt] = dv[r];
+                        pn[pt] = dn[r];
+                        pt3[pt] = dt[r];
+                    }
+                    shapeFrames.Add((coarse.GetBlendShapeName(s), coarse.GetBlendShapeFrameWeight(s, f), pv, pn, pt3));
+                }
+        }
+
+        // Per corner: which unsmoothed replicant vertices it mixes (at most a face's four corners).
+        var mixFrom = new int[corners0][];
+        var mixW = new float[corners0][];
+        for (int r = 0; r < corners0; r++)
+        {
+            mixFrom[r] = new[] { r };
+            mixW[r] = new[] { 1f };
+        }
+
+        for (int round = 0; round < levels; round++)
+        {
+            var next = SubdivideOnce(level, out int[][] ruleFrom, out float[][] ruleW, out int[][] cornerFrom);
+
+            var newPos = new Vector3[next.pointCount];
+            for (int pt = 0; pt < newPos.Length; pt++)
+                for (int k = 0; k < ruleFrom[pt].Length; k++) newPos[pt] += pos[ruleFrom[pt][k]] * ruleW[pt][k];
+            pos = newPos;
+
+            if (skinned)
+            {
+                var newBone = new int[next.pointCount][];
+                var newBoneW = new float[next.pointCount][];
+                var sum = new Dictionary<int, float>();
+                for (int pt = 0; pt < next.pointCount; pt++)
+                {
+                    sum.Clear();
+                    for (int k = 0; k < ruleFrom[pt].Length; k++)
+                    {
+                        int o = ruleFrom[pt][k];
+                        float w = ruleW[pt][k];
+                        for (int j = 0; j < bone[o].Length; j++)
+                        {
+                            sum.TryGetValue(bone[o][j], out float had);
+                            sum[bone[o][j]] = had + boneW[o][j] * w;
+                        }
+                    }
+                    newBone[pt] = new int[sum.Count];
+                    newBoneW[pt] = new float[sum.Count];
+                    int at = 0;
+                    foreach (var kv in sum)
+                    {
+                        newBone[pt][at] = kv.Key;
+                        newBoneW[pt][at++] = kv.Value;
+                    }
+                }
+                bone = newBone;
+                boneW = newBoneW;
+            }
+
+            for (int s = 0; s < shapeFrames.Count; s++)
+            {
+                var (name, weight, dv, dn, dt) = shapeFrames[s];
+                var nv = new Vector3[next.pointCount];
+                var nn = new Vector3[next.pointCount];
+                var nt = new Vector3[next.pointCount];
+                for (int pt = 0; pt < next.pointCount; pt++)
+                    for (int k = 0; k < ruleFrom[pt].Length; k++)
+                    {
+                        int o = ruleFrom[pt][k];
+                        float w = ruleW[pt][k];
+                        nv[pt] += dv[o] * w;
+                        nn[pt] += dn[o] * w;
+                        nt[pt] += dt[o] * w;
+                    }
+                shapeFrames[s] = (name, weight, nv, nn, nt);
+            }
+
+            var newFrom = new int[cornerFrom.Length][];
+            var newW = new float[cornerFrom.Length][];
+            var idx = new List<int>(8);
+            var wts = new List<float>(8);
+            for (int c = 0; c < cornerFrom.Length; c++)
+            {
+                idx.Clear();
+                wts.Clear();
+                float share = 1f / cornerFrom[c].Length;
+                foreach (int o in cornerFrom[c])
+                    for (int k = 0; k < mixFrom[o].Length; k++)
+                    {
+                        int at = idx.IndexOf(mixFrom[o][k]);
+                        if (at < 0) { idx.Add(mixFrom[o][k]); wts.Add(mixW[o][k] * share); }
+                        else wts[at] += mixW[o][k] * share;
+                    }
+                newFrom[c] = idx.ToArray();
+                newW[c] = wts.ToArray();
+            }
+            mixFrom = newFrom;
+            mixW = newW;
+            level = next;
+        }
+
+        // The smoothed mesh.
+        int count = level.cornerPoint.Length;
+        var m = new Mesh { indexFormat = count > 65535 ? IndexFormat.UInt32 : IndexFormat.UInt16 };
+        var vertices = new Vector3[count];
+        for (int v = 0; v < count; v++) vertices[v] = pos[level.cornerPoint[v]];
+        m.vertices = vertices;
+
+        var result = new Subdivided { vertexCount = count, from = new int[count * 4], weight = new float[count * 4] };
+        for (int v = 0; v < count; v++)
+        {
+            // Never more than four: every piece stays inside one face of the original.
+            int n = Mathf.Min(4, mixFrom[v].Length);
+            float total = 0f;
+            for (int k = 0; k < n; k++) total += mixW[v][k];
+            for (int k = 0; k < n; k++)
+            {
+                result.from[v * 4 + k] = mixFrom[v][k];
+                result.weight[v * 4 + k] = total > 0f ? mixW[v][k] / total : 0f;
+            }
+        }
+
+        if (coarse.HasVertexAttribute(VertexAttribute.Color))
+        {
+            var src = coarse.colors;
+            var colours = new Color[count];
+            for (int v = 0; v < count; v++)
+                for (int k = 0; k < 4; k++) colours[v] += src[result.from[v * 4 + k]] * result.weight[v * 4 + k];
+            m.colors = colours;
+        }
+        for (int ch = 0; ch < 8; ch++)
+        {
+            var attribute = VertexAttribute.TexCoord0 + ch;
+            if (!coarse.HasVertexAttribute(attribute)) continue;
+            int dimension = coarse.GetVertexAttributeDimension(attribute);
+            var src = new List<Vector4>();
+            coarse.GetUVs(ch, src);
+            var mixed = new Vector4[count];
+            for (int v = 0; v < count; v++)
+                for (int k = 0; k < 4; k++) mixed[v] += src[result.from[v * 4 + k]] * result.weight[v * 4 + k];
+            if (dimension <= 2) m.SetUVs(ch, System.Array.ConvertAll(mixed, u => (Vector2)u));
+            else if (dimension == 3) m.SetUVs(ch, System.Array.ConvertAll(mixed, u => (Vector3)u));
+            else m.SetUVs(ch, mixed);
+        }
+
+        if (skinned)
+        {
+            // Each vertex keeps its strongest bones (as many as the original's most), strongest first.
+            var newPerVertex = new NativeArray<byte>(count, Allocator.Temp);
+            var weights = new List<BoneWeight1>(count * maxBones);
+            var order = new List<int>(16);
+            for (int v = 0; v < count; v++)
+            {
+                int pt = level.cornerPoint[v];
+                order.Clear();
+                for (int j = 0; j < bone[pt].Length; j++) order.Add(j);
+                var bw = boneW[pt];
+                order.Sort((a, b) => bw[b].CompareTo(bw[a]));
+                int n = Mathf.Min(maxBones, order.Count);
+                float total = 0f;
+                for (int j = 0; j < n; j++) total += bw[order[j]];
+                for (int j = 0; j < n; j++)
+                    weights.Add(new BoneWeight1 { boneIndex = bone[pt][order[j]], weight = total > 0f ? bw[order[j]] / total : 0f });
+                newPerVertex[v] = (byte)n;
+            }
+            var weightArray = new NativeArray<BoneWeight1>(weights.ToArray(), Allocator.Temp);
+            m.SetBoneWeights(newPerVertex, weightArray);
+            newPerVertex.Dispose();
+            weightArray.Dispose();
+        }
+        m.bindposes = coarse.bindposes;
+
+        foreach (var (name, weight, dv, dn, dt) in shapeFrames)
+        {
+            var fv = new Vector3[count];
+            var fn = new Vector3[count];
+            var ft = new Vector3[count];
+            for (int v = 0; v < count; v++)
+            {
+                int pt = level.cornerPoint[v];
+                fv[v] = dv[pt];
+                fn[v] = dn[pt];
+                ft[v] = dt[pt];
+            }
+            m.AddBlendShapeFrame(name, weight, fv, fn, ft);
+        }
+
+        // Triangles, grouped by the original face they came from; each quad cut along its shorter diagonal.
+        result.triStart = new int[TriCount + 1];
+        foreach (int t in level.faceOf) result.triStart[t + 1] += 6;
+        for (int t = 0; t < TriCount; t++) result.triStart[t + 1] += result.triStart[t];
+        result.tris = new int[result.triStart[TriCount]];
+        var fill = (int[])result.triStart.Clone();
+        for (int f = 0; f < level.faces.Count; f++)
+        {
+            var q = level.faces[f];   // every face is a quad after one round
+            int at = fill[level.faceOf[f]];
+            fill[level.faceOf[f]] += 6;
+            bool cutAC = (vertices[q[0]] - vertices[q[2]]).sqrMagnitude <= (vertices[q[1]] - vertices[q[3]]).sqrMagnitude;
+            int[] cut = cutAC
+                ? new[] { q[0], q[1], q[2], q[0], q[2], q[3] }
+                : new[] { q[0], q[1], q[3], q[1], q[2], q[3] };
+            System.Array.Copy(cut, 0, result.tris, at, 6);
+        }
+        m.subMeshCount = 1;
+        m.SetTriangles(result.tris, 0, false);
+
+        // Normals: smooth across every welded point, as Blender's Shade Smooth shows a subdivided model.
+        var pointNormal = new Vector3[level.pointCount];
+        for (int c = 0; c < result.tris.Length; c += 3)
+        {
+            int a = result.tris[c], b = result.tris[c + 1], d = result.tris[c + 2];
+            Vector3 n = Vector3.Cross(vertices[b] - vertices[a], vertices[d] - vertices[a]);
+            pointNormal[level.cornerPoint[a]] += n;
+            pointNormal[level.cornerPoint[b]] += n;
+            pointNormal[level.cornerPoint[d]] += n;
+        }
+        var normals = new Vector3[count];
+        for (int v = 0; v < count; v++) normals[v] = Unit(pointNormal[level.cornerPoint[v]]);
+        m.normals = normals;
+        if (coarse.HasVertexAttribute(VertexAttribute.Tangent) && coarse.HasVertexAttribute(VertexAttribute.TexCoord0))
+            m.RecalculateTangents();
+        m.bounds = coarse.bounds;
+
+        _subdiv = result;
+        return m;
+    }
+
+    // The quad two triangles make (their shared side its diagonal), in the first one's winding.
+    static bool QuadOf(int[] tri, int[] other, out int[] quad)
+    {
+        quad = null;
+        for (int k = 0; k < 3; k++)
+        {
+            int a = tri[k], b = tri[(k + 1) % 3], c = tri[(k + 2) % 3];
+            if (System.Array.IndexOf(other, a) >= 0 || System.Array.IndexOf(other, b) < 0 || System.Array.IndexOf(other, c) < 0)
+                continue;
+            int d = -1;
+            foreach (int o in other)
+                if (o != b && o != c) d = o;
+            if (d < 0) return false;
+            quad = new[] { a, b, d, c };
+            return true;
+        }
+        return false;   // the halves don't share both diagonal corners — a seam runs along it
+    }
+
+    // One round of Catmull-Clark. New points: the old ones (same numbers), one per side, one per face.
+    // ruleFrom/ruleW: each new point as a mix of old points. cornerFrom: each new corner as an equal
+    // mix of old corners (straight across the face, for the map and the rest).
+    static SubdivLevel SubdivideOnce(SubdivLevel level, out int[][] ruleFrom, out float[][] ruleW, out int[][] cornerFrom)
+    {
+        int points = level.pointCount;
+        int faceCount = level.faces.Count;
+        int[] cp = level.cornerPoint;
+
+        // Sides between points, with the faces either side.
+        var sideOf = new Dictionary<long, int>();
+        var sideA = new List<int>();
+        var sideB = new List<int>();
+        var sideFaces = new List<List<int>>();
+        var pointSides = new List<int>[points];
+        var pointFaces = new List<int>[points];
+        for (int f = 0; f < faceCount; f++)
+        {
+            var face = level.faces[f];
+            for (int i = 0; i < face.Length; i++)
+            {
+                int a = cp[face[i]], b = cp[face[(i + 1) % face.Length]];
+                long key = EdgeKey(a, b);
+                if (!sideOf.TryGetValue(key, out int s))
+                {
+                    s = sideA.Count;
+                    sideOf[key] = s;
+                    sideA.Add(a);
+                    sideB.Add(b);
+                    sideFaces.Add(new List<int>(2));
+                    (pointSides[a] ??= new List<int>()).Add(s);
+                    (pointSides[b] ??= new List<int>()).Add(s);
+                }
+                sideFaces[s].Add(f);
+                (pointFaces[a] ??= new List<int>()).Add(f);
+            }
+        }
+        int sides = sideA.Count;
+
+        // How sharp a side is: the mesh's open edge (and anything stranger than two faces) fully.
+        float Sharp(int s) =>
+            sideFaces[s].Count != 2 ? 1f : level.crease.TryGetValue(EdgeKey(sideA[s], sideB[s]), out float c) ? c : 0f;
+
+        ruleFrom = new int[points + sides + faceCount][];
+        ruleW = new float[ruleFrom.Length][];
+        var acc = new Dictionary<int, float>();
+        void Add(int p, float w)
+        {
+            acc.TryGetValue(p, out float had);
+            acc[p] = had + w;
+        }
+        void AddFace(int f, float w)
+        {
+            var face = level.faces[f];
+            foreach (int c in face) Add(cp[c], w / face.Length);
+        }
+        void Take(int p, int[][] from, float[][] wts)
+        {
+            from[p] = new int[acc.Count];
+            wts[p] = new float[acc.Count];
+            int at = 0;
+            foreach (var kv in acc)
+            {
+                from[p][at] = kv.Key;
+                wts[p][at++] = kv.Value;
+            }
+            acc.Clear();
+        }
+
+        // Face points: the middle of the face.
+        for (int f = 0; f < faceCount; f++)
+        {
+            AddFace(f, 1f);
+            Take(points + sides + f, ruleFrom, ruleW);
+        }
+
+        // Side points: the ends and the two faces' middles; on a crease, that much of the plain midpoint.
+        for (int s = 0; s < sides; s++)
+        {
+            float c = Sharp(s);
+            Add(sideA[s], 0.5f * c);
+            Add(sideB[s], 0.5f * c);
+            if (c < 1f)
+            {
+                float smooth = 1f - c;
+                Add(sideA[s], 0.25f * smooth);
+                Add(sideB[s], 0.25f * smooth);
+                AddFace(sideFaces[s][0], 0.25f * smooth);
+                AddFace(sideFaces[s][1], 0.25f * smooth);
+            }
+            Take(points + s, ruleFrom, ruleW);
+        }
+
+        // Old points move: (Q + 2R + (n − 3)S) / n; along a crease (two creased sides) towards the
+        // crease's own curve, at a corner of three or more creases towards staying put. The mesh's
+        // open edge keeps its line and its corners stay put (Blender's Keep Corners).
+        for (int p = 0; p < points; p++)
+        {
+            var around = pointSides[p];
+            if (around == null)
+            {
+                Add(p, 1f);
+                Take(p, ruleFrom, ruleW);
+                continue;
+            }
+            int Other(int s) => sideA[s] == p ? sideB[s] : sideA[s];
+
+            int open = 0;
+            foreach (int s in around) if (sideFaces[s].Count != 2) open++;
+            if (open > 0)
+            {
+                if (open == 2 && pointFaces[p].Count > 1)
+                {
+                    Add(p, 0.75f);
+                    foreach (int s in around)
+                        if (sideFaces[s].Count != 2) Add(Other(s), 0.125f);
+                }
+                else Add(p, 1f);
+                Take(p, ruleFrom, ruleW);
+                continue;
+            }
+
+            int n = around.Count;
+            if (n < 3)
+            {
+                Add(p, 1f);
+                Take(p, ruleFrom, ruleW);
+                continue;
+            }
+            int creased = 0, firstCrease = -1, secondCrease = -1;
+            float creaseSum = 0f;
+            foreach (int s in around)
+            {
+                float c = Sharp(s);
+                if (c <= 0f) continue;
+                creased++;
+                creaseSum += c;
+                if (firstCrease < 0) firstCrease = s;
+                else if (secondCrease < 0) secondCrease = s;
+            }
+            float sharp = creased >= 2 ? creaseSum / creased : 0f;
+            float smoothPart = 1f - sharp;
+            if (smoothPart > 0f)
+            {
+                var faces = pointFaces[p];
+                foreach (int f in faces) AddFace(f, smoothPart / (n * faces.Count));
+                foreach (int s in around)
+                {
+                    Add(p, smoothPart / (n * n));
+                    Add(Other(s), smoothPart / (n * n));
+                }
+                Add(p, smoothPart * (n - 3f) / n);
+            }
+            if (sharp > 0f)
+            {
+                if (creased == 2)
+                {
+                    Add(p, sharp * 0.75f);
+                    Add(Other(firstCrease), sharp * 0.125f);
+                    Add(Other(secondCrease), sharp * 0.125f);
+                }
+                else Add(p, sharp);
+            }
+            Take(p, ruleFrom, ruleW);
+        }
+
+        // Corners: every old one (same number), one per face side between two corners — shared by the
+        // faces either side unless a seam splits them — and one in the middle of each face.
+        var cornerList = new List<int[]>(cp.Length * 4);
+        var cornerPoints = new List<int>(cp.Length * 4);
+        for (int c = 0; c < cp.Length; c++)
+        {
+            cornerList.Add(new[] { c });
+            cornerPoints.Add(cp[c]);
+        }
+        var sideCorner = new Dictionary<long, int>();
+        int SideCorner(int ca, int cb)
+        {
+            long key = EdgeKey(ca, cb);
+            if (sideCorner.TryGetValue(key, out int k)) return k;
+            k = cornerList.Count;
+            sideCorner[key] = k;
+            cornerList.Add(new[] { ca, cb });
+            cornerPoints.Add(points + sideOf[EdgeKey(cp[ca], cp[cb])]);
+            return k;
+        }
+        var nextFaces = new List<int[]>(faceCount * 4);
+        var nextFaceOf = new List<int>(faceCount * 4);
+        for (int f = 0; f < faceCount; f++)
+        {
+            var face = level.faces[f];
+            int k = face.Length;
+            int middle = cornerList.Count;
+            cornerList.Add((int[])face.Clone());
+            cornerPoints.Add(points + sides + f);
+            for (int i = 0; i < k; i++)
+            {
+                int prev = face[(i + k - 1) % k], here = face[i], after = face[(i + 1) % k];
+                nextFaces.Add(new[] { here, SideCorner(here, after), middle, SideCorner(prev, here) });
+                nextFaceOf.Add(level.faceOf[f]);
+            }
+        }
+        cornerFrom = cornerList.ToArray();
+
+        // A creased side's two halves keep its crease.
+        var crease = new Dictionary<long, float>();
+        foreach (var kv in level.crease)
+        {
+            if (!sideOf.TryGetValue(kv.Key, out int s)) continue;
+            crease[EdgeKey(sideA[s], points + s)] = kv.Value;
+            crease[EdgeKey(points + s, sideB[s])] = kv.Value;
+        }
+
+        return new SubdivLevel
+        {
+            pointCount = points + sides + faceCount,
+            cornerPoint = cornerPoints.ToArray(),
+            faces = nextFaces,
+            faceOf = nextFaceOf,
+            crease = crease,
+        };
+    }
+
     // ─────────────────────────────────────────── Hide
 
     // While a group is hidden, the stage copy wears a throwaway copy of the replicant with that
@@ -1627,21 +2559,18 @@ public class ModelTexturingTool : EditorWindow
         var seeThrough = SeeThroughTriangles();
         var hiddenSorted = new SortedSet<int>(hidden);
         var layout = Layout();
-        string key = string.Join(",", hiddenSorted) + "|" + string.Join(",", seeThrough) + "|" + layout.version;
+        string key = string.Join(",", hiddenSorted) + "|" + string.Join(",", TransparencySlots()) + "|" + layout.version +
+                     "|" + _replicantBuilds;
         // Bake and Open in Stage put the replicant itself back on, so the copy is remade then.
         if (key == _hideKey && _hideMesh != null && MeshOf(_target) == _hideMesh) return;
         _hideKey = key;
 
-        var corner = layout.corner;
-        var opaque = new List<int>(corner.Length);
+        var opaque = new List<int>(layout.corner.Length);
         var clear = new List<int>(seeThrough.Count * 3);
         for (int t = 0; t < TriCount; t++)
         {
             if (hidden.Contains(t)) continue;
-            var into = seeThrough.Contains(t) ? clear : opaque;
-            into.Add(corner[t * 3]);
-            into.Add(corner[t * 3 + 1]);
-            into.Add(corner[t * 3 + 2]);
+            AddDrawn(layout, replicant, t, seeThrough.Contains(t) ? clear : opaque);
         }
 
         var old = _hideMesh;
@@ -1670,30 +2599,38 @@ public class ModelTexturingTool : EditorWindow
         _hideKey = null;
     }
 
-    // Opaque faces in submesh 0; faces of groups under full opacity in submesh 1, only when there are any.
+    // Opaque faces in submesh 0; Transparency groups' faces in submesh 1, only when there are any — and
+    // UV2.x, on every vertex, its place in the list of Transparency groups (-1 for the rest), which picks
+    // the group's "<name>_Transparency" on the transparent material.
     void SplitReplicant(Mesh replicant)
     {
         if (replicant == null || !EnsureCache()) return;
         var seeThrough = SeeThroughTriangles();
         var layout = Layout();
-        string key = string.Join(",", seeThrough) + "|" + layout.topology;
+        int[] slotOf = TransparencySlots();
+        string key = string.Join(",", slotOf) + "|" + layout.topology;
         if (key == _splitKey && replicant.subMeshCount == (seeThrough.Count > 0 ? 2 : 1)) return;
         _splitKey = key;
 
-        var corner = layout.corner;
-        var opaque = new List<int>(corner.Length);
+        // Each vertex belongs to one group (the layout splits them per group, and a smoothed vertex
+        // comes from one face), so its slot is exact.
+        var slots = new Vector2[replicant.vertexCount];
+        for (int v = 0; v < slots.Length; v++) slots[v] = new Vector2(-1f, 0f);
+        var opaque = new List<int>(layout.corner.Length);
         var clear = new List<int>(seeThrough.Count * 3);
         for (int t = 0; t < TriCount; t++)
         {
             var into = seeThrough.Contains(t) ? clear : opaque;
-            into.Add(corner[t * 3]);
-            into.Add(corner[t * 3 + 1]);
-            into.Add(corner[t * 3 + 2]);
+            int from = into.Count;
+            AddDrawn(layout, replicant, t, into);
+            for (int i = from; i < into.Count; i++)
+                if (into[i] < slots.Length) slots[into[i]] = new Vector2(slotOf[t], 0f);
         }
         var bounds = replicant.bounds;
         replicant.subMeshCount = clear.Count > 0 ? 2 : 1;
         replicant.SetTriangles(opaque, 0, false);
         if (clear.Count > 0) replicant.SetTriangles(clear, 1, false);
+        replicant.SetUVs(2, slots);
         replicant.bounds = bounds;
         EditorUtility.SetDirty(replicant);
 
@@ -1702,16 +2639,391 @@ public class ModelTexturingTool : EditorWindow
             DressSlots(_target);
     }
 
-    // Triangles of every group whose opacity is below full, in order.
+    // Triangles of every Transparency group, in order.
     SortedSet<int> SeeThroughTriangles()
     {
         var set = new SortedSet<int>();
         if (_data == null) return set;
         foreach (var g in _data.fills)
-            if (g.Opacity < 1f)
+            if (g.Transparent)
                 foreach (int t in g.triangles)
                     if (t >= 0 && t < TriCount) set.Add(t);
         return set;
+    }
+
+    // ─────────────────────────────────────────── Transparency
+
+    // Every face's place in the list of Transparency groups (see TransparencyProps), -1 for the rest.
+    int[] TransparencySlots()
+    {
+        var slotOf = new int[TriCount];
+        for (int t = 0; t < slotOf.Length; t++) slotOf[t] = -1;
+        if (_data == null) return slotOf;
+        int slot = 0;
+        foreach (var g in _data.fills)
+        {
+            if (!g.Transparent) continue;
+            foreach (int t in g.triangles)
+                if (t >= 0 && t < slotOf.Length) slotOf[t] = slot;
+            slot++;
+        }
+        return slotOf;
+    }
+
+    struct TransparencyProp
+    {
+        public ModelTexturingData.Fill group;
+        public string reference;   // "_FaceWindow_Transparency" — what the material stores
+        public string label;       // "FaceWindow_Transparency" — what the material shows
+    }
+
+    // One property per Transparency group, in list order (the order of TransparencySlots).
+    List<TransparencyProp> TransparencyProps()
+    {
+        var props = new List<TransparencyProp>();
+        if (_data == null) return props;
+        var used = new HashSet<string>();
+        foreach (var g in _data.fills)
+        {
+            if (!g.Transparent) continue;
+            string label = TransparencyLabel(g);
+            string reference = "_" + Identifier(label);
+            if (!used.Add(reference))
+            {
+                // Two groups with the same name: the second gets its place in the list on the end.
+                label += "_" + (props.Count + 1);
+                reference = "_" + Identifier(label);
+                used.Add(reference);
+            }
+            props.Add(new TransparencyProp { group = g, reference = reference, label = label });
+        }
+        return props;
+    }
+
+    static string TransparencyLabel(ModelTexturingData.Fill g) =>
+        (string.IsNullOrWhiteSpace(g.name) ? "Group" : g.name.Trim()) + "_Transparency";
+
+    static string Identifier(string s)
+    {
+        var b = new System.Text.StringBuilder(s.Length);
+        foreach (char c in s) b.Append(char.IsLetterOrDigit(c) && c < 128 ? c : '_');
+        return b.ToString();
+    }
+
+    // The transparent material, when it's this data's own (at its path) — else null.
+    Material OwnTransparentMaterial()
+    {
+        var mat = _data != null ? _data.transparentMaterial : null;
+        return mat != null && AssetDatabase.GetAssetPath(mat) == MaterialPath(true) ? mat : null;
+    }
+
+    string ReferenceOf(ModelTexturingData.Fill g)
+    {
+        foreach (var p in TransparencyProps())
+            if (p.group == g) return p.reference;
+        return null;
+    }
+
+    // What the group's slider shows: the material's value once the material has the property (it can
+    // be set there too), else the group's own.
+    float TransparencyOf(ModelTexturingData.Fill g)
+    {
+        var mat = OwnTransparentMaterial();
+        string reference = ReferenceOf(g);
+        return mat != null && reference != null && mat.HasProperty(reference) ? mat.GetFloat(reference) : g.Transparency;
+    }
+
+    // The slider writes both — no bake needed, the material draws it straight away.
+    void SetTransparency(ModelTexturingData.Fill g, float amount)
+    {
+        var mat = OwnTransparentMaterial();
+        string reference = ReferenceOf(g);
+        bool onMaterial = mat != null && reference != null && mat.HasProperty(reference);
+        Undo.RecordObjects(onMaterial ? new Object[] { _data, mat } : new Object[] { _data }, "Group transparency");
+        g.colour.a = amount;
+        EditorUtility.SetDirty(_data);
+        if (onMaterial)
+        {
+            mat.SetFloat(reference, amount);
+            EditorUtility.SetDirty(mat);
+        }
+        SceneView.RepaintAll();
+    }
+
+    string TransparentGraphPath => Path.ChangeExtension(MaterialPath(true), ".shadergraph");
+
+    // What the model's graph was last written with: the key, and each property's group and name, so a
+    // renamed group's value can be read off the material under its old name.
+    [System.NonSerialized] string _graphKey;
+    [System.NonSerialized] List<TransparencyProp> _graphProps;
+
+    // The model's own transparent graph, "<title>Transparent.shadergraph" next to the data: a copy of
+    // AngelMaterialTransparent with a "<group>_Transparency" slider per Transparency group, and the
+    // Alpha going through a Custom Function that picks the face's one by UV2.x (see SplitReplicant):
+    // Alpha × (1 − transparency). Rewritten only when the groups or their names change (the file is
+    // only touched when its text does), then the transparent material is moved onto it and given every
+    // group's value.
+    Shader EnsureTransparentGraph()
+    {
+        if (_data == null || MaterialTitle.Length == 0) return null;
+        string path = TransparentGraphPath;
+        var props = TransparencyProps();
+        var key = new System.Text.StringBuilder(path);
+        foreach (var p in props) key.Append('|').Append(p.reference).Append(':').Append(p.label);
+        var shader = AssetDatabase.LoadAssetAtPath<Shader>(path);
+        if (key.ToString() == _graphKey && shader != null) return shader;
+
+        var template = FindGraph(TransparentGraph);
+        string templatePath = template != null ? AssetDatabase.GetAssetPath(template) : null;
+        if (templatePath == null)
+        {
+            Debug.LogWarning($"Model Texturing Tool: no {TransparentGraph} shader graph found to copy.");
+            return null;
+        }
+        if (path == templatePath) return template;   // a model titled "AngelMaterial" — never overwrite the original
+
+        // The material's values into the groups first, under the names the graph had, so a value set
+        // on the material survives the group being renamed.
+        var mat = OwnTransparentMaterial();
+        if (mat != null && shader != null && mat.shader == shader)
+            foreach (var p in _graphProps ?? props)
+                if (_data.fills.Contains(p.group) && mat.HasProperty(p.reference))
+                    p.group.colour.a = mat.GetFloat(p.reference);
+
+        string text;
+        try
+        {
+            text = TransparentGraphText(File.ReadAllText(templatePath), props, AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(_data)));
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"Model Texturing Tool: couldn't build {path} from {templatePath}: {e.Message}");
+            return shader;
+        }
+        if (text == null)
+        {
+            Debug.LogWarning($"Model Texturing Tool: {templatePath} has no Alpha block to wire the transparencies into.");
+            return shader;
+        }
+        if (shader == null || !File.Exists(path) || File.ReadAllText(path).Replace("\r\n", "\n") != text)
+        {
+            File.WriteAllText(path, text, new System.Text.UTF8Encoding(false));
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
+            shader = AssetDatabase.LoadAssetAtPath<Shader>(path);
+        }
+        _graphKey = key.ToString();
+        _graphProps = props;
+
+        if (mat != null && shader != null)
+        {
+            if (mat.shader != shader) mat.shader = shader;   // values of properties with the same name carry over
+            foreach (var p in props)
+                if (mat.HasProperty(p.reference)) mat.SetFloat(p.reference, p.group.Transparency);
+            EditorUtility.SetDirty(mat);
+        }
+        EditorUtility.SetDirty(_data);
+        return shader;
+    }
+
+    // The template graph with the transparency nodes added. Shader Graph files are JSON objects one
+    // after another; new objects get ids hashed from the data and their role, so the same groups always
+    // make the same text. Null when the template has no Alpha block.
+    static string TransparentGraphText(string template, List<TransparencyProp> props, string seed)
+    {
+        var blocks = new List<JObject>();
+        foreach (string part in System.Text.RegularExpressions.Regex.Split(template.Replace("\r\n", "\n").Trim(), @"\n\s*\n(?=\{)"))
+        {
+            using var reader = new JsonTextReader(new StringReader(part)) { DateParseHandling = DateParseHandling.None };
+            blocks.Add(JObject.Load(reader));
+        }
+        JObject Find(string type, System.Func<JObject, bool> also = null)
+        {
+            foreach (var b in blocks)
+                if ((string)b["m_Type"] == type && (also == null || also(b))) return b;
+            return null;
+        }
+        var graph = Find("UnityEditor.ShaderGraph.GraphData");
+        var category = Find("UnityEditor.ShaderGraph.CategoryData");
+        var alpha = Find("UnityEditor.ShaderGraph.BlockNode", b => (string)b["m_SerializedDescriptor"] == "SurfaceDescription.Alpha");
+        if (graph == null || alpha == null) return null;
+        string alphaId = (string)alpha["m_ObjectId"];
+        int alphaSlot = 0;
+        if (alpha["m_Slots"] is JArray alphaSlots && alphaSlots.Count > 0)
+        {
+            foreach (var b in blocks)
+                if ((string)b["m_ObjectId"] == (string)alphaSlots[0]["m_Id"]) alphaSlot = (int)b["m_Id"];
+        }
+
+        string Id(string role)
+        {
+            using var md5 = System.Security.Cryptography.MD5.Create();
+            byte[] hash = md5.ComputeHash(System.Text.Encoding.UTF8.GetBytes(seed + "|" + role));
+            return System.BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+        }
+        JObject Ref(string id) => new JObject { ["m_Id"] = id };
+        JObject Position(float x, float y, float w, float h) => new JObject
+        {
+            ["m_Expanded"] = true,
+            ["m_Position"] = new JObject { ["serializedVersion"] = "2", ["x"] = x, ["y"] = y, ["width"] = w, ["height"] = h },
+        };
+        JObject Slot(string id, string type, int slotId, string name, bool output, JToken value)
+        {
+            var s = new JObject
+            {
+                ["m_SGVersion"] = 0,
+                ["m_Type"] = "UnityEditor.ShaderGraph." + type,
+                ["m_ObjectId"] = id,
+                ["m_Id"] = slotId,
+                ["m_DisplayName"] = name,
+                ["m_SlotType"] = output ? 1 : 0,
+                ["m_Hidden"] = false,
+                ["m_HideConnector"] = false,
+                ["m_ShaderOutputName"] = name,
+                ["m_StageCapability"] = 3,
+                ["m_CustomBinding"] = "",
+                ["m_Value"] = value,
+                ["m_DefaultValue"] = value.DeepClone(),
+                ["m_Labels"] = new JArray(),
+            };
+            if (type == "Vector1MaterialSlot") s["m_LiteralMode"] = false;
+            return s;
+        }
+        JObject Vector4() => new JObject { ["x"] = 0f, ["y"] = 0f, ["z"] = 0f, ["w"] = 0f };
+        JObject Node(string type, string id, string name, JObject drawState, JArray slots) => new JObject
+        {
+            ["m_SGVersion"] = 0,
+            ["m_Type"] = "UnityEditor.ShaderGraph." + type,
+            ["m_ObjectId"] = id,
+            ["m_Group"] = Ref(""),
+            ["m_Name"] = name,
+            ["m_DrawState"] = drawState,
+            ["m_Slots"] = slots,
+            ["synonyms"] = new JArray(),
+            ["m_Precision"] = 0,
+            ["m_PreviewExpanded"] = false,
+            ["m_DismissedVersion"] = 0,
+            ["m_PreviewMode"] = 0,
+            ["m_CustomColors"] = new JObject { ["m_SerializableColors"] = new JArray() },
+        };
+        JObject Edge(string fromNode, int fromSlot, string toNode, int toSlot) => new JObject
+        {
+            ["m_OutputSlot"] = new JObject { ["m_Node"] = Ref(fromNode), ["m_SlotId"] = fromSlot },
+            ["m_InputSlot"] = new JObject { ["m_Node"] = Ref(toNode), ["m_SlotId"] = toSlot },
+        };
+
+        var added = new List<JObject>();
+        var nodes = (JArray)graph["m_Nodes"];
+        var edges = (JArray)graph["m_Edges"];
+        var properties = (JArray)graph["m_Properties"];
+        var children = category?["m_ChildObjectList"] as JArray;
+
+        // Custom Function: Out = AlphaIn × (1 − the transparency of the face's group).
+        string fn = Id("function");
+        var fnSlots = new JArray { Ref(Id("function.AlphaIn")), Ref(Id("function.Group")), Ref(Id("function.Out")) };
+        added.Add(Slot(Id("function.AlphaIn"), "Vector1MaterialSlot", 0, "AlphaIn", false, 1f));
+        added.Add(Slot(Id("function.Group"), "Vector4MaterialSlot", 1, "Group", false, Vector4()));
+        added.Add(Slot(Id("function.Out"), "Vector1MaterialSlot", 2, "Out", true, 0f));
+        var body = new System.Text.StringBuilder("float t = 0;\nint s = (int)round(Group.x);\n");
+        for (int k = 0; k < props.Count; k++)
+        {
+            fnSlots.Add(Ref(Id("function.T" + k)));
+            added.Add(Slot(Id("function.T" + k), "Vector1MaterialSlot", 3 + k, "T" + k, false, 0f));
+            body.Append($"if (s == {k}) t = T{k};\n");
+        }
+        body.Append("Out = AlphaIn * (1 - saturate(t));");
+        var function = Node("CustomFunctionNode", fn, "GroupTransparency (Custom Function)",
+            Position(-700f, 300f, 240f, 160f + 24f * props.Count), fnSlots);
+        function["m_SGVersion"] = 1;
+        function["synonyms"] = new JArray("code", "HLSL");
+        function["m_SourceType"] = 1;   // String
+        function["m_FunctionName"] = "GroupTransparency";
+        function["m_FunctionSource"] = "";
+        function["m_FunctionSourceUsePragmas"] = true;
+        function["m_FunctionBody"] = body.ToString();
+        added.Add(function);
+        nodes.Add(Ref(fn));
+
+        // UV2: each vertex's place in the list of Transparency groups.
+        string uv = Id("uv2");
+        added.Add(Slot(Id("uv2.Out"), "Vector4MaterialSlot", 0, "Out", true, Vector4()));
+        var uvNode = Node("UVNode", uv, "UV", Position(-1000f, 300f, 145f, 128f), new JArray { Ref(Id("uv2.Out")) });
+        uvNode["m_OutputChannel"] = 2;
+        added.Add(uvNode);
+        nodes.Add(Ref(uv));
+        edges.Add(Edge(uv, 0, fn, 1));
+
+        for (int k = 0; k < props.Count; k++)
+        {
+            var p = props[k];
+            string prop = Id("property." + p.reference);
+            added.Add(new JObject
+            {
+                ["m_SGVersion"] = 1,
+                ["m_Type"] = "UnityEditor.ShaderGraph.Internal.Vector1ShaderProperty",
+                ["m_ObjectId"] = prop,
+                ["m_Guid"] = new JObject { ["m_GuidSerialized"] = new System.Guid(Id("guid." + p.reference)).ToString() },
+                ["promotedFromAssetID"] = "",
+                ["promotedFromCategoryName"] = "",
+                ["promotedOrdering"] = -1,
+                ["m_Name"] = p.label,
+                ["m_DefaultRefNameVersion"] = 1,
+                ["m_RefNameGeneratedByDisplayName"] = p.label,
+                ["m_DefaultReferenceName"] = p.reference,
+                ["m_OverrideReferenceName"] = p.reference,
+                ["m_GeneratePropertyBlock"] = true,
+                ["m_UseCustomSlotLabel"] = false,
+                ["m_CustomSlotLabel"] = "",
+                ["m_DismissedVersion"] = 0,
+                ["m_Precision"] = 0,
+                ["overrideHLSLDeclaration"] = false,
+                ["hlslDeclarationOverride"] = 0,
+                ["hideConnector"] = false,
+                ["m_Hidden"] = false,
+                ["m_PerRendererData"] = false,
+                ["m_customAttributes"] = new JArray(),
+                ["m_Value"] = 0f,
+                ["m_FloatType"] = 1,   // Slider
+                ["m_LiteralFloatMode"] = false,
+                ["m_RangeValues"] = new JObject { ["x"] = 0f, ["y"] = 1f },
+                ["m_SliderType"] = 0,
+                ["m_SliderPower"] = 3f,
+                ["m_EnumType"] = 0,
+                ["m_CSharpEnumString"] = "",
+                ["m_EnumNames"] = new JArray("Default"),
+                ["m_EnumValues"] = new JArray(0),
+            });
+            properties.Add(Ref(prop));
+            children?.Add(Ref(prop));
+
+            string node = Id("node." + p.reference);
+            string nodeSlot = Id("node.Out." + p.reference);
+            added.Add(Slot(nodeSlot, "Vector1MaterialSlot", 0, p.label, true, 0f));
+            var propertyNode = Node("PropertyNode", node, "Property", Position(-1000f, 450f + 40f * k, 200f, 34f), new JArray { Ref(nodeSlot) });
+            propertyNode["m_Property"] = Ref(prop);
+            added.Add(propertyNode);
+            nodes.Add(Ref(node));
+            edges.Add(Edge(node, 0, fn, 3 + k));
+        }
+
+        // Whatever fed the Alpha now feeds the function, and the function feeds the Alpha.
+        foreach (var e in edges)
+            if ((string)e["m_InputSlot"]["m_Node"]["m_Id"] == alphaId)
+            {
+                e["m_InputSlot"] = new JObject { ["m_Node"] = Ref(fn), ["m_SlotId"] = 0 };
+                break;
+            }
+        edges.Add(Edge(fn, 2, alphaId, alphaSlot));
+
+        blocks.AddRange(added);
+        var text = new System.Text.StringBuilder();
+        foreach (var b in blocks)
+        {
+            var sw = new StringWriter { NewLine = "\n" };
+            using (var writer = new JsonTextWriter(sw) { Formatting = Formatting.Indented, Indentation = 4 })
+                b.WriteTo(writer);
+            text.Append(sw.ToString()).Append("\n\n");
+        }
+        return text.ToString();
     }
 
     void OnStageClosed()
@@ -1829,6 +3141,15 @@ public class ModelTexturingTool : EditorWindow
                     DecalFrame(d, out d.point, out d.normal, out d.up);
                     d.triangle = -1;
                 }
+        }
+        foreach (var cr in AllCreaseLines())
+        {
+            if (cr.cornerA >= 0 && cr.cornerB >= 0 && cr.cornerA < _tris.Length && cr.cornerB < _tris.Length)
+            {
+                cr.a = _rest[_tris[cr.cornerA]];
+                cr.b = _rest[_tris[cr.cornerB]];
+            }
+            cr.cornerA = cr.cornerB = -1;
         }
         Vector3[] oldRest = _rest;
         int[] oldTris = _tris;
@@ -2008,6 +3329,7 @@ public class ModelTexturingTool : EditorWindow
         var seen = new HashSet<long>();
         var wire = new List<int>();
         var owners = new List<List<int>>();
+        _wireByEdge = new Dictionary<long, int>();
         for (int t = 0; t < triCount; t++)
         {
             long diagonal = _partner[t] >= 0 ? longest[t] : -1;
@@ -2018,6 +3340,7 @@ public class ModelTexturingTool : EditorWindow
                 if (a == b) continue;
                 long key = EdgeKey(a, b);
                 if (key == diagonal || !seen.Add(key)) continue;
+                _wireByEdge[key] = wire.Count / 2;
                 wire.Add(va);
                 wire.Add(vb);
                 owners.Add(edgeTris[key]);
@@ -2107,6 +3430,15 @@ public class ModelTexturingTool : EditorWindow
                     d.faceUp = FaceAmounts(Unit(d.up - n * Vector3.Dot(d.up, n)), e1, e2);
                     changed = true;
                 }
+        }
+        foreach (var cr in AllCreaseLines())
+        {
+            if (cr.cornerA >= 0 && cr.cornerB >= 0) continue;
+            if (!_weldLookup.TryGetValue(Quantise(cr.a), out int a) || !_weldLookup.TryGetValue(Quantise(cr.b), out int b) ||
+                _weldCorner[a] < 0 || _weldCorner[b] < 0) continue;
+            cr.cornerA = _weldCorner[a];
+            cr.cornerB = _weldCorner[b];
+            changed = true;
         }
         if (changed) EditorUtility.SetDirty(_data);
     }
@@ -2596,6 +3928,18 @@ public class ModelTexturingTool : EditorWindow
         Handles.zTest = CompareFunction.LessEqual;
         Handles.color = _wireColour;
         Handles.DrawLines(segments);
+
+        // Creased lines over it, fainter the softer they are.
+        if (_data != null && _data.creaseGroups != null && _wireByEdge != null)
+            foreach (var g in _data.creaseGroups)
+            {
+                Handles.color = Color.Lerp(_wireColour, _creaseColour, g.amount);
+                foreach (int i in WiresOf(g))
+                {
+                    if (hidden.Count > 0 && _wireOwners[i].TrueForAll(hidden.Contains)) continue;
+                    Handles.DrawLine(_wireSegments[i * 2], _wireSegments[i * 2 + 1], CreaseThickness);
+                }
+            }
         Handles.zTest = prevZ;
     }
 
@@ -2613,7 +3957,7 @@ public class ModelTexturingTool : EditorWindow
 
     // Every group's colour on its faces (laid out by Layout), nothing (A = 0) everywhere else. The
     // group's noise is baked in: RGB = the colour mixed back towards the material's base colour by
-    // the noise, A = the group's opacity. The noise is 3D, read at each pixel's point on the model's
+    // the noise, A = 1. The noise is 3D, read at each pixel's point on the model's
     // rest pose, so its pattern runs on from one face to the next however the faces are laid out on the map.
     Color[] Rasterise(int size)
     {
@@ -2903,8 +4247,8 @@ public class ModelTexturingTool : EditorWindow
                 if (first) { bounds = new Bounds(p, Vector3.zero); first = false; }
                 else bounds.Encapsulate(p);
             }
-        Debug.Log($"[ModelTexturingDecal] group '{g.name}': {g.triangles.Count} tris, opacity {g.Opacity:0.###}, " +
-                  $"opacityOff {g.opacityOff}, hidden {g.hidden}, share {g.mapShare:0.###}, {listed} decal(s) listed, " +
+        Debug.Log($"[ModelTexturingDecal] group '{g.name}': {g.triangles.Count} tris, transparency {g.Transparency:0.###}, " +
+                  $"transparent {g.Transparent}, hidden {g.hidden}, share {g.mapShare:0.###}, {listed} decal(s) listed, " +
                   $"{stamps.Count} with an image, group size {bounds.size} (model span {_noiseSpan:0.####})");
         if (g.decals != null)
             foreach (var d in g.decals)
@@ -3046,7 +4390,7 @@ public class ModelTexturingTool : EditorWindow
                 int i = y * size + x;
                 owned[i] = true;
                 Color colour = group.colour;
-                colour.a = group.Opacity;      // the map's alpha is the fill's opacity
+                colour.a = 1f;      // "is grouped" — a Transparency group's amount is on the material
                 if (noisy)
                 {
                     // The pixel's point on the surface — the same point whichever face and map island it's on.
@@ -3056,7 +4400,7 @@ public class ModelTexturingTool : EditorWindow
                     colour.a = alpha;
                 }
                 // Gradients in list order, each fading out straight from its lines to its reach. They
-                // change the colour only — the group's opacity stays the map's alpha. Each pixel
+                // change the colour only — the map's alpha stays 1. Each pixel
                 // measures its own distance, so a face with lines all round it still fades inside.
                 Vector3 rp = ra * w0 + rb * w1 + rc * w2;
                 for (int k = 0; k < gradients.Count; k++)
@@ -3330,6 +4674,7 @@ public class ModelTexturingTool : EditorWindow
         _selectionColour = LoadColour("SelectionColour", new Color(1f, 0.55f, 0.1f, 0.45f));
         _hoverColour = LoadColour("HoverColour", new Color(1f, 1f, 1f, 0.5f));
         _wireColour = LoadColour("WireColour", new Color(0f, 0f, 0f, 0.6f));
+        _creaseColour = LoadColour("CreaseColour", new Color(1f, 0f, 1f, 1f));   // Blender's crease magenta
         _showWireframe = EditorPrefs.GetBool(PrefPrefix + "ShowWireframe", false);
         _mirror = EditorPrefs.GetBool(PrefPrefix + "Mirror", false);
     }
@@ -3339,6 +4684,7 @@ public class ModelTexturingTool : EditorWindow
         SaveColour("SelectionColour", _selectionColour);
         SaveColour("HoverColour", _hoverColour);
         SaveColour("WireColour", _wireColour);
+        SaveColour("CreaseColour", _creaseColour);
     }
 
     static Color LoadColour(string key, Color fallback) =>

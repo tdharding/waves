@@ -44,7 +44,13 @@ public partial class LevelSelectDesignerWindow
     /// The landscape's surface under this spike's centre: the tile base plus the hills there,
     /// smooth height and rocky noise both, exactly as the shader raises them.
     /// </summary>
-    private float SpikeGroundY(LevelSelectDesignerData.DesignerSpike spike)
+    private float SpikeGroundY(LevelSelectDesignerData.DesignerSpike spike) => LandscapeGroundY(spike.positionXZ);
+
+    /// <summary>
+    /// The landscape's surface at a point on the map, the same way — shared with everything else
+    /// that stands on the land, such as the freestanding structures.
+    /// </summary>
+    private float LandscapeGroundY(Vector2 positionXZ)
     {
         // The Height Multiplier lives on the scene's LandscapeTool, not in the data; found the
         // same way the hill sync finds it.
@@ -54,11 +60,13 @@ public partial class LevelSelectDesignerWindow
 
         // The river edges too, so a spike beside a run with Landscape Influence stands on the
         // lifted ground.
-        return SpikeBaselineY + LandscapeHillHeight.At(_data.hillPoints, spike.positionXZ,
+        return SpikeBaselineY + LandscapeHillHeight.At(_data.hillPoints, positionXZ,
                                                         globalHeight, _data.landscapeNoiseScale,
                                                         tool != null ? tool.riverEdgePoints : null,
                                                         tool != null ? tool.riverEdgeReach  : null,
-                                                        SpikeBaselineY);
+                                                        tool != null ? tool.riverEdgeStrength : null,
+                                                        SpikeBaselineY,
+                                                        tool != null ? tool.riverEdgeShelf : null);
     }
 
     // ─────────────────────────────────────────────
@@ -232,7 +240,7 @@ public partial class LevelSelectDesignerWindow
     // ─────────────────────────────────────────────
 
     /// <summary>
-    /// Each spike's footprint at the baseline as a solid stone-grey disc, with a darker dot at its
+    /// Each spike's footprint at the baseline as a solid stone-grey disc, with a darker triangle at its
     /// tip — the selected one lighter. The perch range is washed round it when it is a perch.
     /// </summary>
     private void DrawSpikes()
@@ -247,7 +255,8 @@ public partial class LevelSelectDesignerWindow
             Vector2 at       = WorldToCanvas(new Vector3(spike.positionXZ.x, 0f, spike.positionXZ.y));
             bool    selected = spike.spikeId == _selectedSpikeId;
 
-            if (spike.perch != null && spike.perch.enabled && spike.perch.perchRadius > 0f)
+            if (spike.perch != null && spike.perch.enabled && spike.perch.perchRadius > 0f
+                && LevelSelectDesignerSettings.ShowPerchRadius)
             {
                 Handles.color = new Color(1f, 0.93f, 0.55f, selected ? 0.16f : 0.08f);
                 Handles.DrawSolidDisc(at, Vector3.forward, spike.perch.perchRadius * PerchCanvasScale);
@@ -258,8 +267,13 @@ public partial class LevelSelectDesignerWindow
                                      : new Color(0.55f, 0.55f, 0.55f, 1f);
             Handles.DrawSolidDisc(at, Vector3.forward, radius);
 
+            // Tip marker: an upward triangle (canvas Y runs down, so the point is at -Y).
+            float tri = Mathf.Min(radius * 0.45f, 4f);
             Handles.color = new Color(0.15f, 0.15f, 0.15f, 1f);
-            Handles.DrawSolidDisc(at, Vector3.forward, Mathf.Min(radius * 0.35f, 3f));
+            Handles.DrawAAConvexPolygon(
+                new Vector3(at.x,                at.y - tri,        0f),
+                new Vector3(at.x + tri * 0.866f, at.y + tri * 0.5f, 0f),
+                new Vector3(at.x - tri * 0.866f, at.y + tri * 0.5f, 0f));
         }
     }
 
@@ -426,7 +440,7 @@ public partial class LevelSelectDesignerWindow
             _spikeBrushPreset = preset;
             _spikeBrushScale  = scale;
             MarkDirty();
-            RebuildSpike(spike);
+            RebuildAfterEdit(spike, () => RebuildSpike(spike));
         }
 
         // The studio's stage in the map's look, the rock standing on this spike's own spot so the
@@ -557,6 +571,13 @@ public partial class LevelSelectDesignerWindow
         if (renderer == null) renderer = Undo.AddComponent<MeshRenderer>(go);
         renderer.sharedMaterial = SpikeMaterial();
         EditorUtility.SetDirty(renderer);
+
+        // Fog keeps off it like any rock — radius where it meets the ground, the rest off the
+        // FogMap's Rock numbers.
+        var fog = go.GetComponent<SpikeFogRepeller>();
+        if (fog == null) fog = Undo.AddComponent<SpikeFogRepeller>(go);
+        fog.Configure(profile.RadiusAt(0f));
+        EditorUtility.SetDirty(fog);
 
         // She stands on the tip the mesh was just built to.
         ApplyPerch(go, spike.perch, Vector3.up * profile.topY);

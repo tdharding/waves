@@ -38,7 +38,7 @@ public class SpikeStudio : EditorWindow
     /// </summary>
     public static event System.Action<SpikeShapePreset> PresetSaved;
 
-    [MenuItem("Tools/Waves/Spike Studio")]
+    [MenuItem("Tools/Studios/Spike Studio", false, 300)]
     static void Open() => GetWindow<SpikeStudio>("Spike Studio");
 
     /// <summary>

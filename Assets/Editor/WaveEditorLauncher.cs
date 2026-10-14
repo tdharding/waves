@@ -3,7 +3,7 @@ using UnityEngine;
 
 public static class WaveEditorLauncher
 {
-    [MenuItem("Tools/Waves/Open All Wave Windows #5")]
+    [MenuItem("Tools/Open All Wave Windows #5", false, 0)]
     public static void OpenAllWindows()
     {
         var win1 = EditorWindow.GetWindow<GameTesterTool>("GameTesterTool");

@@ -351,7 +351,7 @@ public partial class LevelSelectDesignerWindow
             bool    selected = marker.perchId == _selectedPerchId;
             bool    on       = marker.perch != null && marker.perch.enabled;
 
-            if (on && marker.perch.perchRadius > 0f)
+            if (on && marker.perch.perchRadius > 0f && LevelSelectDesignerSettings.ShowPerchRadius)
             {
                 Handles.color = new Color(1f, 0.93f, 0.55f, selected ? 0.16f : 0.08f);
                 Handles.DrawSolidDisc(at, Vector3.forward, marker.perch.perchRadius * PerchCanvasScale);
@@ -487,7 +487,7 @@ public partial class LevelSelectDesignerWindow
             marker.height     = height;
             marker.perch      = perch;
             MarkDirty();
-            RebuildPerchMarkers();
+            RebuildAfterEdit("PerchMarkers", RebuildPerchMarkers);
         }
     }
 
@@ -518,10 +518,14 @@ public partial class LevelSelectDesignerWindow
         bool Starts(LevelSelectDesignerData.DesignerPerch p) => p != null && p.enabled && p.startPerch;
 
         foreach (var pool in _data.pools)
-            if (pool != null && pool.hasTower && Starts(pool.towerPerch)) count++;
+            if (pool != null && pool.hasTower &&
+                pool.towerKind != LevelSelectDesignerData.TowerKind.SoulsPool &&   // no perch on a souls pool
+                Starts(pool.towerPerch)) count++;
 
         foreach (var outpost in _data.outposts)
-            if (outpost != null && Starts(outpost.towerPerch)) count++;
+            if (outpost != null)
+                foreach (var bank in OutpostBanks(outpost.side))
+                    if (Starts(outpost.OnBank(bank).towerPerch)) count++;
 
         foreach (var rim in _data.rimNodes)
         {
@@ -530,7 +534,8 @@ public partial class LevelSelectDesignerWindow
             {
                 var topping = rim.ToppingOn(side);
                 if (topping != null &&
-                    topping.topper == LevelSelectDesignerData.RimNodeTopper.LollipopTower &&
+                    (topping.topper == LevelSelectDesignerData.RimNodeTopper.LollipopTower ||
+                     topping.topper == LevelSelectDesignerData.RimNodeTopper.TurretTower) &&
                     Starts(topping.perch)) count++;
             }
         }

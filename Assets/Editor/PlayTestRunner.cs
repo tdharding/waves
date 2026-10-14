@@ -577,7 +577,7 @@ while ((Get-Date) -lt $end) {
 
 public class PlayTestWindow : EditorWindow
 {
-    [MenuItem("Tools/Waves/Play Test")]
+    [MenuItem("Tools/Testing/Play Test", false, 900)]
     public static void Open() => GetWindow<PlayTestWindow>("Play Test");
 
     void OnGUI()

@@ -74,10 +74,6 @@ public void QuitGame()
     LevelSoulTracker.Instance?.ReturnDroppedSoulsToHome();
     LevelSoulTracker.Instance?.ClearTemporarySouls();
 
-    GridData gridData = LevelSelectionCache.SelectedGridData;
-    if (gridData != null)
-        LevelSelectionCache.JustExitedLevelID = gridData.levelID;
-
     SaveBoatStateFromCache();
     SceneManager.LoadScene(quitDestinationScene); // ← uses inspector value
 }

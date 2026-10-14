@@ -1,0 +1,103 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d4357627f9937304899c8369ae27b593, type: 3}
+  m_Name: SoulWellEncounter1
+  m_EditorClassIdentifier: Assembly-CSharp::CameraSequencePreset
+  shots:
+  - cameraLink: 57df095c6b8f48178d6c7fb2f183aeb0
+    orbitPointLink: 
+    endCameraLink: 47ffea64ebe648e38bd9a018c386bd56
+    characterLinks: []
+    shot:
+      camera: {fileID: 0}
+      duration: 3
+      blendIn:
+        Style: 0
+        Time: 1
+        CustomCurve:
+          serializedVersion: 2
+          m_Curve: []
+          m_PreInfinity: 0
+          m_PostInfinity: 0
+          m_RotationOrder: 0
+      pressAnyKey: 1
+      lines:
+      - text: This is the place where the souls are being kept in this installation...
+        hold: 2
+        pressAnyKey: 1
+        fadeIn: 1
+        fadeOut: 1
+      - text: I can now use the key the angel gave to release them, then I should follow and guide them where they go next...
+        hold: 2
+        pressAnyKey: 1
+        fadeIn: 1
+        fadeOut: 1
+      textFades: 1
+      audio: {fileID: 0}
+      fogCentre: 0
+      animated: 1
+      animation: 2
+      endCamera: {fileID: 0}
+      zoomDistance: 1
+      orbitPoint: {fileID: 0}
+      orbitStartDegrees: 0
+      orbitDegrees: 90
+      animationTime: 20
+      easing: 2
+      characterAnimations: []
+  useAudio: 0
+  sequenceAudio: {fileID: 0}
+  audioFadeOut: 0
+  endBlend:
+    Style: 3
+    Time: 2
+    CustomCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+  overrideFog: 1
+  fog:
+    radius: 105.15
+    outerOpacity: 0.6
+    innerDivision: 8.4
+    innerOpacity: 0.34
+    gradientBottom: -43.13
+  playOnce: 1
+  storedObjects:
+  - linkId: 57df095c6b8f48178d6c7fb2f183aeb0
+    name: Shot 2 Camera
+    parentPath: SCRIPTS2/CameraSequence/SoulWellEncounter1
+    tag: Untagged
+    layer: 0
+    active: 1
+    position: {x: 85.414, y: 13.587562, z: 52.532967}
+    rotation: {x: 0.0056074783, y: -0.9978919, z: -0.06360121, w: -0.011632813}
+    localScale: {x: 1, y: 1, z: 1}
+    components:
+    - type: Unity.Cinemachine.CinemachineCamera, Unity.Cinemachine, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+      json: '{"MonoBehaviour":{"m_Enabled":true,"m_EditorHideFlags":0,"m_Name":"","m_EditorClassIdentifier":"Unity.Cinemachine::Unity.Cinemachine.CinemachineCamera","Priority":{"Enabled":false,"m_Value":0},"OutputChannel":1,"StandbyUpdate":2,"m_StreamingVersion":20241001,"m_LegacyPriority":0,"Target":{"TrackingTarget":{"instanceID":0},"LookAtTarget":{"instanceID":0},"CustomLookAtTarget":false},"Lens":{"FieldOfView":40.0,"OrthographicSize":10.0,"NearClipPlane":0.10000000149011612,"FarClipPlane":5000.0,"Dutch":0.0,"ModeOverride":0,"PhysicalProperties":{"GateFit":2,"SensorSize":{"x":21.945999145507813,"y":16.00200080871582},"LensShift":{"x":0.0,"y":0.0},"FocusDistance":10.0,"Iso":200,"ShutterSpeed":0.004999999888241291,"Aperture":16.0,"BladeCount":5,"Curvature":{"x":2.0,"y":11.0},"BarrelClipping":0.25,"Anamorphism":0.0}},"BlendHint":0}}'
+      references: []
+  - linkId: 47ffea64ebe648e38bd9a018c386bd56
+    name: Shot 2 End Camera
+    parentPath: SCRIPTS2/CameraSequence/SoulWellEncounter1
+    tag: Untagged
+    layer: 0
+    active: 1
+    position: {x: 85.41252, y: 14.000157, z: 52.411865}
+    rotation: {x: 0.0017176208, y: -0.9642679, z: 0.26474798, w: -0.009643666}
+    localScale: {x: 1, y: 1, z: 1}
+    components:
+    - type: Unity.Cinemachine.CinemachineCamera, Unity.Cinemachine, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+      json: '{"MonoBehaviour":{"m_Enabled":false,"m_EditorHideFlags":0,"m_Name":"","m_EditorClassIdentifier":"Unity.Cinemachine::Unity.Cinemachine.CinemachineCamera","Priority":{"Enabled":false,"m_Value":0},"OutputChannel":1,"StandbyUpdate":2,"m_StreamingVersion":0,"m_LegacyPriority":0,"Target":{"TrackingTarget":{"instanceID":0},"LookAtTarget":{"instanceID":0},"CustomLookAtTarget":false},"Lens":{"FieldOfView":40.0,"OrthographicSize":10.0,"NearClipPlane":0.10000000149011612,"FarClipPlane":5000.0,"Dutch":0.0,"ModeOverride":0,"PhysicalProperties":{"GateFit":2,"SensorSize":{"x":21.945999145507813,"y":16.00200080871582},"LensShift":{"x":0.0,"y":0.0},"FocusDistance":10.0,"Iso":200,"ShutterSpeed":0.004999999888241291,"Aperture":16.0,"BladeCount":5,"Curvature":{"x":2.0,"y":11.0},"BarrelClipping":0.25,"Anamorphism":0.0}},"BlendHint":0}}'
+      references: []

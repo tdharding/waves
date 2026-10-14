@@ -458,20 +458,6 @@ public class GridData : ScriptableObject
 
         [Tooltip("Number of intermediate nodes auto-generated between the first and last tube waypoints.")]
         public int tubeSubdivisions = 3;
-
-        [Header("River Routing")]
-        [Tooltip("Set automatically by LevelSelectArenaController at runtime. " +
-                 "The RiverSegmentID.SegmentID of the level-select path that leads to this entrance.")]
-        public string targetSegmentID;
-
-        [Tooltip("Normalised spline progress (0-1) where the boat reappears on exit through this entrance.")]
-        public float targetProgress;
-
-        [Tooltip("Whether the target segment is the left-path branch.")]
-        public bool targetIsLeftPath;
-
-        [Tooltip("Whether the target segment is the right-path branch.")]
-        public bool targetIsRightPath;
     }
 
     public List<ArenaEntrance> entrances = new List<ArenaEntrance>();

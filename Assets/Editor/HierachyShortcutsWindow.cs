@@ -6,7 +6,7 @@ public class HierarchyShortcutsWindow : EditorWindow
 {
     private List<GameObject> shortcuts = new List<GameObject>();
 
-    [MenuItem("Tools/Hierarchy Shortcuts")]
+    [MenuItem("Tools/Scene and Assets/Hierarchy Shortcuts", false, 1001)]
     static void Open()
     {
         GetWindow<HierarchyShortcutsWindow>("Hierarchy Shortcuts");

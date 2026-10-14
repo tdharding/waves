@@ -56,6 +56,18 @@ public class LevelSelectBoatControl : MonoBehaviour
     [Tooltip("How far the boat rides above the surface it finds.")]
     public float floatOffset      = 0f;
 
+    [Header("Slope Lean")]
+    [Tooltip("How far ahead of and behind the boat the water is looked at to tell which way " +
+             "it runs. Longer reads a smoother slope; shorter answers a short drop sooner.")]
+    [Min(0.01f)] public float slopeProbeLength = 0.5f;
+    [Tooltip("How far the hull tips with the slope, as a share of it. 1 lies flat along the " +
+             "water; 0 stays level.")]
+    [Range(0f, 1.5f)] public float slopeLean = 1f;
+    [Tooltip("The most the hull is ever tipped, in degrees, whichever way the slope runs.")]
+    [Min(0f)] public float maxSlopeLeanAngle = 30f;
+    [Tooltip("How long the hull takes to settle into a new slope. 0 tips it at once.")]
+    [Min(0f)] public float slopeLeanTime = 0.2f;
+
     [Header("Debug")]
     [SerializeField] private bool debugMovement = false;
 
@@ -64,6 +76,10 @@ public class LevelSelectBoatControl : MonoBehaviour
     private float _currentTurnInput;
     private float _surfaceY;
     private bool  _hasSurface;
+
+    private float _slopeTarget;        // the slope under the boat this step, in degrees
+    private float _slopeAngle;         // the same, eased
+    private float _slopeVelocity;
 
     private bool _anchored;
     private bool _keyLocked;
@@ -146,6 +162,13 @@ public class LevelSelectBoatControl : MonoBehaviour
     public float CurrentSpeed => _currentSpeed;
 
     /// <summary>
+    /// The slope of the water under the boat along its heading, in degrees and eased: positive
+    /// running downhill ahead of the bow, negative climbing. The hull tips by it and the camera
+    /// reads it to lift itself over a drop.
+    /// </summary>
+    public float SlopeAngle => _slopeAngle;
+
+    /// <summary>
     /// CurrentSpeed as 0..1 against the boat's own top speed. The mirror of
     /// BoatMovement.Speed01, normalised the same way, so an effect written against the arena
     /// boat reads the same number here without knowing which boat it is following.
@@ -216,6 +239,61 @@ public class LevelSelectBoatControl : MonoBehaviour
         // The intro and the menus take the boat away entirely, so an anchor cannot be left
         // set behind them and found still on when they hand it back.
         if (IntroMode || ControlsFrozen) { _anchored = false; _keyLocked = false; _lookLocked = false; }
+
+        EaseSlopeLean();
+    }
+
+    // ── Slope lean ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// Eases towards the slope the last step measured and tips the hull by it — nose down
+    /// over a drop, up on a climb. Only the hull turns: the body stays level, so nothing the
+    /// physics does is touched by it.
+    /// </summary>
+    private void EaseSlopeLean()
+    {
+        if (slopeLeanTime <= 0f)
+        {
+            _slopeAngle    = _slopeTarget;
+            _slopeVelocity = 0f;
+        }
+        else
+        {
+            _slopeAngle = Mathf.SmoothDamp(_slopeAngle, _slopeTarget, ref _slopeVelocity,
+                                           slopeLeanTime);
+        }
+
+        if (_meshTransform == null) return;
+
+        float lean = Mathf.Clamp(_slopeAngle * slopeLean, -maxSlopeLeanAngle, maxSlopeLeanAngle);
+        _meshTransform.localRotation = Quaternion.Euler(lean, 0f, 0f);
+    }
+
+    /// <summary>
+    /// The slope under the boat: the water's height a little ahead of the bow against a little
+    /// behind the stern. Where either end finds no water the slope is called flat rather than
+    /// guessed at.
+    /// </summary>
+    private void MeasureSlope()
+    {
+        if (_boatTransform == null) { _slopeTarget = 0f; return; }
+
+        Vector3 forward = _boatTransform.forward;
+        forward.y = 0f;
+        if (forward.sqrMagnitude < 0.0001f) { _slopeTarget = 0f; return; }
+        forward.Normalize();
+
+        Vector3 at = _boatBody != null ? _boatBody.position : _boatTransform.position;
+
+        if (!TrySampleSurface(at + forward * slopeProbeLength, out float ahead) ||
+            !TrySampleSurface(at - forward * slopeProbeLength, out float behind))
+        {
+            _slopeTarget = 0f;
+            return;
+        }
+
+        // Positive is downhill: the water ahead sits lower than the water behind.
+        _slopeTarget = Mathf.Atan2(behind - ahead, slopeProbeLength * 2f) * Mathf.Rad2Deg;
     }
 
     private void FixedUpdate()
@@ -227,6 +305,8 @@ public class LevelSelectBoatControl : MonoBehaviour
             Coast();
             return;
         }
+
+        MeasureSlope();
 
         // Anchored, or handed over to the intro or a menu: the boat stops where it is but
         // stays on the water, so the camera has something steady to turn about.
@@ -395,19 +475,11 @@ public class LevelSelectBoatControl : MonoBehaviour
         _currentTurnInput = 0f;
         _hasSurface       = false;
 
+        // Put down somewhere new, the hull starts level rather than easing out of the old slope.
+        _slopeTarget = _slopeAngle = _slopeVelocity = 0f;
+        if (_meshTransform != null) _meshTransform.localRotation = Quaternion.identity;
+
         SnapToSurface();
-    }
-
-    /// <summary>Stands the boat where a river and a distance along it name — how a door that
-    /// lets out onto a river places it.</summary>
-    public bool PlaceOnSegment(string segmentID, float progress)
-    {
-        if (!LevelSelectBoatPlacement.TryResolve(segmentID, progress,
-                                                 out var pos, out var rot))
-            return false;
-
-        PlaceAt(pos, rot);
-        return true;
     }
 
     // ── Wiring ─────────────────────────────────────────────────────

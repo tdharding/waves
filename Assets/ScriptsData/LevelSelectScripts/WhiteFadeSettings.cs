@@ -54,11 +54,21 @@ public class WhiteFadeSettings
     private static readonly int InnerOpacityId  = Shader.PropertyToID("_WhiteFadeInnerOpacity");
     private static readonly int GradientBottomId = Shader.PropertyToID("_WhiteFadeGradientBottom");
 
-    /// <summary>This world's numbers, or no fade without a preset.</summary>
+    /// <summary>
+    /// Numbers that win over the world's while set — a Camera Sequence's fog, for as long as it
+    /// plays. ApplyAesthetics pushes every frame, so the override goes in here rather than being
+    /// written once and stomped on the next frame.
+    /// </summary>
+    public static WhiteFadeSettings Override;
+
+    /// <summary>This world's numbers, or no fade without a preset — unless an override is set.</summary>
     public static void Push(WhiteFadeSettings settings)
     {
-        (settings ?? None).Apply();
+        (Override ?? settings ?? None).Apply();
     }
+
+    /// <summary>Push these numbers now, without waiting for the next ApplyAesthetics.</summary>
+    public void PushNow() => Apply();
 
     private void Apply()
     {

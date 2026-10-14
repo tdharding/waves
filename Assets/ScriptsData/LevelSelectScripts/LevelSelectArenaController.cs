@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.Splines;
 using System.Collections.Generic;
 
 /// <summary>
@@ -24,9 +23,16 @@ public class LevelSelectArenaController : MonoBehaviour
         [Tooltip("The LevelSelectEnter trigger on the river that leads to this door.")]
         public LevelSelectEnter trigger;
 
-        [Tooltip("The baked spline path (with RiverSegmentID) that leads to this entrance. " +
-                 "Used to route the boat back to the correct river segment on exit.")]
-        public SplineContainer arenaPath;
+        [Tooltip("Where the boat comes out when the player leaves the level by this door: out " +
+                 "past the door by its Boat Spawn Distance, on the water. Written by the Level " +
+                 "Select Designer.")]
+        public Vector3 boatExitPosition;
+
+        [Tooltip("Which way the boat faces when it comes out — straight out from the arena, away " +
+                 "from the door. Written by the Level Select Designer; zero means not written yet.")]
+        public Vector3 boatExitForward;
+
+        public bool HasBoatExit => boatExitForward.sqrMagnitude > 1e-6f;
     }
 
     [Header("Soul Fish Display")]
@@ -40,76 +46,6 @@ public class LevelSelectArenaController : MonoBehaviour
              "so you only need to set them here rather than on each individual trigger.")]
     public List<PortalLink> portalLinks = new List<PortalLink>();
 
-    [Header("Boat Spawning")]
-    [Tooltip("World units to offset the boat away from the entrance point when returning from a level.")]
-    [SerializeField] private float returnOffsetWorld = 3f;
-
-    /// <summary>
-    /// Called by SplinePathStitcher after baking. Assigns each portal link's arenaPath to the
-/// baked SplineContainer whose spline passes nearest to the link's trigger.
-    /// </summary>
-    public void AutoDetectPaths(List<SplineContainer> bakedContainers)
-    {
-        bool anyChanged = false;
-
-        foreach (var link in portalLinks)
-        {
-            if (link.trigger == null) continue;
-
-            Vector3 triggerPos = link.trigger.transform.position;
-            SplineContainer nearest = null;
-            float nearestDist = float.MaxValue;
-
-            foreach (var container in bakedContainers)
-            {
-                if (container == null || container.Spline == null) continue;
-
-                Vector3 localPos = container.transform.InverseTransformPoint(triggerPos);
-                SplineUtility.GetNearestPoint(container.Spline,
-                    (Unity.Mathematics.float3)localPos, out _, out float t);
-
-                Vector3 nearestWorld = container.transform.TransformPoint(
-                    (Vector3)container.Spline.EvaluatePosition(t));
-                float dist = Vector3.Distance(triggerPos, nearestWorld);
-
-                if (dist < nearestDist)
-                {
-                    nearestDist = dist;
-                    nearest = container;
-                }
-            }
-
-            int linkIdx = portalLinks.IndexOf(link);
-
-            if (nearest != null && link.arenaPath != nearest)
-            {
-#if UNITY_EDITOR
-                UnityEditor.Undo.RecordObject(this, "Auto-Detect Arena Path");
-#endif
-                link.arenaPath = nearest;
-                anyChanged = true;
-                Debug.Log($"[ArenaController] '{name}' link {linkIdx} arenaPath → '{nearest.name}' ({nearestDist:F2}m)");
-            }
-
-            if (link.entranceIndex != linkIdx)
-            {
-#if UNITY_EDITOR
-                UnityEditor.Undo.RecordObject(this, "Auto-Detect Arena Path");
-#endif
-                link.entranceIndex = linkIdx;
-                anyChanged = true;
-                Debug.Log($"[ArenaController] '{name}' link {linkIdx} entranceIndex → {linkIdx}");
-            }
-        }
-
-        if (anyChanged)
-        {
-#if UNITY_EDITOR
-            UnityEditor.EditorUtility.SetDirty(this);
-#endif
-        }
-    }
-
     private void Awake()
     {
         if (gridData != null && !string.IsNullOrEmpty(gridData.displayName))
@@ -121,51 +57,54 @@ public class LevelSelectArenaController : MonoBehaviour
             link.trigger.gridData      = gridData;
             link.trigger.entranceIndex = link.entranceIndex;
             Debug.Log($"[ArenaController] Wired trigger '{link.trigger.name}' → entranceIndex: {link.entranceIndex}");
-
-            // Push river routing into GridData so LevelExitController can read it
-            // when the player exits through this entrance portal.
-            if (gridData != null && link.arenaPath != null &&
-                link.entranceIndex >= 0 && link.entranceIndex < gridData.entrances.Count)
-            {
-                var segID = link.arenaPath.GetComponent<RiverSegmentID>();
-                if (segID != null)
-                {
-                    // Auto-compute return progress from the trigger's world position
-                    float returnProgress = 0.95f; // fallback
-                    if (link.trigger != null)
-                    {
-                        Vector3 triggerWorld = link.trigger.transform.position;
-                        Vector3 triggerLocal = link.arenaPath.transform.InverseTransformPoint(triggerWorld);
-                        SplineUtility.GetNearestPoint(link.arenaPath.Spline,
-                            (Unity.Mathematics.float3)triggerLocal, out _, out float t);
-                        
-                        // Apply offset away from arena (offset world units converted to parametric t)
-                        float length = link.arenaPath.CalculateLength();
-                        float tOffset = length > 0.1f ? returnOffsetWorld / length : 0.05f;
-
-                        if (segID.ArenaIsAtEnd)
-                            returnProgress = Mathf.Clamp01(t - tOffset);
-                        else
-                            returnProgress = Mathf.Clamp01(t + tOffset);
-                    }
-
-                    var entrance = gridData.entrances[link.entranceIndex];
-entrance.targetSegmentID    = segID.SegmentID;
-                    entrance.targetProgress     = returnProgress;
-                    entrance.targetIsLeftPath    = segID.IsLeftPath;
-                    entrance.targetIsRightPath = segID.IsRightPath;
-                    gridData.entrances[link.entranceIndex] = entrance;
-                    Debug.Log($"[ArenaController] Entrance {link.entranceIndex} → segment '{segID.SegmentID}' @ {returnProgress:F3} (auto)");
-                }
-                else
-                {
-                    Debug.LogWarning($"[ArenaController] arenaPath '{link.arenaPath.name}' has no RiverSegmentID component.");
-                }
-            }
         }
 
         if (wavePlane != null)
             wavePlane.SetGridData(gridData);
+    }
+
+    // ─────────────────────────────────────────────
+    // BOAT EXIT
+    // ─────────────────────────────────────────────
+
+    /// <summary>
+    /// Where the boat comes out of door <paramref name="entranceIndex"/> of this arena, and the
+    /// way it faces. False when there is no such door, or the designer has not written its exit.
+    /// </summary>
+    public bool TryGetBoatExit(int entranceIndex, out Vector3 position, out Quaternion rotation)
+    {
+        position = Vector3.zero;
+        rotation = Quaternion.identity;
+
+        var link = portalLinks.Find(l => l != null && l.entranceIndex == entranceIndex);
+        if (link == null || !link.HasBoatExit) return false;
+
+        Vector3 forward = link.boatExitForward;
+        forward.y = 0f;
+        if (forward.sqrMagnitude < 1e-6f) return false;
+
+        position = link.boatExitPosition;
+        rotation = Quaternion.LookRotation(forward.normalized, Vector3.up);
+        return true;
+    }
+
+    /// <summary>
+    /// The boat exit of door <paramref name="entranceIndex"/> of the arena showing
+    /// <paramref name="levelID"/>, from every arena in the open scene. False when none has it.
+    /// </summary>
+    public static bool TryFindBoatExit(string levelID, int entranceIndex,
+                                       out Vector3 position, out Quaternion rotation)
+    {
+        position = Vector3.zero;
+        rotation = Quaternion.identity;
+        if (string.IsNullOrEmpty(levelID)) return false;
+
+        foreach (var arena in FindObjectsByType<LevelSelectArenaController>(FindObjectsSortMode.None))
+        {
+            if (arena.gridData == null || arena.gridData.levelID != levelID) continue;
+            if (arena.TryGetBoatExit(entranceIndex, out position, out rotation)) return true;
+        }
+        return false;
     }
 
     // ─────────────────────────────────────────────
@@ -200,7 +139,7 @@ entrance.targetSegmentID    = segID.SegmentID;
     }
 
 
-    // One colour per link so you can tell paths apart at a glance
+    // One colour per link so you can tell doors apart at a glance
     private static readonly Color[] _linkColours = new Color[]
     {
         new Color(0f,   1f,   1f,   1f), // cyan
@@ -209,6 +148,7 @@ entrance.targetSegmentID    = segID.SegmentID;
         new Color(1f,   0.3f, 0.8f, 1f), // pink
     };
 
+    // Where each door lets the boat out, and which way it faces.
     private void OnDrawGizmosSelected()
     {
         if (portalLinks == null) return;
@@ -216,44 +156,18 @@ entrance.targetSegmentID    = segID.SegmentID;
         for (int i = 0; i < portalLinks.Count; i++)
         {
             var link = portalLinks[i];
-            if (link.arenaPath == null) continue;
+            if (link == null || !link.HasBoatExit) continue;
 
-            var spline    = link.arenaPath.Spline;
-            var transform = link.arenaPath.transform;
-            Color col     = _linkColours[i % _linkColours.Length];
+            Color   col = _linkColours[i % _linkColours.Length];
+            Vector3 at  = link.boatExitPosition;
+            Vector3 fwd = link.boatExitForward.normalized;
 
-            // Draw the spline as a polyline by sampling 64 points
-            const int steps = 64;
-            Vector3 prev = transform.TransformPoint(spline.EvaluatePosition(0f));
-            for (int s = 1; s <= steps; s++)
-            {
-                float   t    = s / (float)steps;
-                Vector3 next = transform.TransformPoint(spline.EvaluatePosition(t));
-                UnityEditor.Handles.color = col;
-                UnityEditor.Handles.DrawLine(prev, next, 3f);
-                prev = next;
-            }
-
-            // Sphere + label at the auto-computed return progress point (nearest point to trigger)
-            float returnT = 0.95f;
-            if (link.trigger != null)
-            {
-                Vector3 triggerLocal = transform.InverseTransformPoint(link.trigger.transform.position);
-                SplineUtility.GetNearestPoint(spline, (Unity.Mathematics.float3)triggerLocal, out _, out returnT);
-            }
-
-            Vector3 returnPos = transform.TransformPoint(spline.EvaluatePosition(returnT));
             Gizmos.color = col;
-            Gizmos.DrawSphere(returnPos, 0.5f);
-
-            string label = $"Entrance {link.entranceIndex}";
-            var segID = link.arenaPath.GetComponent<RiverSegmentID>();
-            if (segID != null && !string.IsNullOrEmpty(segID.SegmentID))
-                label += $"\n{segID.SegmentID}";
-            label += $"\nt={returnT:F2} (auto)";
+            Gizmos.DrawSphere(at, 0.3f);
 
             UnityEditor.Handles.color = col;
-            UnityEditor.Handles.Label(returnPos + Vector3.up * 1.5f, label);
+            UnityEditor.Handles.DrawLine(at, at + fwd * 1.5f, 3f);
+            UnityEditor.Handles.Label(at + Vector3.up * 1f, $"Entrance {link.entranceIndex}\nboat exit");
         }
     }
 #endif

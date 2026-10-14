@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: WhiteFadePreset1
   m_EditorClassIdentifier: Assembly-CSharp::LevelSelectWhiteFadePreset
   whiteFade:
-    radius: 181.7
-    outerOpacity: 0.6
-    innerDivision: 5.33
-    innerOpacity: 0.482
-    gradientBottom: -43.13
+    radius: 105.3
+    outerOpacity: 1
+    innerDivision: 1.65
+    innerOpacity: 0.665
+    gradientBottom: -45.3

@@ -7,7 +7,7 @@ using System.Reflection;
 public class WaveEffectsLiveTuner : EditorWindow
 {
     // Shift+3 shortcut
-    [MenuItem("Tools/Waves/Wave Effects Tuner #3")]
+    [MenuItem("Tools/Tuners/Wave Effects Tuner #3", false, 200)]
     public static void Open() => GetWindow<WaveEffectsLiveTuner>("Wave Effects Tuner");
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -1318,18 +1318,24 @@ public class WaveEffectsLiveTuner : EditorWindow
 
         if (!EditorUtility.DisplayDialog(
                 "Save Wave Preset",
-                $"Overwrite '{activePreset.name}' with the current tuner values?\n\nThis cannot be undone from disk.",
+                $"Overwrite '{activePreset.name}' with the current tuner values?\n\nThis cannot be undone from disk.\n\n" +
+                TunerSaveChanges.Describe(activePreset, WriteTo),
                 "Save", "Cancel"))
             return;
 
         Undo.RecordObject(activePreset, "Save Wave Preset");
-        activePreset.state      = BuildState();
-        activePreset.lights     = BuildLightEntries();
-        activePreset.musicIntro = musicIntro;
-        activePreset.musicLoop  = musicLoop;
+        WriteTo(activePreset);
         EditorUtility.SetDirty(activePreset);
         AssetDatabase.SaveAssetIfDirty(activePreset);
         Debug.Log($"[WaveEffectsLiveTuner] Saved to {activePreset.name}");
+    }
+
+    void WriteTo(WavePreset preset)
+    {
+        preset.state      = BuildState();
+        preset.lights     = BuildLightEntries();
+        preset.musicIntro = musicIntro;
+        preset.musicLoop  = musicLoop;
     }
 
     void ExportAsNewPreset()

@@ -7,15 +7,6 @@ public class LevelSelectObstacleManager : MonoBehaviour
     [Header("Identification")]
     public string obstacleID;
 
-    [Header("Next Obstacle Target")]
-    [SerializeField] private LevelSelectObstacleManager _nextObstacle;
-
-    [Header("River Stop Point")]
-    [Tooltip("Child transform marking where the river should stop extruding when the previous obstacle is unlocked. Wired by the designer.")]
-    [SerializeField] private Transform _riverStopPoint;
-
-    public Transform RiverStopPoint => _riverStopPoint;
-
     [Header("Slots")]
     [SerializeField] private List<SoulSlot> slots = new List<SoulSlot>();
 
@@ -73,19 +64,6 @@ public class LevelSelectObstacleManager : MonoBehaviour
         if (filledSlots < slots.Count) return;
 
         GameProgressData.UnlockObstacle(obstacleID);
-
-        if (_nextObstacle != null)
-        {
-            Vector3 stopPos = _nextObstacle.RiverStopPoint != null
-                ? _nextObstacle.RiverStopPoint.position
-                : _nextObstacle.transform.position;
-            LevelSelectSplineManager.Instance?.AdvanceSplineToPosition(stopPos);
-        }
-        else
-        {
-            LevelSelectSplineManager.Instance?.AdvanceSpline(100f);
-        }
-
         ApplyUnlockedState(false);
     }
 
@@ -136,21 +114,4 @@ public class LevelSelectObstacleManager : MonoBehaviour
                 filledSlots++;
         }
     }
-
-#if UNITY_EDITOR
-    private void OnDrawGizmos()
-    {
-        if (_riverStopPoint == null) return;
-        Gizmos.color = new Color(0f, 1f, 0.5f, 0.4f);
-        Gizmos.DrawSphere(_riverStopPoint.position, 0.2f);
-    }
-
-    private void OnDrawGizmosSelected()
-    {
-        if (_riverStopPoint == null) return;
-        Gizmos.color = new Color(0f, 1f, 0.5f, 1f);
-        Gizmos.DrawSphere(_riverStopPoint.position, 0.35f);
-        Gizmos.DrawLine(transform.position, _riverStopPoint.position);
-    }
-#endif
 }

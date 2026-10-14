@@ -43,6 +43,19 @@ public class RiverProfile
              "they were. Try around 0.03 at this world scale.")]
     [Min(0f)] public float jointGroove = 0f;
 
+    // ── The run's style ──
+    // Not part of the river's shape: they belong to the PATH (its Run Type), and the Level Select
+    // Designer stamps them onto a copy of this profile for whatever it builds from that path.
+    // A Structural River Run leaves both at nothing, which is the flat-rimmed run as it always was.
+
+    /// <summary>How rounded the rim is: 0 a flat rim with square corners, 1 fully rounded.
+    /// With the outer walls on both corners round; with them off only the channel side does,
+    /// and the outer edge stays level to meet the ground.</summary>
+    [NonSerialized] public float rimRounding;
+
+    /// <summary>The run is built with no outer walls, so the landscape can run onto its rim.</summary>
+    [NonSerialized] public bool wallsOff;
+
     /// <summary>Full outer width — derived, never authored.</summary>
     public float OuterWidth => innerWidth + rimWidth * 2f;
 
@@ -50,5 +63,6 @@ public class RiverProfile
 
     /// <summary>Identifies the shape, so meshes can be reused when nothing changed.</summary>
     public string ShapeKey =>
-        $"{innerWidth:F4}|{rimWidth:F4}|{riverDepth:F4}|{depth:F4}|{jointGroove:F4}";
+        $"{innerWidth:F4}|{rimWidth:F4}|{riverDepth:F4}|{depth:F4}|{jointGroove:F4}" +
+        $"|{rimRounding:F4}|{(wallsOff ? 1 : 0)}";
 }

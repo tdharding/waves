@@ -6,7 +6,7 @@ public class SplineFlowEditor : EditorWindow
 {
     private SplineContainer _target;
 
-    [MenuItem("Tools/Spline Flow Flipper")]
+    [MenuItem("Tools/Splines/Spline Flow Flipper", false, 520)]
     public static void OpenWindow()
     {
         GetWindow<SplineFlowEditor>("Spline Flow Flipper");
