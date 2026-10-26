@@ -6,40 +6,18 @@ using UnityEngine;
 /// <summary>
 /// Playtesting from a node of your choosing, whatever the save says.
 ///
-/// Setup > Playtest > Set Playtest Position, then click a node: a second boat, in the colour
-/// set in the Designer Settings (Node Dots), stands there on the map. Under PLAYTEST (Fresh Save)
-/// sits Playtest From Playtest Position: the same fresh save, with the boat on that node instead
-/// of at the level's start. Only that launch, and a build never sees it.
+/// Under PLAYTEST (Fresh Save) sits Playtest From Playtest Position, with a small square (⊙)
+/// beside it: press that, then click a node, and a second boat, in the colour set in the
+/// Designer Settings (Node Dots), stands there on the map. The long button is the same fresh
+/// save, with the boat on that node instead of at the level's start. Only that launch, and a
+/// build never sees it.
 ///
 /// While picking, Esc cancels quietly; a click off the map or a change of tool cancels with a
 /// pop-up saying so.
 /// </summary>
 public partial class LevelSelectDesignerWindow
 {
-    private bool _foldSetupPlaytest = false;
     private bool _pickingPlaytestBoat;
-
-    private void DrawPlaytestSection()
-    {
-        if (_pickingPlaytestBoat)
-        {
-            EditorGUILayout.HelpBox("Click a node to put the playtest boat there.\n" +
-                                    "Esc, another tool or a click off the map cancels.",
-                                    MessageType.Info);
-            return;
-        }
-
-        if (GUILayout.Button("Set Playtest Position"))
-        {
-            _pickingBoatStart    = false;
-            _pickingPlaytestBoat = true;
-        }
-
-        EditorGUILayout.LabelField(_data.HasPlaytestBoatNode
-                                       ? "Playtest boat is on a node — Playtest From Playtest Position (under PLAYTEST)"
-                                       : "No playtest position set",
-                                   EditorStyles.miniLabel);
-    }
 
     private const string SkipOpeningPref = "LevelSelectDesigner_SkipOpeningCinematic";
 
@@ -59,23 +37,44 @@ public partial class LevelSelectDesignerWindow
     }
 
     /// <summary>
-    /// The secondary button under PLAYTEST (Fresh Save): the same fresh save, but the boat starts
-    /// on the playtest node rather than at the level's start.
+    /// The secondary row under PLAYTEST (Fresh Save): the same fresh save, but the boat starts
+    /// on the playtest node rather than at the level's start. The small square beside it places
+    /// the playtest boat.
     /// </summary>
     private void DrawPlaytestFromPositionButton(bool canPlaytest)
     {
         bool can = canPlaytest && _data.HasPlaytestBoatNode;
         var  tip = can
             ? "Clear saved progress and enter play mode with the boat on the playtest node"
-            : "Set a playtest position first — Setup > Playtest";
+            : "Place the playtest boat first — the square button on the right";
+
+        EditorGUILayout.BeginHorizontal();
 
         var prev = GUI.backgroundColor;
         GUI.enabled         = can;
         GUI.backgroundColor = can ? LevelSelectDesignerSettings.PlaytestBoatColour : Color.gray;
         if (GUILayout.Button(new GUIContent("Playtest From Playtest Position", tip), GUILayout.Height(20)))
             PlaytestFromPlaytestPosition();
-        GUI.backgroundColor = prev;
         GUI.enabled         = true;
+
+        GUI.backgroundColor = _pickingPlaytestBoat ? LevelSelectDesignerSettings.PlaytestBoatColour : prev;
+        bool pick = GUILayout.Toggle(_pickingPlaytestBoat,
+            new GUIContent("⊙", "Set Playtest Position: click a node to put the playtest boat there"),
+            GUI.skin.button, GUILayout.Width(20), GUILayout.Height(20));
+        GUI.backgroundColor = prev;
+
+        EditorGUILayout.EndHorizontal();
+
+        if (pick != _pickingPlaytestBoat)
+        {
+            _pickingBoatStart    = false;
+            _pickingPlaytestBoat = pick;
+        }
+
+        if (_pickingPlaytestBoat)
+            EditorGUILayout.HelpBox("Click a node to put the playtest boat there.\n" +
+                                    "Esc, another tool or a click off the map cancels.",
+                                    MessageType.Info);
     }
 
     private void PlaytestFromPlaytestPosition()
@@ -134,7 +133,7 @@ public partial class LevelSelectDesignerWindow
         // Not shown mid-event: a modal opened inside OnGUI breaks the layout it is drawing.
         EditorApplication.delayCall += () =>
             EditorUtility.DisplayDialog("Set Playtest Position",
-                $"Playtest position not set — {why}.\n\nPress Set Playtest Position again and click a node.",
+                $"Playtest position not set — {why}.\n\nPress the ⊙ beside Playtest From Playtest Position again and click a node.",
                 "OK");
     }
 

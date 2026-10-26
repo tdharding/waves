@@ -157,9 +157,10 @@ public static partial class RiverMeshBuilder
     /// </summary>
     public static Mesh BuildRun(
         RiverProfile profile, IList<Vector3> centres, IList<Vector3> forwards,
-        IList<RiverNotch> notches, float edge, bool capStart = true, bool capEnd = true)
+        IList<RiverNotch> notches, float edge, bool capStart = true, bool capEnd = true,
+        RiverRunShadingSettings shading = null)
     {
-        var b = new MeshBuild();
+        var b = new MeshBuild { NextDesignation = StoneDesignation.RiverRuns };
         if (profile == null || centres == null || forwards == null || centres.Count < 2)
             return b.ToMesh("RiverRun");
 
@@ -191,7 +192,7 @@ public static partial class RiverMeshBuilder
                 // The loop opens on its two underside corners, so everything from 2 on is the
                 // top surface — the only part a joint shows in.
                 float y = loop[i].y - (i >= 2 ? dip : 0f);
-                ring[j][i] = grid.centre[j] + grid.right[j] * loop[i].x + Vector3.up * y;
+                ring[j][i] = grid.Line(j, loop[i].x) + Vector3.up * y;
             }
         }
 
@@ -204,22 +205,45 @@ public static partial class RiverMeshBuilder
         // landscape is brought up to meet its rim instead.
         int rightWall = 1, leftWall = loop.Count - 1;
 
+        // An outer flare's points sit either side of the top surface in the loop (see
+        // BuildCrossSectionLoop): the faces between them, and the walls they stand on, are the
+        // run's skirt. A mouth cuts the skirt along the branch's own side lines, straight down.
+        int  flareCount = (loop.Count - 2 - grid.xs.Count) / 2;
+        bool flared     = flareCount > 0;
+
+        // A porthole builds both outer walls across its own stretch, with the hole cut out.
+        var holes = RunPortholes(profile, grid, mouths, ring, loop.Count);
+
         for (int j = 0; j < grid.Rings - 1; j++)
         for (int i = 0; i < loop.Count; i++)
         {
             if (profile.wallsOff && (i == rightWall || i == leftWall)) continue;
+            if ((i == rightWall || i == leftWall) && InPortholeStretch(holes, j)) continue;
 
-            int i2 = (i + 1) % loop.Count;
-            if (CutByMouth(b, mouths, grid, loop.Count, i, j,
+            int  i2      = (i + 1) % loop.Count;
+            bool flareAt = IsFlareFace(i, flareCount, grid.Columns, loop.Count);
+            b.NextLabel = flareAt ? "Outer Flare" : SectionLabel(profile, loop, i, rightWall, leftWall);
+
+            if (flared && (flareAt || i == rightWall || i == leftWall))
+            {
+                BuildRunSkirtFace(b, mouths, grid, ring[j][i], ring[j][i2], ring[j + 1][i2], ring[j + 1][i]);
+                continue;
+            }
+
+            if (CutByMouth(b, mouths, grid, loop.Count, flareCount, i, j,
                            ring[j][i], ring[j][i2], ring[j + 1][i2], ring[j + 1][i])) continue;
 
             b.Quad(ring[j][i], ring[j][i2], ring[j + 1][i2], ring[j + 1][i]);
         }
 
+        foreach (var hole in holes) BuildRunPorthole(b, hole, ring, loop.Count, grid, shading);
+
         // Caps at each end of the run.
+        b.NextLabel = "End";
         if (capEnd)   CapRun(b, ring[grid.Rings - 1], loop, false);
         if (capStart) CapRun(b, ring[0],              loop, true);
 
+        b.NextLabel = null;
         foreach (var mouth in mouths) BuildRunMouthPatch(b, mouth, grid, edge);
 
         // The run's rim rides the sweep, so the shading is measured off the centres it was
@@ -237,6 +261,15 @@ public static partial class RiverMeshBuilder
         b.ShadeSeams(grid.centre, groove);
 
         return b.ToMesh("RiverRun");
+    }
+
+    // The designer overlay's name for the stretch of a run's section from loop[i] to the next point.
+    private static string SectionLabel(RiverProfile profile, List<Vector2> loop, int i, int rightWall, int leftWall)
+    {
+        if (i == 0) return "Underside";
+        if (i == rightWall || i == leftWall) return "Outer Wall";
+        float across = Mathf.Abs((loop[i].x + loop[(i + 1) % loop.Count].x) * 0.5f);
+        return across < profile.innerWidth * 0.5f ? "Channel" : "Rim";
     }
 
     private static void CapRun(MeshBuild b, Vector3[] ring, List<Vector2> shape, bool reversed)
@@ -260,14 +293,93 @@ public static partial class RiverMeshBuilder
         float halfOuter = profile.OuterWidth * 0.5f;
         float halfInner = profile.innerWidth * 0.5f;
 
+        // An outer flare carries the outer corner on out past the rim's edge, so the outer walls
+        // and the underside they stand on move out with it. Its points sit between the underside
+        // corner and the rim's outermost column on each side: foot first on the right, rim edge
+        // first on the left, so the loop still runs round counter-clockwise.
+        var   flare = FlarePoints(CornersOf(profile), edge);
+        float foot  = halfOuter + FlareReach(profile);
+
         var loop = new List<Vector2>();
-        loop.Add(new Vector2(-halfOuter, -profile.depth));
-        loop.Add(new Vector2( halfOuter, -profile.depth));
+        loop.Add(new Vector2(-foot, -profile.depth));
+        loop.Add(new Vector2( foot, -profile.depth));
+
+        foreach (var f in flare)
+            loop.Add(new Vector2(halfOuter + f.x, -f.y));
 
         foreach (float x in TopColumns(profile, edge))
             loop.Add(new Vector2(x, -SectionCut(profile, x)));
 
+        for (int k = flare.Count - 1; k >= 0; k--)
+            loop.Add(new Vector2(-(halfOuter + flare[k].x), -flare[k].y));
+
         return loop;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // OUTER FLARE
+    // ══════════════════════════════════════════════════════════════
+    //
+    // The outer corner stretched: it starts to turn where it always did on the rim, but runs on
+    // out past the rim's edge by the Outer Flare and drops by the same before it comes down
+    // vertical. Below that the outer wall goes on down as it always did. Only the part past the
+    // rim's edge is new geometry — inside it is the rim's own corner, just a longer curve.
+
+    /// <summary>How far past the rim's outer edge the outer flare reaches. 0 without one.</summary>
+    public static float FlareReach(RiverProfile p) => p == null ? 0f : CornersOf(p).flare;
+
+    /// <summary>How far below the rim top the foot of the outer flare is — where the vertical
+    /// outer wall starts. 0 without a flare.</summary>
+    public static float FlareFootFall(RiverProfile p)
+    {
+        if (p == null) return 0f;
+        var c = CornersOf(p);
+        return c.flare > 0f ? c.outerY : 0f;
+    }
+
+    // How far round the stretched corner the rim's outer edge comes: the angle the quarter
+    // ellipse has turned through there, a quarter turn with no flare.
+    private static float OuterEdgeAngle(RimCorners c)
+    {
+        float rx = c.outerX + c.flare;
+        return rx > 0f ? Mathf.Asin(Mathf.Clamp01(c.outerX / rx)) : HalfPi;
+    }
+
+    // The stretched corner's steps on the rim itself, by angle as an unstretched corner's are.
+    private static int OuterCornerSteps(RimCorners c, float edge)
+    {
+        if (c.flare <= 0f) return CornerSteps(c.outerX, c.outerY, edge);
+
+        float rx  = c.outerX + c.flare;
+        float arc = OuterEdgeAngle(c) * Mathf.Sqrt((rx * rx + c.outerY * c.outerY) * 0.5f);
+        return Mathf.Max(MinRimCornerSegments, Mathf.CeilToInt(arc / edge));
+    }
+
+    /// <summary>
+    /// The outer flare's points past the rim's outer edge, foot first: x how far out past the
+    /// edge, y how far below the rim top. Stepped by angle round the rest of the stretched corner,
+    /// so the curve is even however steep it gets. The rim's edge itself is not among them — it
+    /// is the rim's own outermost column. Empty without a flare.
+    /// </summary>
+    private static List<Vector2> FlarePoints(RimCorners c, float edge)
+    {
+        var pts = new List<Vector2>();
+        if (c.flare <= 0f) return pts;
+
+        edge = Mathf.Max(edge, 0.001f);
+
+        float rx   = c.outerX + c.flare;
+        float from = OuterEdgeAngle(c);
+        float arc  = (HalfPi - from) * Mathf.Sqrt((rx * rx + c.outerY * c.outerY) * 0.5f);
+        int   n    = Mathf.Max(MinRimCornerSegments, Mathf.CeilToInt(arc / edge));
+
+        for (int k = 0; k < n; k++)
+        {
+            float t = k == 0 ? HalfPi : HalfPi - (HalfPi - from) * k / n;
+            pts.Add(new Vector2(k == 0 ? c.flare : rx * Mathf.Sin(t) - c.outerX,
+                                c.outerY * (1f - Mathf.Cos(t))));
+        }
+        return pts;
     }
 
     // Fewest segments round a rounded rim corner, however coarse the detail is set — at the
@@ -288,6 +400,10 @@ public static partial class RiverMeshBuilder
         public float innerX, innerY;   // the channel side
         public float outerX, outerY;   // the outer wall side
 
+        // How far the outer corner carries on past the rim's outer edge — the Outer Flare. The
+        // corner then reaches outerX + flare across and outerY down (which takes the flare too).
+        public float flare;
+
         public bool Any => innerX > 0f || outerX > 0f;
     }
 
@@ -295,17 +411,27 @@ public static partial class RiverMeshBuilder
     {
         var c = new RimCorners();
         float k = Mathf.Clamp01(p.rimRounding);
-        if (k <= 0f || p.rimWidth <= 0.0001f) return c;
+        if (k > 0f && p.rimWidth > 0.0001f)
+        {
+            // With the walls off the outer edge stays level, to meet the ground, and the whole
+            // rounding goes to the channel side. With them on, each corner takes half the rim.
+            if (p.wallsOff)
+                c.innerX = k * p.rimWidth;
+            else
+                c.innerX = c.outerX = k * p.rimWidth * 0.5f;
 
-        // With the walls off the outer edge stays level, to meet the ground, and the whole
-        // rounding goes to the channel side. With them on, each corner takes half the rim.
-        if (p.wallsOff)
-            c.innerX = k * p.rimWidth;
-        else
-            c.innerX = c.outerX = k * p.rimWidth * 0.5f;
+            c.innerY = Mathf.Min(c.innerX, p.riverDepth * MaxCornerDrop);
+            c.outerY = Mathf.Min(c.outerX, p.depth * MaxCornerDrop);
+        }
 
-        c.innerY = Mathf.Min(c.innerX, p.riverDepth * MaxCornerDrop);
-        c.outerY = Mathf.Min(c.outerX, p.depth * MaxCornerDrop);
+        // The flare stretches the outer corner out and down by the same amount. A square corner
+        // has nothing to stretch, so there the flare is a corner of its own, starting right on
+        // the rim's edge.
+        if (!p.wallsOff && p.outerFlare > 0f)
+        {
+            c.flare  = p.outerFlare;
+            c.outerY = Mathf.Min(c.outerX + c.flare, p.depth * MaxCornerDrop);
+        }
         return c;
     }
 
@@ -344,7 +470,7 @@ public static partial class RiverMeshBuilder
 
         float fromOuter = p.OuterWidth * 0.5f - a;
         if (outerCorner && c.outerX > 0f && fromOuter < c.outerX)
-            return CornerFall(c.outerX - fromOuter, c.outerX, c.outerY);
+            return CornerFall(c.outerX - fromOuter, c.outerX + c.flare, c.outerY);
 
         return 0f;
     }
@@ -374,11 +500,21 @@ public static partial class RiverMeshBuilder
         float flatFrom = halfOuter - c.outerX;   // where the outer corner comes level
         float flatTo   = halfInner + c.innerX;   // where the inner corner starts to fall
 
-        if (c.outerX > 0f)
+        if (c.outerX > 0f && c.flare <= 0f)
         {
             int n = CornerSteps(c.outerX, c.outerY, edge);
             for (int i = 0; i < n; i++)
                 d.Add(flatFrom + c.outerX * Mathf.Cos(HalfPi * i / n));
+        }
+        else if (c.outerX > 0f)
+        {
+            // Stretched by a flare: only the part of the longer curve on the rim, from the edge
+            // in to where it comes level. The rest is the flare's.
+            float rx    = c.outerX + c.flare;
+            float edgeA = OuterEdgeAngle(c);
+            int   n     = OuterCornerSteps(c, edge);
+            for (int i = 0; i < n; i++)
+                d.Add(i == 0 ? flatFrom + c.outerX : flatFrom + rx * Mathf.Sin(edgeA * (n - i) / n));
         }
 
         float flat = flatFrom - flatTo;
@@ -487,8 +623,9 @@ public static partial class RiverMeshBuilder
     /// The centres are the rim top of the run, so a run that climbs or drops carries its
     /// water with it — the surface keeps the same distance from the rim the whole way.
     ///
-    /// A branch passes the river it leaves as <paramref name="join"/>, and its water carries
-    /// that river's banks on UV3 wherever it lies near it — see <see cref="RiverJoin"/>.
+    /// A branch passes the river it leaves as <paramref name="join"/>, and its water is cut on
+    /// that river's ribbon edge so the two butt — see <see cref="RiverJoin"/>. UV3 is left for
+    /// the designer, which writes the mouths a water meets onto it once everything is built.
     /// </summary>
     public static Mesh BuildWater(
         RiverProfile profile, float waterLevel,
@@ -510,6 +647,13 @@ public static partial class RiverMeshBuilder
         // edge, is what the surface reads to draw ripples along its banks.
         float shore = WaterHalfWidth(profile, waterLevel);
 
+        // Where a width override widens or narrows the channel, the ribbon and its waterline move
+        // with it, ring by ring, just as the run's own section does.
+        var   widths    = InnerWidthsAlong(profile, centres);
+        float baseInner = profile.innerWidth * 0.5f;
+        var   halves    = new float[rings];
+        var   shores    = new float[rings];
+
         var left  = new Vector3[rings];
         var right = new Vector3[rings];
         var along = new float[rings];
@@ -521,57 +665,80 @@ public static partial class RiverMeshBuilder
             if (fwd.sqrMagnitude < 1e-8f) fwd = Vector3.forward;
             fwd.Normalize();
 
+            float inner = widths != null ? widths[j] * 0.5f : baseInner;
+            halves[j] = AcrossAt(half,  baseInner, inner);
+            shores[j] = AcrossAt(shore, baseInner, inner);
+
             // Flat to world up, exactly as the run's rim is, so the two never disagree.
             Vector3 across = Vector3.Cross(Vector3.up, fwd);
-            left[j]  = centres[j] - across * half + Vector3.up * y;
-            right[j] = centres[j] + across * half + Vector3.up * y;
+            left[j]  = centres[j] - across * halves[j] + Vector3.up * y;
+            right[j] = centres[j] + across * halves[j] + Vector3.up * y;
 
             if (j > 0) along[j] = along[j - 1] + Vector3.Distance(centres[j - 1], centres[j]);
         }
 
-        // The river a branch leaves. A ring still lying within the joined river's own width of
-        // its near bank carries that river's banks; the first ring past that, and every ring after
-        // it, carries none. Decided per ring pair rather than per corner, so no face is left
-        // half-flagged and interpolating a blend that fades out across it.
-        bool joining = join.HasValue;
-        DebugJoinQuads = 0; DebugJoinAlong = 0f; DebugJoinMaxIn = float.NegativeInfinity;
-        DebugWaterLength = along[rings - 1];
-        for (int j = 0; j < rings - 1; j++)
+        // A branch's water stops on the edge of the river it leaves rather than running on over
+        // it. Each side is cut where it crosses that edge, so the end lies along it however the
+        // branch leans; the rings behind a cut fold onto it, and the faces between them collapse
+        // and are dropped.
+        var alongL = (float[])along.Clone();
+        var alongR = (float[])along.Clone();
+        int first  = 0;
+        if (join.HasValue && join.Value.ribbon > 0f)
         {
-            if (joining)
-            {
-                var jn = join.Value;
-                joining = jn.Near(left[j]) || jn.Near(right[j]) ||
-                          jn.Near(left[j + 1]) || jn.Near(right[j + 1]);
-                b.BankAt = joining ? jn.BankAt : null;
-
-                // DEBUG (branch mouth fade at pools): where the flagged stretch reaches, and the
-                // most any flagged corner lies INSIDE the joined river's water.
-                if (joining)
-                {
-                    DebugJoinQuads = j + 1;
-                    DebugJoinAlong = along[j + 1];
-                    DebugJoinMaxIn = Mathf.Max(DebugJoinMaxIn,
-                        Mathf.Max(jn.BankAt(left[j + 1]).x, jn.BankAt(right[j + 1]).x));
-                }
-            }
-
-            // The lines run the whole length of the ribbon — across a junction mouth and over a
-            // pool's rim — with nothing easing them off at either end.
-            b.Quad(left[j], left[j + 1], right[j + 1], right[j],
-                   RunEdgeData(shore, -half, along[j]),
-                   RunEdgeData(shore, -half, along[j + 1]),
-                   RunEdgeData(shore,  half, along[j + 1]),
-                   RunEdgeData(shore,  half, along[j]),
-                   RunFlowData(-half, along[j]),
-                   RunFlowData(-half, along[j + 1]),
-                   RunFlowData( half, along[j + 1]),
-                   RunFlowData( half, along[j]));
+            int cutL = CutAtJoin(join.Value, left,  alongL);
+            int cutR = CutAtJoin(join.Value, right, alongR);
+            if (cutL >= 0 && cutR >= 0) first = Mathf.Min(cutL, cutR);
         }
 
-        b.BankAt = null;
+        for (int j = first; j < rings - 1; j++)
+        {
+            // The lines run the whole length of the ribbon — across a junction mouth and over a
+            // pool's rim — with nothing easing them off at either end.
+            int k = j + 1;
+            b.Quad(left[j], left[k], right[k], right[j],
+                   RunEdgeData(shores[j], -halves[j], alongL[j]),
+                   RunEdgeData(shores[k], -halves[k], alongL[k]),
+                   RunEdgeData(shores[k],  halves[k], alongR[k]),
+                   RunEdgeData(shores[j],  halves[j], alongR[j]),
+                   RunFlowData(-halves[j], alongL[j]),
+                   RunFlowData(-halves[k], alongL[k]),
+                   RunFlowData( halves[k], alongR[k]),
+                   RunFlowData( halves[j], alongR[j]));
+        }
 
         return b.ToMesh("RiverWater");
+    }
+
+    /// <summary>
+    /// Cuts one side of a branch's water where it crosses the edge of the river it leaves: every
+    /// corner behind the crossing is moved onto it, with the distance along the channel it lies
+    /// at. The side runs straight between rings, so the crossing is exact. Hands back the ring the
+    /// crossing lies after, or -1 where the side never crosses and is left whole.
+    /// </summary>
+    private static int CutAtJoin(RiverJoin join, Vector3[] side, float[] along)
+    {
+        for (int j = 0; j < side.Length - 1; j++)
+        {
+            float o0 = join.PastEdge(side[j]);
+            float o1 = join.PastEdge(side[j + 1]);
+
+            // Already out past the edge where the water starts: nothing over that river to cut.
+            if (j == 0 && o0 >= 0f) return -1;
+            if (o1 < 0f) continue;
+
+            float   t = o0 / (o0 - o1);
+            Vector3 p = Vector3.Lerp(side[j], side[j + 1], t);
+            float   a = Mathf.Lerp(along[j], along[j + 1], t);
+
+            for (int k = 0; k <= j; k++)
+            {
+                side[k]  = p;
+                along[k] = a;
+            }
+            return j;
+        }
+        return -1;
     }
 
     /// <summary>The longest a stretch of water is left between two rings once smoothed.</summary>
@@ -725,20 +892,11 @@ public static partial class RiverMeshBuilder
     /// <summary>
     /// The river a branch leaves, as its water sees it: a straight line across the junction.
     ///
-    /// A branch's water runs back across the mouth to that river's centreline and lies over it,
-    /// drawn on top. Where it does, its lines should belong to THAT river's banks — held along
-    /// them, gone from its middle — rather than carrying the branch's own banks straight out
-    /// across it. So every corner near the junction carries, on UV3, how far it lies from each of
-    /// that river's waterlines, which the shader turns into that river's Reach and eases the
-    /// branch's own over to.
+    /// A branch's water runs back across the mouth and stops on the edge of that river's water,
+    /// cut along it (<see cref="ribbon"/>), so the two butt and nothing lies over anything.
     ///
-    /// The river is taken as straight across the junction: its tangent there. Both distances are
-    /// straight lines, so they interpolate exactly across a face.
+    /// The river is taken as straight across the junction: its tangent there.
     /// </summary>
-    // DEBUG (branch mouth fade at pools) — read by the designer straight after BuildWater.
-    public static int   DebugJoinQuads;
-    public static float DebugJoinAlong, DebugJoinMaxIn, DebugWaterLength;
-
     public struct RiverJoin
     {
         /// <summary>A point on that river's centreline, in the water's own space.</summary>
@@ -750,9 +908,9 @@ public static partial class RiverMeshBuilder
         /// <summary>Half the width of that river's water.</summary>
         public float shore;
 
-        /// <summary>How far out past its near waterline, into the branch, the banks are still
-        /// carried. That river's outer width: past it the branch is its own water.</summary>
-        public float extent;
+        /// <summary>Half the width that river's water is BUILT to — the edge of its ribbon, which
+        /// is the line this water is cut on and stops at. 0 leaves it uncut.</summary>
+        public float ribbon;
 
         private float Out(Vector3 corner)
         {
@@ -761,18 +919,9 @@ public static partial class RiverMeshBuilder
             return Vector3.Dot(d, across);
         }
 
-        public bool Near(Vector3 corner) => Out(corner) <= shore + extent;
-
-        /// <summary>
-        /// UV3 for one corner: .x metres to that river's NEAR waterline (the branch's side),
-        /// positive inside its water and negative out in the branch; .y metres to its far
-        /// waterline; .z 1, carrying.
-        /// </summary>
-        public Vector4 BankAt(Vector3 corner)
-        {
-            float off = Out(corner);
-            return new Vector4(shore - off, shore + off, 1f, 0f);
-        }
+        /// <summary>Metres a corner lies out past the edge of that river's water, toward the
+        /// branch; negative over that river's water.</summary>
+        public float PastEdge(Vector3 corner) => Out(corner) - ribbon;
     }
 
     /// <summary>
@@ -784,7 +933,7 @@ public static partial class RiverMeshBuilder
     /// the world, they follow the river round its bends — which is what carries the lines round
     /// a branch as it curves away from the river it left.
     ///
-    /// The lap ramp is always 1: a river's water never laps over another's. Only a pool does.
+    /// The third channel is always 1: no water laps over another's any more.
     /// </summary>
     private static Vector4 RunFlowData(float across, float along)
         => new Vector4(along, across, 1f, RiverKind);
@@ -801,7 +950,7 @@ public static partial class RiverMeshBuilder
     /// Negative on the far side of a waterline, out where the wall has the water buried. That
     /// water is never seen, so nothing is spent hiding it.
     ///
-    /// <c>.w</c> is the length of the lap in metres — always 0, a river never laps.
+    /// <c>.w</c> is always 0: it was the length of a lap, and nothing laps now.
     /// </summary>
     private static Vector4 RunEdgeData(float shore, float across, float along)
         => new Vector4(shore + across, shore - across, along, 0f);
@@ -938,8 +1087,8 @@ public static partial class RiverMeshBuilder
 
             for (int j = 0; j < grid.Rings - 1; j++)
             {
-                Vector3 a = grid.centre[j]     + grid.right[j]     * x;
-                Vector3 c = grid.centre[j + 1] + grid.right[j + 1] * x;
+                Vector3 a = grid.Line(j,     x);
+                Vector3 c = grid.Line(j + 1, x);
 
                 // Looking back across the channel at the water it holds in.
                 Vector3 inward = grid.right[j] * (side == 0 ? -1f : 1f);
@@ -1009,8 +1158,8 @@ public static partial class RiverMeshBuilder
         float best = float.MaxValue;
         for (int j = 0; j < grid.Rings - 1; j++)
         {
-            Vector3 a = grid.centre[j]     + grid.right[j]     * x;
-            Vector3 c = grid.centre[j + 1] + grid.right[j + 1] * x;
+            Vector3 a = grid.Line(j,     x);
+            Vector3 c = grid.Line(j + 1, x);
 
             // Flat: ray from + dir*t against segment a + (c-a)*u.
             float ex = c.x - a.x, ez = c.z - a.z;
@@ -1052,8 +1201,20 @@ public static partial class RiverMeshBuilder
     }
 
     /// <summary>
-    /// The pool's banks: a wall round the waterline of the bowl, open where each river
-    /// arrives, and a second wall round the island when one stands above the water.
+    /// The pool's banks: a wall standing wherever the pool's own stone comes up through the
+    /// water — round the bowl, in along each mouth to where its river's banks take over, and
+    /// round the island when one stands above the water.
+    ///
+    /// Read off the faces the pool is actually built from rather than worked out beside them.
+    /// A wall laid by reckoning — a circle at the waterline radius, and each river's banks
+    /// carried dead straight in to meet it — cut across every mouth corner the stone rounds or
+    /// steps, and stood out in the water at one corner while it buried itself in the stone at
+    /// the other. Traced off the stone, it is wherever the shore is seen to be.
+    ///
+    /// Only the faces the water lies against are read: the outer wall, the underside and the
+    /// Outer Flare skirt all pass down through the water's height too, but out under the
+    /// ground where no boat goes. Each piece of wall looks the way its face leans, which is
+    /// down the slope into the water.
     /// </summary>
     public static Mesh BuildPoolBanks(
         RiverProfile profile, float waterLevel,
@@ -1063,173 +1224,94 @@ public static partial class RiverMeshBuilder
         var b = new MeshBuild();
         if (profile == null) return b.ToMesh("RiverPoolBanks");
 
-        poolRadius   = Mathf.Max(poolRadius, 0.01f);
-        islandRadius = Mathf.Clamp(islandRadius, 0f, poolRadius - 0.01f);
         if (floorDepth <= 0f) floorDepth = profile.riverDepth;
-        edge = Mathf.Max(edge, 0.005f);
 
-        // Where the bowl comes up through the surface, coming in from the rim and going out
-        // from the island. Walked rather than solved, because the island end of a roundabout
-        // is the same half-ellipse read backwards.
-        var   pc     = PoolCornersOf(profile, poolRadius, islandRadius, floorDepth);
-        float outerR = WaterlineRadius(poolRadius, islandRadius, poolRadius + profile.rimWidth,
-                                       floorDepth, waterLevel, true, pc);
-        float innerR = islandRadius > 0f
-                     ? WaterlineRadius(poolRadius, islandRadius, poolRadius + profile.rimWidth,
-                                       floorDepth, waterLevel, false, pc)
-                     : 0f;
+        var stone = PoolStone(profile, poolRadius, islandRadius, floorDepth, mouths, edge);
 
-        float outer = poolRadius + profile.rimWidth;
-        var   spans = ResolveMouths(mouths, poolRadius, islandRadius, outer, edge);
-
+        // As deep as the deepest channel meeting it, so a mouth cut deeper than the bowl
+        // cannot be slipped under where its river comes in.
         float topY = 0f;
         float botY = -floorDepth;
+        if (mouths != null)
+            foreach (var m in mouths)
+                if (m.profile != null) botY = Mathf.Min(botY, -m.profile.riverDepth);
 
-        int columns = Mathf.Clamp(Mathf.RoundToInt(TwoPi * poolRadius / edge), 12, 1024);
+        // The water is found from the middle of the pool. Where an island stands there instead,
+        // it is found in the channel beside it, the nearest water to the middle there is.
+        var shore = stone.Shoreline(-waterLevel, Vector3.zero);
+        foreach (var piece in shore)
+            Wall(b, piece.a, piece.c, botY, topY, piece.water);
 
-        // Each river carries its own two banks in across the rim to the bowl's waterline, and
-        // the bowl is opened exactly between where they land. A river whose banks cannot reach
-        // it falls back to the slice the mouth took out, as before.
-        var gaps     = new List<Vector2>();   // start angle, then how far round
-        var fallback = new List<MouthSpan>();
-        foreach (var s in spans)
-        {
-            if (outerR > 0.0001f && PoolMouthBanks(b, s, outerR, waterLevel, botY, topY, out Vector2 gap))
-                gaps.Add(gap);
-            else
-                fallback.Add(s);
-        }
-
-        for (int j = 0; j < columns; j++)
-        {
-            float a1  = TwoPi * j            / columns;
-            float a2  = TwoPi * (j + 1)      / columns;
-            float mid = TwoPi * (j + 0.5f)   / columns;
-
-            // A mouth is a gap in the outer wall only — a river arrives across the rim, and
-            // the island in the middle is never cut into.
-            // The bowl's wall looks in at the water; the island's looks out at it.
-            if (outerR > 0.0001f && !InAnyMouth(fallback, outerR, outer, mid))
-            {
-                // Each gap laid against this column twice, a turn apart, so one that wraps
-                // past zero still cuts the column it spills into.
-                var columnGaps = new List<Vector2>(gaps.Count * 2);
-                foreach (var g in gaps)
-                {
-                    float from = a1 + Mathf.Repeat(g.x - a1, TwoPi);
-                    columnGaps.Add(new Vector2(from,         from + g.y));
-                    columnGaps.Add(new Vector2(from - TwoPi, from - TwoPi + g.y));
-                }
-
-                foreach (var piece in OutsideGaps(a1, a2, columnGaps))
-                    Wall(b, PoolDirection(piece.x) * outerR, PoolDirection(piece.y) * outerR,
-                         botY, topY, -PoolDirection(mid));
-            }
-
-            if (innerR > 0.0001f)
-                Wall(b, PoolDirection(a1) * innerR, PoolDirection(a2) * innerR,
-                     botY, topY, PoolDirection(mid));
-        }
+        if (mouths != null)
+            foreach (var m in mouths)
+                RiverBankStep(b, shore, m, waterLevel, botY, topY);
 
         return b.ToMesh("RiverPoolBanks");
     }
 
     /// <summary>
-    /// A river's two banks carried in from where its run stops, across the rim, to where each
-    /// meets the bowl's waterline — the pool's side of <see cref="BranchBanks"/>. Hands back
-    /// the stretch of the bowl's wall between them as a start angle and how far round it runs.
+    /// Closes the step where a river's banks end against the pool's shore. The river's banks
+    /// stand at the width its channel's curve meets the water; the stone is built of flat
+    /// facets across that curve, which meet the water a little way off it. So on the line the
+    /// river stops at, its bank ends a short step from where the pool's shore begins, and a
+    /// boat finds the crack between them unless a wall closes it.
     /// </summary>
-    private static bool PoolMouthBanks(
-        MeshBuild b, MouthSpan s, float waterlineR, float waterLevel,
-        float botY, float topY, out Vector2 gap)
+    private static void RiverBankStep(
+        MeshBuild b, List<MeshBuild.ShorePiece> shore, PoolMouth m, float waterLevel,
+        float botY, float topY)
     {
-        gap = default;
+        if (m.profile == null) return;
 
-        float half = WaterHalfWidth(s.mouth.profile, waterLevel);
-        if (half <= 0.0001f) return false;
+        float half = WaterHalfWidth(m.profile, waterLevel);
+        if (half <= 0.0001f) return;
 
-        Vector3 start0 = s.mouth.centre + s.right * half;
-        Vector3 startM = s.mouth.centre - s.right * half;
+        Vector3 dir = new Vector3(m.direction.x, 0f, m.direction.z);
+        if (dir.sqrMagnitude < 1e-8f) return;
+        dir.Normalize();
 
-        if (!CircleMeets(start0, -s.dir, waterlineR, out Vector3 h0)) return false;
-        if (!CircleMeets(startM, -s.dir, waterlineR, out Vector3 hM)) return false;
+        Vector3 centre = new Vector3(m.centre.x, 0f, m.centre.z);
+        Vector3 right  = Vector3.Cross(Vector3.up, dir);
 
-        float bot = Mathf.Min(botY, -s.mouth.profile.riverDepth);
-
-        Wall(b, start0, h0, bot, topY, -s.right);
-        Wall(b, startM, hM, bot, topY,  s.right);
-
-        float a0    = Mathf.Atan2(h0.x, h0.z);
-        float aM    = Mathf.Atan2(hM.x, hM.z);
-        float delta = DeltaRad(a0, aM);
-
-        gap = delta >= 0f ? new Vector2(a0, delta) : new Vector2(aM, -delta);
-        return true;
-    }
-
-    /// <summary>Where a flat line walked in from <paramref name="from"/> first crosses the
-    /// circle of that radius about the pool's centre.</summary>
-    private static bool CircleMeets(Vector3 from, Vector3 dir, float radius, out Vector3 hit)
-    {
-        hit = from;
-
-        float fd   = from.x * dir.x + from.z * dir.z;
-        float ff   = from.x * from.x + from.z * from.z;
-        float disc = fd * fd - (ff - radius * radius);
-        if (disc < 0f) return false;
-
-        float t = -fd - Mathf.Sqrt(disc);
-        if (t < 0f) return false;
-
-        hit = new Vector3(from.x + dir.x * t, 0f, from.z + dir.z * t);
-        return true;
-    }
-
-    /// <summary>
-    /// How far out the pool's floor crosses the water surface. Walked from one end of the
-    /// bowl to the other in even steps, taking the first crossing found from whichever end
-    /// is asked for. A rounded island is walked from the flat of its top, where its corner
-    /// starts to fall, or water lying on that corner is never crossed into.
-    /// </summary>
-    private static float WaterlineRadius(
-        float poolRadius, float islandRadius, float rimRadius, float floorDepth,
-        float waterLevel, bool fromRim, PoolCorners pc)
-    {
-        const int steps = 256;
-
-        float islandTop = islandRadius - pc.islandX;
-        float from = fromRim ? rimRadius : islandTop;
-        float to   = fromRim ? islandTop : rimRadius;
-
-        float prevR = from;
-        float prevD = PoolFloor(prevR, islandRadius, poolRadius, floorDepth, pc);
-
-        for (int i = 1; i <= steps; i++)
+        // The shore's loose ends — a point only one piece of shore reaches. Where the pool's
+        // shore runs out into a river, it stops on the line that river ends at.
+        var reach = new Dictionary<Vector3, int>();
+        foreach (var piece in shore)
         {
-            float r = Mathf.Lerp(from, to, (float)i / steps);
-            float d = PoolFloor(r, islandRadius, poolRadius, floorDepth, pc);
-
-            // Crossing from shallower than the water to deeper than it.
-            if (prevD < waterLevel && d >= waterLevel)
-            {
-                float span = d - prevD;
-                float t    = span < 1e-6f ? 0f : (waterLevel - prevD) / span;
-                return Mathf.Lerp(prevR, r, t);
-            }
-
-            prevR = r;
-            prevD = d;
+            reach[piece.a] = reach.TryGetValue(piece.a, out int na) ? na + 1 : 1;
+            reach[piece.c] = reach.TryGetValue(piece.c, out int nc) ? nc + 1 : 1;
         }
 
-        return 0f;
+        // No further than half the channel: anything beyond is some other river's shore.
+        float within = m.profile.innerWidth * 0.5f;
+
+        for (int side = -1; side <= 1; side += 2)
+        {
+            Vector3 bank = centre + right * (half * side);
+
+            Vector3 end  = bank;
+            float   best = within * within;
+            foreach (var kv in reach)
+            {
+                if (kv.Value != 1) continue;
+                float sq = (kv.Key - bank).sqrMagnitude;
+                if (sq < best) { best = sq; end = kv.Key; }
+            }
+
+            if ((end - bank).sqrMagnitude < 1e-8f) continue;
+
+            // The water stands on whichever side reaches out across the step: back up the river
+            // when its banks are the wider of the two, out into the pool when the shore is.
+            float across = Vector3.Dot(end - centre, right * side);
+            Wall(b, bank, end, botY, topY, across < half ? dir : -dir);
+        }
     }
 
     /// <summary>A wall right across the channel at one end of a run, facing back down it.</summary>
     private static void Cap(MeshBuild b, RunGrid grid, int ring, int towards, float half,
                             float botY, float topY)
     {
-        Vector3 left  = grid.centre[ring] - grid.right[ring] * half;
-        Vector3 right = grid.centre[ring] + grid.right[ring] * half;
+        Vector3 left  = grid.Line(ring, -half);
+        Vector3 right = grid.Line(ring,  half);
 
         Vector3 inward = grid.centre[Mathf.Clamp(towards, 0, grid.Rings - 1)] - grid.centre[ring];
         inward.y = 0f;
@@ -1303,8 +1385,11 @@ public static partial class RiverMeshBuilder
     private static float CollarFor(RiverProfile main, RiverProfile branch,
                                    float sin, float cos, float edge)
     {
+        // A flared branch's last ring reaches out past its rim by the flare, and all of that has
+        // to clear the river too — at a slant, its flare would otherwise stand up in the river's
+        // channel.
         sin = Mathf.Max(sin, Mathf.Sin(MinFromAxis));
-        return (main.OuterWidth * 0.5f + branch.OuterWidth * 0.5f * cos) / sin
+        return (main.OuterWidth * 0.5f + (branch.OuterWidth * 0.5f + FlareReach(branch)) * cos) / sin
              + Mathf.Max(edge, 0.005f);
     }
 
@@ -1346,6 +1431,10 @@ public static partial class RiverMeshBuilder
         public readonly List<float>  xs;
         public readonly float[]      colY;
 
+        // Half the channel's width at each ring, where a width override changes it along the run;
+        // null where the run is its profile's one width the whole way.
+        private readonly float[]     halfInner;
+
         public int Rings   => centre.Length;
         public int Columns => xs.Count - 1;
 
@@ -1363,6 +1452,13 @@ public static partial class RiverMeshBuilder
 
             for (int c = 0; c < xs.Count; c++)
                 colY[c] = -SectionCut(profile, xs[c]);
+
+            var widths = InnerWidthsAlong(profile, centres);
+            if (widths != null)
+            {
+                halfInner = new float[n];
+                for (int j = 0; j < n; j++) halfInner[j] = widths[j] * 0.5f;
+            }
 
             for (int j = 0; j < n; j++)
             {
@@ -1382,8 +1478,52 @@ public static partial class RiverMeshBuilder
         public Vector3 At(int j, int col)
         {
             col = Mathf.Clamp(col, 0, Columns);
-            return centre[j] + right[j] * xs[col] + Vector3.up * colY[col];
+            return Line(j, xs[col]) + Vector3.up * colY[col];
         }
+
+        /// <summary>
+        /// The point on ring <paramref name="j"/>'s rim line that stands where
+        /// <paramref name="x"/> does across the profile's own section — moved with the channel's
+        /// width at that ring (see <see cref="AcrossAt"/>).
+        /// </summary>
+        public Vector3 Line(int j, float x) => centre[j] + right[j] * Across(j, x);
+
+        /// <summary>How far across ring <paramref name="j"/> the section's point <paramref name="x"/> stands.</summary>
+        public float Across(int j, float x)
+            => halfInner == null ? x : AcrossAt(x, profile.innerWidth * 0.5f, halfInner[j]);
+
+        /// <summary>Half the channel's width at a ring.</summary>
+        public float HalfInnerAt(int j) => halfInner == null ? profile.innerWidth * 0.5f : halfInner[j];
+
+        /// <summary>Half the channel's width that far along the run, eased between its rings.</summary>
+        public float HalfInnerAtArc(float s)
+        {
+            if (halfInner == null) return profile.innerWidth * 0.5f;
+            int   j    = RingAt(s);
+            int   k    = Mathf.Min(j + 1, Rings - 1);
+            float span = arc[k] - arc[j];
+            float t    = span < 1e-6f ? 0f : Mathf.Clamp01((s - arc[j]) / span);
+            return Mathf.Lerp(halfInner[j], halfInner[k], t);
+        }
+
+        /// <summary>The most any ring's channel is widened past the profile's own, each side.</summary>
+        public float MaxWiden
+        {
+            get
+            {
+                float most = 0f;
+                if (halfInner != null)
+                    foreach (float h in halfInner) most = Mathf.Max(most, h - profile.innerWidth * 0.5f);
+                return most;
+            }
+        }
+
+        /// <summary>
+        /// The section as it stands at one spot along the run — the profile at the channel's
+        /// width there. For what is built round one spot (a rim node, a bridge) rather than swept.
+        /// </summary>
+        public RiverProfile ProfileAtArc(float s)
+            => halfInner == null ? profile : profile.WithInnerWidth(HalfInnerAtArc(s) * 2f);
 
         /// <summary>
         /// How far along the run one of its column lines crosses a line running across it —
@@ -1656,9 +1796,20 @@ public static partial class RiverMeshBuilder
     }
 
     // Which column of the section a point of the cross-section loop stands on. The loop opens
-    // on its two underside corners, -x then +x, and each sits under the outermost column.
-    private static int LoopColumn(int index, int columns)
-        => index == 0 ? columns : index == 1 ? 0 : index - 2;
+    // on its two underside corners, -x then +x, and each sits under the outermost column. An
+    // outer flare's points come between those corners and the top surface; they stand on no
+    // column, and the faces between them are never asked here.
+    private static int LoopColumn(int index, int columns, int flareCount)
+        => index == 0 ? columns : index == 1 ? 0 : index - 2 - flareCount;
+
+    // Whether the face from loop point i to the next is one of the outer flare's — between the
+    // flare's points, or from the last of them onto the rim's outermost column (either side).
+    private static bool IsFlareFace(int i, int flareCount, int columns, int loopCount)
+    {
+        if (flareCount <= 0) return false;
+        int topFirst = 2 + flareCount, topLast = topFirst + columns;
+        return (i >= 2 && i < topFirst) || (i >= topLast && i < loopCount - 1);
+    }
 
     /// <summary>
     /// Builds one face of the sweep that a mouth runs through, cut along the mouth's two side
@@ -1672,7 +1823,7 @@ public static partial class RiverMeshBuilder
     /// slivers, and nothing either piece has that the other lacks.
     /// </summary>
     private static bool CutByMouth(
-        MeshBuild b, List<RunMouth> mouths, RunGrid grid, int loopCount, int i, int j,
+        MeshBuild b, List<RunMouth> mouths, RunGrid grid, int loopCount, int flareCount, int i, int j,
         Vector3 c0, Vector3 c1, Vector3 c2, Vector3 c3)
     {
         // The underside is never cut into — a mouth only takes the top surface and the outer
@@ -1681,7 +1832,7 @@ public static partial class RiverMeshBuilder
 
         int m    = grid.Columns;
         int i2   = (i + 1) % loopCount;
-        int colA = LoopColumn(i, m), colB = LoopColumn(i2, m);
+        int colA = LoopColumn(i, m, flareCount), colB = LoopColumn(i2, m, flareCount);
 
         foreach (var mouth in mouths)
         {
@@ -1901,7 +2052,12 @@ public static partial class RiverMeshBuilder
             // under it. Stepping it off the row instead makes the water climb a hump crossing
             // the rim. A run with no channel of its own has nothing to hand over to, so there
             // it is stepped off the rows after all.
-            float mainCut = SectionCut(mouth.main, grid.xs[col]);
+            // Read with the run's outer corner square: that corner is where the run falls away to
+            // its outer wall, and across a mouth there is no wall — the branch carries on through.
+            // Left in, a rounded run sank the whole branch, banks and channel, by the corner's
+            // full fall right on its outer edge: a trench across the mouth.
+            float mainCut = SectionCut(mouth.main, grid.xs[col], outerCorner: false);
+            float wall    = SectionCut(mouth.main, grid.xs[col]) - mainCut;
             float v = mouth.main.riverDepth > 0.0001f
                     ? Mathf.Clamp01(mainCut / mouth.main.riverDepth)
                     : (float)(k + 1) / (steps + 1);
@@ -1919,8 +2075,16 @@ public static partial class RiverMeshBuilder
                 // are this run's surface, so they read the branch as square-cornered.
                 float cut = SectionCut(mouth.branch, us[j], outerCorner: false);
 
+                // Where the two outer corners overlap, the branch and the run are two blocks
+                // side by side and the top is whichever stands higher: the branch's own corner
+                // out on the run's edge, easing to the run's as it crosses the rim. The two
+                // sides keep the run's point exactly, so the cut faces beside them still meet.
+                float rise = j == 0 || j == m
+                           ? 0f
+                           : wall - Mathf.Min(wall, SectionCut(mouth.branch, us[j]) - cut);
+
                 Vector3 p = grid.PointAt(RunColumnArc(mouth, grid, col, us[j], mouth.fan[j]), col);
-                pts[j] = new Vector3(p.x, p.y - (1f - v) * cut, p.z);
+                pts[j] = new Vector3(p.x, p.y + rise - (1f - v) * cut, p.z);
             }
             rows.Add(pts);
             rowCol.Add(col);
@@ -1983,7 +2147,20 @@ public static partial class RiverMeshBuilder
 
         // The collar between the branch's open end and the run's rim stands clear of both, so
         // it carries its own sides down — and they are the branch's own sides, dead straight,
-        // from the end of its run to where they meet the run's outer corner.
+        // from the end of its run to where they meet the run's outer corner. A flared branch
+        // carries its whole skirt down them instead, stopped on the run's own outer edge.
+        if (FlareReach(mouth.branch) > 0f)
+        {
+            Vector3 host0 = grid.right[grid.RingAt(NearestArc(grid, rows[1][0]))] * mouth.step;
+            Vector3 hostM = grid.right[grid.RingAt(NearestArc(grid, rows[1][m]))] * mouth.step;
+
+            b.NextLabel = "Outer Flare";
+            BuildCollarSkirt(b, rows[0][0], rows[1][0],  mouth.right, mouth.branch, edge, floorY, host0);
+            BuildCollarSkirt(b, rows[0][m], rows[1][m], -mouth.right, mouth.branch, edge, floorY, hostM);
+            b.NextLabel = null;
+            return;
+        }
+
         MouthWall(b, rows[0][0], rows[1][0], floorY, rows[0][0] - mouth.centre);
         MouthWall(b, rows[0][m], rows[1][m], floorY, rows[0][m] - mouth.centre);
     }
@@ -2105,9 +2282,18 @@ public static partial class RiverMeshBuilder
     public static Mesh BuildPool(
         RiverProfile profile, float poolRadius, float islandRadius, float floorDepth,
         IList<PoolMouth> mouths, float edge)
+        => PoolStone(profile, poolRadius, islandRadius, floorDepth, mouths, edge).ToMesh("RiverPool");
+
+    /// <summary>
+    /// Every face of the pool, laid down but not yet made into a mesh — what
+    /// <see cref="BuildPool"/> draws, and what <see cref="BuildPoolBanks"/> reads the shore off.
+    /// </summary>
+    private static MeshBuild PoolStone(
+        RiverProfile profile, float poolRadius, float islandRadius, float floorDepth,
+        IList<PoolMouth> mouths, float edge)
     {
-        var b = new MeshBuild();
-        if (profile == null) return b.ToMesh("RiverPool");
+        var b = new MeshBuild { NextDesignation = StoneDesignation.RiverRuns };
+        if (profile == null) return b;
 
         poolRadius   = Mathf.Max(poolRadius, 0.01f);
         islandRadius = Mathf.Clamp(islandRadius, 0f, poolRadius - 0.01f);
@@ -2130,7 +2316,7 @@ public static partial class RiverMeshBuilder
                          : Mathf.Min(ladder.holdRadius, poolRadius);
 
         var radii  = BuildPoolRadii(profile, poolRadius, islandRadius, spans, edge, gridRadius, pc);
-        if (radii.Count < 2) return b.ToMesh("RiverPool");
+        if (radii.Count < 2) return b;
 
         // Now the rings are known, each mouth is pulled onto one of them and squared up to its
         // columns — so its inner row of vertices IS that ring's, and its sides ARE column lines.
@@ -2154,7 +2340,11 @@ public static partial class RiverMeshBuilder
         // Top surface — island, channel and rim in one sheet, with the cells a mouth takes
         // left out of it entirely.
         for (int i = 0; i < radii.Count - 1; i++)
-            StitchRings(b, ring[i], ring[i + 1], radii[i], radii[i + 1], spans);
+        {
+            float mid = (radii[i] + radii[i + 1]) * 0.5f;
+            b.NextLabel = mid < islandRadius ? "Island" : mid < poolRadius ? "Pool" : "Rim";
+                StitchRings(b, ring[i], ring[i + 1], radii[i], radii[i + 1], spans);
+        }
 
         // The middle, filled with a grid off the innermost ring. It used to be closed by fanning
         // that ring across itself, which kept the faces off the very centre but still ran every
@@ -2162,7 +2352,8 @@ public static partial class RiverMeshBuilder
         // sitting off to one side of the calmest part of the pool. The grid has no such corner:
         // its cells are square-ish right across the middle, and the ring it is filled to is left
         // exactly where it was, so the rings outside still meet it vertex for vertex.
-        PoolMiddle(b, ring[0], spans, islandRadius, poolRadius, floorDepth, pc);
+        b.NextLabel = islandRadius > 0f ? "Island" : "Pool";
+        PoolMiddle(b, ring[0], radii[0], spans, islandRadius, poolRadius, floorDepth, pc);
 
         // Outer wall, and the underside it stands on. The wall breaks across a mouth — the
         // patch carries its own sides down through that gap. With its outer walls off, a pool
@@ -2174,6 +2365,11 @@ public static partial class RiverMeshBuilder
 
         Vector3 hub = new Vector3(0f, floorY, 0f);
 
+        // A flared pool's skirt runs out past the rim's edge, and the wall and the underside
+        // with it.
+        var   flare = pc.wallsOff ? new List<Vector2>() : FlarePoints(pc.rim, edge);
+        float foot  = outer + (flare.Count > 0 ? pc.rim.flare : 0f);
+
         for (int j = 0; j < na; j++)
         {
             int j2 = (j + 1) % na;
@@ -2181,15 +2377,27 @@ public static partial class RiverMeshBuilder
             Vector3 bot  = new Vector3(top.x,  floorY, top.z);
             Vector3 bot2 = new Vector3(top2.x, floorY, top2.z);
 
-            if (!pc.wallsOff && !InAnyMouth(spans, below, outer, TwoPi * (j + 0.5f) / na))
+            if (flare.Count > 0)
+            {
+                bot  = PoolDirection(TwoPi * j  / na) * foot + Vector3.up * floorY;
+                bot2 = PoolDirection(TwoPi * j2 / na) * foot + Vector3.up * floorY;
+
+                if (!InAnyMouth(spans, below, outer, TwoPi * (j + 0.5f) / na))
+                    BuildPoolSkirt(b, top, TwoPi * j / na, top2, TwoPi * j2 / na, flare, outer, floorY);
+            }
+
+            b.NextLabel = "Outer Wall";
+            if (flare.Count == 0 && !pc.wallsOff && !InAnyMouth(spans, below, outer, TwoPi * (j + 0.5f) / na))
                 b.Quad(top, bot, bot2, top2);
 
             // The flat the wall stands on stays a fan. It is the one hub left in the piece and
             // it is deliberate: nobody ever looks at the bottom of a pool, and a grid laid off a
             // ring this wide would cost a hundred times the faces this does.
+            b.NextLabel = "Underside";
             b.Tri(hub, bot2, bot);
         }
 
+        b.NextLabel = null;
         foreach (var span in spans)
             BuildMouthPatch(b, span, poolRadius, islandRadius, floorDepth,
                             outer, radii, profile.depth, edge, pc);
@@ -2204,7 +2412,13 @@ public static partial class RiverMeshBuilder
 
         b.ShadeSeams(null, groove);
 
-        return b.ToMesh("RiverPool");
+        // A rounded rim rolls off its flat into each corner without a crease, as a natural run's
+        // does — so there is no lip edge to find. Asked anyway, the test put a hard line wherever
+        // a face tipped past level: round every ring of every corner, and in zigzags across the
+        // mouths, which the lighting drew as bands and jagged steps.
+        b.RoundedRim = pc.Any;
+
+        return b;
     }
 
 
@@ -2219,9 +2433,33 @@ public static partial class RiverMeshBuilder
     /// height the ring already had, exactly, which is why the border does not move.
     /// </summary>
     private static void PoolMiddle(
-        MeshBuild b, Vector3[] ring, List<MouthSpan> spans,
+        MeshBuild b, Vector3[] ring, float radius, List<MouthSpan> spans,
         float islandRadius, float poolRadius, float floorDepth, PoolCorners pc)
     {
+        // The ring handed in carries every column the mouths need, and a grid laid straight off
+        // it is that fine right across the middle — over a thousand cells on a floor that is all
+        // but flat. Nothing reaches in here, so each ring in from it halves its columns, until a
+        // grid inside the last is a handful of cells.
+        while (ring.Length >= 2 * MinMiddleColumns)
+        {
+            int next = ring.Length / 2;
+            if ((next & 1) != 0) next++;                 // the grid needs an even count
+            if (next < MinMiddleColumns) break;
+
+            // Stepped in about as far as one of its own cells is wide, so the band between is
+            // square-ish rather than a strip of slivers.
+            float r = radius / (1f + TwoPi / next);
+            float y = -PoolFloor(r, islandRadius, poolRadius, floorDepth, pc);
+
+            var inner = new Vector3[next];
+            for (int j = 0; j < next; j++)
+                inner[j] = PoolDirection(TwoPi * j / next) * r + Vector3.up * y;
+
+            ZipRings(b, inner, ring);
+            ring   = inner;
+            radius = r;
+        }
+
         // Turned so the grid's corners fall between the rivers, exactly as the water's is. The
         // rings outside carry the mouths in, so the lines the grid runs back from them want to
         // be the straight middle of a side rather than the shear of a corner.
@@ -2263,6 +2501,35 @@ public static partial class RiverMeshBuilder
             }
 
         EmitGrid(b, grid);
+    }
+
+    // Fewest columns the middle of a pool steps down to before it is filled with a grid.
+    private const int MinMiddleColumns = 8;
+
+    // Stitches a ring to the one outside it when the two carry any number of columns, both
+    // starting at heading 0: whichever ring has the nearer point next takes the triangle. The
+    // headings are compared as whole numbers, so two points on the same heading always agree.
+    private static void ZipRings(MeshBuild b, Vector3[] inner, Vector3[] outer)
+    {
+        int ni = inner.Length, no = outer.Length;
+        if (ni < 3 || no < 3) return;
+
+        int i = 0, o = 0;
+        while (i < ni || o < no)
+        {
+            bool takeOuter = i >= ni || (o < no && (long)(o + 1) * ni <= (long)(i + 1) * no);
+
+            if (takeOuter)
+            {
+                b.Tri(inner[i % ni], outer[o % no], outer[(o + 1) % no]);
+                o++;
+            }
+            else
+            {
+                b.Tri(inner[i % ni], outer[o % no], inner[(i + 1) % ni]);
+                i++;
+            }
+        }
     }
 
     /// <summary>
@@ -2318,7 +2585,28 @@ public static partial class RiverMeshBuilder
 
         float halfInner = branch.innerWidth * 0.5f;
         float reach     = Mathf.Max(0.0001f, outer - span.innerRadius);
-        float poolIn    = PoolFloor(span.innerRadius, islandRadius, poolRadius, floorDepth, pc);
+
+        // The pool as if its rim's outer corner were square. That corner is where the pool falls
+        // away to its outer wall, and across a mouth there is no wall: the river carries straight
+        // on through it. Left in, a rounded pool dropped the whole river — banks, channel and all
+        // — by the corner's full fall right on the pool's outer edge, a trough across the mouth
+        // that only climbed back out on the flat of the rim.
+        var   square = pc;
+        square.rim.outerX = 0f;
+
+        float poolIn    = PoolFloor(span.innerRadius, islandRadius, poolRadius, floorDepth, square);
+
+        // A rounded rim's inner corner, the river's and the pool's alike, falls to a foot and the
+        // channel hangs below it. Where a bank crosses the pool's rim the two corners are one
+        // rim turning a corner, so each point takes the DEEPER of the two falls rather than both
+        // added — which puts a mitre straight from where the channel meets the bowl out to where
+        // the two outer walls meet, and stops the river's bank carrying on across the pool's rim.
+        // Only what hangs below the feet is blended, exactly as the whole depth used to be. A
+        // flat rim has no corners, so both feet are nothing and this is the old patch exactly.
+        float poolFoot  = pc.rim.innerY;
+        float riverFoot = CornersOf(branch).innerY;
+        float bowlIn    = poolIn - Mathf.Min(poolIn, poolFoot);
+        bool  rounded   = pc.Any || CornersOf(branch).Any;
 
         // Rows outermost first: the run's own last ring, then every pool ring the mouth
         // crosses. A row's radius is -1 for the run's own ring, which is not on a circle.
@@ -2352,10 +2640,17 @@ public static partial class RiverMeshBuilder
             // Measured against the bowl at the ring the mouth reaches in to, so the handover
             // is complete exactly there and the patch still lands on the pool's own floor
             // without a step — which is the one thing the radius ramp did get right.
-            float pool = PoolFloor(r, islandRadius, poolRadius, floorDepth, pc);
-            float v    = poolIn > 0.0001f
-                       ? Mathf.Clamp01(pool / poolIn)
-                       : Mathf.Clamp01((outer - r) / reach);
+            float pool     = PoolFloor(r, islandRadius, poolRadius, floorDepth, square);
+            float wall     = PoolFloor(r, islandRadius, poolRadius, floorDepth, pc) - pool;
+            float poolRim  = Mathf.Min(pool, poolFoot);
+            float poolBowl = pool - poolRim;
+
+            // Off the bowl alone, so the river holds its whole section across the rim — the
+            // rim's own rounding is not bowl, and fading the channel over it stood a bar of stone
+            // across the mouth right where the rim ends.
+            float v        = bowlIn > 0.0001f
+                           ? Mathf.Clamp01(poolBowl / bowlIn)
+                           : Mathf.Clamp01((outer - r) / reach);
 
             var pts = new Vector3[m + 1];
 
@@ -2368,7 +2663,25 @@ public static partial class RiverMeshBuilder
                 // Over the pool's own rim the sides are the pool's surface, so a rounded river's
                 // outer corner is left out on its last ring, as at a junction.
                 float cut = SectionCut(branch, xs[j], outerCorner: false);
-                float y   = -(pool + (1f - v) * cut);
+
+                // Where the two outer corners overlap, the river and the pool are two blocks
+                // side by side and the top is whichever stands higher: the river's own corner
+                // out at the pool's edge, so the collar is the run swept straight on, easing to
+                // the pool's as the river crosses its rim. The two sides are the pool's, exactly,
+                // so the shoulders beside them still meet them.
+                float fall = j == 0 || j == m
+                           ? wall
+                           : Mathf.Min(wall, SectionCut(branch, xs[j]) - cut);
+
+                // The two inner corners mitred, the bowl, the outer corners, and the river's
+                // channel below its foot fading out as the bowl takes over. The river's corner
+                // fades too, so a pool whose foot sits higher than the river's is still met on
+                // its own floor at the ring the mouth reaches in to.
+                float riverRim = Mathf.Min(cut, riverFoot);
+                float channel  = cut - riverRim;
+
+                float y   = -(Mathf.Max(poolRim, (1f - v) * riverRim) + poolBowl + fall
+                            + (1f - v) * channel);
                 float fan = Mathf.Lerp(span.FanStart, span.FanEnd, (float)j / m);
 
                 pts[j] = PoolDirection(MouthColumnAngle(span, xs[j], fan, r)) * r
@@ -2398,8 +2711,27 @@ public static partial class RiverMeshBuilder
             {
                 Vector3 p = rows[k][j],         q = rows[k][j + 1];
                 Vector3 s = rows[k + 1][j + 1], t = rows[k + 1][j];
-                if (flip) b.Quad(q, p, t, s);
-                else      b.Quad(p, q, s, t);
+
+                // A rounded bank turns into the pool's rim along its mitre, and the pool steps
+                // its corners exactly as the river steps its own, so that line runs from corner to
+                // corner of these cells: down p to s on the bank at +x, q to t on the one at -x.
+                // Split across it instead, a cell folds the wrong way over the crease and stands a
+                // triangle proud of it.
+                if (!rounded)
+                {
+                    if (flip) b.Quad(q, p, t, s);
+                    else      b.Quad(p, q, s, t);
+                }
+                else if (xs[j] + xs[j + 1] >= 0f)
+                {
+                    if (flip) b.Quad(p, t, s, q);
+                    else      b.Quad(p, q, s, t);
+                }
+                else
+                {
+                    if (flip) b.Quad(q, p, t, s);
+                    else      b.Quad(q, s, t, p);
+                }
             }
 
             if (!collar)
@@ -2434,7 +2766,15 @@ public static partial class RiverMeshBuilder
         // carries its own sides down — and they are the run's own sides, dead straight, from
         // the end of the run to the point where they meet the rim's outer corner. A run with its
         // outer walls off has none to carry on.
-        if (!branch.wallsOff)
+        // A flared river carries its whole skirt down them instead, stopped on the pool's edge.
+        if (FlareReach(branch) > 0f)
+        {
+            b.NextLabel = "Outer Flare";
+            BuildCollarSkirt(b, rows[0][0], rows[1][0],  span.right, branch, edge, floorY, rows[1][0]);
+            BuildCollarSkirt(b, rows[0][m], rows[1][m], -span.right, branch, edge, floorY, rows[1][m]);
+            b.NextLabel = null;
+        }
+        else if (!branch.wallsOff)
         {
             MouthWall(b, rows[0][0], rows[1][0], floorY, rows[0][0] - span.mouth.centre);
             MouthWall(b, rows[0][m], rows[1][m], floorY, rows[0][m] - span.mouth.centre);
@@ -2448,8 +2788,37 @@ public static partial class RiverMeshBuilder
         MouthCells(span, rowR[1], rowR[2], out float w0, out float wM);
         MouthSides(span, rowR[1], out float s0, out float sM);
 
+        // A flared pool carries its skirt on round the shoulder instead, and closes it where it
+        // stops at the mouth's side.
+        if (pc.rim.flare > 0f)
+        {
+            var flare = FlarePoints(pc.rim, edge);
+            ShoulderSkirt(b, span, rowR[1], s0, w0, flare, floorY, islandRadius, poolRadius, floorDepth, pc);
+            ShoulderSkirt(b, span, rowR[1], sM, wM, flare, floorY, islandRadius, poolRadius, floorDepth, pc);
+            b.NextLabel = null;
+            return;
+        }
+
         ShoulderWall(b, span, rowR[1], s0, w0, floorY, islandRadius, poolRadius, floorDepth, pc);
         ShoulderWall(b, span, rowR[1], sM, wM, floorY, islandRadius, poolRadius, floorDepth, pc);
+    }
+
+    // The pool's skirt along a shoulder's own arc, broken at the same cell lines, and closed at
+    // the mouth's side where it stops.
+    private static void ShoulderSkirt(
+        MeshBuild b, MouthSpan span, float r, float side, float boundary, List<Vector2> flare,
+        float floorY, float islandRadius, float poolRadius, float floorDepth, PoolCorners pc)
+    {
+        var angles = ShoulderAngles(side, boundary, span.step);
+        for (int i = 0; i < angles.Count - 1; i++)
+        {
+            Vector3 p = ShoulderPoint(r, angles[i],     islandRadius, poolRadius, floorDepth, pc);
+            Vector3 q = ShoulderPoint(r, angles[i + 1], islandRadius, poolRadius, floorDepth, pc);
+            BuildPoolSkirt(b, p, angles[i], q, angles[i + 1], flare, r, floorY);
+        }
+
+        Vector3 end = ShoulderPoint(r, side, islandRadius, poolRadius, floorDepth, pc);
+        BuildPoolSkirtEnd(b, end, side, span.midAngle, flare, r, floorY);
     }
 
     /// <summary>
@@ -2886,7 +3255,7 @@ public static partial class RiverMeshBuilder
     public static Mesh BuildPoolWater(
         RiverProfile profile, float waterLevel,
         float poolRadius, float islandRadius, float edge,
-        IList<PoolMouth> mouths = null, float floorDepth = 0f, float overlap = 0f)
+        IList<PoolMouth> mouths = null, float floorDepth = 0f)
     {
         var b = new MeshBuild();
         if (profile == null) return b.ToMesh("RiverPoolWater");
@@ -2894,12 +3263,10 @@ public static partial class RiverMeshBuilder
         poolRadius   = Mathf.Max(poolRadius, 0.01f);
         islandRadius = Mathf.Clamp(islandRadius, 0f, poolRadius - 0.01f);
         edge         = Mathf.Max(edge, 0.005f);
-        overlap      = Mathf.Max(overlap, 0f);
         if (floorDepth <= 0f) floorDepth = profile.riverDepth;
 
-        // Every river that meets this pool, each carrying the two lines its strip runs between:
-        // where the river's own water really ends, and how far past that the pool's water is
-        // drawn over it before fading out.
+        // Every river that meets this pool, each carrying the line its strip runs out to: where
+        // the river's own water really ends.
         bool island = islandRadius > 0f;
 
         // Where the bowl comes up through the water, out at the wall and in at the island, and
@@ -2911,7 +3278,7 @@ public static partial class RiverMeshBuilder
                        out float waterRadius, out float waterInner);
 
         var flats = WaterFlats(profile, poolRadius, islandRadius, floorDepth, waterLevel,
-                               mouths, edge, overlap);
+                               mouths, edge);
 
         var angles = PoolWaterAngles(waterRadius, flats, edge);
         if (angles.Count < 3) return b.ToMesh("RiverPoolWater");
@@ -2919,11 +3286,11 @@ public static partial class RiverMeshBuilder
         float y = -waterLevel;
 
         // A pool's rings are drawn in world space from the pool's own centre. What its surface
-        // carries is the SAME on every vertex — the two waterline radii, for Pool Reach, the
-        // circle its strips set off from, for Pool Mouth Fade, and the lap's length, for the fade
-        // distance — so nothing can change along a face edge.
+        // carries is the SAME on every vertex — the two waterline radii, for Pool Reach, and the
+        // circle its strips set off from — so nothing can change along a face edge. Where its
+        // mouths open the shore is not baked at all: see PoolWaterMouths.
         System.Func<Vector3, bool, Vector4> edges = (flat, open)
-            => new Vector4(outerShore, innerShore, waterRadius, overlap);
+            => new Vector4(outerShore, innerShore, waterRadius, 0f);
 
         int n = angles.Count;
 
@@ -2940,9 +3307,6 @@ public static partial class RiverMeshBuilder
         var owner = WaterOwners(angles, flats, waterRadius);
 
         // ── The sheet inside the circle ──────────────────────────────────────
-        // It carries UV3 too, so Pool Mouth Reach Overlap can start a river's reach inside the circle:
-        // each corner takes the river it faces. See SheetBank.
-        b.BankAt = corner => SheetBank(corner, flats, waterLevel, edge);
         if (island) PoolWaterRings(b, angles, waterRadius, waterInner, edge, y, edges);
         else        PoolWaterGrid (b, rim, GridTurn(angles, RiverHeadings(flats, waterRadius)),
                                   y, edges);
@@ -2964,73 +3328,85 @@ public static partial class RiverMeshBuilder
             Vector4 fo1 = PoolFlowData(o1, 1f);
             Vector4 fo2 = PoolFlowData(o2, 1f);
 
-            // UV3: the river this strip runs down — metres to its waterline either side, read off
-            // the corner's offset across it, against the same shore the river's own water measures
-            // from. Straight lines across a flat face, so it interpolates exactly. Only the strip
-            // and its lap carry it; the sheet inside the circle has none.
-            float riverShore = WaterHalfWidth(f.section, waterLevel);
-            float centreline = Vector3.Dot(f.end, f.across);
-            b.BankAt = corner =>
-            {
-                float off = Vector3.Dot(corner, f.across) - centreline;
-                return new Vector4(riverShore + off, riverShore - off, 1f, 0f);
-            };
-
             // The two rim corners a strip sets off from are open water as well: there is no wall
             // across a mouth for the ripples to end on, so they carry on out into the river.
             b.Quad(rim[j] + Vector3.up * y, o1 + Vector3.up * y,
                    o2     + Vector3.up * y, rim[k] + Vector3.up * y,
                    edges(rim[j], true), eo1, eo2, edges(rim[k], true),
                    PoolFlowData(rim[j], 1f), fo1, fo2, PoolFlowData(rim[k], 1f));
-
-            // The lap: the same water carried on up the river, over the river's own, running out
-            // to nothing at the far lip. With no overlap authored the two lines are one line and
-            // this face is collapsed, which the builder drops.
-            if (f.lipDistance <= f.distance + 0.0001f) continue;
-
-            Vector3 l1 = CarryDownRiver(rim[j], f, f.lipDistance);
-            Vector3 l2 = CarryDownRiver(rim[k], f, f.lipDistance);
-
-            b.Quad(o1 + Vector3.up * y, l1 + Vector3.up * y,
-                   l2 + Vector3.up * y, o2 + Vector3.up * y,
-                   eo1, edges(l1, true), edges(l2, true), eo2,
-                   fo1, PoolFlowData(l1, 0f), PoolFlowData(l2, 0f), fo2);
         }
-
-        b.BankAt = null;
 
         return b.ToMesh("RiverPoolWater");
     }
 
     /// <summary>
-    /// UV3 for a corner of the pool's own sheet: the river whose heading it lies nearest, and
-    /// its metres to that river's waterline either side, exactly as a strip carries them — so
-    /// the two agree along the circle they meet on. .z is 1 only between that river's banks
-    /// (give or take <paramref name="margin"/>), 0 anywhere else, and the shader weights the
-    /// river's reach by it. That keeps a face lying between two rivers — whose corners read two
-    /// different rivers, and whose distances mean nothing interpolated — out of it entirely.
-    /// Past a river's banks its reach is full anyway, so where .z steps off nothing shows.
+    /// One river opening a pool's shore, as the water's lines see it — pool-local and flat.
+    ///
+    /// The shore the lines are drawn from is the one really seen: the pool's waterline circle
+    /// with a gap where the river comes in, and the river's own two waterlines running out from
+    /// the two corners of that gap. Measured from that, a pool's rings bend round each corner and
+    /// carry on down the river as its bank lines, rather than running straight across the mouth.
     /// </summary>
-    private static Vector4 SheetBank(Vector3 corner, List<WaterFlat> flats, float waterLevel, float margin)
+    public struct PoolWaterMouth
     {
-        corner.y = 0f;
-        if (flats.Count == 0 || corner.sqrMagnitude < 1e-8f) return Vector4.zero;
+        /// <summary>Flat and unit, pointing back out along the river.</summary>
+        public Vector3 dir;
 
-        Vector3 heading = corner.normalized;
-        int     best    = -1;
-        float   nearest = 0f;
-        for (int i = 0; i < flats.Count; i++)
+        /// <summary>Where each of the river's waterlines meets the pool's outer waterline.</summary>
+        public Vector3 cornerA, cornerB;
+
+        /// <summary>How far out along <see cref="dir"/> the river's own water starts — the end of
+        /// the pool's strip, where the two waters butt.</summary>
+        public float butt;
+
+        /// <summary>Half the width of the river's water: its waterline either side.</summary>
+        public float shore;
+    }
+
+    /// <summary>
+    /// The mouths <see cref="BuildPoolWater"/> opens, given the same numbers, with the pool's
+    /// outer waterline radius. Worked off the very lines the strips are built on, so the corners
+    /// and the butt line are where the water really turns and ends. A river whose waterlines never
+    /// cross the pool's — wider than the pool it arrives at — is left out.
+    /// </summary>
+    public static List<PoolWaterMouth> PoolWaterMouths(
+        RiverProfile profile, float waterLevel,
+        float poolRadius, float islandRadius, float edge,
+        IList<PoolMouth> mouths, float floorDepth, out float outerShore)
+    {
+        var result = new List<PoolWaterMouth>();
+        outerShore = 0f;
+        if (profile == null) return result;
+
+        poolRadius   = Mathf.Max(poolRadius, 0.01f);
+        islandRadius = Mathf.Clamp(islandRadius, 0f, poolRadius - 0.01f);
+        edge         = Mathf.Max(edge, 0.005f);
+        if (floorDepth <= 0f) floorDepth = profile.riverDepth;
+
+        PoolWaterEdges(profile, poolRadius, islandRadius, floorDepth, waterLevel,
+                       out outerShore, out _, out _, out _);
+
+        float r = outerShore;
+        foreach (var f in WaterFlats(profile, poolRadius, islandRadius, floorDepth, waterLevel,
+                                     mouths, edge))
         {
-            float d = Vector3.Dot(heading, flats[i].dir);
-            if (d > nearest) { nearest = d; best = i; }
-        }
-        if (best < 0) return Vector4.zero;
+            float shore  = WaterHalfWidth(f.section, waterLevel);
+            float centre = Vector3.Dot(f.end, f.across);
+            float a      = centre - shore;
+            float c      = centre + shore;
+            if (shore <= 0f || Mathf.Abs(a) >= r || Mathf.Abs(c) >= r) continue;
 
-        var   f     = flats[best];
-        float shore = WaterHalfWidth(f.section, waterLevel);
-        float off   = Vector3.Dot(corner, f.across) - Vector3.Dot(f.end, f.across);
-        float held  = Mathf.Abs(off) <= shore + margin ? 1f : 0f;
-        return new Vector4(shore + off, shore - off, held, 0f);
+            result.Add(new PoolWaterMouth
+            {
+                dir     = f.dir,
+                cornerA = f.across * a + f.dir * Mathf.Sqrt(r * r - a * a),
+                cornerB = f.across * c + f.dir * Mathf.Sqrt(r * r - c * c),
+                butt    = f.distance,
+                shore   = shore,
+            });
+        }
+
+        return result;
     }
 
     /// <summary>
@@ -3291,16 +3667,12 @@ public static partial class RiverMeshBuilder
     /// </summary>
     private static List<WaterFlat> WaterFlats(
         RiverProfile profile, float poolRadius, float islandRadius, float floorDepth,
-        float waterLevel, IList<PoolMouth> mouths, float edge, float overlap = 0f)
+        float waterLevel, IList<PoolMouth> mouths, float edge)
     {
         var flats = new List<WaterFlat>();
         if (mouths == null) return flats;
 
-        // The reach is measured back INWARD from where the arriving run stopped. The overlap then
-        // carries the pool's water on up the river from there, over the river's own — so it is
-        // the same line moved further out, and both are held on one record rather than the whole
-        // list being worked out twice. Two lists could not be told apart river by river anyway:
-        // the guard below can drop a river from one and keep it in the other.
+        // The reach is measured back INWARD from where the arriving run stopped.
         float reach = Mathf.Max(0f, PoolWaterReach(profile, poolRadius, islandRadius, floorDepth,
                                                    waterLevel, edge));
 
@@ -3329,7 +3701,6 @@ public static partial class RiverMeshBuilder
                 across      = Vector3.Cross(Vector3.up, dir).normalized,
                 end         = end,
                 distance    = d,
-                lipDistance = d + Mathf.Max(overlap, 0f),
                 halfWidth   = WaterRibbonHalfWidth(section, waterLevel),
                 section     = section,
             });
@@ -3500,11 +3871,6 @@ public static partial class RiverMeshBuilder
 
         /// <summary>How far out along <see cref="dir"/> the line lies.</summary>
         public float   distance;
-
-        /// <summary>The same line carried on up the river by the overlap — how far the pool's
-        /// water is drawn OVER the river's own before it fades out. Equal to
-        /// <see cref="distance"/> when nothing is lapped.</summary>
-        public float   lipDistance;
 
         /// <summary>How far the arriving river's water reaches either side of its centreline,
         /// which is exactly what its ribbon spans: half its inner width, or wider where a rounded
@@ -3683,7 +4049,7 @@ public static partial class RiverMeshBuilder
 
             float fromOuter = Mathf.Max(0f, pc.outer - r);
             if (c.outerX > 0f && fromOuter < c.outerX)
-                return CornerFall(c.outerX - fromOuter, c.outerX, c.outerY);
+                return CornerFall(c.outerX - fromOuter, c.outerX + c.flare, c.outerY);
 
             return 0f;
         }
@@ -3739,7 +4105,21 @@ public static partial class RiverMeshBuilder
         }
 
         Corner(poolRadius + c.innerX, c.innerX, c.innerY, -1f);
-        Corner(pc.outer - c.outerX,   c.outerX, c.outerY,  1f);
+
+        if (c.flare <= 0f)
+            Corner(pc.outer - c.outerX, c.outerX, c.outerY, 1f);
+        else if (c.outerX > 0f)
+        {
+            // Stretched by a flare: only the part of the longer curve on the rim, stepped by angle
+            // from where it starts to turn out to the rim's edge. The rest is the skirt's.
+            float flat  = pc.outer - c.outerX;
+            float rx    = c.outerX + c.flare;
+            float edgeA = OuterEdgeAngle(c);
+            int   n     = OuterCornerSteps(c, edge);
+            for (int i = 0; i <= n; i++)
+                steps.Add(i == n ? pc.outer : flat + rx * Mathf.Sin(edgeA * i / n));
+            corners.Add(new Vector2(flat, pc.outer));
+        }
         if (islandRadius > 0f) Corner(islandRadius - pc.islandX, pc.islandX, c.innerY, 1f);
 
         const float eps = 1e-5f;
@@ -3823,26 +4203,46 @@ public static partial class RiverMeshBuilder
     /// and lets the caller leave some of them undrawn — see <see cref="StoneSeamLines"/>.</param>
     /// <param name="surfaces">When given, filled with which surface each face of the finished
     /// mesh belongs to and that surface's width — see <see cref="StoneSurfaces"/>.</param>
+    /// <param name="designation">Which Designation in the Run Shading Tuner the piece is, so its
+    /// faces take that Designation's Scale.</param>
+    /// <param name="faceDesignations">When given, one entry per source triangle, winning over
+    /// <paramref name="designation"/> — for a piece carrying another, like an outpost's tower.</param>
+    /// <param name="faceLabels">When given, one entry per source triangle: the designer overlay's
+    /// name for the bit it is part of. Left out, the names come from <see cref="PartLabels.Mark"/>.</param>
+    /// <param name="rimHeights">When given, the rim top is read off the nearest of these points,
+    /// seen from above, instead of <paramref name="rimTopY"/> — for a piece standing over a river that
+    /// climbs or falls under it, such as an arena archway.</param>
     public static Mesh ShadeAsStone(Mesh source, float rimTopY = 0f, float? lipY = null,
                                     IList<float> faceKinds = null, IList<int> faceParts = null,
-                                    StoneSeamLines seamLines = null, StoneSurfaces surfaces = null)
+                                    StoneSeamLines seamLines = null, StoneSurfaces surfaces = null,
+                                    StoneDesignation designation = StoneDesignation.None,
+                                    IList<StoneDesignation> faceDesignations = null,
+                                    IList<string> faceLabels = null,
+                                    IList<Vector3> rimHeights = null)
     {
         var b = new MeshBuild { SeamLines = seamLines, SurfaceInfo = surfaces };
         if (source == null) return b.ToMesh("Stone");
 
         var verts = source.vertices;
         var tris  = source.triangles;
+        faceLabels ??= PartLabels.FaceLabels(verts, tris);
         for (int i = 0; i + 2 < tris.Length; i += 3)
         {
             int face = i / 3;
             b.NextKind = faceKinds != null && face < faceKinds.Count ? faceKinds[face] : 0f;
             b.NextPart = faceParts != null && face < faceParts.Count ? faceParts[face] : 0;
+            b.NextDesignation = faceDesignations != null && face < faceDesignations.Count
+                              ? faceDesignations[face] : designation;
+            b.NextLabel = faceLabels != null && face < faceLabels.Count ? faceLabels[face] : null;
             b.Tri(verts[tris[i]], verts[tris[i + 1]], verts[tris[i + 2]]);
         }
         b.NextKind = 0f;
         b.NextPart = 0;
+        b.NextLabel = null;
+        b.NextDesignation = StoneDesignation.None;
 
         b.ShadeSeams(rimTopY, lipY);
+        b.RimHeights = rimHeights;
         var mesh = b.ToMesh(source.name);
         Object.DestroyImmediate(source);
         return mesh;
@@ -3906,15 +4306,9 @@ public static partial class RiverMeshBuilder
         private readonly List<Vector2> _uvs   = new List<Vector2>();
         private readonly List<Vector4> _edges = new List<Vector4>();
         private readonly List<Vector4> _flows = new List<Vector4>();
-        private readonly List<Vector4> _banks = new List<Vector4>();
         private readonly List<int>     _tris  = new List<int>();
         private bool                   _hasEdges;
         private bool                   _hasFlows;
-        private bool                   _hasBanks;
-
-        // What UV3 carries at a corner, read off where the corner lies, while this is set — a
-        // pool's strips hand it the river they run down. Everything else gets zeroes.
-        public System.Func<Vector3, Vector4> BankAt;
 
         // Set when the piece is stone the run shader draws its seam and waterline shading on.
         // Water never asks for it — it has its own use for UV1 — so the two never collide.
@@ -3930,10 +4324,19 @@ public static partial class RiverMeshBuilder
         // another origin, such as an arena wall standing on the water surface.
         private float            _rimTopY;
 
+        // Rim-top points to read that height off instead, nearest seen from above, for a piece
+        // over a river that climbs or falls under it. Only the height is read — the piece is
+        // shaded otherwise as one with a flat rim top.
+        public IList<Vector3>    RimHeights;
+
         // The height of the flat lip for a piece whose lip is NOT its rim top — an outpost's lip
         // is the top of its wall, standing well above the river it is beside. Null leaves the
         // face kinds read off the rim top as a run's are.
         private float?           _lipY;
+
+        // Set on a pool whose rim is rounded: its top has no flat lip ending at a corner, so the
+        // end-of-the-lip test is not asked of it — see Topology.
+        public bool              RoundedRim;
 
         // A river piece — a run, a pool, a rim node or a walkway — rather than some other piece
         // shaded as stone. Its worked-out faces are the run's outer, rim and inner, which take
@@ -3951,6 +4354,17 @@ public static partial class RiverMeshBuilder
         private readonly List<int>   _parts = new List<int>();
         public int                   NextPart;
 
+        // Which Designation in the Run Shading Tuner each face actually added was built as — baked
+        // beside the face mark so the shader can find that Designation's Scale. NextDesignation is
+        // what the next face added carries; a walkway mesh changes it as it moves on to bridges.
+        private readonly List<StoneDesignation> _designations = new List<StoneDesignation>();
+        public StoneDesignation                 NextDesignation;
+
+        // The designer overlay's name for the bit each face actually added belongs to — see
+        // PartLabels. NextLabel is what the next face added carries; null names it nothing.
+        private readonly List<string> _labels = new List<string>();
+        public string                 NextLabel;
+
         public void Tri(Vector3 a, Vector3 b, Vector3 c)
             => Tri(a, b, c,
                    Vector4.zero, Vector4.zero, Vector4.zero,
@@ -3967,8 +4381,8 @@ public static partial class RiverMeshBuilder
 
         /// <summary>
         /// A face carrying both what its corners know about their edges and the frame the water
-        /// is drawn in — which way is along, which way is across, how much of an overlap it lies
-        /// under, and whether it is a river or a pool.
+        /// is drawn in — which way is along, which way is across, and whether it is a river or a
+        /// pool.
         /// </summary>
         public void Tri(Vector3 a, Vector3 b, Vector3 c,
                         Vector4 ea, Vector4 eb, Vector4 ec,
@@ -3990,18 +4404,11 @@ public static partial class RiverMeshBuilder
             _uvs.Add(PlanarUV(a, n)); _uvs.Add(PlanarUV(b, n)); _uvs.Add(PlanarUV(c, n));
             _edges.Add(ea); _edges.Add(eb); _edges.Add(ec);
             _flows.Add(fa); _flows.Add(fb); _flows.Add(fc);
-            if (BankAt != null)
-            {
-                _banks.Add(BankAt(a)); _banks.Add(BankAt(b)); _banks.Add(BankAt(c));
-                _hasBanks = true;
-            }
-            else
-            {
-                _banks.Add(Vector4.zero); _banks.Add(Vector4.zero); _banks.Add(Vector4.zero);
-            }
             _tris.Add(i0); _tris.Add(i0 + 1); _tris.Add(i0 + 2);
             _fixedKinds.Add(NextKind);
             _parts.Add(NextPart);
+            _designations.Add(NextDesignation);
+            _labels.Add(NextLabel);
 
             _hasEdges |= carriesEdges;
             _hasFlows |= carriesFlows;
@@ -4065,6 +4472,153 @@ public static partial class RiverMeshBuilder
         {
             Tri(a, b, c, ea, eb, ec, fa, fb, fc);
             Tri(a, c, d, ea, ec, ed, fa, fc, fd);
+        }
+
+        /// <summary>One piece of shore: where a face crosses the water, flat at y = 0, and which
+        /// way the water lies from it.</summary>
+        public struct ShorePiece
+        {
+            public Vector3 a, c, water;
+        }
+
+        // Faces that cross the water's height but never hold any water: they stand outside the
+        // piece, or under it.
+        private static bool UnderGround(string label) =>
+            label == "Outer Wall" || label == "Underside" || label == "Outer Flare";
+
+        // Corners closer than this are the same corner, as far as the water spreading is
+        // concerned. Far below anything a boat could pass through.
+        private const float ShoreMatch = 1e-3f;
+
+        private static Vector3Int ShoreCell(Vector3 p) => new Vector3Int(
+            Mathf.FloorToInt(p.x / ShoreMatch), Mathf.FloorToInt(p.y / ShoreMatch),
+            Mathf.FloorToInt(p.z / ShoreMatch));
+
+        // How far a face has to look up before the water can lie against it. A wall standing
+        // straight up — a mouth's side carried down through the gap it opens — looks level.
+        private const float ShoreFacesUp = 1e-3f;
+
+        /// <summary>
+        /// Where the faces built so far cross the height <paramref name="y"/>, as the water
+        /// standing there meets them — piece by piece, one per face that crosses it.
+        ///
+        /// Only the shore the water can actually reach counts. The water is found from
+        /// <paramref name="waterAt"/>, somewhere it is known to lie, and spread from there across
+        /// the faces under it, corner by corner under the surface. A rim rounded off on its
+        /// outside dips under the water's height too, out under the ground; between it and the
+        /// pool stands the dry rim top, so the water never reaches it and it is left out.
+        ///
+        /// A crossing on an edge two faces share is worked from the edge's lower end in both,
+        /// so the two pieces meeting there meet exactly, with no crack for a boat to find.
+        /// </summary>
+        public List<ShorePiece> Shoreline(float y, Vector3 waterAt)
+        {
+            var shore = new List<ShorePiece>();
+            int faces = _tris.Count / 3;
+
+            // Faces the water could lie against: looking up, not underground, and dipping under
+            // the surface somewhere. The one the water is found in first is wholly under it,
+            // nearest the place it was said to be.
+            var holds    = new bool[faces];
+            int seed     = -1;
+            float seedSq = float.MaxValue;
+
+            for (int f = 0; f < faces; f++)
+            {
+                int t = f * 3;
+                if (UnderGround(_labels[f]) || _norms[_tris[t]].y <= ShoreFacesUp) continue;
+
+                Vector3 p0 = _verts[_tris[t]], p1 = _verts[_tris[t + 1]], p2 = _verts[_tris[t + 2]];
+                if (Mathf.Min(p0.y, Mathf.Min(p1.y, p2.y)) >= y) continue;
+                holds[f] = true;
+
+                if (Mathf.Max(p0.y, Mathf.Max(p1.y, p2.y)) >= y) continue;
+
+                Vector3 mid = (p0 + p1 + p2) / 3f - waterAt;
+                float   sq  = mid.x * mid.x + mid.z * mid.z;
+                if (sq < seedSq) { seedSq = sq; seed = f; }
+            }
+
+            if (seed < 0) return shore;
+
+            // Which of those faces meet at each corner under the water. A mouth's patch is
+            // worked out apart from the bowl it opens into, so a corner the two share can differ
+            // in its last digits — they are matched by where they lie, not by the exact number.
+            var meet = new Dictionary<Vector3Int, List<int>>();
+            for (int f = 0; f < faces; f++)
+            {
+                if (!holds[f]) continue;
+                for (int k = 0; k < 3; k++)
+                {
+                    Vector3 p = _verts[_tris[f * 3 + k]];
+                    if (p.y >= y) continue;
+
+                    var cell = ShoreCell(p);
+                    if (!meet.TryGetValue(cell, out var list)) meet[cell] = list = new List<int>();
+                    list.Add(f);
+                }
+            }
+
+            var wet  = new bool[faces];
+            var next = new Queue<int>();
+            wet[seed] = true;
+            next.Enqueue(seed);
+
+            while (next.Count > 0)
+            {
+                int f = next.Dequeue();
+                for (int k = 0; k < 3; k++)
+                {
+                    Vector3 p = _verts[_tris[f * 3 + k]];
+                    if (p.y >= y) continue;
+
+                    // The cells round it too, so two corners either side of a cell's edge
+                    // still find each other.
+                    var cell = ShoreCell(p);
+                    for (int dx = -1; dx <= 1; dx++)
+                    for (int dy = -1; dy <= 1; dy++)
+                    for (int dz = -1; dz <= 1; dz++)
+                    {
+                        if (!meet.TryGetValue(cell + new Vector3Int(dx, dy, dz), out var list)) continue;
+                        foreach (int g in list)
+                            if (!wet[g]) { wet[g] = true; next.Enqueue(g); }
+                    }
+                }
+            }
+
+            var cut = new List<Vector3>(3);
+            for (int f = 0; f < faces; f++)
+            {
+                if (!wet[f]) continue;
+
+                int     t = f * 3;
+                Vector3 n = _norms[_tris[t]];
+
+                cut.Clear();
+                for (int k = 0; k < 3; k++)
+                {
+                    Vector3 p = _verts[_tris[t + k]];
+                    Vector3 q = _verts[_tris[t + (k + 1) % 3]];
+
+                    // Lying exactly at the water's height counts as above it, on every face
+                    // alike, so a corner there is crossed once rather than twice or never.
+                    bool pUp = p.y >= y, qUp = q.y >= y;
+                    if (pUp == qUp) continue;
+
+                    Vector3 lo = pUp ? q : p;
+                    Vector3 hi = pUp ? p : q;
+                    float   u  = (y - lo.y) / (hi.y - lo.y);
+
+                    cut.Add(new Vector3(lo.x + (hi.x - lo.x) * u, 0f, lo.z + (hi.z - lo.z) * u));
+                }
+
+                if (cut.Count != 2 || (cut[1] - cut[0]).sqrMagnitude < 1e-12f) continue;
+
+                // A face that looks up leans the way its slope runs down — into the water.
+                shore.Add(new ShorePiece { a = cut[0], c = cut[1], water = new Vector3(n.x, 0f, n.z) });
+            }
+
+            return shore;
         }
 
         // Projected off whichever axis the face points along most — keeps the marble
@@ -4193,13 +4747,18 @@ public static partial class RiverMeshBuilder
                 // A run has no need of the test either — its channel is cut to a width, so it
                 // leaves the lip at a real corner the turn test sees.
                 //
+                // Nor does a pool with a rounded rim. Its lip rolls into the bowl and over to the
+                // wall on a curve, so there is no corner where it ends: "level" only says which
+                // facets of that curve happen to be within a degree of flat, and the line between
+                // them and the rest wanders through the faces.
+                //
                 // A CHANGE OF PART — the two faces were built as different parts of the piece (a
                 // tower's base, ramp and second base). A steep ramp turns off the tier below by
                 // less than SeamAngle, but the join is still a corner the piece was built with.
                 //
                 // A face whose corners weld onto fewer than three points is left out altogether.
                 float cosLimit = Mathf.Cos(SeamAngle * Mathf.Deg2Rad);
-                bool  flatLip  = b._rimLine == null || b._rimLine.Count == 0;
+                bool  flatLip  = (b._rimLine == null || b._rimLine.Count == 0) && !b.RoundedRim;
                 Folds          = new Dictionary<long, SideFold>(b._tris.Count);
 
                 for (int t = 0; t < Faces; t++)
@@ -4506,7 +5065,12 @@ public static partial class RiverMeshBuilder
                 // mark is what a run that has not been rebuilt cannot accidentally produce.
                 //
                 // z marks a run part: 1 says x is the run's outer, rim or inner, 0 a stone type.
-                var carried = new Vector4(kind, widths[t], runPart ? 1f : 0f, FaceMark);
+                //
+                // The mark carries the face's Designation on top of it — 1 + the Designation — so
+                // the shader can look up that Designation's Scale. None adds nothing, which is the
+                // plain mark a piece built before Designations were baked carries.
+                var carried = new Vector4(kind, widths[t], runPart ? 1f : 0f,
+                                          FaceMark + (float)_designations[t]);
                 for (int e = 0; e < 3; e++) kinds[_tris[t * 3 + e]] = carried;
             }
 
@@ -4828,12 +5392,13 @@ public static partial class RiverMeshBuilder
         /// </summary>
         private float RimTopAt(Vector3 p)
         {
-            if (_rimLine == null || _rimLine.Count == 0) return _rimTopY;
+            var line = _rimLine != null && _rimLine.Count > 0 ? _rimLine : RimHeights;
+            if (line == null || line.Count == 0) return _rimTopY;
 
             float best = float.MaxValue, y = 0f;
-            for (int i = 0; i < _rimLine.Count; i++)
+            for (int i = 0; i < line.Count; i++)
             {
-                Vector3 c  = _rimLine[i];
+                Vector3 c  = line[i];
                 float   dx = c.x - p.x, dz = c.z - p.z;
                 float   dd = dx * dx + dz * dz;
                 if (dd < best) { best = dd; y = c.y; }
@@ -4894,9 +5459,9 @@ public static partial class RiverMeshBuilder
                 SurfaceInfo.Surface = surfaces;
                 SurfaceInfo.Width   = widths;
             }
-            if (_hasBanks) mesh.SetUVs(3, _banks);
             mesh.SetTriangles(_tris, 0);
             mesh.RecalculateBounds();
+            PartLabels.Attach(mesh, _labels, _verts, _tris);
             return mesh;
         }
     }

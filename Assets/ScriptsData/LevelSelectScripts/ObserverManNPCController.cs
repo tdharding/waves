@@ -16,6 +16,12 @@ public class ObserverManNPCController : MonoBehaviour
     private const string StandingState = "StandingState";
     private const string WalkingState  = "WalkingState";
 
+    [Tooltip("Which of the level's characters this is — its id in the level's NPC Character Registry " +
+             "(set in the NPC Path Tool).")]
+    [SerializeField, HideInInspector] private string characterId;
+
+    public string CharacterId => characterId;
+
     [Header("Travel Path (set in the NPC Path Tool)")]
     [Tooltip("The path file it walks: points in turn, standing a while at each. None, or no points = " +
              "it stands still.")]
@@ -91,6 +97,7 @@ public class ObserverManNPCController : MonoBehaviour
     public bool HasPath        => Points != null && Points.Count > 0;
     public int  PathPointCount => Points?.Count ?? 0;
     public bool PathLoops      => travelPath != null && travelPath.walk == NPCTravelPath.PathWalk.Loop;
+    public bool PathStatic     => travelPath != null && travelPath.walk == NPCTravelPath.PathWalk.Static;
     public bool GroundFitted   => Ground != null && Ground.Count == PathPointCount;
 
     /// <summary>A travel path point, in the world.</summary>
@@ -119,7 +126,8 @@ public class ObserverManNPCController : MonoBehaviour
 
     /// <summary>
     /// Stands it on the first path point, facing along the path — towards the first bit of
-    /// fitted ground, or the second point. One point and it keeps the way it faces.
+    /// fitted ground, or the second point. One point and it keeps the way it faces. A Static
+    /// path faces the first point's Rot instead, when it has one.
     /// </summary>
     public void PlaceAtPathStart()
     {
@@ -131,13 +139,16 @@ public class ObserverManNPCController : MonoBehaviour
                       : PathPointCount > 1 ? PathPoint(1)
                       : (Vector3?)null;
 
-        if (next.HasValue)
+        Vector3? along = next.HasValue ? next.Value - start : (Vector3?)null;
+        if (PathStatic && TryPathFacing(0, out Vector3 rot)) along = rot;
+
+        if (along.HasValue)
         {
-            Vector3 along = next.Value - start;
-            along.y = 0f;
+            Vector3 want = along.Value;
+            want.y = 0f;
             Vector3 face = FacingWorld();
-            if (along.sqrMagnitude > 1e-10f && face.sqrMagnitude > 1e-10f)
-                transform.RotateAround(FeetWorld(), Vector3.up, Vector3.SignedAngle(face, along, Vector3.up));
+            if (want.sqrMagnitude > 1e-10f && face.sqrMagnitude > 1e-10f)
+                transform.RotateAround(FeetWorld(), Vector3.up, Vector3.SignedAngle(face, want, Vector3.up));
         }
 
         transform.position += start - FeetWorld();
@@ -163,6 +174,14 @@ public class ObserverManNPCController : MonoBehaviour
 
         // Sets off from the first point, wherever it was left in the scene.
         PlaceAtPathStart();
+
+        // Static: stays there, starting no animation of its own.
+        if (PathStatic)
+        {
+            enabled = false;
+            return;
+        }
+
         _pathIndex = 0;
         Stand();
     }

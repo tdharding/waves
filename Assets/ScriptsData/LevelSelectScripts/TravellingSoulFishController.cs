@@ -60,8 +60,8 @@ public class TravellingSoulFishController : MonoBehaviour
     [Range(0f, 1f)]
     [SerializeField] private float strength = 1f;
 
-    [Header("In The Souls Pool Tower")]
-    [Tooltip("World units per second souls swim round the bowl of the souls pool tower they are waiting in.")]
+    [Header("In The Soul Juice Tank")]
+    [Tooltip("World units per second souls swim round the bowl of the soul juice tank they are waiting in.")]
     [SerializeField] private float bowlSwimSpeed = 0.25f;
 
     [Tooltip("World-space width/height of one fish in a tower's bowl — the bowl is far smaller " +
@@ -84,9 +84,12 @@ public class TravellingSoulFishController : MonoBehaviour
     // a global array locks its size on the first push.
     private const int MaxZonePoints = 128;
 
-    // Closest together the zone's points are ever packed, world units. Routes short enough to fit
-    // are packed at this; longer ones are spread out so every route fits in MaxZonePoints at once.
+    // Step, world units, when walking a route looking for the entry trigger a fish swims in by.
     private const float MinZoneSpacing = 0.25f;
+
+    // Closest the zone's points ever keep to the route's line, world units: the line is thinned
+    // to points no further off it than this, doubled until every route fits in MaxZonePoints.
+    private const float MinZoneTolerance = 0.01f;
 
     private static readonly int ZonePositionsID = Shader.PropertyToID("_TravelSoulZonePositions");
     private static readonly int ZoneCountID     = Shader.PropertyToID("_TravelSoulZoneCount");
@@ -97,8 +100,14 @@ public class TravellingSoulFishController : MonoBehaviour
     // that is already open is drawn out to its open end at once, and only what opens while the
     // map is up draws out as you watch.
     private readonly Dictionary<string, float> _zoneHeads = new Dictionary<string, float>();
-    private float _zoneSpacing = MinZoneSpacing;
+    private float _zoneTolerance = MinZoneTolerance;
     private bool  _zoneOverflowWarned;
+
+    // The Corner Smoothing the zones were last packed with — repacked when the tuner changes it.
+    private float _packedCornerSmoothing = -1f;
+
+    // World units between the evenly resampled points the corners are eased over.
+    private const float CornerStep = 0.1f;
 
     // ── Cached route shapes ──────────────────────────────
     // Rebuilt only when the asset changes, since a route's shape is authored, not simulated.
@@ -108,7 +117,12 @@ public class TravellingSoulFishController : MonoBehaviour
         public List<int>     pointIndex = new List<int>();     // polyline index of each authored point
         public List<float>   cumArc   = new List<float>();     // arc length to each polyline vertex
 
-        // The same line thinned to the zone's packing, with the arc length to each point.
+        // The line the zone is drawn along: the polyline evenly resampled with its corners eased
+        // by the tuner's Corner Smoothing, each point keeping the arc length it had on the polyline.
+        public List<Vector3> zoneLine    = new List<Vector3>();
+        public List<float>   zoneLineArc = new List<float>();
+
+        // That line thinned to the zone's packing, with the arc length to each point.
         public List<Vector3> zonePoints = new List<Vector3>();
         public List<float>   zoneArc    = new List<float>();
         public float         bandWidth;
@@ -134,8 +148,9 @@ public class TravellingSoulFishController : MonoBehaviour
             return;
         }
 
-        // Bowls first: each one's zone disc takes a point the routes are packed around.
+        // Bowls and Soul Fish Areas first: their zone points are what the routes are packed around.
         FindTowerBowls();
+        FindSoulFishAreas();
         BuildRouteShapes();
         FindEntryTriggers();
         SeedOriginPools();
@@ -164,6 +179,7 @@ public class TravellingSoulFishController : MonoBehaviour
         AdvanceTravellingSouls();
         PublishGlobals();
         PublishZone();
+        SoulPathGlow.SetFronts(_zoneHeads);
     }
 
     // ─────────────────────────────────────────────
@@ -182,7 +198,8 @@ public class TravellingSoulFishController : MonoBehaviour
         {
             if (route == null || string.IsNullOrEmpty(route.routeId)) continue;
 
-            var ids      = designerData.BuildSoulRouteNodeIds(route);
+            var pointIds = new List<int>();
+            var ids      = designerData.BuildSoulRouteNodeIds(route, pointIds);
             var problems = new List<string>();
             var shape    = new RouteShape { bandWidth = Mathf.Max(route.bandWidth, 0.0001f) };
 
@@ -190,21 +207,12 @@ public class TravellingSoulFishController : MonoBehaviour
                                                   out List<int> nodeVertex, problems);
 
             // Where each authored point lands in the line — souls travel point to point, and the
-            // river between is just the shape of the way. The cursor walks the node ids the same
-            // way BuildSoulRouteNodeIds laid them down; nodeVertex turns that into the line.
-            int cursor = string.IsNullOrEmpty(route.originNodeId) ? 0 : 1;
-            for (int i = 0; i < route.points.Count; i++)
+            // river between is just the shape of the way. BuildSoulRouteNodeIds says where each
+            // point sits in the ids; nodeVertex turns that into the line.
+            foreach (int idAt in pointIds)
             {
-                if (i > 0)
-                {
-                    var between = designerData.NodesBetween(route.points[i - 1].nodeId,
-                                                            route.points[i].nodeId);
-                    if (between != null) cursor += between.Count;
-                }
-
-                int idIndex = Mathf.Min(cursor, nodeVertex.Count - 1);
+                int idIndex = Mathf.Min(idAt, nodeVertex.Count - 1);
                 shape.pointIndex.Add(idIndex >= 0 ? nodeVertex[idIndex] : 0);
-                cursor++;
             }
 
             float arc = 0f;
@@ -225,32 +233,96 @@ public class TravellingSoulFishController : MonoBehaviour
                           $"{shape.pointIndex.Count} points, {arc:F1}m long.");
         }
 
-        PackZones();
+        PackZones(ZoneLook().cornerSmoothing);
 
         Debug.Log($"[TravelFish] Built {_shapes.Count} route shape(s) from {runs.Count} generated run(s).");
     }
 
     /// <summary>
-    /// Thins every route's line to the points the zone shader takes. One spacing for all of them,
-    /// wide enough that every route drawn out in full still fits the shader's point limit — so a
-    /// zone never changes shape as more routes open. The front of a zone drawing out is one extra
-    /// point per route, which is what the two spare per route are for; each tower bowl's disc
-    /// takes one more.
+    /// Thins every route's line to the points the zone shader takes: close together where the line
+    /// bends (round a pool's ring, a tight river bend), far apart down the straights. One tolerance
+    /// for all of them, as tight as lets every route drawn out in full still fit the shader's point
+    /// limit — so a zone never changes shape as more routes open. The front of a zone drawing out
+    /// is one extra point per route, which is what the two spare per route are for; each tower
+    /// bowl's disc takes one more, and so does each open-bowl Soul Fish Area's; one with an island
+    /// takes its whole ring.
     /// </summary>
-    private void PackZones()
+    private void PackZones(float cornerSmoothing)
     {
+        _packedCornerSmoothing = cornerSmoothing;
+        foreach (var shape in _shapes.Values) EaseCorners(shape, cornerSmoothing);
+
         float total = 0f;
         foreach (var shape in _shapes.Values) total += shape.Length;
 
-        int budget   = Mathf.Max(1, MaxZonePoints - 2 * _shapes.Count - _bowls.Count);
-        _zoneSpacing = Mathf.Max(MinZoneSpacing, total / budget);
+        int areaPoints = 0;
+        foreach (var area in _areas) areaPoints += area.ZonePointCount;
 
-        foreach (var shape in _shapes.Values)
-            SoulRouteCurve.Resample(shape.polyline, shape.cumArc, _zoneSpacing,
-                                    shape.zonePoints, shape.zoneArc);
+        int budget = Mathf.Max(1, MaxZonePoints - 2 * _shapes.Count - _bowls.Count - areaPoints);
+        int used   = 0;
+        for (_zoneTolerance = MinZoneTolerance; ; _zoneTolerance *= 2f)
+        {
+            used = 0;
+            foreach (var shape in _shapes.Values)
+            {
+                SoulRouteCurve.Simplify(shape.zoneLine, shape.zoneLineArc, _zoneTolerance,
+                                        shape.zonePoints, shape.zoneArc);
+                used += shape.zonePoints.Count;
+            }
+            if (used <= budget || _zoneTolerance > total) break;
+        }
 
-        Debug.Log($"[TravelFish] Soul zones packed {_zoneSpacing:F2}m apart over {total:F1}m of route.");
+        Debug.Log($"[TravelFish] Soul zones packed into {used} of {budget} points over {total:F1}m of route, " +
+                  $"never more than {_zoneTolerance * 100f:0.#}cm off the line, corners eased over " +
+                  $"{cornerSmoothing:0.##}m.");
     }
+
+    /// <summary>
+    /// The line a route's zone is drawn along: its polyline resampled evenly, every point moved to
+    /// the average of the line within <paramref name="radius"/> of it along the route — nearer
+    /// points counting more — so a sharp turn becomes a smooth curve while a straight stays where
+    /// it is. Near either end the reach shrinks to the distance left, so the ends never move. Each
+    /// point keeps its arc length on the polyline, so the zone's front, the fish and the glow still
+    /// agree on how far along the route anything is.
+    /// </summary>
+    private static void EaseCorners(RouteShape shape, float radius)
+    {
+        shape.zoneLine.Clear();
+        shape.zoneLineArc.Clear();
+        if (shape.polyline.Count < 2 || radius <= 0f || shape.Length <= 0f)
+        {
+            shape.zoneLine.AddRange(shape.polyline);
+            shape.zoneLineArc.AddRange(shape.cumArc);
+            return;
+        }
+
+        var even    = new List<Vector3>();
+        var evenArc = new List<float>();
+        SoulRouteCurve.Resample(shape.polyline, shape.cumArc, CornerStep, even, evenArc);
+
+        int   n      = even.Count;
+        float length = evenArc[n - 1];
+        float step   = length / Mathf.Max(1, n - 1);
+        for (int i = 0; i < n; i++)
+        {
+            float s     = evenArc[i];
+            int   reach = Mathf.FloorToInt(Mathf.Min(radius, Mathf.Min(s, length - s)) / step);
+
+            Vector3 sum   = Vector3.zero;
+            float   total = 0f;
+            for (int j = -reach; j <= reach; j++)
+            {
+                float w = reach + 1 - Mathf.Abs(j);
+                sum   += even[i + j] * w;
+                total += w;
+            }
+            shape.zoneLine.Add(sum / total);
+            shape.zoneLineArc.Add(s);
+        }
+    }
+
+    private RiverSoulZoneSettings ZoneLook()
+        => RiverSoulZoneSettings.Resolve(designerData.waterPreset != null ? designerData.waterPreset.soulZone : null);
 
     // ─────────────────────────────────────────────
     // ORIGIN POOLS
@@ -267,7 +339,7 @@ public class TravellingSoulFishController : MonoBehaviour
 
         foreach (var route in designerData.soulRoutes)
         {
-            if (route?.souls == null) continue;
+            if (route?.souls == null || !RouteCarriesFish(route)) continue;
 
             foreach (var soul in route.souls)
             {
@@ -284,10 +356,16 @@ public class TravellingSoulFishController : MonoBehaviour
     }
 
     /// <summary>
-    /// A route's souls no longer set off the moment the map loads. They wait in the bowl of the
-    /// souls pool tower the route begins at, circling, until something calls
-    /// <see cref="ReleaseTower"/>. A route that does not begin at a tower can't start at all —
-    /// said once here, so a route that has gone quiet is explained.
+    /// A soul juice tank carries no fish: its route is only the soul juice path, drawn out when the
+    /// tank is released. Fish come from elsewhere and join it.
+    /// </summary>
+    private bool RouteCarriesFish(LevelSelectDesignerData.SoulRoute route)
+        => route != null && !designerData.RouteStartsAtSoulJuiceTank(route);
+
+    /// <summary>
+    /// A soul juice tank's route stays closed until E at the tank (<see cref="ReleaseTower"/>).
+    /// A route that does not begin at a tank can't start at all — said once here, so a route that
+    /// has gone quiet is explained.
     /// </summary>
     private void ReportHeldOrigins()
     {
@@ -297,19 +375,20 @@ public class TravellingSoulFishController : MonoBehaviour
 
             int waiting = HeldSouls(route).Count;
 
-            if (designerData.RouteStartsAtSoulsTower(route))
+            if (designerData.RouteStartsAtSoulJuiceTank(route))
             {
+                bool open = SoulJourneyData.OpenLegOf(route.routeId) >= 0;
                 if (!_bowls.ContainsKey(route.originNodeId))
-                    Debug.LogWarning($"[TravelFish] Route '{route.displayName}' starts at a souls pool tower, but no " +
-                                     "generated tower for it is in the scene — Generate in the Level Select " +
-                                     $"Designer. Its {waiting} waiting soul(s) can't be drawn.", this);
+                    Debug.LogWarning($"[TravelFish] Route '{route.displayName}' starts at a soul juice tank, but no " +
+                                     "generated tank for it is in the scene — Generate in the Level Select " +
+                                     "Designer.", this);
                 else
-                    Debug.Log($"[TravelFish] Route '{route.displayName}': {waiting} soul(s) waiting in its souls " +
-                              "pool tower.");
+                    Debug.Log($"[TravelFish] Route '{route.displayName}': soul juice path " +
+                              (open ? "already released." : "waiting in its tank."));
             }
             else if (waiting > 0)
             {
-                Debug.LogWarning($"[TravelFish] Route '{route.displayName}' doesn't begin at a souls pool tower, so " +
+                Debug.LogWarning($"[TravelFish] Route '{route.displayName}' doesn't begin at a soul juice tank, so " +
                                  $"it can't start — its {waiting} soul(s) stay where they are. Pick an origin " +
                                  "tower for it in the Level Select Designer.", this);
             }
@@ -317,108 +396,89 @@ public class TravellingSoulFishController : MonoBehaviour
     }
 
     /// <summary>
-    /// Lets the souls waiting in a route's souls pool tower out onto the route. Called through
-    /// <see cref="ReleaseSoulsPool"/> when the player presses E at the tower. Returns how many left.
+    /// Opens a soul juice tank's route to its last point, so its band draws out from the tank.
+    /// Called once the tank has drained and the pool round it has filled. True when it opened.
     ///
-    /// The route is opened to its last point here too. Nothing else opens one yet, and a soul
-    /// never swims past the open end — so without this the fish would stop dead at the first
-    /// point. When openness becomes real player progress, that line is the one to delete.
+    /// Opened all the way: nothing else opens a route yet. When openness becomes real player
+    /// progress, that line is the one to change.
     /// </summary>
-    public int ReleaseTower(string routeId)
+    public bool ReleaseTower(string routeId)
     {
         var route = designerData != null ? designerData.soulRoutes.Find(r => r != null && r.routeId == routeId) : null;
         if (route == null)
         {
             Debug.LogWarning($"[TravelFish] ReleaseTower: no route '{routeId}'.", this);
-            return 0;
+            return false;
         }
-        if (!designerData.RouteStartsAtSoulsTower(route))
+        if (!designerData.RouteStartsAtSoulJuiceTank(route))
         {
-            Debug.LogWarning($"[TravelFish] ReleaseTower: route '{route.displayName}' doesn't begin at a souls " +
-                             "pool tower — nothing to release.", this);
-            return 0;
+            Debug.LogWarning($"[TravelFish] ReleaseTower: route '{route.displayName}' doesn't begin at a soul " +
+                             "juice tank — nothing to release.", this);
+            return false;
         }
         if (route.points.Count == 0)
         {
-            Debug.LogWarning($"[TravelFish] ReleaseTower: route '{route.displayName}' has no points to swim to.", this);
-            return 0;
+            Debug.LogWarning($"[TravelFish] ReleaseTower: route '{route.displayName}' has no destinations to draw to.", this);
+            return false;
         }
 
         SoulJourneyData.OpenRouteTo(route.routeId, route.points.Count - 1);
-
-        int released = 0;
-        foreach (int identity in HeldSouls(route))
-        {
-            SoulJourneyData.Release(identity, route.routeId, 0);
-            released++;
-        }
-
-        Debug.Log($"[TravelFish] Released {released} soul(s) from the tower on route '{route.displayName}'.");
-        return released;
+        Debug.Log($"[TravelFish] Soul juice path '{route.displayName}' released from its tank.");
+        return true;
     }
 
     /// <summary>
-    /// What pressing E at the souls pool tower standing in <paramref name="poolNodeId"/> does:
-    /// the bowl drains, the pool round the tower fills, and then every route beginning there is
-    /// let out (<see cref="AdvanceBowls"/>). Returns how many souls are on their way.
+    /// What pressing E at the soul juice tank standing in <paramref name="poolNodeId"/> does:
+    /// the bowl drains, the pool round the tank fills, and then every route beginning there is
+    /// drawn out (<see cref="AdvanceBowls"/>). True when the release started.
     /// </summary>
-    public int ReleaseSoulsPool(string poolNodeId)
+    public bool ReleaseSoulJuiceTank(string poolNodeId)
     {
-        if (designerData == null || string.IsNullOrEmpty(poolNodeId)) return 0;
+        if (!CanRelease(poolNodeId)) return false;
 
-        // No tower in the scene to drain — straight out, as before.
-        if (!_bowlStates.TryGetValue(poolNodeId, out var state)) return ReleaseRoutesAt(poolNodeId);
-
-        if (state.phase != BowlPhase.Holding) return 0;
-
-        int waiting = WaitingAt(poolNodeId);
-        if (waiting == 0) return 0;
+        // No tank in the scene to drain — straight out.
+        if (!_bowlStates.TryGetValue(poolNodeId, out var state)) return ReleaseRoutesAt(poolNodeId) > 0;
 
         state.phase = BowlPhase.Draining;
-        Debug.Log($"[TravelFish] Souls pool tower on '{poolNodeId}' draining — {waiting} soul(s) set off once " +
-                  "the pool round it has filled.");
-        return waiting;
+        Debug.Log($"[TravelFish] Soul juice tank on '{poolNodeId}' draining — its path draws out once the " +
+                  "pool round it has filled.");
+        return true;
     }
 
-    /// <summary>Whether E at the tower on <paramref name="poolNodeId"/> has anything to do.</summary>
+    /// <summary>Whether E at the tank on <paramref name="poolNodeId"/> has anything to do.</summary>
     public bool CanRelease(string poolNodeId)
     {
-        if (WaitingAt(poolNodeId) == 0) return false;
+        if (designerData == null || string.IsNullOrEmpty(poolNodeId)) return false;
+        if (!TankHasRoutes(poolNodeId) || TowerReleased(poolNodeId)) return false;
         return !_bowlStates.TryGetValue(poolNodeId, out var state) || state.phase == BowlPhase.Holding;
     }
 
-    /// <summary>Lets out every route that begins at <paramref name="poolNodeId"/>. Returns how many left.</summary>
+    /// <summary>Opens every route that begins at <paramref name="poolNodeId"/>. Returns how many opened.</summary>
     private int ReleaseRoutesAt(string poolNodeId)
     {
-        int released = 0;
+        int opened = 0;
         foreach (var route in designerData.soulRoutes)
-            if (route != null && route.originNodeId == poolNodeId && HeldSouls(route).Count > 0)
-                released += ReleaseTower(route.routeId);
+            if (route != null && route.originNodeId == poolNodeId && route.points.Count > 0 &&
+                SoulJourneyData.OpenLegOf(route.routeId) < 0 && ReleaseTower(route.routeId))
+                opened++;
 
-        return released;
+        return opened;
     }
 
-    /// <summary>How many souls are waiting in the souls pool tower on <paramref name="poolNodeId"/>.</summary>
-    public int WaitingAt(string poolNodeId)
-    {
-        if (designerData == null || string.IsNullOrEmpty(poolNodeId)) return 0;
-
-        int waiting = 0;
-        foreach (var route in designerData.soulRoutes)
-            if (route != null && route.originNodeId == poolNodeId && designerData.RouteStartsAtSoulsTower(route))
-                waiting += HeldSouls(route).Count;
-
-        return waiting;
-    }
+    /// <summary>Whether a route with somewhere to go begins at the tank on <paramref name="poolNodeId"/>.</summary>
+    private bool TankHasRoutes(string poolNodeId)
+        => designerData.soulRoutes.Exists(r => r != null && r.originNodeId == poolNodeId && r.points.Count > 0 &&
+                                               designerData.RouteStartsAtSoulJuiceTank(r));
 
     /// <summary>
     /// The route's souls still waiting at its origin. Only the pool: a soul already travelling,
-    /// arrived or caught keeps what it is doing, so nothing here can drag one backwards.
+    /// arrived or caught keeps what it is doing, so nothing here can drag one backwards. A soul
+    /// juice tank's route has none — it carries no fish.
     /// </summary>
     private List<int> HeldSouls(LevelSelectDesignerData.SoulRoute route)
     {
         _held.Clear();
-        if (route?.souls == null) return _held;
+        if (route?.souls == null || !RouteCarriesFish(route)) return _held;
 
         foreach (var soul in route.souls)
         {
@@ -434,23 +494,23 @@ public class TravellingSoulFishController : MonoBehaviour
     private readonly List<int> _held = new List<int>();
 
     // ─────────────────────────────────────────────
-    // SOULS POOL TOWERS
+    // SOUL JUICE TANKS
     // ─────────────────────────────────────────────
 
-    // Every generated souls pool tower in the scene, by the pool node it stands on.
-    private readonly Dictionary<string, SoulsPoolTowerBowl> _bowls = new Dictionary<string, SoulsPoolTowerBowl>();
+    // Every generated soul juice tank in the scene, by the pool node it stands on.
+    private readonly Dictionary<string, SoulJuiceTankBowl> _bowls = new Dictionary<string, SoulJuiceTankBowl>();
 
     private void FindTowerBowls()
     {
         _bowls.Clear();
-        foreach (var bowl in FindObjectsOfType<SoulsPoolTowerBowl>())
+        foreach (var bowl in FindObjectsOfType<SoulJuiceTankBowl>())
             if (bowl != null && !string.IsNullOrEmpty(bowl.poolNodeId))
                 _bowls[bowl.poolNodeId] = bowl;
     }
 
-    // Releasing a tower: Holding (souls in the full bowl) → Draining (the water lowers, the souls
-    // sink with it) → Filling (souls gone down the hole; the zone grows across the pool round the
-    // tower) → Done (souls let out onto their routes; the pool stays filled).
+    // Releasing a tank: Holding (the full bowl of soul juice) → Draining (the juice lowers) →
+    // Filling (gone down the hole; the zone grows across the pool round the tank) → Done (its
+    // routes drawn out; the pool stays filled).
     private enum BowlPhase { Holding, Draining, Filling, Done }
 
     private class BowlState
@@ -468,8 +528,8 @@ public class TravellingSoulFishController : MonoBehaviour
     private readonly Dictionary<string, BowlState> _bowlStates = new Dictionary<string, BowlState>();
 
     /// <summary>
-    /// Not saved — read off the souls instead: a tower whose routes have souls and none of them
-    /// still waiting was released before, so it loads drained, with the pool round it filled.
+    /// The phase isn't saved — read off its routes instead: a tank whose routes are all open was
+    /// released before, so it loads drained, with the pool round it filled.
     /// </summary>
     private void InitBowlStates()
     {
@@ -486,14 +546,15 @@ public class TravellingSoulFishController : MonoBehaviour
 
     private bool TowerReleased(string poolNodeId)
     {
-        bool hasSouls = false;
+        bool any = false;
         foreach (var route in designerData.soulRoutes)
         {
-            if (route == null || route.originNodeId != poolNodeId || !designerData.RouteStartsAtSoulsTower(route)) continue;
-            if (route.souls != null && route.souls.Exists(s => s != null && s.soulDataIdentity > 0)) hasSouls = true;
-            if (HeldSouls(route).Count > 0) return false;
+            if (route == null || route.originNodeId != poolNodeId || route.points.Count == 0 ||
+                !designerData.RouteStartsAtSoulJuiceTank(route)) continue;
+            any = true;
+            if (SoulJourneyData.OpenLegOf(route.routeId) < 0) return false;
         }
-        return hasSouls;
+        return any;
     }
 
     /// <summary>Drains each released tower's bowl, then fills the pool round it, then lets its souls out.</summary>
@@ -533,7 +594,7 @@ public class TravellingSoulFishController : MonoBehaviour
     /// pool nearest the tower that reaches it. The tuner's Pool Fill Radius is a proportion of
     /// the water between the two.
     /// </summary>
-    private float PoolFillRadius(SoulsPoolTowerBowl bowl, out float island)
+    private float PoolFillRadius(SoulJuiceTankBowl bowl, out float island)
     {
         island = 0f;
         if (bowl == null) return 0f;
@@ -554,7 +615,7 @@ public class TravellingSoulFishController : MonoBehaviour
         }
 
         if (radius <= 0f)
-            Debug.LogWarning($"[TravelFish] No generated pool round the souls pool tower on '{bowl.poolNodeId}' — " +
+            Debug.LogWarning($"[TravelFish] No generated pool round the soul juice tank on '{bowl.poolNodeId}' — " +
                              "nothing for the zone to fill.", bowl);
         return radius;
     }
@@ -576,7 +637,7 @@ public class TravellingSoulFishController : MonoBehaviour
         if (!_shapes.TryGetValue(entry.routeId ?? string.Empty, out var shape) || shape.polyline.Count == 0) return false;
 
         var route = designerData.soulRoutes.Find(r => r != null && r.routeId == entry.routeId);
-        if (route == null || !designerData.RouteStartsAtSoulsTower(route)) return false;
+        if (route == null || !designerData.RouteStartsAtSoulJuiceTank(route)) return false;
         if (!_bowls.TryGetValue(route.originNodeId, out var bowl) || bowl == null) return false;
 
         // Round the pool, on the ring the route starts from.
@@ -602,7 +663,7 @@ public class TravellingSoulFishController : MonoBehaviour
     // Where round the bowl each waiting soul has got to, radians.
     private readonly Dictionary<int, float> _bowlAngles = new Dictionary<int, float>();
 
-    private void BowlPose(SoulsPoolTowerBowl bowl, int identity, float fishSize,
+    private void BowlPose(SoulJuiceTankBowl bowl, int identity, float fishSize,
                           out Vector3 position, out float heading)
     {
         float wet = Mathf.Max(0.0001f, bowl.WorldWaterRadius);
@@ -632,6 +693,186 @@ public class TravellingSoulFishController : MonoBehaviour
 
         // Moving along the circle: the tangent of increasing angle.
         heading = Mathf.Atan2(-Mathf.Sin(angle), Mathf.Cos(angle));
+    }
+
+    // ─────────────────────────────────────────────
+    // SOUL FISH AREAS
+    // ─────────────────────────────────────────────
+
+    // A pool ticked Soul Fish Area in the designer: filled with soul juice, its souls circling in
+    // its water. Where it stands comes off the generated pool, as a tank's pool does.
+    private class SoulFishArea
+    {
+        public string    nodeId;
+        public Vector3   centre;
+        public float     poolRadius;    // world units, the water's edge
+        public float     islandRadius;  // world units, 0 for an open bowl
+        public float     ringRadius;    // world units, the channel ring a route rides round the island
+        public float     bandWidth;     // the soul routes' Band Width, before the tuner's Width
+        public List<int> souls = new List<int>();
+
+        // With an island: the band round the channel ring, closed — its first point again at the
+        // end — with the arc length to each point. Empty for an open bowl, which keeps its disc.
+        public List<Vector3> ring    = new List<Vector3>();
+        public List<float>   ringArc = new List<float>();
+
+        public int ZonePointCount => ring.Count > 0 ? ring.Count : 1;
+    }
+
+    // Most sides a Soul Fish Area's ring is drawn with; fewer on a small ring.
+    private const int MaxAreaRingSides = 24;
+
+    private readonly List<SoulFishArea> _areas = new List<SoulFishArea>();
+
+    // Where round its pool each soul has got to, radians.
+    private readonly Dictionary<int, float> _areaAngles = new Dictionary<int, float>();
+
+    private void FindSoulFishAreas()
+    {
+        _areas.Clear();
+        if (designerData.pools == null) return;
+
+        RiverPoolMesh[] generated = null;
+        foreach (var pool in designerData.pools)
+        {
+            if (pool == null || !pool.soulFishArea) continue;
+
+            var node = designerData.nodes.Find(n => n != null && n.id == pool.nodeId);
+            if (node == null) continue;
+
+            generated ??= FindObjectsOfType<RiverPoolMesh>();
+            if (!NearestPool(generated, node.worldPosition, out var record))
+            {
+                Debug.LogWarning($"[TravelFish] Pool '{pool.nodeId}' is a Soul Fish Area, but no generated pool " +
+                                 "stands there — Generate in the Level Select Designer.", this);
+                continue;
+            }
+
+            float scale = Mathf.Abs(record.transform.lossyScale.x);
+            var   area  = new SoulFishArea
+            {
+                nodeId       = pool.nodeId,
+                centre       = record.transform.position,
+                poolRadius   = record.poolRadius * scale,
+                islandRadius = Mathf.Min(record.poolRadius, record.islandRadius) * scale,
+                ringRadius   = record.ChannelRadius * scale,
+                bandWidth    = SoulRouteBandWidth(),
+            };
+            if (area.islandRadius > 0f) BuildAreaRing(area);
+
+            if (pool.soulFishAreaSouls != null)
+                foreach (var soul in pool.soulFishAreaSouls)
+                    if (soul != null && soul.soulDataIdentity > 0 && !area.souls.Contains(soul.soulDataIdentity))
+                        area.souls.Add(soul.soulDataIdentity);
+
+            _areas.Add(area);
+        }
+
+        if (_areas.Count > 0)
+            Debug.Log($"[TravelFish] {_areas.Count} Soul Fish Area pool(s) found.");
+    }
+
+    // A Soul Fish Area's band is as wide as the soul routes' bands on the rivers — the widest, if
+    // they differ, and a new route's when there are none.
+    private float SoulRouteBandWidth()
+    {
+        float widest = 0f;
+        foreach (var route in designerData.soulRoutes)
+            if (route != null) widest = Mathf.Max(widest, route.bandWidth);
+        return widest > 0f ? widest : new LevelSelectDesignerData.SoulRoute().bandWidth;
+    }
+
+    // The ring round the island, on the channel ring a route takes round the pool: sides enough to
+    // stay within the zone's packing tolerance of the circle, closed back on its first point.
+    private static void BuildAreaRing(SoulFishArea area)
+    {
+        area.ring.Clear();
+        area.ringArc.Clear();
+        float r = area.ringRadius;
+        if (r <= 0f) return;
+
+        float step  = 2f * Mathf.Acos(Mathf.Clamp(1f - MinZoneTolerance / r, -1f, 1f));
+        int   sides = Mathf.Clamp(Mathf.CeilToInt(2f * Mathf.PI / Mathf.Max(step, 0.0001f)), 12, MaxAreaRingSides);
+
+        for (int i = 0; i <= sides; i++)
+        {
+            float a = 2f * Mathf.PI * i / sides;
+            area.ring.Add(new Vector3(area.centre.x + Mathf.Cos(a) * r, area.centre.y,
+                                      area.centre.z + Mathf.Sin(a) * r));
+            area.ringArc.Add(r * a);
+        }
+    }
+
+    // The generated pool whose water reaches the point, nearest first.
+    private static bool NearestPool(RiverPoolMesh[] pools, Vector3 at, out RiverPoolMesh found)
+    {
+        found = null;
+        float best = float.MaxValue;
+        foreach (var pool in pools)
+        {
+            if (pool == null) continue;
+            Vector3 p    = pool.transform.position;
+            float   r    = pool.poolRadius * Mathf.Abs(pool.transform.lossyScale.x);
+            float   dist = new Vector2(p.x - at.x, p.z - at.z).magnitude;
+            if (dist <= r && dist < best) { best = dist; found = pool; }
+        }
+        return found != null;
+    }
+
+    /// <summary>
+    /// Where a soul circling in a Soul Fish Area is now. As in a tank's bowl, each keeps its own
+    /// lane, seeded off its identity, drifting gently in and out of it, all going the same way
+    /// round. With an island the lanes stay inside the band round the channel ring — and inside
+    /// the water between the island's edge and the pool's — so none swims off the band; an open
+    /// bowl's circle round its middle. <paramref name="zoneWidth"/> is the tuner's Width, which
+    /// widens the band on the water.
+    /// </summary>
+    private void AreaPose(SoulFishArea area, int identity, float fishSize, float zoneWidth,
+                          out Vector3 position, out float heading)
+    {
+        float half  = fishSize * 0.5f;
+        float outer = Mathf.Max(0.0001f, area.poolRadius - half);
+        float inner = area.islandRadius > 0f ? Mathf.Min(area.islandRadius + half, outer) : 0f;
+
+        if (area.ring.Count > 0)
+        {
+            float bandHalf = Mathf.Max(0f, area.bandWidth * zoneWidth - half);
+            outer = Mathf.Max(inner, Mathf.Min(outer, area.ringRadius + bandHalf));
+            inner = Mathf.Min(outer, Mathf.Max(inner, area.ringRadius - bandHalf));
+        }
+
+        var   rng   = new System.Random(identity * 7919 + 17);
+        float pick  = (float)rng.NextDouble();
+        float start = (float)rng.NextDouble() * Mathf.PI * 2f;
+        float drift = (float)rng.NextDouble() * Mathf.PI * 2f;
+
+        float lane, sway, lo;
+        if (area.islandRadius > 0f)
+        {
+            // In the ring: a fish wider than the ring rides its middle.
+            lane = Mathf.Lerp(inner, outer, Mathf.Lerp(0.15f, 0.85f, pick));
+            sway = 0.12f * (outer - inner);
+            lo   = inner;
+        }
+        else
+        {
+            lane = Mathf.Lerp(0.3f, 0.85f, pick) * outer;
+            sway = 0.12f * outer;
+            lo   = 0.05f * outer;
+        }
+        float radius = Mathf.Clamp(lane + Mathf.Sin(Time.time * 0.7f + drift) * sway, lo, outer);
+
+        // Stepped on each frame, as in the bowl, so every fish keeps the river's swim speed.
+        float turn = swimSpeed / Mathf.Max(0.05f * area.poolRadius, lane);
+        if (!_areaAngles.TryGetValue(identity, out float angle))
+            angle = start + Time.time * turn;
+        else
+            angle += Time.deltaTime * turn;
+        _areaAngles[identity] = angle;
+
+        position = new Vector3(area.centre.x + Mathf.Cos(angle) * radius, area.centre.y,
+                               area.centre.z + Mathf.Sin(angle) * radius);
+        heading  = Mathf.Atan2(-Mathf.Sin(angle), Mathf.Cos(angle));
     }
 
     // ─────────────────────────────────────────────
@@ -1144,11 +1385,16 @@ public class TravellingSoulFishController : MonoBehaviour
         int  count    = 0;
         bool overflow = false;
 
-        // Every souls pool tower's bowl is filled with the zone: one lone point, a disc as wide as
+        // Every soul juice tank's bowl is filled with the zone: one lone point, a disc as wide as
         // the bowl's water. The shader widens every point by the tuner's Width, so it is divided
         // out here to keep the disc the bowl's own size.
-        var   look  = RiverSoulZoneSettings.Resolve(designerData.waterPreset != null ? designerData.waterPreset.soulZone : null);
+        var   look  = ZoneLook();
         float width = Mathf.Max(look.width, 0.0001f);
+
+        // Corner Smoothing is tuned live: repack the routes' lines when it changes.
+        if (_shapes.Count > 0 && Mathf.Abs(look.cornerSmoothing - _packedCornerSmoothing) > 1e-4f)
+            PackZones(look.cornerSmoothing);
+
         // Once a tower is released the same point becomes the pool fill round its base instead —
         // the bowl has drained first, so the two never show at once.
         foreach (var pair in _bowls)
@@ -1172,6 +1418,27 @@ public class TravellingSoulFishController : MonoBehaviour
             ZoneBuffer[count++] = disc;
         }
 
+        // Every Soul Fish Area round an island is a band round its channel ring, as wide as a soul
+        // route's; an open bowl is filled the same way as a tank's, out to its water's edge.
+        foreach (var area in _areas)
+        {
+            if (count >= MaxZonePoints) { overflow = true; break; }
+            if (area.poolRadius <= 0f) continue;
+
+            if (area.ring.Count > 0)
+            {
+                if (count + area.ring.Count > MaxZonePoints) { overflow = true; break; }
+                for (int i = 0; i < area.ring.Count; i++)
+                    ZoneBuffer[count++] = ZonePoint(area.ring[i], area.bandWidth, area.ringArc[i]);
+                ZoneBuffer[count - 1].w = -ZoneBuffer[count - 1].w;
+                continue;
+            }
+
+            Vector4 disc = ZonePoint(area.centre, area.poolRadius / width, 0f);
+            disc.w = -disc.w;
+            ZoneBuffer[count++] = disc;
+        }
+
         foreach (var pair in _shapes)
         {
             if (!_zoneHeads.TryGetValue(pair.Key, out float head)) continue;
@@ -1189,7 +1456,7 @@ public class TravellingSoulFishController : MonoBehaviour
             // The front, exactly where it has drawn to — so it slides on rather than stepping from
             // one packed point to the next.
             if (count < MaxZonePoints)
-                ZoneBuffer[count++] = ZonePoint(SoulRouteCurve.PointAt(shape.polyline, shape.cumArc, head),
+                ZoneBuffer[count++] = ZonePoint(SoulRouteCurve.PointAt(shape.zoneLine, shape.zoneLineArc, head),
                                                 shape.bandWidth, head);
             else
                 overflow = true;
@@ -1236,7 +1503,7 @@ public class TravellingSoulFishController : MonoBehaviour
             count++;
         }
 
-        // Then the souls still waiting in a souls pool tower, circling in its bowl. They share the
+        // Then the souls still waiting in a soul juice tank, circling in its bowl. They share the
         // one buffer: the bowl's water is the same water material, so it draws them the same way.
         int inBowls = 0;
         float bowlSize = bowlFishSize > 0f ? bowlFishSize : Mathf.Max(fishSize, 0.0001f);
@@ -1244,7 +1511,7 @@ public class TravellingSoulFishController : MonoBehaviour
         foreach (var route in designerData.soulRoutes)
         {
             if (count >= MaxDrawnFish) break;
-            if (!designerData.RouteStartsAtSoulsTower(route)) continue;
+            if (!designerData.RouteStartsAtSoulJuiceTank(route)) continue;
             if (!_bowls.TryGetValue(route.originNodeId, out var bowl) || bowl == null) continue;
             if (!SoulsInBowl(route.originNodeId)) continue;   // gone down the hole
 
@@ -1254,6 +1521,26 @@ public class TravellingSoulFishController : MonoBehaviour
 
                 BowlPose(bowl, identity, bowlSize, out Vector3 pos, out float heading);
                 PositionBuffer[count] = new Vector4(pos.x, heading, pos.z, bowlSize);
+                count++;
+                inBowls++;
+            }
+        }
+
+        // Then the souls circling in each Soul Fish Area — river fish, in river water. One that
+        // has a journey of its own now is wherever that has it, never here as well.
+        float zoneWidth = _areas.Count > 0
+            ? Mathf.Max(RiverSoulZoneSettings.Resolve(designerData.waterPreset != null ? designerData.waterPreset.soulZone : null).width, 0.0001f)
+            : 1f;
+        foreach (var area in _areas)
+        {
+            if (count >= MaxDrawnFish) break;
+            foreach (int identity in area.souls)
+            {
+                if (count >= MaxDrawnFish) break;
+                if (SoulJourneyData.HasRecord(identity)) continue;
+
+                AreaPose(area, identity, Mathf.Max(fishSize, 0.0001f), zoneWidth, out Vector3 pos, out float heading);
+                PositionBuffer[count] = new Vector4(pos.x, heading, pos.z, 0f);
                 count++;
                 inBowls++;
             }
@@ -1367,7 +1654,7 @@ public class TravellingSoulFishController : MonoBehaviour
         }
 
         if (river == 0)
-            Debug.LogWarning("[TravelFish] Nothing is on the river yet — souls waiting in a souls pool tower are drawn in its bowl, " +
+            Debug.LogWarning("[TravelFish] Nothing is on the river yet — souls waiting in a soul juice tank are drawn in its bowl, " +
                              "and nothing on the river draws until a tower is released or a soul departs a level.", this);
     }
 

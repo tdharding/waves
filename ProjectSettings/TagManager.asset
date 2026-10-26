@@ -68,6 +68,9 @@ TagManager:
   - name: Top
     uniqueID: 291924777
     locked: 0
+  - name: Fog
+    uniqueID: 1769913685
+    locked: 0
   m_RenderingLayers:
   - Default
   - Light Layer 1
@@ -78,4 +81,5 @@ TagManager:
   - Light Layer 6
   - Light Layer 7
   - Glow
+  - Boat Glow
   m_MigratedRenderPipelines: []

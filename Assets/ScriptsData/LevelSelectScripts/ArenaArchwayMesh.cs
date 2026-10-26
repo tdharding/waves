@@ -36,10 +36,19 @@ public static class ArenaArchwayMesh
     ///
     /// <paramref name="parts"/>, when given, is filled with one entry per triangle of the finished
     /// mesh saying which part of the arch it is, for the stone shading to colour each part.
+    ///
+    /// <paramref name="frames"/>, when given, are where the river under the arch actually runs,
+    /// front face first — the tunnel is swept through them so its legs stay on the rims however
+    /// the river bends, climbs or falls under it. Without them it runs straight back by the depth.
+    ///
+    /// <paramref name="heights"/>, when given, is filled with one entry per triangle: how high above
+    /// the rim top its part of the outline stands — what tells a leg from the arch once the tunnel
+    /// follows a river that climbs or falls.
     /// </summary>
-    public static Mesh Build(ArenaArchwayProfile profile, float edge, List<Part> parts = null)
+    public static Mesh Build(ArenaArchwayProfile profile, float edge, List<Part> parts = null,
+                             IList<Frame> frames = null, List<float> heights = null)
     {
-        var b = new MeshBuild { Parts = parts };
+        var b = new MeshBuild { Parts = parts, Heights = heights };
         if (profile == null) return b.ToMesh("ArenaArchway");
 
         edge = Mathf.Max(edge, 0.005f);
@@ -64,7 +73,18 @@ public static class ArenaArchwayMesh
         if (inner.Count < 2 || inner.Count != outer.Count) return b.ToMesh("ArenaArchway");
 
         int n = inner.Count;
-        Vector3 back = Vector3.forward * depth;
+
+        // Where the outline stands along the tunnel: straight back by the depth, or through
+        // the frames the river under it was swept through.
+        if (frames == null || frames.Count < 2)
+            frames = new[]
+            {
+                new Frame { origin = Vector3.zero,                right = Vector3.right, z = 0f },
+                new Frame { origin = Vector3.forward * depth,     right = Vector3.right, z = depth },
+            };
+        int ends = frames.Count - 1;
+
+        Vector3 At(Vector2 p, int k) => frames[k].origin + frames[k].right * p.x + Vector3.up * p.y;
 
         // Arc length along the band, so the texture keeps world scale round the curve the way
         // it does along a wall.
@@ -74,56 +94,71 @@ public static class ArenaArchwayMesh
 
         for (int i = 0; i < n - 1; i++)
         {
-            Vector3 i0 = At(inner[i]),     i1 = At(inner[i + 1]);
-            Vector3 o0 = At(outer[i]),     o1 = At(outer[i + 1]);
-            float   u0 = run[i],           u1 = run[i + 1];
+            float u0 = run[i], u1 = run[i + 1];
+            b.Height = (inner[i].y + inner[i + 1].y) * 0.5f;
 
-            // Soffit — the surface you pass under, facing in toward the opening.
-            b.Part = Part.Inside;
-            b.Quad(i0, i0 + back, i1 + back, i1,
-                   new Vector2(u0, 0f), new Vector2(u0, depth),
-                   new Vector2(u1, depth), new Vector2(u1, 0f));
+            for (int k = 0; k < ends; k++)
+            {
+                Vector3 i0 = At(inner[i], k),     i1 = At(inner[i + 1], k);
+                Vector3 o0 = At(outer[i], k),     o1 = At(outer[i + 1], k);
+                Vector3 j0 = At(inner[i], k + 1), j1 = At(inner[i + 1], k + 1);
+                Vector3 p0 = At(outer[i], k + 1), p1 = At(outer[i + 1], k + 1);
+                float   z0 = frames[k].z,         z1 = frames[k + 1].z;
 
-            // Extrados — the outside of the arch.
-            b.Part = Part.Outside;
-            b.Quad(o0, o1, o1 + back, o0 + back,
-                   new Vector2(u0, 0f), new Vector2(u1, 0f),
-                   new Vector2(u1, depth), new Vector2(u0, depth));
+                // Soffit — the surface you pass under, facing in toward the opening.
+                b.Part = Part.Inside;
+                b.Quad(i0, j0, j1, i1,
+                       new Vector2(u0, z0), new Vector2(u0, z1),
+                       new Vector2(u1, z1), new Vector2(u1, z0));
+
+                // Extrados — the outside of the arch.
+                b.Part = Part.Outside;
+                b.Quad(o0, o1, p1, p0,
+                       new Vector2(u0, z0), new Vector2(u1, z0),
+                       new Vector2(u1, z1), new Vector2(u0, z1));
+            }
 
             // The band itself, at each end of the tunnel.
             b.Part = Part.Faces;
-            b.Quad(i0, i1, o1, o0,
+            b.Quad(At(inner[i], 0), At(inner[i + 1], 0), At(outer[i + 1], 0), At(outer[i], 0),
                    new Vector2(u0, 0f), new Vector2(u1, 0f),
                    new Vector2(u1, thick), new Vector2(u0, thick));
-            b.Quad(i0 + back, o0 + back, o1 + back, i1 + back,
+            b.Quad(At(inner[i], ends), At(outer[i], ends), At(outer[i + 1], ends), At(inner[i + 1], ends),
                    new Vector2(u0, 0f), new Vector2(u0, thick),
                    new Vector2(u1, thick), new Vector2(u1, 0f));
         }
 
         // The feet the arch stands on — one at each end of the outline, closing the solid where
-        // it meets the rim.
+        // it meets the rim. Wound opposite ways at the two, so both face down out of the solid.
         b.Part = Part.Feet;
-        Foot(b, inner[0],     outer[0],     back, thick, depth, true);
-        Foot(b, inner[n - 1], outer[n - 1], back, thick, depth, false);
+        b.Height = 0f;
+        for (int k = 0; k < ends; k++)
+        {
+            float z0 = frames[k].z, z1 = frames[k + 1].z;
+            var uv = new[]
+            {
+                new Vector2(0f,    z0), new Vector2(thick, z0),
+                new Vector2(thick, z1), new Vector2(0f,    z1),
+            };
+
+            b.Quad(At(inner[0], k), At(outer[0], k), At(outer[0], k + 1), At(inner[0], k + 1),
+                   uv[0], uv[1], uv[2], uv[3]);
+            b.Quad(At(inner[n - 1], k), At(inner[n - 1], k + 1), At(outer[n - 1], k + 1), At(outer[n - 1], k),
+                   uv[0], uv[3], uv[2], uv[1]);
+        }
 
         return b.ToMesh("ArenaArchway");
     }
 
-    private static Vector3 At(Vector2 p) => new Vector3(p.x, p.y, 0f);
-
-    private static void Foot(MeshBuild b, Vector2 inner, Vector2 outer, Vector3 back,
-                             float thick, float depth, bool first)
+    /// <summary>
+    /// One place along the tunnel, in the archway's own space: the rim-top centre of the river
+    /// there, its cross axis (the way +x runs), and how far back from the front face it is.
+    /// </summary>
+    public struct Frame
     {
-        Vector3 i0 = At(inner), o0 = At(outer);
-        var uv = new[]
-        {
-            new Vector2(0f,    0f), new Vector2(thick, 0f),
-            new Vector2(thick, depth), new Vector2(0f, depth),
-        };
-
-        // Wound opposite ways at the two feet, so both face down out of the solid.
-        if (first) b.Quad(i0, o0, o0 + back, i0 + back, uv[0], uv[1], uv[2], uv[3]);
-        else       b.Quad(i0, i0 + back, o0 + back, o0,   uv[0], uv[3], uv[2], uv[1]);
+        public Vector3 origin;
+        public Vector3 right;
+        public float   z;
     }
 
     /// <summary>
@@ -182,6 +217,11 @@ public static class ArenaArchwayMesh
         public List<Part> Parts;
         public Part       Part;
 
+        // Where each triangle's height above the rim is recorded, if anyone asked, and the
+        // height of what is being built now.
+        public List<float> Heights;
+        public float       Height;
+
         // Wound a-c-b rather than a-b-c: the corners are handed in walking the arch outline,
         // which traces the solid the other way round. Taken at face value every face of the
         // archway points into it and the whole thing renders inside out.
@@ -204,6 +244,7 @@ public static class ArenaArchwayMesh
             _uvs.Add(ua);  _uvs.Add(ub);  _uvs.Add(uc);
             _tris.Add(i0); _tris.Add(i0 + 1); _tris.Add(i0 + 2);
             Parts?.Add(Part);
+            Heights?.Add(Height);
         }
 
         public Mesh ToMesh(string name)

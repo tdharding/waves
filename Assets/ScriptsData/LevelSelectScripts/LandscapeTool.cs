@@ -47,10 +47,22 @@ public class LandscapeTool : MonoBehaviour
     // Shelf, one per point: negative (or missing) for the usual lift, just under the rim top. A
     // run with its outer walls off has the ground run straight onto its rim instead: lifted to
     // the rim top exactly and held level this far past its outer edge before easing back.
+    // Cut gap, one per point: the path's Cutout Gap — how far past the outer edge the ground is
+    // cut away, negative to tuck it in under the rim (missing reads as the default tuck).
+    // Smooth, one per point: the path's Smooth Factor — the rocky noise is calmed over the reach
+    // times (1 + this), so further out than the ground is lifted (missing reads as 0).
     [HideInInspector] public List<Vector4> riverEdgePoints   = new();
     [HideInInspector] public List<float>   riverEdgeReach    = new();
     [HideInInspector] public List<float>   riverEdgeStrength = new();
     [HideInInspector] public List<float>   riverEdgeShelf    = new();
+    [HideInInspector] public List<float>   riverEdgeCutGap   = new();
+    [HideInInspector] public List<float>   riverEdgeSmooth   = new();
+
+    // The painted base height, rocky noise and Texture maps, pushed by the Level Select Designer (its
+    // Landscape Maps working copy), laid over mapArea — the tile area: x/y the min world X/Z,
+    // width/height its extent.
+    [HideInInspector] public LandscapeMaps maps    = new();
+    [HideInInspector] public Rect          mapArea;
 
     /// <summary>The only thing the landscape shader still reads: the grain of the noise lean.</summary>
     static readonly int NoiseScaleId = Shader.PropertyToID("_HillNoiseScale");
@@ -58,6 +70,17 @@ public class LandscapeTool : MonoBehaviour
     // Read back for the Hole Depth gizmo — the very values the landscape shading uses.
     static readonly int HoleDepthId = Shader.PropertyToID("_LandscapeHoleDepth");
     static readonly int BaseYId     = Shader.PropertyToID("_LandscapeBaseY");
+
+    // The painted Texture map, as the landscape shader reads it: one texel per cell, r Red, g Blue,
+    // b Yellow (each 0 or 1), laid over the grid's own world area. Not baked into the tiles — the
+    // shader blends between the cells itself, so painting shows without a re-bake.
+    static readonly int PaintMapId  = Shader.PropertyToID("_LandscapePaintMap");
+    static readonly int PaintAreaId = Shader.PropertyToID("_LandscapePaintArea");
+    static readonly int PaintSizeId = Shader.PropertyToID("_LandscapePaintSize");
+
+    private Texture2D _paintMap;
+    private Color32[] _paintPixels;
+    private int       _paintVersion = 1, _paintBuiltVersion;
 
     // Bumped whenever the bake itself changes, so every tile re-bakes once.
     const int BakeVersion = 1;
@@ -79,12 +102,23 @@ public class LandscapeTool : MonoBehaviour
     void OnTransformChildrenChanged() => MarkDirty();
     void OnValidate()                 => MarkDirty();
 
+    void OnDisable()
+    {
+        // The shader falls back to everything Landscape rather than reading a texture now gone.
+        Shader.SetGlobalVector(PaintSizeId, Vector4.zero);
+        Shader.SetGlobalTexture(PaintMapId, Texture2D.blackTexture);
+        if (_paintMap != null) DestroyImmediate(_paintMap);
+        _paintMap = null;
+    }
+
     /// <summary>
     /// Something a tile is baked from changed (a tile's size or subdivisions, the river edges):
-    /// asks for an edit-mode tick, which re-bakes whatever it reaches.
+    /// asks for an edit-mode tick, which re-bakes whatever it reaches. The Texture map is rebuilt
+    /// on that tick too.
     /// </summary>
     public void MarkDirty()
     {
+        _paintVersion++;
 #if UNITY_EDITOR
         EditorApplication.QueuePlayerLoopUpdate();
 #endif
@@ -94,6 +128,7 @@ public class LandscapeTool : MonoBehaviour
     {
         // A bare global: no value is kept on the material, so it is sent every tick.
         PushNoiseScale();
+        PushPaintMap();
 
         if (Application.isPlaying) return;
 
@@ -108,13 +143,69 @@ public class LandscapeTool : MonoBehaviour
         _surface.edgeReach    = riverEdgeReach;
         _surface.edgeStrength = riverEdgeStrength;
         _surface.edgeShelf    = riverEdgeShelf;
+        _surface.edgeCutGap   = riverEdgeCutGap;
+        _surface.edgeSmooth   = riverEdgeSmooth;
         _surface.edgeCount    = Mathf.Min(riverEdgePoints.Count, riverEdgeReach.Count, MaxRiverEdgePoints);
+        _surface.maps         = maps != null && !maps.IsEmpty ? maps : null;
+        _surface.mapArea      = mapArea;
 
         foreach (var tile in GetComponentsInChildren<LandscapeTileMesh>())
             BakeIfChanged(tile);
     }
 
     void PushNoiseScale() => Shader.SetGlobalFloat(NoiseScaleId, noiseScale);
+
+    /// <summary>
+    /// Sends the painted Texture map to the landscape shader every tick: the texture (rebuilt only
+    /// when the maps change), the world area it lies over, and its cell count. With nothing painted
+    /// the size goes out as zero, which the shader reads as all Landscape before it samples.
+    /// </summary>
+    void PushPaintMap()
+    {
+        var grid = maps != null ? maps.texture : null;
+        var area = grid != null ? grid.AreaOr(mapArea) : default;
+        if (grid == null || grid.IsEmpty || area.width <= 0f || area.height <= 0f)
+        {
+            Shader.SetGlobalVector(PaintSizeId, Vector4.zero);
+            Shader.SetGlobalTexture(PaintMapId, Texture2D.blackTexture);
+            return;
+        }
+
+        int w = grid.cellsX, h = grid.cellsZ;
+        if (_paintMap == null || _paintMap.width != w || _paintMap.height != h)
+        {
+            if (_paintMap != null) DestroyImmediate(_paintMap);
+            _paintMap = new Texture2D(w, h, TextureFormat.RGBA32, false, true)
+            {
+                name       = "LandscapePaintMap",
+                hideFlags  = HideFlags.HideAndDontSave,
+                filterMode = FilterMode.Point,   // the shader reads cells by Load and blends them itself
+                wrapMode   = TextureWrapMode.Clamp,
+            };
+            _paintBuiltVersion = 0;
+        }
+
+        if (_paintBuiltVersion != _paintVersion)
+        {
+            if (_paintPixels == null || _paintPixels.Length != w * h) _paintPixels = new Color32[w * h];
+            for (int i = 0; i < w * h; i++)
+            {
+                int c = Mathf.RoundToInt(grid.cells[i]);
+                _paintPixels[i] = new Color32(c == LandscapeMaps.TextureRed    ? (byte)255 : (byte)0,
+                                              c == LandscapeMaps.TextureBlue   ? (byte)255 : (byte)0,
+                                              c == LandscapeMaps.TextureYellow ? (byte)255 : (byte)0, 255);
+            }
+            _paintMap.SetPixels32(_paintPixels);
+            _paintMap.Apply(false);
+            _paintBuiltVersion = _paintVersion;
+        }
+
+        Shader.SetGlobalTexture(PaintMapId, _paintMap);
+        // xy the area's min world X/Z, zw one over its width/depth.
+        Shader.SetGlobalVector(PaintAreaId, new Vector4(area.xMin, area.yMin, 1f / area.width, 1f / area.height));
+        // xy the cell count, z 1 = painted.
+        Shader.SetGlobalVector(PaintSizeId, new Vector4(w, h, 1f, 0f));
+    }
 
     // The landscape used to be raised in its shader from a property block on every tile. The
     // block would keep the tiles out of the SRP batcher for nothing now, so it is cleared.
@@ -132,12 +223,28 @@ public class LandscapeTool : MonoBehaviour
     /// Select Designer when runs or pools are built, or a path's Landscape Influence changes.
     /// </summary>
     public void SetRiverEdges(IList<Vector4> points, IList<float> reach, IList<float> strength,
-                              IList<float> shelf = null)
+                              IList<float> shelf = null, IList<float> cutGap = null,
+                              IList<float> smooth = null)
     {
         riverEdgePoints   = points   != null ? new List<Vector4>(points) : new List<Vector4>();
         riverEdgeReach    = reach    != null ? new List<float>(reach)    : new List<float>();
         riverEdgeStrength = strength != null ? new List<float>(strength) : new List<float>();
         riverEdgeShelf    = shelf    != null ? new List<float>(shelf)    : new List<float>();
+        riverEdgeCutGap   = cutGap   != null ? new List<float>(cutGap)   : new List<float>();
+        riverEdgeSmooth   = smooth   != null ? new List<float>(smooth)   : new List<float>();
+        MarkDirty();
+    }
+
+    /// <summary>
+    /// Replaces the painted maps the ground is raised and roughened by. Called by the Level Select
+    /// Designer whenever its Landscape Maps working copy changes; tiles they reach re-bake.
+    /// </summary>
+    public void SetMaps(LandscapeMaps source, Rect area)
+    {
+        maps ??= new LandscapeMaps();
+        if (source != null) maps.CopyFrom(source);
+        else                maps = new LandscapeMaps();
+        mapArea = area;
         MarkDirty();
     }
 
@@ -148,6 +255,14 @@ public class LandscapeTool : MonoBehaviour
     /// <summary>A traced point's shelf: negative for the usual lift, where none was traced too.</summary>
     public static float RiverEdgeShelfAt(IList<float> shelf, int i)
         => shelf != null && i < shelf.Count ? shelf[i] : -1f;
+
+    /// <summary>A traced point's Cutout Gap; the default tuck under the rim where none was traced.</summary>
+    public static float RiverEdgeCutGapAt(IList<float> cutGap, int i)
+        => cutGap != null && i < cutGap.Count ? cutGap[i] : -LandscapeHillHeight.RiverEdgeTuck;
+
+    /// <summary>A traced point's Smooth Factor; 0 where none was traced.</summary>
+    public static float RiverEdgeSmoothAt(IList<float> smooth, int i)
+        => smooth != null && i < smooth.Count ? Mathf.Max(0f, smooth[i]) : 0f;
 
     // Reads the hill handles into the surface, so a handle dragged, scaled, added or removed is
     // caught without anything having to report it.
@@ -199,7 +314,7 @@ public class LandscapeTool : MonoBehaviour
 
         FindNear(minX, maxX, minZ, maxZ, cellReach);
 
-        ulong from = Fingerprint(tile, cellsX, cellsZ);
+        ulong from = Fingerprint(tile, cellsX, cellsZ, minX, maxX, minZ, maxZ);
         bool  have = _bakedFrom.TryGetValue(tile, out ulong was) && was == from && IsBaked(tile, filter);
         if (have) return;
 
@@ -247,9 +362,10 @@ public class LandscapeTool : MonoBehaviour
 
             // The cut is looked at a cell past the tile (to meet the next tile cleanly), and a line
             // only matters there within a couple of cells of its edge.
-            if (Overlaps(p, q, half + 3f * cellReach, minX, maxX, minZ, maxZ)) _nearCuts.Add(i);
+            float gap = Mathf.Max(0f, RiverEdgeCutGapAt(_surface.edgeCutGap, i));
+            if (Overlaps(p, q, half + gap + 3f * cellReach, minX, maxX, minZ, maxZ)) _nearCuts.Add(i);
 
-            float reach = _surface.edgeReach[i];
+            float reach = _surface.edgeReach[i] * (1f + RiverEdgeSmoothAt(_surface.edgeSmooth, i));
             float shelf = Mathf.Max(0f, RiverEdgeShelfAt(_surface.edgeShelf, i));
             if (reach >= 0f && Overlaps(p, q, half + shelf + reach + pad, minX, maxX, minZ, maxZ)) _nearLifts.Add(i);
         }
@@ -264,7 +380,8 @@ public class LandscapeTool : MonoBehaviour
            Mathf.Max(p.z, q.z) + grow >= minZ && Mathf.Min(p.z, q.z) - grow <= maxZ;
 
     // Everything this tile's bake depends on, boiled down to one number.
-    ulong Fingerprint(LandscapeTileMesh tile, int cellsX, int cellsZ)
+    ulong Fingerprint(LandscapeTileMesh tile, int cellsX, int cellsZ,
+                      float minX, float maxX, float minZ, float maxZ)
     {
         ulong h = 14695981039346656037ul;
         void Add(float v) { unchecked { h = (h ^ (uint)System.BitConverter.SingleToInt32Bits(v)) * 1099511628211ul; } }
@@ -286,12 +403,19 @@ public class LandscapeTool : MonoBehaviour
             Add(i); AddV(_surface.edgePoints[i]); AddV(_surface.EdgeEnd(i)); Add(_surface.edgeReach[i]);
             Add(RiverEdgeStrengthAt(_surface.edgeStrength, i));
             Add(RiverEdgeShelfAt(_surface.edgeShelf, i));
+            Add(RiverEdgeSmoothAt(_surface.edgeSmooth, i));
         }
         Add(-2f);
         foreach (int i in _nearCuts)
         {
             Add(i); AddV(_surface.edgePoints[i]); AddV(_surface.EdgeEnd(i));
+            Add(RiverEdgeCutGapAt(_surface.edgeCutGap, i));
         }
+        Add(-3f);
+        // The painted cells that reach this tile — padded a normal step, as the hills are.
+        float pad = LandscapeHillHeight.NormalStep;
+        if (_surface.maps != null)
+            _surface.maps.Fingerprint(mapArea, minX - pad, maxX + pad, minZ - pad, maxZ + pad, Add);
         return h;
     }
 

@@ -692,7 +692,9 @@ public static class ArenaDoorMesh
     /// </summary>
     private static List<Vector2> Keyhole(float baseHalf, float waistHalf, float waistHeight,
                                          float bulbRadius, float height, float baseCurve,
-                                         int flareSteps, int neckSteps, int bulbSteps, int arcSteps)
+                                         int flareSteps, int neckSteps, int bulbSteps, int arcSteps,
+                                         float shoulderHalf = 0f, float shoulderRoundness = 0f,
+                                         int shoulderSteps = 0)
     {
         var rh = new List<Vector2>();
 
@@ -706,9 +708,32 @@ public static class ArenaDoorMesh
         var atFoot  = new Vector2(baseHalf,  0f);
         var atWaist = new Vector2(waistHalf, waistHeight);
 
-        // The flare: straight out from the waist down to the foot.
-        for (int i = 0; i <= flareSteps; i++)
-            rh.Add(Vector2.Lerp(atFoot, atWaist, (float)i / flareSteps));
+        if (shoulderSteps > 0 && shoulderHalf > waistHalf + 0.0001f)
+        {
+            // Shoulders: the side runs straight up from the foot to the shoulder, then curves
+            // round and in to the neck, arriving across. How far down the side the curve starts
+            // is the roundness's share of how far the shoulder stands out from the neck — 0 a
+            // flat shoulder with a corner, 1 a full quarter round.
+            float run  = shoulderHalf - waistHalf;
+            float drop = Mathf.Clamp01(shoulderRoundness) * Mathf.Min(run, waistHeight);
+            var   atShoulder = new Vector2(shoulderHalf, waistHeight - drop);
+
+            for (int i = 0; i <= flareSteps; i++)
+                rh.Add(Vector2.Lerp(atFoot, atShoulder, (float)i / flareSteps));
+
+            var side = atShoulder - atFoot;
+            side = side.sqrMagnitude > 1e-10f ? side.normalized : Vector2.up;
+            var s1 = atShoulder + side * (drop * 0.55f);
+            var s2 = atWaist + Vector2.right * (run * 0.55f);
+            for (int i = 1; i <= shoulderSteps; i++)
+                rh.Add(Bezier(atShoulder, s1, s2, atWaist, (float)i / shoulderSteps));
+        }
+        else
+        {
+            // The flare: straight out from the waist down to the foot.
+            for (int i = 0; i <= flareSteps; i++)
+                rh.Add(Vector2.Lerp(atFoot, atWaist, (float)i / flareSteps));
+        }
 
         // The neck: a curve leaving the waist straight up and arriving on the bulb running the
         // way the bulb runs, so the two read as one line rather than a join.
@@ -738,6 +763,38 @@ public static class ArenaDoorMesh
         }
 
         return pts;
+    }
+
+    /// <summary>
+    /// The door's keyhole silhouette with no sag, walked from the left foot (-baseHalf, 0) up
+    /// over the bulb and down to the right foot — the same outline the arena door is built
+    /// round, so anything else cut to it matches. Stations come about <paramref name="edge"/>
+    /// apart. A pool's doorways are cut through their wall to it.
+    ///
+    /// <paramref name="shoulderHalf"/> wider than the waist gives the body shoulders: the side
+    /// runs up from the foot to that width and curves round and in to the neck, as round as
+    /// <paramref name="shoulderRoundness"/> (0 to 1) says. At 0 width it is the plain flare.
+    /// </summary>
+    public static List<Vector2> KeyholeOutline(float baseHalf, float waistHalf, float waistHeight,
+                                               float bulbRadius, float height, float edge,
+                                               float shoulderHalf = 0f, float shoulderRoundness = 0f)
+    {
+        edge = Mathf.Max(edge, 0.005f);
+        bool  shoulders  = shoulderHalf > waistHalf + 0.0001f;
+        float run        = shoulders ? shoulderHalf - waistHalf : 0f;
+        float drop       = shoulders ? Mathf.Clamp01(shoulderRoundness) * Mathf.Min(run, waistHeight) : 0f;
+        var   sideTop    = shoulders ? new Vector2(shoulderHalf, waistHeight - drop)
+                                     : new Vector2(waistHalf, waistHeight);
+
+        int flare = Mathf.Max(1, Mathf.CeilToInt(
+            Vector2.Distance(new Vector2(baseHalf, 0f), sideTop) / edge));
+        int neck  = Mathf.Max(3, Mathf.CeilToInt(bulbRadius * 1.5f / edge));
+        int bulb  = Mathf.Max(4, Mathf.CeilToInt(
+            bulbRadius * (Mathf.PI - BulbAttachDegrees * Mathf.Deg2Rad) / edge));
+        int shoulder = shoulders ? Mathf.Max(4, Mathf.CeilToInt((run + drop) * 0.8f / edge)) : 0;
+
+        return Keyhole(baseHalf, waistHalf, waistHeight, bulbRadius, height, 0f, flare, neck, bulb, 0,
+                       shoulderHalf, shoulderRoundness, shoulder);
     }
 
     private static Vector2 Bezier(Vector2 a, Vector2 b, Vector2 c, Vector2 d, float t)

@@ -4,7 +4,7 @@ using UnityEngine;
 
 /// <summary>
 /// Where a Level Select Designer preset is edited — an installation outpost, a lollipop tower, a
-/// turret or a souls pool tower. The designer's preset rows only pick a preset (Edit / New open
+/// turret or a soul juice tank. The designer's preset rows only pick a preset (Edit / New open
 /// this); every one of its settings lives here.
 ///
 /// Editing a preset changes every placed thing that uses it: each edit is handed to the open
@@ -68,7 +68,9 @@ public class LevelSelectPresetEditorWindow : EditorWindow
             case InstallationOutpostPreset p: DrawOutpost(p);   break;
             case LollipopTowerPreset p:       DrawLollipop(p);  break;
             case TurretTowerPreset p:         DrawTurret(p);    break;
-            case SoulsPoolTowerPreset p:      DrawSoulsPool(p); break;
+            case SoulJuiceTankPreset p:      DrawSoulJuiceTank(p); break;
+            case SoulFishBowlPreset p:       DrawSoulFishBowl(p); break;
+            case NomKabarTreePreset p:        DrawNomKabarTree(p); break;
             case WallPreset p:                DrawWall(p);      break;
             case BridgePreset p:              DrawBridge(p);    break;
         }
@@ -81,7 +83,9 @@ public class LevelSelectPresetEditorWindow : EditorWindow
         InstallationOutpostPreset => "Installation Outpost",
         LollipopTowerPreset       => "Lollipop Tower",
         TurretTowerPreset         => "Turret Tower",
-        SoulsPoolTowerPreset      => "Souls Pool Tower",
+        SoulJuiceTankPreset      => "Soul Juice Tank",
+        SoulFishBowlPreset       => "Soul Fish Bowl",
+        NomKabarTreePreset        => "NomKabar Tree",
         WallPreset                => "Wall",
         BridgePreset              => "Bridge",
         _                         => preset.GetType().Name,
@@ -137,7 +141,12 @@ public class LevelSelectPresetEditorWindow : EditorWindow
     private void DrawLollipop(LollipopTowerPreset p)
     {
         EditorGUI.BeginChangeCheck();
-        var tower = LevelSelectDesignerWindow.DrawLollipopTowerFields(p.tower);
+        var tower = LevelSelectDesignerWindow.DrawLollipopTowerFields(p.tower, onInnerPresetCreated: made =>
+            Commit("New Lollipop Tower Preset", () =>
+            {
+                p.tower ??= new LollipopTower();
+                p.tower.innerLollipopPreset = made;
+            }));
         ClearDesignerTowerFlag();
         if (EditorGUI.EndChangeCheck())
             Commit("Edit Lollipop Tower Preset", () => p.tower = tower);
@@ -152,13 +161,36 @@ public class LevelSelectPresetEditorWindow : EditorWindow
             Commit("Edit Turret Tower Preset", () => p.turret = turret);
     }
 
-    private void DrawSoulsPool(SoulsPoolTowerPreset p)
+    private void DrawSoulJuiceTank(SoulJuiceTankPreset p)
     {
         EditorGUI.BeginChangeCheck();
-        var tower = LevelSelectDesignerWindow.DrawSoulsPoolTowerFields(p.tower);
+        var tower = LevelSelectDesignerWindow.DrawSoulJuiceTankFields(p.tower);
         ClearDesignerTowerFlag();
         if (EditorGUI.EndChangeCheck())
-            Commit("Edit Souls Pool Tower Preset", () => p.tower = tower);
+            Commit("Edit Soul Juice Tank Preset", () => p.tower = tower);
+    }
+
+    private void DrawSoulFishBowl(SoulFishBowlPreset p)
+    {
+        EditorGUI.BeginChangeCheck();
+        var tower = LevelSelectDesignerWindow.DrawSoulFishBowlFields(p.tower);
+        ClearDesignerTowerFlag();
+        if (EditorGUI.EndChangeCheck())
+            Commit("Edit Soul Fish Bowl Preset", () => p.tower = tower);
+    }
+
+    private void DrawNomKabarTree(NomKabarTreePreset p)
+    {
+        if (p.name == "Default NomKabarTree")
+            EditorGUILayout.LabelField("Every new NomKabarTree starts as this, and a tree's extra arms come from it " +
+                                       "when its Arm Count is raised. Trees already placed keep their own settings.",
+                                       EditorStyles.wordWrappedMiniLabel);
+
+        EditorGUI.BeginChangeCheck();
+        var tree = LevelSelectDesignerWindow.DrawNomKabarTreeFields(p.tree, "Preset:" + AssetDatabase.GetAssetPath(p));
+        ClearDesignerTowerFlag();
+        if (EditorGUI.EndChangeCheck())
+            Commit("Edit NomKabar Tree Preset", () => p.tree = tree);
     }
 
     // ─────────────────────────────────────────────

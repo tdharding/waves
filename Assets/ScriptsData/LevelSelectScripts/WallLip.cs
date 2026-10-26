@@ -18,5 +18,9 @@ public class WallLip
     [Tooltip("How far the lip's ring round a column stands out from the column's side. 0 leaves columns without one.")]
     [Min(0f)] public float columnRing = 0.02f;
 
+    [Tooltip("Carry each column's lip ring on down to the wall's base — a round sleeve the ring's size " +
+             "round the column below the lip.")]
+    public bool columnSleeve;
+
     public WallLip Clone() => (WallLip)MemberwiseClone();
 }

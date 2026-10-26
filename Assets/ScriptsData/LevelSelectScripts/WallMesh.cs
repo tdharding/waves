@@ -29,6 +29,10 @@ public class WallSeamSpot
     // carry only the one height.
     public bool    measuredBoth;
     public float   otherHeight;
+
+    // The node's permanent id (LevelSelectDesignerData.WallNode.nodeId). The designer keeps
+    // <see cref="node"/> pointing at that node's place as nodes are added and deleted.
+    public string  nodeId;
 }
 
 /// <summary>
@@ -80,7 +84,16 @@ public class WallMesh : MonoBehaviour
         public float portholeRadius;
         public float portholeHeight; // from the wall's base up to the hole's centre
 
-        public bool  column;      // a round column standing at the node, base to past the top
+        public bool  destruction;    // a hole broken down into the wall from its very top, through the lip too
+        public float holeOffset;     // along the wall from the node to the hole's middle
+        public float holeWidth;      // across the hole's top, along the wall
+        public float holeHeight;     // down from the very top — the lip's, with a lip — to the hole's bottom
+        public int   holeEdgeComplexity;
+        public float holeEdgeDepth, holeEdgeUnevenness, holeEdgeRoundness;
+        public float holeCornerCurve;      // how far each top corner curves away, 0..1
+        public int   holeCornerComplexity; // rounded shapes broken into each curved corner
+
+        public bool  column;     // a round column standing at the node, base to past the top
         public float columnRadius;
         public float columnHeight; // how far its top stands above the lip's top here — the wall's, with no lip
 
@@ -98,6 +111,9 @@ public class WallMesh : MonoBehaviour
 
     /// <summary>How many pieces a porthole's circle is cut into along the wall, each half round.</summary>
     public const int PortholeSteps = 16;
+
+    /// <summary>How many pieces a Destruction hole's edge is cut into, from one side of its top round to the other.</summary>
+    public const int HoleSteps = 64;
 
     /// <summary>
     /// The wall's centre line along its top, as unbroken pieces — a gap ends one and starts the
@@ -275,6 +291,12 @@ public class WallMesh : MonoBehaviour
         stone.lipTop       = Choice(s => s.wallLipTop,       stone.top);
         stone.lipSides     = Choice(s => s.wallLipSides,     stone.sides);
         stone.lipUnderside = Choice(s => s.wallLipUnderside, stone.sides);
+        stone.portholes          = Choice(s => s.wallPortholes,          stone.openings);
+        stone.damageEdge         = Choice(s => s.wallDamageEdge,         stone.openings);
+        stone.columnLipTop       = Choice(s => s.wallColumnLipTop,       stone.lipTop);
+        stone.columnLipSides     = Choice(s => s.wallColumnLipSides,     stone.lipSides);
+        stone.columnLipUnderside = Choice(s => s.wallColumnLipUnderside, stone.lipUnderside);
+        stone.columnSleeve       = Choice(s => s.wallColumnSleeve,       stone.columnLipSides);
 
         float lipH    = lip != null ? Mathf.Max(0f, lip.height) : 0f;
         float lipHalf = lip != null ? Mathf.Max(0.0005f, lip.thickness * 0.5f) : half;
@@ -282,6 +304,7 @@ public class WallMesh : MonoBehaviour
         // With a lip, it goes round every column as a ring standing its Column Ring out from it.
         float ringOut = lip != null ? Mathf.Max(0f, lip.columnRing) : 0f;
         bool  hasRing = lipH > Eps && ringOut > Eps;
+        bool  sleeve  = hasRing && lip.columnSleeve;
         var rings = new List<LipRing>();
         if (hasRing)
             for (int i = 0; i < nodeCount; i++)
@@ -289,8 +312,8 @@ public class WallMesh : MonoBehaviour
 
         foreach (var (points, nodeAt, loop) in CentreLinesWithNodes(nodes, closed))
         {
-            var line = Cuts(points, nodeAt, loop, nodes, bottomY, out var cutIn, out var cutOut, out var closeAt,
-                            out var along, out var bounds, out var marks);
+            var line = Cuts(points, nodeAt, loop, nodes, bottomY, lipH, out var cutIn, out var cutOut, out var closeAt,
+                            out var along, out var added, out var bounds, out var marks);
             if (line.Count < 2) continue;
 
             // The chunks along this piece, and which one each leg of it falls in. A loop's last
@@ -319,7 +342,7 @@ public class WallMesh : MonoBehaviour
                 Rows(nodes[node], bottomY, chunks[k].rows);
             }
 
-            AppendSlab(legChunk, stone, line, cutIn, cutOut, closeAt, loop, half, bottomY, lipH, lipHalf, rings);
+            AppendSlab(legChunk, stone, line, added, cutIn, cutOut, closeAt, loop, half, bottomY, lipH, lipHalf, rings);
         }
 
         for (int i = 0; i < nodeCount; i++)
@@ -327,7 +350,7 @@ public class WallMesh : MonoBehaviour
             if (!nodes[i].column) continue;
             if (nodeChunk[i] < 0) { nodeChunk[i] = chunks.Count; chunks.Add(new Chunk()); }   // a node standing alone between two gaps
             AppendColumn(chunks[nodeChunk[i]], stone, nodes[i], bottomY);
-            if (hasRing) AppendLipRing(chunks[nodeChunk[i]], stone, nodes[i], lipH, ringOut);
+            if (hasRing) AppendLipRing(chunks[nodeChunk[i]], stone, nodes[i], lipH, ringOut, sleeve, bottomY);
         }
 
         // Where each removed spot is on the wall as it stands now, and which way its seam runs.
@@ -381,7 +404,8 @@ public class WallMesh : MonoBehaviour
             // River run stone shading, the waterline placed off the rim top at y = 0.
             int index    = meshes.Count;
             var surfaces = new RiverMeshBuilder.StoneSurfaces();
-            meshes.Add(RiverMeshBuilder.ShadeAsStone(mesh, 0f, null, chunk.kinds, chunk.parts, lines, surfaces));
+            meshes.Add(RiverMeshBuilder.ShadeAsStone(mesh, 0f, null, chunk.kinds, chunk.parts, lines, surfaces,
+                                                         StoneDesignation.Walls));
             chunkSurfaces.Add(surfaces);
 
             if (report != null && lines != null)
@@ -978,12 +1002,17 @@ public class WallMesh : MonoBehaviour
     {
         public StoneFaceKind sides, top, ends, openings, columnSides, columnTop;
         public StoneFaceKind lipTop, lipSides, lipUnderside;
+        public StoneFaceKind portholes;
+        public StoneFaceKind damageEdge;
+        public StoneFaceKind columnLipTop, columnLipSides, columnLipUnderside;
+        public StoneFaceKind columnSleeve;
     }
 
-    /// <summary>An archway or a porthole, placed along one piece of the wall.</summary>
+    /// <summary>An archway or a porthole, placed along one piece of the wall — or every Destruction hole on it.</summary>
     struct Cut
     {
         public bool  porthole; // a round hole with wall under it; else an archway up from the base
+        public bool  damage;   // the piece's Destruction holes, all as one cut — each reaches the top
         public float at;       // how far along the piece its node is
         public float halfW;    // half its width along the wall — a porthole's radius
         public float round;    // archway: how tall its round top is
@@ -996,6 +1025,18 @@ public class WallMesh : MonoBehaviour
     {
         public bool  on;
         public float lo, hi;
+        public bool  porthole;   // the cut reaching here is a porthole, not an archway
+        public bool  damage;     // the Destruction holes' cut, which carries lo — the hole's edge — even where off
+    }
+
+    /// <summary>
+    /// One Destruction hole along a piece: its edge from one side of its top to the other, as
+    /// <c>xs</c> along the wall from its middle (always rising) and <c>depths</c> down from the very top.
+    /// </summary>
+    class Hole
+    {
+        public float   middle;   // how far along the piece the hole's middle is
+        public float[] xs, depths;
     }
 
     const float Eps = 1e-6f;
@@ -1017,13 +1058,18 @@ public class WallMesh : MonoBehaviour
     /// only at an archway's straight side. Every point carries every cut, ordered low to high up
     /// the wall; <paramref name="closeAt"/> is the height each cut closes to where it doesn't reach.
     ///
+    /// Every Destruction hole on the piece comes as one cut, last: it reaches past the top. Its
+    /// edge is measured down from the very top — <paramref name="lipH"/> over the wall's — so it
+    /// carries the edge's height at every point, even where the hole is only into the lip.
+    ///
     /// Also hands back how far along the piece each point is (<paramref name="alongOut"/>), where
     /// one chunk ends and the next begins (<paramref name="bounds"/>, low to high, each with a
     /// point of its own on the line), and how far along each node stands (<paramref name="marks"/>).
     /// </summary>
     static List<Vector3> Cuts(List<Vector3> line, List<int> nodeAt, bool loop, IList<Node> nodes,
-                              float bottomY, out Open[][] cutIn, out Open[][] cutOut, out float[] closeAt,
-                              out List<float> alongOut, out List<float> bounds, out List<(int node, float at)> marks)
+                              float bottomY, float lipH, out Open[][] cutIn, out Open[][] cutOut, out float[] closeAt,
+                              out List<float> alongOut, out List<bool> addedOut, out List<float> bounds,
+                              out List<(int node, float at)> marks)
     {
         int count = line.Count;
 
@@ -1034,7 +1080,8 @@ public class WallMesh : MonoBehaviour
             along[i + 1] = along[i] + Flat(line[(i + 1) % count] - line[i]).magnitude;
         float length = along[legs];
 
-        var cuts = new List<Cut>();
+        var cuts  = new List<Cut>();
+        var holes = new List<Hole>();
         marks = new List<(int, float)>();
         var reach = new List<float>();   // how far each node's openings reach either side of it
         for (int i = 0; i < count; i++)
@@ -1063,10 +1110,20 @@ public class WallMesh : MonoBehaviour
                                    height = node.portholeHeight, topY = node.top.y });
                 widest = Mathf.Max(widest, node.portholeRadius);
             }
+
+            if (node.destruction && node.holeWidth * 0.5f > 1e-4f && node.holeHeight > 0f)
+            {
+                var hole = HoleOf(node, along[i]);
+                holes.Add(hole);
+                widest = Mathf.Max(widest, Mathf.Abs(node.holeOffset) +
+                                           Mathf.Max(-hole.xs[0], hole.xs[hole.xs.Length - 1]));
+            }
             reach.Add(widest);
         }
+        if (holes.Count > 0) cuts.Add(new Cut { damage = true });
 
-        // Low to high: archways first (they stand on the base), portholes by their centres.
+        // Low to high: archways first (they stand on the base), portholes by their centres, the
+        // Destruction holes last.
         cuts.Sort((x, y) => CloseAt(x, bottomY).CompareTo(CloseAt(y, bottomY)));
         closeAt = new float[cuts.Count];
         for (int k = 0; k < cuts.Count; k++) closeAt[k] = CloseAt(cuts[k], bottomY);
@@ -1093,19 +1150,28 @@ public class WallMesh : MonoBehaviour
             cutIn = cutOut = new Open[count][];
             for (int i = 0; i < count; i++) cutIn[i] = new Open[cuts.Count];
             alongOut = new List<float>(along);
+            addedOut = new List<bool>(new bool[count]);
             return line;
         }
 
-        // Where the extra points go.
-        var extra = new List<float>();
-        void Extra(float s)
+        // Where the extra points go, and which are steps along a Destruction hole's edge.
+        var extra = new List<(float s, bool hole)>();
+        void Extra(float s, bool hole = false)
         {
             if (loop) s = Mathf.Repeat(s, length);
             else if (s < 0f || s > length) return;
-            extra.Add(s);
+            extra.Add((s, hole));
         }
         foreach (var cut in cuts)
         {
+            if (cut.damage)
+            {
+                // Every step along each hole's edge.
+                foreach (var hole in holes)
+                    foreach (float x in hole.xs) Extra(hole.middle + x, true);
+                continue;
+            }
+
             if (!cut.porthole)
             {
                 // The two sides, and evenly across the round.
@@ -1129,29 +1195,40 @@ public class WallMesh : MonoBehaviour
             }
         }
         foreach (float b in bounds) Extra(b);   // every chunk ends on a point of its own
-        extra.Sort();
+        extra.Sort((x, y) => x.s.CompareTo(y.s));
 
         // The original points and the extra ones, merged in order along the piece.
         var outLine  = new List<Vector3>(count + extra.Count);
         var outAlong = new List<float>(count + extra.Count);
+        var outAdded = new List<bool>(count + extra.Count);   // whether each point is one of the extra ones
+        var outHole  = new List<bool>(count + extra.Count);   // whether it is only a step along a hole's edge
 
-        void Add(Vector3 p, float s)
+        void Add(Vector3 p, float s, bool isExtra, bool isHole)
         {
-            if (outAlong.Count > 0 && s - outAlong[outAlong.Count - 1] < 1e-5f) return;
+            if (outAlong.Count > 0 && s - outAlong[outAlong.Count - 1] < 1e-5f)
+            {
+                // A point in the same place as one the wall needs keeps it: an original its
+                // corner, an opening its side.
+                if (!isExtra) outAdded[outAdded.Count - 1] = false;
+                if (!isHole)  outHole[outHole.Count - 1]   = false;
+                return;
+            }
             outLine.Add(p);
             outAlong.Add(s);
+            outAdded.Add(isExtra);
+            outHole.Add(isHole);
         }
 
         int e = 0;
         for (int i = 0; i < count; i++)
         {
-            Add(line[i], along[i]);
+            Add(line[i], along[i], false, false);
             if (i >= legs) break;
-            while (e < extra.Count && extra[e] <= along[i]) e++;
-            for (; e < extra.Count && extra[e] < along[i + 1]; e++)
+            while (e < extra.Count && extra[e].s <= along[i]) e++;
+            for (; e < extra.Count && extra[e].s < along[i + 1]; e++)
             {
-                float t = (extra[e] - along[i]) / Mathf.Max(along[i + 1] - along[i], 1e-9f);
-                Add(Vector3.Lerp(line[i], line[(i + 1) % count], t), extra[e]);
+                float t = (extra[e].s - along[i]) / Mathf.Max(along[i + 1] - along[i], 1e-9f);
+                Add(Vector3.Lerp(line[i], line[(i + 1) % count], t), extra[e].s, true, extra[e].hole);
             }
         }
 
@@ -1160,7 +1237,13 @@ public class WallMesh : MonoBehaviour
         {
             outLine.RemoveAt(outLine.Count - 1);
             outAlong.RemoveAt(outAlong.Count - 1);
+            outAdded.RemoveAt(outAdded.Count - 1);
+            outHole.RemoveAt(outHole.Count - 1);
         }
+
+        // How far down from the very top the holes reach at each point.
+        List<float> depths = null;
+        if (holes.Count > 0) depths = HolePoints(outLine, outAlong, outAdded, outHole, loop, length, holes, lipH, bottomY);
 
         int outCount = outLine.Count;
         cutIn  = new Open[outCount][];
@@ -1171,16 +1254,322 @@ public class WallMesh : MonoBehaviour
             cutOut[i] = new Open[cuts.Count];
             for (int k = 0; k < cuts.Count; k++)
             {
+                if (cuts[k].damage)
+                {
+                    cutIn[i][k] = cutOut[i][k] = Bite(depths[i], outLine[i].y, lipH);
+                    continue;
+                }
                 cutIn[i][k]  = Reach(cuts[k], outAlong[i], -1, length, loop, bottomY);
                 cutOut[i][k] = Reach(cuts[k], outAlong[i], +1, length, loop, bottomY);
             }
         }
         alongOut = outAlong;
+        addedOut = outAdded;
         return outLine;
     }
 
     // Where a cut sits in the low-to-high order, and the height it closes to where it doesn't reach.
-    static float CloseAt(Cut cut, float bottomY) => cut.porthole ? bottomY + cut.height : bottomY;
+    // The Destruction holes close to past the top: where they don't reach, the wall stands to its top.
+    static float CloseAt(Cut cut, float bottomY) =>
+        cut.damage ? float.MaxValue : cut.porthole ? bottomY + cut.height : bottomY;
+
+    /// <summary>
+    /// A Destruction hole's edge, from one side of its top round to the other, centred on its
+    /// node's place along the piece plus Hole Offset. Round, Hole Width across and Hole Height
+    /// deep, with Hole Edge Complexity rounded shapes along it reaching out past it by up to Hole
+    /// Edge Depth of its size — the orb's hole edge (<see cref="LollipopTower.HoleEdgeAngles"/>),
+    /// laid along half a round. Where a shape would curl back over the edge before it, the edge
+    /// steps steeply instead, so the wall is never left overhanging. Its steps stand at least
+    /// <see cref="HoleMinStep"/> apart along the wall.
+    /// </summary>
+    static Hole HoleOf(Node node, float at)
+    {
+        float halfW  = node.holeWidth * 0.5f;
+        int   count  = Mathf.Max(0, node.holeEdgeComplexity);
+        float uneven = Mathf.Clamp01(node.holeEdgeUnevenness);
+        float power  = Mathf.Lerp(2f, 5f, Mathf.Clamp01(node.holeEdgeRoundness));
+        float depth  = Mathf.Clamp01(node.holeEdgeDepth);
+
+        var middles = new float[count];
+        var halves  = new float[count];
+        var lengths = new float[count];
+        float spacing = count > 0 ? Mathf.PI / count : 0f;
+        for (int i = 0; i < count; i++)
+        {
+            middles[i] = (i + 0.5f + (Hash(i, 1) - 0.5f) * 0.5f * uneven) * spacing;
+            halves[i]  = 0.5f * spacing * (1f + uneven * (Hash(i, 2) * 0.9f - 0.45f));
+            lengths[i] = 1f - uneven * 0.75f * Hash(i, 3);
+        }
+
+        var xs     = new List<float>(HoleSteps + 1);
+        var depths = new List<float>(HoleSteps + 1);
+        for (int k = 0; k <= HoleSteps; k++)
+        {
+            float theta = Mathf.PI * (1f - k / (float)HoleSteps);   // round from the left of the top to the right
+            float reach = 0f;
+            for (int i = 0; i < count; i++)
+            {
+                float t = Mathf.Abs(theta - middles[i]) / halves[i];
+                if (t >= 1f) continue;
+                float hump = 1f - Mathf.Pow(t, power);
+                reach += lengths[i] * hump * hump;
+            }
+            float r = 1f + depth * reach;
+
+            float x     = halfW * r * Mathf.Cos(theta);
+            float down  = k == 0 || k == HoleSteps ? 0f : Mathf.Max(0f, node.holeHeight * r * Mathf.Sin(theta));
+            bool  last  = k == HoleSteps;
+
+            // Only on along the wall, each step clear of the one before — the far side of the
+            // top always kept, standing in for a step too close to it.
+            if (xs.Count > 0 && x < xs[xs.Count - 1] + HoleMinStep)
+            {
+                if (!last) continue;
+                if (xs.Count > 1) { xs.RemoveAt(xs.Count - 1); depths.RemoveAt(depths.Count - 1); }
+                x = Mathf.Max(x, xs[xs.Count - 1] + HoleMinStep);
+            }
+            xs.Add(x);
+            depths.Add(down);
+        }
+
+        // Hole Corner Curve: each top corner curved away, the left one by mirroring.
+        if (node.holeCornerCurve > 0f && xs.Count > 2)
+        {
+            Corner(node, xs, depths, 100);
+            for (int k = 0; k < xs.Count; k++) xs[k] = -xs[k];
+            xs.Reverse(); depths.Reverse();
+            Corner(node, xs, depths, 200);
+            for (int k = 0; k < xs.Count; k++) xs[k] = -xs[k];
+            xs.Reverse(); depths.Reverse();
+        }
+        return new Hole { middle = at + node.holeOffset, xs = xs.ToArray(), depths = depths.ToArray() };
+    }
+
+    const int CornerSteps = 32;
+
+    /// <summary>
+    /// Curves the hole's right-hand top corner away: from where its edge is Hole Corner Curve of
+    /// Hole Height down, round past the corner to Hole Corner Curve of Hole Width out along the
+    /// top, meeting the top flat. Hole Corner Complexity rounded shapes are broken into the curve,
+    /// into the wall, sized by the hole edge's Depth, Unevenness and Roundness; where one would
+    /// curl back, the edge steps instead, as along the rest of the hole. <paramref name="salt"/>
+    /// keeps the two corners' shapes apart.
+    /// </summary>
+    static void Corner(Node node, List<float> xs, List<float> depths, int salt)
+    {
+        float curve = Mathf.Clamp01(node.holeCornerCurve);
+        int   last  = xs.Count - 1;
+
+        // Where the curve leaves the hole's edge: the first point in from the corner that far down.
+        float want = curve * node.holeHeight;
+        int   from = -1, deepest = 0;
+        for (int k = last - 1; k > 0 && from < 0; k--)
+            if (depths[k] >= want) from = k;
+        for (int k = 1; k < last; k++) if (depths[k] > depths[deepest]) deepest = k;
+        if (from < 0) from = deepest;
+
+        Vector2 p0 = new Vector2(xs[from], depths[from]);
+        Vector2 p1 = new Vector2(xs[last], 0f);
+        Vector2 p2 = new Vector2(xs[last] + curve * node.holeWidth, 0f);
+        xs.RemoveRange(from + 1, last - from);
+        depths.RemoveRange(from + 1, last - from);
+
+        // The rounded shapes along the curve, each kept inside it so the ends stay on the edge and the top.
+        int   count  = Mathf.Max(0, node.holeCornerComplexity);
+        float uneven = Mathf.Clamp01(node.holeEdgeUnevenness);
+        float power  = Mathf.Lerp(2f, 5f, Mathf.Clamp01(node.holeEdgeRoundness));
+        var middles = new float[count];
+        var halves  = new float[count];
+        var lengths = new float[count];
+        float spacing = count > 0 ? 1f / count : 0f;
+        for (int i = 0; i < count; i++)
+        {
+            middles[i] = (i + 0.5f + (Hash(i + salt, 1) - 0.5f) * 0.5f * uneven) * spacing;
+            halves[i]  = 0.5f * spacing * (1f + uneven * (Hash(i + salt, 2) * 0.9f - 0.45f));
+            halves[i]  = Mathf.Min(halves[i], middles[i], 1f - middles[i]);
+            lengths[i] = 1f - uneven * 0.75f * Hash(i + salt, 3);
+        }
+
+        // Half as tall as wide at full Hole Edge Depth.
+        float curveLength = 0f;
+        for (int k = 1; k <= CornerSteps; k++)
+            curveLength += Vector2.Distance(Bezier(p0, p1, p2, (k - 1) / (float)CornerSteps),
+                                            Bezier(p0, p1, p2, k / (float)CornerSteps));
+        float height = count > 0 ? Mathf.Clamp01(node.holeEdgeDepth) * 0.5f * curveLength * spacing : 0f;
+
+        for (int k = 1; k <= CornerSteps; k++)
+        {
+            float   t     = k / (float)CornerSteps;
+            Vector2 p     = Bezier(p0, p1, p2, t);
+            bool    final = k == CornerSteps;
+
+            float reach = 0f;
+            for (int i = 0; i < count && !final; i++)
+            {
+                float u = Mathf.Abs(t - middles[i]) / Mathf.Max(halves[i], 1e-6f);
+                if (u >= 1f) continue;
+                float hump = 1f - Mathf.Pow(u, power);
+                reach += lengths[i] * hump * hump;
+            }
+            if (reach > 0f)
+            {
+                // Into the wall: out along it and down.
+                Vector2 tangent = 2f * (1f - t) * (p1 - p0) + 2f * t * (p2 - p1);
+                Vector2 inward  = new Vector2(-tangent.y, tangent.x).normalized;
+                p += inward * (height * reach);
+            }
+
+            float x = p.x, down = final ? 0f : Mathf.Max(0f, p.y);
+            if (x < xs[xs.Count - 1] + HoleMinStep)
+            {
+                if (!final) continue;
+                if (xs.Count > from + 1) { xs.RemoveAt(xs.Count - 1); depths.RemoveAt(depths.Count - 1); }
+                x = Mathf.Max(x, xs[xs.Count - 1] + HoleMinStep);
+            }
+            xs.Add(x);
+            depths.Add(down);
+        }
+    }
+
+    static Vector2 Bezier(Vector2 a, Vector2 b, Vector2 c, float t) =>
+        (1f - t) * (1f - t) * a + 2f * t * (1f - t) * b + t * t * c;
+
+    // A fixed number in [0, 1) for shape `i` — the same every build, the same as the orb's.
+    static float Hash(int i, int salt)
+    {
+        float x = Mathf.Sin(i * 12.9898f + salt * 78.233f) * 43758.5453f;
+        return x - Mathf.Floor(x);
+    }
+
+    /// <summary>How far down from the very top the Destruction holes reach at <paramref name="s"/> — the deepest of them; 0 where none.</summary>
+    static float HoleDepthAt(List<Hole> holes, float s, float length, bool loop)
+    {
+        float most = 0f;
+        foreach (var hole in holes)
+        {
+            float d = s - hole.middle;
+            if (loop) d = Mathf.Repeat(d + length * 0.5f, length) - length * 0.5f;
+            var xs = hole.xs;
+            if (d <= xs[0] || d >= xs[xs.Length - 1]) continue;
+
+            int k = 0;
+            while (k < xs.Length - 2 && xs[k + 1] <= d) k++;
+            float t = (d - xs[k]) / Mathf.Max(xs[k + 1] - xs[k], 1e-9f);
+            most = Mathf.Max(most, Mathf.Lerp(hole.depths[k], hole.depths[k + 1], t));
+        }
+        return most;
+    }
+
+    /// <summary>
+    /// The Destruction holes' cut at a point whose top is <paramref name="topY"/>, the holes
+    /// reaching <paramref name="depth"/> down from the very top there: their edge (<c>lo</c>),
+    /// always carried — and on only where it is down into the wall itself, not just into the lip.
+    /// Within <see cref="HoleSnap"/> of the wall's top, the edge is on it: the wall not cut, and
+    /// no lip left standing.
+    /// </summary>
+    static Open Bite(float depth, float topY, float lipH)
+    {
+        float top = topY + lipH;
+        return new Open { on = depth > lipH + HoleSnap, lo = top - depth, hi = top, damage = true };
+    }
+
+    /// <summary>
+    /// How near a hole's edge has to come to the wall's top to count as on it. Where the edge
+    /// drops steeply, the point found for that crossing sits a few hundredths of a millimetre
+    /// off it, which would leave the lip's foot that far above the wall's cut — a crack.
+    /// </summary>
+    const float HoleSnap = 1e-4f;
+
+    /// <summary>
+    /// The closest a Destruction hole's points come to each other, or to any other point along
+    /// the wall. The stone shading welds corners onto a millimetre grid, so two closer than that
+    /// can land as one and leave a sliver whose open side draws as a dark seam spot.
+    /// </summary>
+    const float HoleMinStep = 2e-3f;
+
+    /// <summary>
+    /// Settles the points along a piece with Destruction holes, and hands back how far down from
+    /// the very top the holes reach at each. A step along a hole's edge that falls within
+    /// <see cref="HoleMinStep"/> of a point the wall needs for something else is dropped. Then,
+    /// wherever the edge crosses the wall's top (under a lip) or its base between two points, a
+    /// point goes there — or the nearest step along the edge moves onto it, when one is within
+    /// HoleMinStep — so no stretch has the lip standing at one end and the wall cut open at the
+    /// other, or wall at one end and none at the other. A point put on a crossing is given that
+    /// crossing's depth exactly, so it lands right on the top or the base.
+    /// </summary>
+    static List<float> HolePoints(List<Vector3> line, List<float> along, List<bool> added, List<bool> hole,
+                                  bool loop, float length, List<Hole> holes, float lipH, float bottomY)
+    {
+        // Edge steps crowding a point the wall needs.
+        for (int i = line.Count - 1; i >= 0 && line.Count > 2; i--)
+        {
+            if (!hole[i]) continue;
+            int  back = i - 1, on = i + 1;
+            bool near = (back >= 0 && !hole[back] && along[i] - along[back] < HoleMinStep) ||
+                        (on < line.Count && !hole[on] && along[on] - along[i] < HoleMinStep);
+            if (!near) continue;
+            line.RemoveAt(i); along.RemoveAt(i); added.RemoveAt(i); hole.RemoveAt(i);
+        }
+
+        var depths = new List<float>(line.Count + 8);
+        foreach (float s in along) depths.Add(HoleDepthAt(holes, s, length, loop));
+
+        // How far a point is above a level (+) or below it, counted as on it within HoleSnap.
+        static float Off(float v) => Mathf.Abs(v) <= HoleSnap ? 0f : v;
+
+        int looks = 0;
+        for (int i = 0; i < (loop ? line.Count : line.Count - 1); i++)
+        {
+            if (++looks > 4 * line.Count + 16) break;   // never round for ever on a point that won't settle
+            int   j  = (i + 1) % line.Count;
+            float sA = along[i], sB = j == 0 ? length : along[j];
+            float dA = depths[i], dB = depths[j];
+            if (dA <= 0f && dB <= 0f) continue;
+
+            // The first crossing along the stretch — of the wall's top under a lip, or of the
+            // base — and the depth the edge has there.
+            float t = 2f;
+            bool  atBase = false;
+            if (lipH > HoleSnap)
+            {
+                float fa = Off(lipH - dA), fb = Off(lipH - dB);
+                if (fa * fb < 0f) t = fa / (fa - fb);
+            }
+            {
+                float fa = Off(line[i].y + lipH - dA - bottomY), fb = Off(line[j].y + lipH - dB - bottomY);
+                if (fa * fb < 0f && fa / (fa - fb) < t) { t = fa / (fa - fb); atBase = true; }
+            }
+            if (t > 1f) continue;
+
+            float   s = Mathf.Lerp(sA, sB, t);
+            Vector3 p = Vector3.Lerp(line[i], line[j], t);
+
+            // The edge's depth on the crossing, for a point whose top is topY.
+            float DepthOn(float topY) => atBase ? topY + lipH - bottomY : lipH;
+
+            // Within HoleMinStep of a point, that point takes the crossing: a step along the edge
+            // moves onto it, any other point stays where the wall needs it and takes its depth.
+            bool nearA = s - sA < HoleMinStep, nearB = sB - s < HoleMinStep;
+            if (nearA && (!nearB || s - sA <= sB - s))
+            {
+                if (hole[i] && (loop || i > 0)) { line[i] = p; along[i] = s; }
+                depths[i] = DepthOn(line[i].y);
+                i--;   // the rest of this stretch, on from the crossing, may cross again
+            }
+            else if (nearB)
+            {
+                if (hole[j] && j != 0) { line[j] = p; along[j] = s; }
+                depths[j] = DepthOn(line[j].y);
+            }
+            else
+            {
+                line.Insert(i + 1, p); along.Insert(i + 1, s); depths.Insert(i + 1, DepthOn(p.y));
+                added.Insert(i + 1, true); hole.Insert(i + 1, true);
+            }
+            // The stretch on from the crossing may cross again; it comes next.
+        }
+        return depths;
+    }
 
     /// <summary>
     /// How far one cut reaches at a point <paramref name="s"/> along the piece. Right on an
@@ -1201,7 +1590,7 @@ public class WallMesh : MonoBehaviour
         {
             if (Mathf.Abs(d) > cut.halfW + tol) return default;
             float c = bottomY + cut.height, h = cut.halfW * round;
-            return new Open { on = true, lo = c - h, hi = c + h };
+            return new Open { on = true, lo = c - h, hi = c + h, porthole = true };
         }
 
         bool inside = side > 0 ? d >= -cut.halfW - tol && d < cut.halfW - tol
@@ -1233,6 +1622,12 @@ public class WallMesh : MonoBehaviour
         bands.Add(new Vector2(at, topY));
     }
 
+    // What the faces of cut k, reaching either of two points, are: a Destruction hole's edge, a
+    // porthole, or an archway — the stone they take and what they're labelled.
+    static (StoneFaceKind kind, string label) CutFace(Open[] a, Open[] b, int k, PartKinds stone) =>
+        a[k].damage   || b[k].damage   ? (stone.damageEdge, "Damage Edge") :
+        a[k].porthole || b[k].porthole ? (stone.portholes,  "Porthole")    : (stone.openings, "Archway");
+
     // The cuts reaching either of two points — the ones to band both round.
     static void Using(Open[] a, Open[] b, List<int> use)
     {
@@ -1244,18 +1639,29 @@ public class WallMesh : MonoBehaviour
     // ── One unbroken piece: a side each way, the top, and a flat end at each open end ──
     // Each leg goes into its own chunk (legChunk), the piece worked out whole so they meet.
     // With a lip (lipH > 0), a square band lipHalf either side of the line stands on the top,
-    // its top and underside cut back wherever a column's lip ring stands (rings).
+    // its top and underside cut back wherever a column's lip ring stands (rings), and cut down
+    // to a Destruction hole's edge wherever one is broken into it.
     static void AppendSlab(Chunk[] legChunk, PartKinds stone,
-                           List<Vector3> line, Open[][] cutIn, Open[][] cutOut, float[] closeAt,
+                           List<Vector3> line, List<bool> added, Open[][] cutIn, Open[][] cutOut, float[] closeAt,
                            bool loop, float half, float bottomY, float lipH = 0f, float lipHalf = 0f,
                            IList<LipRing> rings = null)
     {
         bool  hasLip   = lipH > Eps;
         float lipScale = hasLip ? lipHalf / half : 1f;   // the lip's mitred offsets are the wall's, scaled
-        Vector3 lift   = Vector3.up * lipH;
 
         int count = line.Count;
         if (count < 2) return;
+
+        // How high the lip stands at point i: all of it, less wherever a Destruction hole is
+        // broken down into it — the holes are the last cut, and carry their edge everywhere.
+        int holesCut = closeAt.Length - 1;
+        if (holesCut >= 0 && !cutIn[0][holesCut].damage) holesCut = -1;
+        float LipAt(int i)
+        {
+            if (holesCut < 0) return lipH;
+            float h = cutIn[i][holesCut].lo - line[i].y;
+            return h <= HoleSnap ? 0f : Mathf.Min(h, lipH);
+        }
 
         // Out to the left of the line at each point, mitred where two stretches meet so the
         // slab keeps its thickness round a corner. A very sharp corner is held back from
@@ -1277,6 +1683,7 @@ public class WallMesh : MonoBehaviour
             float   cos  = Mathf.Max(0.25f, Vector3.Dot(n, side));
             offsets[i]   = n * (half / cos);
         }
+        InlineOffsets(line, added, offsets, loop);
 
         var use    = new List<int>(closeAt.Length);
         var bandsA = new List<Vector2>();
@@ -1309,13 +1716,16 @@ public class WallMesh : MonoBehaviour
                 Side(c, aL, bL, ba, bb, nL);
                 Side(c, aR, bR, ba, bb, -nL);
                 StoneFaces.Tag(c.kinds, c.tris, stone.sides);
+                PartLabels.Mark("Wall", c.verts, c.tris);
 
                 // The cut under this band: its roof, across, facing down into it. None on the drop.
                 if (m > 0 && (ba.x - bandsA[m - 1].y > Eps || bb.x - bandsB[m - 1].y > Eps))
                 {
                     Vector3 down = Vector3.Cross(Down(b, bb.x) - Down(a, ba.x), nL).normalized;
                     Quad(c, Down(aL, ba.x), Down(bL, bb.x), Down(bR, bb.x), Down(aR, ba.x), down);
-                    StoneFaces.Tag(c.kinds, c.tris, stone.openings);
+                    var (kind, label) = CutFace(cutOut[i], cutIn[j], use[m - 1], stone);
+                    StoneFaces.Tag(c.kinds, c.tris, kind);
+                    PartLabels.Mark(label, c.verts, c.tris);
                 }
 
                 // The cut over this band: its floor, across, facing up into it.
@@ -1323,7 +1733,9 @@ public class WallMesh : MonoBehaviour
                 {
                     Vector3 up = -Vector3.Cross(Down(b, bb.y) - Down(a, ba.y), nL).normalized;
                     Quad(c, Down(aL, ba.y), Down(bL, bb.y), Down(bR, bb.y), Down(aR, ba.y), up);
-                    StoneFaces.Tag(c.kinds, c.tris, stone.openings);
+                    var (kind, label) = CutFace(cutOut[i], cutIn[j], use[m], stone);
+                    StoneFaces.Tag(c.kinds, c.tris, kind);
+                    PartLabels.Mark(label, c.verts, c.tris);
                 }
             }
 
@@ -1331,6 +1743,8 @@ public class WallMesh : MonoBehaviour
             if (loop || i > 0) Jambs(c, line, offsets, cutIn, cutOut, closeAt, i, count, bottomY);
 
             StoneFaces.Tag(c.kinds, c.tris, stone.openings);
+
+            PartLabels.Mark("Archway", c.verts, c.tris);
             StoneFaces.Part(c.parts, c.tris, 0);
 
             // The top, across — unless a cut runs out through it the whole stretch. Under a lip,
@@ -1348,25 +1762,58 @@ public class WallMesh : MonoBehaviour
                 }
             }
             StoneFaces.Tag(c.kinds, c.tris, stone.top);
+            PartLabels.Mark("Wall", c.verts, c.tris);
             StoneFaces.Part(c.parts, c.tris, 1);
 
             if (!hasLip) continue;
 
-            // The lip: its two sides, its top, and its underside where it overhangs the wall.
-            Quad(c, aLL, bLL, bLL + lift, aLL + lift, nL);
-            Quad(c, aLR, bLR, bLR + lift, aLR + lift, -nL);
+            // The lip — none where a Destruction hole is broken right down through it.
+            float   hA = LipAt(i), hB = LipAt(j);
+            if (hA <= Eps && hB <= Eps)
+            {
+                // Broken down to the wall's top and no further: the top shows where the lip stood.
+                if (ta.y - ta.x > Eps || tb.y - tb.x > Eps)
+                {
+                    if (lipHalf < half - Eps) Quad(c, aLL, bLL, bLR, aLR, Vector3.up);
+                    else                      Quad(c, aL, bL, bR, aR, Vector3.up);
+                    StoneFaces.Tag(c.kinds, c.tris, stone.damageEdge);
+                    PartLabels.Mark("Damage Edge", c.verts, c.tris);
+                    StoneFaces.Part(c.parts, c.tris, 0);
+                }
+                continue;
+            }
+            Vector3 liftA = Vector3.up * hA, liftB = Vector3.up * hB;
+
+            // Its two sides, its top, and its underside where it overhangs the wall.
+            Quad(c, aLL, bLL, bLL + liftB, aLL + liftA, nL);
+            Quad(c, aLR, bLR, bLR + liftB, aLR + liftA, -nL);
             StoneFaces.Tag(c.kinds, c.tris, stone.lipSides);
+            PartLabels.Mark("Lip", c.verts, c.tris);
             StoneFaces.Part(c.parts, c.tris, 4);
 
-            FlatLessRings(c, rings, aLL + lift, bLL + lift, bLR + lift, aLR + lift, Vector3.up);
-            StoneFaces.Tag(c.kinds, c.tris, stone.lipTop);
-            StoneFaces.Part(c.parts, c.tris, 5);
+            if (hA < lipH - Eps || hB < lipH - Eps)
+            {
+                // Down into a hole: its edge, across the lip, facing up into it.
+                Vector3 up = -Vector3.Cross((b + liftB) - (a + liftA), nL).normalized;
+                Quad(c, aLL + liftA, bLL + liftB, bLR + liftB, aLR + liftA, up);
+                StoneFaces.Tag(c.kinds, c.tris, stone.damageEdge);
+                PartLabels.Mark("Damage Edge", c.verts, c.tris);
+                StoneFaces.Part(c.parts, c.tris, 0);
+            }
+            else
+            {
+                FlatLessRings(c, rings, aLL + liftA, bLL + liftB, bLR + liftB, aLR + liftA, Vector3.up);
+                StoneFaces.Tag(c.kinds, c.tris, stone.lipTop);
+                PartLabels.Mark("Lip", c.verts, c.tris);
+                StoneFaces.Part(c.parts, c.tris, 5);
+            }
 
             if (lipHalf > half + Eps)
             {
                 FlatLessRings(c, rings, aL, bL, bLL, aLL, Vector3.down);
                 FlatLessRings(c, rings, aR, bR, bLR, aLR, Vector3.down);
                 StoneFaces.Tag(c.kinds, c.tris, stone.lipUnderside);
+                PartLabels.Mark("Lip", c.verts, c.tris);
                 StoneFaces.Part(c.parts, c.tris, 6);
             }
         }
@@ -1379,21 +1826,57 @@ public class WallMesh : MonoBehaviour
         Chunk   startC   = legChunk[0], endC = legChunk[legs - 1];
         EndFaces(startC, line[0], offsets[0], cutOut[0], closeAt, bottomY, -startDir);
         StoneFaces.Tag(startC.kinds, startC.tris, stone.ends);
+        PartLabels.Mark("Wall", startC.verts, startC.tris);
         StoneFaces.Part(startC.parts, startC.tris, 0);
         EndFaces(endC, line[count - 1], offsets[count - 1], cutIn[count - 1], closeAt, bottomY, endDir);
         StoneFaces.Tag(endC.kinds, endC.tris, stone.ends);
+        PartLabels.Mark("Wall", endC.verts, endC.tris);
         StoneFaces.Part(endC.parts, endC.tris, 0);
 
         if (!hasLip) return;
 
         // The lip's flat ends, over the wall's.
         Vector3 start = line[0], end = line[count - 1];
-        Across(startC, start, offsets[0] * lipScale, start.y, start.y + lipH, -startDir);
+        Across(startC, start, offsets[0] * lipScale, start.y, start.y + LipAt(0), -startDir);
         StoneFaces.Tag(startC.kinds, startC.tris, stone.lipSides);
+        PartLabels.Mark("Lip", startC.verts, startC.tris);
         StoneFaces.Part(startC.parts, startC.tris, 4);
-        Across(endC, end, offsets[count - 1] * lipScale, end.y, end.y + lipH, endDir);
+        Across(endC, end, offsets[count - 1] * lipScale, end.y, end.y + LipAt(count - 1), endDir);
         StoneFaces.Tag(endC.kinds, endC.tris, stone.lipSides);
+        PartLabels.Mark("Lip", endC.verts, endC.tris);
         StoneFaces.Part(endC.parts, endC.tris, 4);
+    }
+
+    /// <summary>
+    /// A point added part way along a straight stretch — for an opening or a hole — takes its
+    /// place on the line between the corners either side, mitred as they are. Its own square
+    /// offset would stand it out past a corner's mitre on the inside of a bend, folding the side
+    /// back over itself wherever it falls within a hair of the corner — as a hole's many points do.
+    /// </summary>
+    static void InlineOffsets(List<Vector3> line, List<bool> added, Vector3[] offsets, bool loop)
+    {
+        int count = line.Count;
+        var corner = new bool[count];
+        int corners = 0;
+        for (int i = 0; i < count; i++)
+        {
+            corner[i] = !added[i] || (!loop && (i == 0 || i == count - 1));
+            if (corner[i]) corners++;
+        }
+        if (corners < 2) return;
+
+        for (int c0 = 0; c0 < count; c0++)
+        {
+            if (!corner[c0]) continue;
+            int c1 = (c0 + 1) % count;
+            while (!corner[c1]) c1 = (c1 + 1) % count;
+            if (!loop && c1 < c0) break;
+
+            float whole = Flat(line[c1] - line[c0]).magnitude;
+            if (whole < 1e-9f) continue;
+            for (int i = (c0 + 1) % count; i != c1; i = (i + 1) % count)
+                offsets[i] = Vector3.Lerp(offsets[c0], offsets[c1], Flat(line[i] - line[c0]).magnitude / whole);
+        }
     }
 
     /// <summary>
@@ -1545,6 +2028,7 @@ public class WallMesh : MonoBehaviour
             AddTri(tris, verts, n, b0, t1, b1);
         }
         StoneFaces.Tag(c.kinds, tris, stone.columnSides);
+        PartLabels.Mark("Column", c.verts, tris);
         StoneFaces.Part(c.parts, tris, 2);
 
         int mid = verts.Count;
@@ -1557,23 +2041,55 @@ public class WallMesh : MonoBehaviour
         for (int i = 0; i < ColumnSides; i++)
             AddTri(tris, verts, Vector3.up, mid, mid + 1 + i, mid + 2 + i);
         StoneFaces.Tag(c.kinds, tris, stone.columnTop);
+        PartLabels.Mark("Column", c.verts, tris);
         StoneFaces.Part(c.parts, tris, 3);
     }
 
     // ── The lip going round a column: a ring standing on the wall's top at the node, `thick` out
-    // from the column's side — its outer side, top and underside; its inside is against the column ──
-    static void AppendLipRing(Chunk c, PartKinds stone, Node node, float lipH, float thick)
+    // from the column's side — its outer side, top and underside; its inside is against the column.
+    // With `sleeve`, the ring carries on down to the wall's base as a round sleeve its own size,
+    // which leaves no underside to see ──
+    static void AppendLipRing(Chunk c, PartKinds stone, Node node, float lipH, float thick,
+                              bool sleeve, float bottomY)
     {
         float   r  = Mathf.Max(0.001f, node.columnRadius);
         float   rO = r + thick;
         Vector3 lo = node.top, hi = node.top + Vector3.up * lipH;
 
+        RoundSide(c, lo, hi, rO);
+        StoneFaces.Tag(c.kinds, c.tris, stone.columnLipSides);
+        PartLabels.Mark("Column Ring", c.verts, c.tris);
+        StoneFaces.Part(c.parts, c.tris, 4);
+
+        FlatRing(c, hi, r, rO, Vector3.up);
+        StoneFaces.Tag(c.kinds, c.tris, stone.columnLipTop);
+        PartLabels.Mark("Column Ring", c.verts, c.tris);
+        StoneFaces.Part(c.parts, c.tris, 5);
+
+        if (sleeve)
+        {
+            RoundSide(c, Down(lo, bottomY), lo, rO);
+            StoneFaces.Tag(c.kinds, c.tris, stone.columnSleeve);
+            PartLabels.Mark("Sleeve", c.verts, c.tris);
+            StoneFaces.Part(c.parts, c.tris, 7);
+            return;
+        }
+
+        FlatRing(c, lo, r, rO, Vector3.down);
+        StoneFaces.Tag(c.kinds, c.tris, stone.columnLipUnderside);
+        PartLabels.Mark("Column Ring", c.verts, c.tris);
+        StoneFaces.Part(c.parts, c.tris, 6);
+    }
+
+    // A smooth round side `radius` out from the line between lo and hi, facing out.
+    static void RoundSide(Chunk c, Vector3 lo, Vector3 hi, float radius)
+    {
         int start = c.verts.Count;
         for (int i = 0; i <= ColumnSides; i++)
         {
             Vector3 n = RoundDir(i);
-            c.verts.Add(lo + n * rO); c.norms.Add(n);
-            c.verts.Add(hi + n * rO); c.norms.Add(n);
+            c.verts.Add(lo + n * radius); c.norms.Add(n);
+            c.verts.Add(hi + n * radius); c.norms.Add(n);
         }
         for (int i = 0; i < ColumnSides; i++)
         {
@@ -1582,16 +2098,6 @@ public class WallMesh : MonoBehaviour
             AddTri(c.tris, c.verts, n, b0, t0, t1);
             AddTri(c.tris, c.verts, n, b0, t1, b1);
         }
-        StoneFaces.Tag(c.kinds, c.tris, stone.lipSides);
-        StoneFaces.Part(c.parts, c.tris, 4);
-
-        FlatRing(c, hi, r, rO, Vector3.up);
-        StoneFaces.Tag(c.kinds, c.tris, stone.lipTop);
-        StoneFaces.Part(c.parts, c.tris, 5);
-
-        FlatRing(c, lo, r, rO, Vector3.down);
-        StoneFaces.Tag(c.kinds, c.tris, stone.lipUnderside);
-        StoneFaces.Part(c.parts, c.tris, 6);
     }
 
     static void FlatRing(Chunk c, Vector3 centre, float rIn, float rOut, Vector3 n)

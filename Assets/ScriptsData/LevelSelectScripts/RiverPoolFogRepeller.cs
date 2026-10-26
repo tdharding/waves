@@ -27,8 +27,15 @@ public class RiverPoolFogRepeller : MonoBehaviour, IFogRepeller
     public float   MaskClearRadius  => FogFieldManager.PoolMaskRadius;
     public float   MaskFeather      => FogFieldManager.PoolMaskFeather;
 
-    public bool    RepelActive      => FogFieldManager.PoolsRepel && isActiveAndEnabled
+    public bool    RepelActive      => Repels && isActiveAndEnabled
                                     && RepelRadius + RepelClearRadius > 0.0001f;
+
+    /// <summary>
+    /// Pools repel at all, and a pool on a Landscape Natural River Run only while the FogMap's
+    /// Natural Runs Repel is on — the same rule the run chains follow, read live.
+    /// </summary>
+    bool Repels => FogFieldManager.PoolsRepel
+                && (_pool == null || !_pool.naturalRun || FogFieldManager.NaturalRunsRepel);
 
     void OnEnable()
     {
@@ -37,26 +44,4 @@ public class RiverPoolFogRepeller : MonoBehaviour, IFogRepeller
     }
 
     void OnDisable() => FogFieldManager.Unregister(this);
-
-#if UNITY_EDITOR
-    // Drawn at the pool's own height, for lining the circle up against the basin it covers.
-    void OnDrawGizmosSelected()
-    {
-        var pool = GetComponent<RiverPoolMesh>();
-        if (pool == null) return;
-
-        float radius = pool.poolRadius + FogFieldManager.PoolRepelRadius;
-        bool  on     = FogFieldManager.PoolsRepel;
-
-        UnityEditor.Handles.color = on ? new Color(0.95f, 0.55f, 0.35f, 0.14f)
-                                       : new Color(0.55f, 0.55f, 0.58f, 0.10f);
-        UnityEditor.Handles.DrawSolidDisc(transform.position, Vector3.up, radius);
-        UnityEditor.Handles.color = on ? new Color(0.95f, 0.45f, 0.30f, 0.5f)
-                                       : new Color(0.55f, 0.55f, 0.58f, 0.4f);
-        UnityEditor.Handles.DrawWireDisc(transform.position, Vector3.up, radius);
-
-        UnityEditor.Handles.color = Color.white;
-        UnityEditor.Handles.Label(transform.position, on ? "fog pool" : "fog pool (pools repel off)");
-    }
-#endif
 }

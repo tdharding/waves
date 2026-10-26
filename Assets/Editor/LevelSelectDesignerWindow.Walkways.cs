@@ -11,7 +11,8 @@ using UnityEngine.Splines;
 /// River walkways — an extra rim along the outside of a river run, between the run and any
 /// outpost on that bank (see <see cref="LevelSelectDesignerData.DesignerWalkway"/>). Ticked on a
 /// node in its panel; a walkway runs from a ticked node to the next ticked node of the river on
-/// the same side, built from the settings of the node it starts at.
+/// the same side, built from the settings of the node it starts at. Run to End of River on the
+/// last ticked node carries it on from there to wherever the run stops at the river's end.
 ///
 /// Built as a piece of its own under each run, by <see cref="RiverMeshBuilder.BuildWalkways"/>,
 /// in the river material. An outpost standing beside a walkway is moved out past it, and the
@@ -46,7 +47,8 @@ public partial class LevelSelectDesignerWindow
     /// when <paramref name="layer"/> is 2. A stretch runs while each next node is ticked on the
     /// same side, and breaks where a node's settings differ from the node the stretch started
     /// at — the next stretch starts there. Walkway 2 also breaks where the first walkway beside
-    /// it starts, stops or changes width, since it stands out past it.
+    /// it starts, stops or changes width, since it stands out past it. The last node ticked on a
+    /// side, when it has Run to End of River on, carries its walkway on to the path's last node.
     /// </summary>
     private List<WalkwayStretch> WalkwayStretches(IList<string> nodeIds, int layer = 1)
     {
@@ -74,7 +76,18 @@ public partial class LevelSelectDesignerWindow
 
         foreach (int side in new[] { 1, -1 })
         {
-            bool On(int i) => held[i] != null && held[i].Covers(side);
+            // Run to End of River: every node past the last one ticked on this side stands in
+            // as that one, so the stretch carries on to the end of the path.
+            var on = held;
+            int lastOn = n - 1;
+            while (lastOn >= 0 && (held[lastOn] == null || !held[lastOn].Covers(side))) lastOn--;
+            if (lastOn >= 0 && lastOn < n - 1 && held[lastOn].toEnd)
+            {
+                on = (LevelSelectDesignerData.DesignerWalkway[])held.Clone();
+                for (int i = lastOn + 1; i < n; i++) on[i] = held[lastOn];
+            }
+
+            bool On(int i) => on[i] != null && on[i].Covers(side);
             var inset = side > 0 ? insetRight : insetLeft;
 
             int at = 0;
@@ -82,9 +95,9 @@ public partial class LevelSelectDesignerWindow
             {
                 if (!On(at) || !On(at + 1)) { at++; continue; }
 
-                var settings = held[at];
+                var settings = on[at];
                 int end = at + 1;
-                while (end < n - 1 && On(end + 1) && held[end].SameBuild(settings) &&
+                while (end < n - 1 && On(end + 1) && on[end].SameBuild(settings) &&
                        Mathf.Approximately(inset[end], inset[at]))
                     end++;
 
@@ -150,7 +163,8 @@ public partial class LevelSelectDesignerWindow
                                   LevelSelectDesignerData.DesignerPath path,
                                   LevelSelectDesignerData.OutpostSide bank)
     {
-        return _data.ProfileFor(path.riverName).OuterWidth * 0.5f
+        var profile = _data.ProfileFor(path.riverName);
+        return InnerWidthAlongPath(path, profile, outpost.pathT) * 0.5f + profile.rimWidth
              + WalkwayPushAt(path, outpost.pathT, bank);
     }
 
@@ -168,6 +182,17 @@ public partial class LevelSelectDesignerWindow
 
         EditorGUILayout.Space(6);
         EditorGUILayout.LabelField("River Walkway", EditorStyles.boldLabel);
+
+        // The end of a river: a tick per river ending here, for that river alone.
+        var ending = _data.paths.Where(p => p != null && p.nodeIds.Count >= 2 &&
+                                            p.nodeIds[p.nodeIds.Count - 1] == _selectedNodeId).ToList();
+        if (ending.Count > 0)
+        {
+            foreach (var end in ending)
+            foreach (int layer in new[] { 1, 2 })
+                DrawWalkwayEndTick(end, layer, ending.Count > 1);
+            return;
+        }
 
         if (!CanHoldWalkway(_selectedNodeId, out string why))
         {
@@ -211,6 +236,9 @@ public partial class LevelSelectDesignerWindow
         var   side   = source?.side ?? LevelSelectDesignerData.WalkwaySide.Both;
         float width  = source?.width ?? 0.2f;
         float height = source?.height ?? 0f;
+        bool  occlusion = source?.occlusion ?? false;
+        var   occlusionStyle = source?.occlusionStyle ?? OcclusionStyle.WholeObject;
+        bool  toEnd  = source?.toEnd ?? false;
 
         if (on && walkway != null)
         {
@@ -223,6 +251,15 @@ public partial class LevelSelectDesignerWindow
             height = EditorGUILayout.FloatField(
                 new GUIContent("Height", "How far its top stands above the rim — below it when " +
                                          "negative, 0 for flush."), height);
+            OcclusionField(ref occlusion, ref occlusionStyle);
+
+            // Only the last node ticked on the river can carry it on to the end.
+            if (!LaterWalkwayOnPath(path, _selectedNodeId, layer))
+                toEnd = EditorGUILayout.Toggle(
+                    new GUIContent("Run to End of River",
+                        "Carries this walkway on past this node to wherever the run stops at the " +
+                        "end of the river — a pool's edge, an arena's wall or a junction."),
+                    toEnd);
 
             EditorGUILayout.LabelField((second ? "Runs on to the next node with River Walkway 2 ticked. "
                                                : "Runs on to the next node with River Walkway ticked. ") +
@@ -245,6 +282,9 @@ public partial class LevelSelectDesignerWindow
         walkway.side    = side;
         walkway.width   = width;
         walkway.height  = height;
+        walkway.occlusion = occlusion;
+        walkway.occlusionStyle = occlusionStyle;
+        walkway.toEnd   = toEnd;
 
         MarkDirty();
         string pathId = path.pathId;
@@ -265,6 +305,65 @@ public partial class LevelSelectDesignerWindow
             if (w != null && w.enabled) return w;
         }
         return null;
+    }
+
+    /// <summary>
+    /// The River Walkway tick on the end of one river — the walkway, or River Walkway 2 when
+    /// <paramref name="layer"/> is 2. It belongs to that river only, never to another river
+    /// through the same node: it is the Run to End of River tick of the last node before the end
+    /// with that walkway ticked, which the walkway runs on from with that node's side, width and
+    /// height.
+    /// </summary>
+    private void DrawWalkwayEndTick(LevelSelectDesignerData.DesignerPath path, int layer, bool nameRiver)
+    {
+        bool   second = layer == 2;
+        string label  = (second ? "River Walkway 2" : "River Walkway") +
+                        (nameRiver ? $" ({path.riverName})" : "");
+
+        // The last node before the end with this walkway ticked — where the walkway runs on from.
+        LevelSelectDesignerData.DesignerWalkway from = null;
+        for (int i = path.nodeIds.Count - 2; i >= 0 && from == null; i--)
+        {
+            var w = second ? _data.Walkway2At(path.nodeIds[i]) : _data.WalkwayAt(path.nodeIds[i]);
+            if (w != null && w.enabled && CanHoldWalkway(path.nodeIds[i], out _)) from = w;
+        }
+
+        if (from == null)
+        {
+            using (new EditorGUI.DisabledScope(true))
+                EditorGUILayout.Toggle(new GUIContent(label), false);
+            EditorGUILayout.LabelField(
+                $"Tick {(second ? "River Walkway 2" : "River Walkway")} on a node before this one " +
+                "first — it runs on to here from there.", EditorStyles.wordWrappedMiniLabel);
+            return;
+        }
+
+        bool on = EditorGUILayout.Toggle(
+            new GUIContent(label,
+                "Carries the walkway on to the end of this river, to wherever the run stops — a " +
+                "pool's edge, an arena's wall or a junction — with the side, width and height of the " +
+                "last node before it with this walkway ticked. Only this river: any other river " +
+                "through this node is left alone. The same as Run to End of River on that node."),
+            from.toEnd);
+        if (on == from.toEnd) return;
+
+        Undo.RecordObject(_data, second ? "Edit River Walkway 2" : "Edit River Walkway");
+        from.toEnd = on;
+        MarkDirty();
+        string pathId = path.pathId;
+        RebuildAfterTowerEdit("Walkway:" + pathId, () => RebuildWalkwaysOnPath(pathId, true));
+        Repaint();
+    }
+
+    /// <summary>Whether any node after this one on the path has this walkway ticked.</summary>
+    private bool LaterWalkwayOnPath(LevelSelectDesignerData.DesignerPath path, string nodeId, int layer)
+    {
+        for (int i = path.nodeIds.IndexOf(nodeId) + 1; i < path.nodeIds.Count; i++)
+        {
+            var w = layer == 2 ? _data.Walkway2At(path.nodeIds[i]) : _data.WalkwayAt(path.nodeIds[i]);
+            if (w != null && w.enabled && CanHoldWalkway(path.nodeIds[i], out _)) return true;
+        }
+        return false;
     }
 
     // ─────────────────────────────────────────────
@@ -288,32 +387,41 @@ public partial class LevelSelectDesignerWindow
             var stretches = WalkwayStretches(path.nodeIds, layer);
             if (stretches.Count == 0) continue;
 
-            float runEdge = _data.ProfileFor(path.riverName).OuterWidth * 0.5f;
+            var profile = _data.ProfileFor(path.riverName);
+
+            // A path end on a pool pulled back to the pool's outer rim, as the river's own rims
+            // are — a walkway run on to the end of the river stops there.
+            var points = path.nodeIds.Select(id => _data.NodeWorldPosition(id)).ToList();
+            TrimRimEndAtPool(points, path.nodeIds[0], 0, 1);
+            TrimRimEndAtPool(points, path.nodeIds[points.Count - 1], points.Count - 1, points.Count - 2);
 
             foreach (var s in stretches)
             {
-                float halfOuter = runEdge + s.inset;
                 float width = Mathf.Max(s.settings.width, RiverMeshBuilder.WalkwayMinWidth);
                 bool  selected = false;
                 for (int i = s.from; i <= s.to; i++) selected |= path.nodeIds[i] == _selectedNodeId;
 
                 // Walkway 2 a shade darker, so the two read apart side by side.
-                Handles.color = selected ? new Color(0.95f, 0.95f, 0.9f, 0.8f)
+                Handles.color = Faded(selected ? new Color(0.95f, 0.95f, 0.9f, 0.8f)
                               : layer == 2 ? new Color(0.55f, 0.55f, 0.52f, 0.6f)
-                                           : new Color(0.7f, 0.7f, 0.66f, 0.6f);
+                                           : new Color(0.7f, 0.7f, 0.66f, 0.6f));
 
                 for (int i = s.from; i < s.to; i++)
                 {
-                    Vector3 a  = _data.NodeWorldPosition(path.nodeIds[i]);
-                    Vector3 b  = _data.NodeWorldPosition(path.nodeIds[i + 1]);
+                    Vector3 a  = points[i];
+                    Vector3 b  = points[i + 1];
                     Vector3 ra = DrawnRightAt(path, i)     * s.side;
                     Vector3 rb = DrawnRightAt(path, i + 1) * s.side;
 
+                    // Out from the run's outer edge, which a width override moves.
+                    float ha = HalfOuterAtNode(profile, path.nodeIds[i])     + s.inset;
+                    float hb = HalfOuterAtNode(profile, path.nodeIds[i + 1]) + s.inset;
+
                     Handles.DrawAAConvexPolygon(
-                        (Vector3)WorldToCanvas(a + ra * halfOuter),
-                        (Vector3)WorldToCanvas(b + rb * halfOuter),
-                        (Vector3)WorldToCanvas(b + rb * (halfOuter + width)),
-                        (Vector3)WorldToCanvas(a + ra * (halfOuter + width)));
+                        (Vector3)WorldToCanvas(a + ra * ha),
+                        (Vector3)WorldToCanvas(b + rb * hb),
+                        (Vector3)WorldToCanvas(b + rb * (hb + width)),
+                        (Vector3)WorldToCanvas(a + ra * (ha + width)));
                 }
             }
         }
@@ -335,8 +443,13 @@ public partial class LevelSelectDesignerWindow
     // BUILDING
     // ─────────────────────────────────────────────
 
-    /// <summary>The walkways along a run, as the builder takes them — in the run's own space.</summary>
-    private List<RiverMeshBuilder.Walkway> WalkwaysFor(RiverRunMesh record)
+    /// <summary>
+    /// The walkways along a run, as the builder takes them — in the run's own space. With
+    /// <paramref name="occluded"/>, one entry per walkway: a name for each ticked for Occlusion
+    /// (the node its stretch starts at), null for the rest.
+    /// </summary>
+    private List<RiverMeshBuilder.Walkway> WalkwaysFor(RiverRunMesh record, List<string> occluded = null,
+        List<OcclusionStyle> occludedStyles = null)
     {
         var walkways = new List<RiverMeshBuilder.Walkway>();
         if (record?.pathNodes == null || record.pathNodes.Count < 2) return walkways;
@@ -344,6 +457,7 @@ public partial class LevelSelectDesignerWindow
         var ids = record.pathNodes.Select(n => n.nodeId).ToList();
         foreach (int layer in new[] { 1, 2 })
         foreach (var s in WalkwayStretches(ids, layer))
+        {
             walkways.Add(new RiverMeshBuilder.Walkway
             {
                 from   = record.pathNodes[s.from].position,
@@ -354,6 +468,11 @@ public partial class LevelSelectDesignerWindow
                 layer  = layer,
                 inset  = s.inset,
             });
+            occluded?.Add(s.settings.occlusion
+                ? $"Walkway{layer}_{SanitiseAssetName(ids[s.from])}_{(s.side > 0 ? "R" : "L")}"
+                : null);
+            occludedStyles?.Add(s.settings.occlusionStyle);
+        }
         return walkways;
     }
 
@@ -419,10 +538,60 @@ public partial class LevelSelectDesignerWindow
 
         string name     = $"RiverWalkways_{record.meshAssetName.Replace("RiverRun_", string.Empty)}";
         var    existing = record.transform.Find(name);
-        var    walkways = WalkwaysFor(record);
-        var    bridges  = BridgesFor(record);
+        var    walkwayOcc = new List<string>();
+        var    bridgeOcc  = new List<string>();
+        var    archwayOcc = new List<string>();
+        var    rimWallOcc = new List<string>();
+        var    walkwayStyles = new List<OcclusionStyle>();
+        var    bridgeStyles  = new List<OcclusionStyle>();
+        var    archwayStyles = new List<OcclusionStyle>();
+        var    rimWallStyles = new List<OcclusionStyle>();
+        var    walkways = WalkwaysFor(record, walkwayOcc, walkwayStyles);
+        var    bridges  = BridgesFor(record, bridgeOcc, bridgeStyles);
+        var    archways = ArchwaysFor(record, archwayOcc, archwayStyles);
+        var    rimWalls = RimWallsFor(record, rimWallOcc, rimWallStyles);
+        var    flats    = WalkwayFlatsFor(record);
+        var    poolAtStart = RimWallPoolAt(record, false);
+        var    poolAtEnd   = RimWallPoolAt(record, true);
 
-        if (walkways.Count == 0 && bridges.Count == 0)
+        // Each one ticked for Occlusion is built as a mesh of its own, so it fades on its own;
+        // the rest share the one piece.
+        var pieces = new List<(string name, Mesh built, OcclusionStyle style)>();
+        for (int i = walkways.Count - 1; i >= 0; i--)
+        {
+            if (walkwayOcc[i] == null) continue;
+            pieces.Add((OcclusionPieceName(name, walkwayOcc[i]), RiverMeshBuilder.BuildWalkways(
+                profile, centres, forwards, new[] { walkways[i] }, flats, MeshEdge, StoneShadingForBuild),
+                walkwayStyles[i]));
+            walkways.RemoveAt(i);
+        }
+        for (int i = bridges.Count - 1; i >= 0; i--)
+        {
+            if (bridgeOcc[i] == null) continue;
+            pieces.Add((OcclusionPieceName(name, bridgeOcc[i]), RiverMeshBuilder.BuildWalkways(
+                profile, centres, forwards, null, flats, MeshEdge, StoneShadingForBuild,
+                new[] { bridges[i] }), bridgeStyles[i]));
+            bridges.RemoveAt(i);
+        }
+        for (int i = archways.Count - 1; i >= 0; i--)
+        {
+            if (archwayOcc[i] == null) continue;
+            pieces.Add((OcclusionPieceName(name, archwayOcc[i]), RiverMeshBuilder.BuildWalkways(
+                profile, centres, forwards, null, flats, MeshEdge, StoneShadingForBuild,
+                null, new[] { archways[i] }), archwayStyles[i]));
+            archways.RemoveAt(i);
+        }
+        for (int i = rimWalls.Count - 1; i >= 0; i--)
+        {
+            if (rimWallOcc[i] == null) continue;
+            pieces.Add((OcclusionPieceName(name, rimWallOcc[i]), RiverMeshBuilder.BuildWalkways(
+                profile, centres, forwards, null, flats, MeshEdge, StoneShadingForBuild,
+                null, null, new[] { rimWalls[i] }, poolAtStart, poolAtEnd), rimWallStyles[i]));
+            rimWalls.RemoveAt(i);
+        }
+        RefreshOcclusionPieces(record, name + OcclusionPiecePrefix, pieces);
+
+        if (walkways.Count == 0 && bridges.Count == 0 && archways.Count == 0 && rimWalls.Count == 0)
         {
             if (existing != null) Undo.DestroyObjectImmediate(existing.gameObject);
             record.walkwaysMeshAssetName = null;
@@ -431,8 +600,8 @@ public partial class LevelSelectDesignerWindow
         }
 
         var mesh = SaveGeneratedMesh(name, RiverMeshBuilder.BuildWalkways(
-            profile, centres, forwards, walkways, WalkwayFlatsFor(record), MeshEdge,
-            StoneShadingForBuild, bridges));
+            profile, centres, forwards, walkways, flats, MeshEdge,
+            StoneShadingForBuild, bridges, archways, rimWalls, poolAtStart, poolAtEnd));
         if (mesh == null) return;
 
         GameObject go;
@@ -472,7 +641,9 @@ public partial class LevelSelectDesignerWindow
         int found = 0;
         foreach (var record in FindObjectsOfType<RiverRunMesh>())
         {
-            if (record.pathId != pathId || record.pathNodes == null || record.knots.Count < 2) continue;
+            // A path cut into legs at its pools gives each leg its own '#pool' id.
+            if (record.pathNodes == null || record.knots.Count < 2) continue;
+            if (record.pathId != pathId && !(record.pathId?.StartsWith(pathId + "#pool") ?? false)) continue;
 
             var profile = RunProfileFor(record);
             var notches = ToNotches(record.mouths);
@@ -487,16 +658,7 @@ public partial class LevelSelectDesignerWindow
             found++;
         }
 
-        if (outposts && _data.outposts != null)
-        {
-            var blocks = FindObjectsOfType<InstallationOutpostMesh>();
-            foreach (var outpost in _data.outposts)
-            {
-                if (outpost == null || outpost.pathId != pathId) continue;
-                var block = blocks.FirstOrDefault(r => r.outpostId == outpost.outpostId);
-                if (block != null) BuildOutpostBlocks(outpost, block.transform.parent);
-            }
-        }
+        if (outposts) RebuildOutpostsOnPath(pathId);
         AssetDatabase.SaveAssets();
 
         if (found == 0)

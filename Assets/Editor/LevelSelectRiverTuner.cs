@@ -20,9 +20,12 @@ public class LevelSelectRiverTuner : EditorWindow
     private const string PrefPreset  = "LevelSelectRiverTuner_PresetGUID";
 
     [SerializeField] private LevelSelectRiverWaterPreset  activePreset;
+    // The preset the values below came from; Save is held until it matches activePreset.
+    [SerializeField] private LevelSelectRiverWaterPreset  loadedPreset;
     [SerializeField] private bool                    applyLive = true;
     [SerializeField] private RiverEdgeRippleSettings edgeRipples = new RiverEdgeRippleSettings();
     [SerializeField] private RiverSoulZoneSettings   soulZone    = new RiverSoulZoneSettings();
+    [SerializeField] private RiverDepthSettings      depth       = new RiverDepthSettings();
 
     // Not part of the preset and never saved with one: it is a way of READING the water, not a
     // way the water is meant to look. The world holds its own on the designer data; this is the
@@ -30,6 +33,7 @@ public class LevelSelectRiverTuner : EditorWindow
     [SerializeField] private RiverRippleDebugView    debugView = RiverRippleDebugView.Off;
 
     private SerializedObject _window;
+    private readonly TunerUnsavedReminder _saveReminder = new TunerUnsavedReminder(nameof(LevelSelectRiverTuner));
     private Vector2          _scroll;
 
     // ─────────────────────────────────────────────────────────────
@@ -50,12 +54,14 @@ public class LevelSelectRiverTuner : EditorWindow
         // A pump of its own, so the window still drives a scene that has no designer data and no
         // controller in it — and so the numbers survive the shader reimport that empties them.
         EditorApplication.update += Drive;
+        EditorApplication.update += RemindToSave;
         TakeOver();
     }
 
     private void OnDisable()
     {
         EditorApplication.update -= Drive;
+        EditorApplication.update -= RemindToSave;
         RiverEdgeRippleSettings.LiveDebug = null;
         HandBack();
     }
@@ -71,6 +77,7 @@ public class LevelSelectRiverTuner : EditorWindow
     {
         RiverEdgeRippleSettings.Live      = applyLive ? edgeRipples : null;
         RiverSoulZoneSettings.Live        = applyLive ? soulZone    : null;
+        RiverDepthSettings.Live           = applyLive ? depth       : null;
         RiverEdgeRippleSettings.LiveDebug = debugView;
         SceneView.RepaintAll();
     }
@@ -97,6 +104,7 @@ public class LevelSelectRiverTuner : EditorWindow
     {
         if (RiverEdgeRippleSettings.Live == edgeRipples) RiverEdgeRippleSettings.Live = null;
         if (RiverSoulZoneSettings.Live   == soulZone)    RiverSoulZoneSettings.Live   = null;
+        if (RiverDepthSettings.Live      == depth)       RiverDepthSettings.Live      = null;
         SceneView.RepaintAll();
     }
 
@@ -116,6 +124,7 @@ public class LevelSelectRiverTuner : EditorWindow
 
         RiverEdgeRippleSettings.Push(edgeRipples);
         RiverSoulZoneSettings.Push(soulZone);
+        RiverDepthSettings.Push(depth);
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -133,6 +142,18 @@ public class LevelSelectRiverTuner : EditorWindow
         EditorGUILayout.Space();
 
         _scroll = EditorGUILayout.BeginScrollView(_scroll);
+
+        // The water's own colour, first, because everything below goes on over it. It lives on the
+        // depth settings, beside the Depth Colour it is blended away from.
+        EditorGUI.BeginChangeCheck();
+        EditorGUILayout.PropertyField(_window.FindProperty("depth").FindPropertyRelative("waterColour"));
+        if (EditorGUI.EndChangeCheck())
+        {
+            _window.ApplyModifiedProperties();
+            TakeOver();
+        }
+
+        EditorGUILayout.Space();
 
         var data = TunerMaterialLinks.WorldData();
         TunerMaterialLinks.Draw("LevelSelectRiverTuner_MaterialsOpen",
@@ -170,6 +191,22 @@ public class LevelSelectRiverTuner : EditorWindow
 
         EditorGUILayout.Space();
 
+        EditorGUILayout.LabelField("Depth", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField(
+            "The water blends towards the Depth Colour where the river bed is deep under it; over " +
+            "the banks and in the shallows it keeps its own colour. Live.",
+            EditorStyles.wordWrappedMiniLabel);
+
+        EditorGUI.BeginChangeCheck();
+        DrawChildren(_window.FindProperty("depth"), "waterColour");
+        if (EditorGUI.EndChangeCheck())
+        {
+            _window.ApplyModifiedProperties();
+            TakeOver();
+        }
+
+        EditorGUILayout.Space();
+
         EditorGUILayout.LabelField("Soul Zone", EditorStyles.boldLabel);
         EditorGUILayout.LabelField(
             "The band drawn along a soul route when its souls are released. It draws out from the " +
@@ -187,34 +224,19 @@ public class LevelSelectRiverTuner : EditorWindow
             TakeOver();
         }
 
-        EditorGUILayout.Space();
-
-        // The one thing in the effect that is NOT a global. Where two waters lap over each other
-        // is geometry, so it is authored on the world and needs a rebuild — saying so here is
-        // what stops it being hunted for among the sliders above.
-        EditorGUILayout.LabelField("Where Two Waters Meet", EditorStyles.boldLabel);
-        EditorGUILayout.HelpBox(
-            "How far a pool's water laps over each river that meets it is GEOMETRY — Water " +
-            "Pool Overlap in the Level Select Designer's Aesthetics section, applied by " +
-            "Rebuild Runs. " +
-            "How far back from the lip the alpha gradient runs is River Fade To Pool Distance above, in " +
-            "metres — never longer than the lap that was built. Which water draws on top is " +
-            "each water's Sorting Group.",
-            MessageType.None);
-
         EditorGUILayout.EndScrollView();
 
         _window.ApplyModifiedProperties();
     }
 
-    private static void DrawChildren(SerializedProperty parent)
+    private static void DrawChildren(SerializedProperty parent, string skip = null)
     {
         var end   = parent.GetEndProperty();
         var field = parent.Copy();
         field.NextVisible(true);
         while (!SerializedProperty.EqualContents(field, end))
         {
-            EditorGUILayout.PropertyField(field, true);
+            if (field.name != skip) EditorGUILayout.PropertyField(field, true);
             if (!field.NextVisible(false)) break;
         }
     }
@@ -246,8 +268,8 @@ public class LevelSelectRiverTuner : EditorWindow
                            "Bands draws the coordinate the lines are cut from — stripes down a " +
                            "river's banks, rings round a pool. Along draws the one they run in, " +
                            "which crosses them at a right angle and is the way the distortion " +
-                           "travels. Fade shows how much of a surface is really there under an " +
-                           "overlap. Purple means a surface has no frame at all — Rebuild Runs."),
+                           "travels. Fade shows how much of a surface is really there. Purple " +
+                           "means a surface has no frame at all — Rebuild Runs."),
             debugView);
         if (EditorGUI.EndChangeCheck())
         {
@@ -269,6 +291,7 @@ public class LevelSelectRiverTuner : EditorWindow
         // The folder's presets by name, and an object field beside it for one held from anywhere
         // else. Both drive the same field: the dropdown feeds the object field, so whichever was
         // touched is the one that differs from what is held.
+        var tint = TunerLoadedPreset.TintRow(activePreset, loadedPreset);
         using (new EditorGUILayout.HorizontalScope())
         {
             var picked = LevelSelectRiverPresetLibrary.DrawPicker(
@@ -289,16 +312,20 @@ public class LevelSelectRiverTuner : EditorWindow
                 if (activePreset != null) LoadFromPreset();
             }
         }
+        GUI.backgroundColor = tint;
 
         using (new EditorGUILayout.HorizontalScope())
         {
             using (new EditorGUI.DisabledScope(activePreset == null))
             {
                 if (GUILayout.Button("Load")) LoadFromPreset();
-                if (GUILayout.Button("Save")) SaveToPreset();
+                using (new EditorGUI.DisabledScope(!TunerLoadedPreset.IsLoaded(activePreset, loadedPreset)))
+                    if (GUILayout.Button("Save")) SaveToPreset();
             }
             if (GUILayout.Button("Save as New")) SaveAsNewPreset();
         }
+
+        TunerLoadedPreset.DrawNotLoaded(activePreset, loadedPreset);
 
         if (activePreset == null)
         {
@@ -332,17 +359,20 @@ public class LevelSelectRiverTuner : EditorWindow
 
         edgeRipples.CopyFrom(activePreset.edgeRipples);
         soulZone.CopyFrom(activePreset.soulZone);
+        depth.CopyFrom(activePreset.depth);
+        loadedPreset = activePreset;
         _window = new SerializedObject(this);
         TakeOver();
         Repaint();
     }
 
-    private void SaveToPreset()
+    private void SaveToPreset(string reminder = null)
     {
-        if (activePreset == null) return;
+        if (!TunerLoadedPreset.IsLoaded(activePreset, loadedPreset)) return;
 
         if (!EditorUtility.DisplayDialog(
                 "Save Level Select River Water Preset",
+                reminder +
                 $"Overwrite '{activePreset.name}' with the current tuner values?\n\n" +
                 "This cannot be undone from disk.\n\n" +
                 TunerSaveChanges.Describe(activePreset, WriteTo),
@@ -361,7 +391,14 @@ public class LevelSelectRiverTuner : EditorWindow
     {
         preset.edgeRipples.CopyFrom(edgeRipples);
         preset.soulZone.CopyFrom(soulZone);
+        preset.depth.CopyFrom(depth);
     }
+
+    // Ten minutes of changes the preset hasn't got, and Save asks for itself.
+    private void RemindToSave() => _saveReminder.Tick(
+        () => TunerLoadedPreset.IsLoaded(activePreset, loadedPreset) &&
+              TunerSaveChanges.List(activePreset, WriteTo).Count > 0,
+        SaveToPreset);
 
     private void SaveAsNewPreset()
     {
@@ -373,6 +410,7 @@ public class LevelSelectRiverTuner : EditorWindow
         var preset = CreateInstance<LevelSelectRiverWaterPreset>();
         preset.edgeRipples.CopyFrom(edgeRipples);
         preset.soulZone.CopyFrom(soulZone);
+        preset.depth.CopyFrom(depth);
 
         AssetDatabase.CreateAsset(preset, path);
         AssetDatabase.SaveAssets();
@@ -380,6 +418,7 @@ public class LevelSelectRiverTuner : EditorWindow
         Selection.activeObject = preset;
 
         activePreset = preset;
+        loadedPreset = preset;
         RememberPreset();
         Repaint();
 

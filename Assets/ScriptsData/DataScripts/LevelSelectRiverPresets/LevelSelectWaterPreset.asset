@@ -13,12 +13,12 @@ MonoBehaviour:
   m_Name: LevelSelectWaterPreset
   m_EditorClassIdentifier: Assembly-CSharp::LevelSelectRiverWaterPreset
   edgeRipples:
-    strength: 0.64
+    strength: 0.54
     width: 0.904
     softness: 1
     spacing: 0.14
     speed: 0
-    reachPercent: 32.6
+    reachPercent: 40.5
     bevel: 0.247
     distortStrength: 0.48
     distortScale: 5.4
@@ -27,11 +27,8 @@ MonoBehaviour:
     secondDistortStrength: 2.65
     secondDistortScale: 1.33
     secondDistortionSpeed: 0.12
-    branchMouthFade: 2.75
-    branchMouthInset: 1.63
     poolSpacing: 0.2
     poolWidth: 0.617
-    poolSoftness: 0.557
     poolReach: 0.84
     poolSpeed: 0
     poolDistortStrength: 0.67
@@ -40,28 +37,46 @@ MonoBehaviour:
     poolSecondDistortStrength: 0.44
     poolSecondDistortScale: 1.36
     poolSecondDistortionSpeed: 0
-    poolMouthFade: 5.63
-    poolMouthReachOverlap: 7.22
-    poolMouthExtent: 0.9
-    riverFadeToPoolDistance: 4.84
-    riverFadeToPoolIntensity: 17.58
-    grainStrength: 0.08
-    grainSize: 1.04
-    grainAlpha: 0.081
-    lowResStyle: 1
-    blockSize: 0.06
+    joinOverlap: 1
+    grainStrength: 0.03
+    grainSize: 0.02
+    grainAlpha: 0.829
+    waveBandStrength: 0.21
+    waveBandAngle: 48.3
+    waveBandFrequency: 3.42
+    waveBandSpeed: 1.174
+    waveBandWidth: 0.89
+    waveBandSoftness: 1
+    waveBandWaviness: 2.57
+    waveBandWavinessScale: 0.12
+    waveBandMeanderStrength: 4
+    waveBandMeanderScale: 0.4
+    waveBandGrainStrength: 0.1
+    lowResStyle: 0
+    blockSize: 0.01
     scatterGrain: 0.01
     blocksOnScreen: 0
-    contrast: 0.55
+    contrast: 1.69
   soulZone:
     strength: 1
-    baseColour: {r: 0, g: 0, b: 0, a: 1}
-    brightness: 1.11
+    baseColour: {r: 0.41509432, g: 0.41509432, b: 0.41509432, a: 1}
+    brightness: 6.57
     width: 0.43
-    fadeStart: 0.219
-    grainSize: 0.35
-    grainStrength: 1
+    fadeStart: 0.114
+    meanderWidth: 0.09
+    meanderLength: 3.66
+    cornerSmoothing: 1.26
+    grainSize: 0.02
+    grainStrength: 0.996
     scrollSpeed: 1.32
     drainSpeed: 0.05
-    poolFillRadius: 1
+    poolFillRadius: 0.808
     fillSpeed: 1
+    glowStrength: 10
+    glowReach: 3.46
+    glowRevealSoftness: 4.68
+  depth:
+    waterColour: {r: 0.11725702, g: 0.20769753, b: 0.2924528, a: 1}
+    depth: 0.22
+    depthColour: {r: 0.2735849, g: 0.2735849, b: 0.2735849, a: 1}
+    depthOpacity: 0

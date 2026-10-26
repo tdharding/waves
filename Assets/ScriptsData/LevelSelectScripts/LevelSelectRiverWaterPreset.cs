@@ -25,4 +25,7 @@ public class LevelSelectRiverWaterPreset : ScriptableObject
     [Tooltip("The soul zone drawn along a soul route when its souls are released — how it looks " +
              "and how fast it draws out. The fish follow behind it.")]
     public RiverSoulZoneSettings soulZone = new RiverSoulZoneSettings();
+
+    [Tooltip("How the water darkens over deep river bed.")]
+    public RiverDepthSettings depth = new RiverDepthSettings();
 }

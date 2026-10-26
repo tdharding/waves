@@ -1,0 +1,146 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d4357627f9937304899c8369ae27b593, type: 3}
+  m_Name: TheBegrudgedEmployee
+  m_EditorClassIdentifier: Assembly-CSharp::CameraSequencePreset
+  shots:
+  - cameraLink: 3ed635b5385b4cc58cb7f1dc97b1e9ba
+    orbitPointLink: 
+    endCameraLink: 
+    viewTargetLink: 07af238bffa84c77abebd5f8b0613aa5
+    characterLinks: []
+    shot:
+      camera: {fileID: 0}
+      duration: 3
+      blendIn:
+        Style: 0
+        Time: 1
+        CustomCurve:
+          serializedVersion: 2
+          m_Curve: []
+          m_PreInfinity: 0
+          m_PostInfinity: 0
+          m_RotationOrder: 0
+      pressAnyKey: 1
+      lines: []
+      textFades: 0
+      audio: {fileID: 0}
+      fogCentre: 0
+      viewTarget: {fileID: 0}
+      viewTargetPath: bob/Mesh/ObserversCharacterMesh/Cube.001
+      viewTargetHeight: 0.7138462
+      focusViewTarget: 1
+      focusAddedVolume: 1
+      animated: 0
+      animation: 0
+      endCamera: {fileID: 0}
+      zoomDistance: 1
+      orbitPoint: {fileID: 0}
+      orbitStartDegrees: 0
+      orbitDegrees: 90
+      animationTime: 3
+      easing: 0
+      characterAnimations: []
+  - cameraLink: 61e6c16698654da0b2528ce6b4fd00f4
+    orbitPointLink: 
+    endCameraLink: 
+    viewTargetLink: 07af238bffa84c77abebd5f8b0613aa5
+    characterLinks: []
+    shot:
+      camera: {fileID: 0}
+      duration: 3
+      blendIn:
+        Style: 0
+        Time: 1
+        CustomCurve:
+          serializedVersion: 2
+          m_Curve: []
+          m_PreInfinity: 0
+          m_PostInfinity: 0
+          m_RotationOrder: 0
+      pressAnyKey: 1
+      lines:
+      - text: I'm tired of this job
+        hold: 2
+        pressAnyKey: 1
+        fadeIn: 1
+        fadeOut: 1
+      textFades: 1
+      audio: {fileID: 0}
+      fogCentre: 0
+      viewTarget: {fileID: 0}
+      viewTargetPath: bob/Mesh/ObserversCharacterMesh/Cube.001
+      viewTargetHeight: -0.034439087
+      focusViewTarget: 1
+      focusAddedVolume: 1
+      animated: 0
+      animation: 0
+      endCamera: {fileID: 0}
+      zoomDistance: 1
+      orbitPoint: {fileID: 0}
+      orbitStartDegrees: 0
+      orbitDegrees: 90
+      animationTime: 3
+      easing: 0
+      characterAnimations: []
+  useAudio: 0
+  sequenceAudio: {fileID: 0}
+  audioFadeOut: 4
+  endBlend:
+    Style: 0
+    Time: 2
+    CustomCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+  playOnce: 0
+  storedObjects:
+  - linkId: 3ed635b5385b4cc58cb7f1dc97b1e9ba
+    name: Shot 1 Camera
+    parentPath: SCRIPTS2/CameraSequence/TheBegrudgedEmployee
+    tag: Untagged
+    layer: 0
+    active: 1
+    position: {x: 99.19017, y: 14.262641, z: 65.7568}
+    rotation: {x: 0.028493896, y: 0.9068185, z: -0.051693134, w: 0.41736817}
+    localScale: {x: 1, y: 1, z: 1}
+    components:
+    - type: Unity.Cinemachine.CinemachineCamera, Unity.Cinemachine, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+      json: '{"MonoBehaviour":{"m_Enabled":true,"m_EditorHideFlags":0,"m_Name":"","m_EditorClassIdentifier":"Unity.Cinemachine::Unity.Cinemachine.CinemachineCamera","Priority":{"Enabled":false,"m_Value":0},"OutputChannel":1,"StandbyUpdate":2,"m_StreamingVersion":20241001,"m_LegacyPriority":0,"Target":{"TrackingTarget":{"instanceID":0},"LookAtTarget":{"instanceID":0},"CustomLookAtTarget":false},"Lens":{"FieldOfView":40.0,"OrthographicSize":10.0,"NearClipPlane":0.10000000149011612,"FarClipPlane":5000.0,"Dutch":0.0,"ModeOverride":0,"PhysicalProperties":{"GateFit":2,"SensorSize":{"x":21.945999145507813,"y":16.00200080871582},"LensShift":{"x":0.0,"y":0.0},"FocusDistance":10.0,"Iso":200,"ShutterSpeed":0.004999999888241291,"Aperture":16.0,"BladeCount":5,"Curvature":{"x":2.0,"y":11.0},"BarrelClipping":0.25,"Anamorphism":0.0}},"BlendHint":0}}'
+      references: []
+    - type: Unity.Cinemachine.CinemachineVolumeSettings, Unity.Cinemachine, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+      json: '{"MonoBehaviour":{"m_Enabled":true,"m_EditorHideFlags":0,"m_Name":"","m_EditorClassIdentifier":"Unity.Cinemachine::Unity.Cinemachine.CinemachineVolumeSettings","Weight":1.0,"FocusTracking":0,"FocusTarget":{"instanceID":0},"FocusOffset":0.0,"Profile":{"fileID":11400000,"guid":"9eafecbf7740f374b941e60136993d6f","type":2}}}'
+      references:
+      - propertyPath: Profile
+        globalId: GlobalObjectId_V1-3-9eafecbf7740f374b941e60136993d6f-11400000-0
+        linkId: 
+  - linkId: 61e6c16698654da0b2528ce6b4fd00f4
+    name: Shot 2 Camera
+    parentPath: SCRIPTS2/CameraSequence/TheBegrudgedEmployee
+    tag: Untagged
+    layer: 0
+    active: 1
+    position: {x: 102.88634, y: 13.514356, z: 61.693535}
+    rotation: {x: -0.010189697, y: 0.91653687, z: -0.034195438, w: -0.3983555}
+    localScale: {x: 1, y: 1, z: 1}
+    components:
+    - type: Unity.Cinemachine.CinemachineCamera, Unity.Cinemachine, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+      json: '{"MonoBehaviour":{"m_Enabled":true,"m_EditorHideFlags":0,"m_Name":"","m_EditorClassIdentifier":"Unity.Cinemachine::Unity.Cinemachine.CinemachineCamera","Priority":{"Enabled":false,"m_Value":0},"OutputChannel":1,"StandbyUpdate":2,"m_StreamingVersion":20241001,"m_LegacyPriority":0,"Target":{"TrackingTarget":{"instanceID":0},"LookAtTarget":{"instanceID":0},"CustomLookAtTarget":false},"Lens":{"FieldOfView":40.0,"OrthographicSize":10.0,"NearClipPlane":0.10000000149011612,"FarClipPlane":5000.0,"Dutch":0.0,"ModeOverride":0,"PhysicalProperties":{"GateFit":2,"SensorSize":{"x":21.945999145507813,"y":16.00200080871582},"LensShift":{"x":0.0,"y":0.0},"FocusDistance":10.0,"Iso":200,"ShutterSpeed":0.004999999888241291,"Aperture":16.0,"BladeCount":5,"Curvature":{"x":2.0,"y":11.0},"BarrelClipping":0.25,"Anamorphism":0.0}},"BlendHint":0}}'
+      references: []
+    - type: Unity.Cinemachine.CinemachineVolumeSettings, Unity.Cinemachine, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+      json: '{"MonoBehaviour":{"m_Enabled":true,"m_EditorHideFlags":0,"m_Name":"","m_EditorClassIdentifier":"Unity.Cinemachine::Unity.Cinemachine.CinemachineVolumeSettings","Weight":1.0,"FocusTracking":0,"FocusTarget":{"instanceID":0},"FocusOffset":0.0,"Profile":{"fileID":11400000,"guid":"9eafecbf7740f374b941e60136993d6f","type":2}}}'
+      references:
+      - propertyPath: Profile
+        globalId: GlobalObjectId_V1-3-9eafecbf7740f374b941e60136993d6f-11400000-0
+        linkId: 

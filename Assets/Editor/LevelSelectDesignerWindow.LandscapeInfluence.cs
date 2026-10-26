@@ -16,9 +16,10 @@ using UnityEngine;
 ///
 /// The tile grid is far coarser than a rim is wide, so vertices alone can never meet the edge.
 /// Instead the ground is held flat at the rim height right across the run, and the RiverEdgeCut
-/// subgraph cuts it away inside every run and pool, to the pixel. That is why runs whose path
-/// has no influence are traced too — cut only, never lifted — so raised ground running up to a
-/// junction or a pool never covers that river's channel. Nothing is traced at all while no
+/// subgraph cuts it away inside every run and pool, to the pixel. That is why Landscape Natural
+/// runs whose path has no influence are traced too — cut only, never lifted — so raised ground
+/// running up to a junction or a pool never covers that river's channel. Structural runs and
+/// pools are left out unless they lift the ground themselves. Nothing is traced at all while no
 /// path has Landscape Influence on, so the landscape is exactly as it was until one does.
 /// </summary>
 public partial class LevelSelectDesignerWindow
@@ -34,9 +35,12 @@ public partial class LevelSelectDesignerWindow
     {
         public List<Vector3> points;
         public float         half;
+        public List<float>   halves;  // one per point where a width override changes it; else null
         public float         reach;   // negative: cut only
         public float         strength = 1f;
         public float         shelf    = -1f;   // walls-off run: held level this far past the edge
+        public float         cutGap   = -LandscapeHillHeight.RiverEdgeTuck;
+        public float         smooth;
     }
 
     /// <summary>
@@ -57,6 +61,13 @@ public partial class LevelSelectDesignerWindow
             new GUIContent("Landscape Influence",
                 "Lets this path's river run shape the landscape around it."),
             path.landscapeInfluence);
+
+        path.cutoutGap = EditorGUILayout.FloatField(
+            new GUIContent("Cutout Gap",
+                "How far out past the run's outer edge the landscape is cut away, leaving a gap " +
+                "round it. Negative tucks the landscape in under the rim instead (the default, " +
+                $"{-LandscapeHillHeight.RiverEdgeTuck}, hides the seam)."),
+            path.cutoutGap);
 
         if (path.landscapeInfluence)
         {
@@ -79,6 +90,19 @@ public partial class LevelSelectDesignerWindow
                         "How far the landscape is drawn up toward the rim top: 1 meets it, 0.5 " +
                         "goes halfway, 0 leaves the hills as they are."),
                     path.influenceStrength, 0f, 1f);
+
+                path.influenceVerticalOffset = EditorGUILayout.FloatField(
+                    new GUIContent("Vertical Offset",
+                        "Moves the influenced landscape up (positive) or down (negative) from the " +
+                        "height it is drawn to, in metres."),
+                    path.influenceVerticalOffset);
+
+                path.influenceSmoothFactor = Mathf.Max(0f, EditorGUILayout.FloatField(
+                    new GUIContent("Smooth Factor",
+                        "Calms the hills' rocky noise further out round the influenced area: it " +
+                        "is eased away over the Influence Distance times (1 + this). 0 calms it " +
+                        "only as far as the landscape is lifted."),
+                    path.influenceSmoothFactor));
 
                 path.influenceCancelledNodes ??= new List<string>();
                 EditorGUI.indentLevel++;
@@ -125,9 +149,10 @@ public partial class LevelSelectDesignerWindow
             TracePools(lines);
         }
 
-        PackRiverEdges(lines, out var points, out var reach, out var strength, out var shelf);
+        PackRiverEdges(lines, out var points, out var reach, out var strength, out var shelf,
+                       out var cutGap, out var smooth);
 
-        tool.SetRiverEdges(points, reach, strength, shelf);
+        tool.SetRiverEdges(points, reach, strength, shelf, cutGap, smooth);
         EditorUtility.SetDirty(tool);
         EditorApplication.QueuePlayerLoopUpdate();
         SceneView.RepaintAll();
@@ -136,6 +161,7 @@ public partial class LevelSelectDesignerWindow
         if (placeSpikes)
         {
             PlaceAllSpikes();
+            PlaceAllNomKabarTrees();
             PlaceAllStructures();
         }
 
@@ -160,6 +186,11 @@ public partial class LevelSelectDesignerWindow
         {
             if (record.knots.Count < 2) continue;
 
+            // A Structural River Run isn't cut out of the landscape unless it lifts the ground.
+            var path = PathForRun(record);
+            bool lifts = path != null && path.landscapeInfluence && path.landscapeToOuterRim;
+            if (!lifts && !IsNaturalRun(path)) continue;
+
             var profile = RunProfileFor(record);
             if (!SampleRun(record.ToSpline(), MeshEdge, profile, ToNotches(record.mouths),
                            out var centres, out var forwards)) continue;
@@ -169,6 +200,10 @@ public partial class LevelSelectDesignerWindow
 
             var world = centres.Select(c => record.transform.TransformPoint(c)).ToList();
 
+            // Half the outer width at each point, where a width override changes it along the run.
+            var widths = RiverMeshBuilder.InnerWidthsAlong(profile, centres);
+            var halves = widths?.Select(w => w * 0.5f + profile.rimWidth).ToList();
+
             // A branch's run stops a collar clear of the river it leaves, and the mouth between
             // belongs to that river's mesh. Carry the line back to that river's centreline so
             // the ground is cut over the mouth too.
@@ -177,20 +212,26 @@ public partial class LevelSelectDesignerWindow
                 Vector3 join = record.transform.TransformPoint(record.joinPoint);
                 join.y = world[0].y;
                 world.Insert(0, join);
+                halves?.Insert(0, halves[0]);
             }
 
-            var path = PathForRun(record);
-            bool lifts = path != null && path.landscapeInfluence && path.landscapeToOuterRim;
             float half  = profile.OuterWidth * 0.5f;
             float reach = lifts ? Mathf.Max(0f, path.influenceDistance) : -1f;
             float strength = lifts ? Mathf.Clamp01(path.influenceStrength) : 1f;
+            float smooth   = lifts ? Mathf.Max(0f, path.influenceSmoothFactor) : 0f;
+
+            // A point's height is only what the ground is lifted to, so the Vertical Offset moves
+            // the lifted ground by moving the points; the cut ignores height.
+            if (lifts && path.influenceVerticalOffset != 0f)
+                for (int i = 0; i < world.Count; i++) world[i] += Vector3.up * path.influenceVerticalOffset;
 
             // A run with no outer walls has the ground run straight onto its rim.
             float shelf = RunWallsOff(path) ? landscapeShelf : -1f;
+            float cutGap = path != null ? path.cutoutGap : -LandscapeHillHeight.RiverEdgeTuck;
 
             if (!lifts || path.influenceCancelledNodes == null || path.influenceCancelledNodes.Count == 0)
             {
-                lines.Add(new RiverEdgeLine { points = world, half = half, reach = reach, strength = strength, shelf = shelf });
+                lines.Add(new RiverEdgeLine { points = world, half = half, halves = halves, reach = reach, strength = strength, shelf = shelf, cutGap = cutGap, smooth = smooth });
                 continue;
             }
 
@@ -227,9 +268,12 @@ public partial class LevelSelectDesignerWindow
                 {
                     points = world.GetRange(start, end - start + 1),
                     half   = half,
+                    halves = halves?.GetRange(start, end - start + 1),
                     reach  = off ? -1f : reach,
                     strength = strength,
                     shelf    = shelf,
+                    cutGap   = cutGap,
+                    smooth   = smooth,
                 });
                 start = end;
                 off   = here;
@@ -239,7 +283,7 @@ public partial class LevelSelectDesignerWindow
 
     // A pool is a disc: its centre and outer radius. A pool has no path of its own, so a
     // Landscape Natural River Run pool lifts the ground by its river's path, as that river's
-    // runs do; any other pool is cut only.
+    // runs do; any other natural pool is cut only, and a structural one isn't cut at all.
     private void TracePools(List<RiverEdgeLine> lines)
     {
         float landscapeShelf = LandscapeShelf(FindLandscapeTool());
@@ -248,16 +292,23 @@ public partial class LevelSelectDesignerWindow
         {
             var  pool    = PoolForRecord(record);
             var  path    = pool != null ? PoolPath(pool) : PathForRiver(record.riverName);
+            if (!IsNaturalRun(path)) continue;
+
             var  profile = RunProfileFor(path, record.riverName);
-            bool lifts   = IsNaturalRun(path) && path.landscapeInfluence && path.landscapeToOuterRim;
+            bool lifts   = path.landscapeInfluence && path.landscapeToOuterRim;
 
             lines.Add(new RiverEdgeLine
             {
-                points   = new List<Vector3> { record.transform.position },
+                points   = new List<Vector3>
+                {
+                    record.transform.position + Vector3.up * (lifts ? path.influenceVerticalOffset : 0f),
+                },
                 half     = record.poolRadius + profile.rimWidth,
                 reach    = lifts ? Mathf.Max(0f, path.influenceDistance) : -1f,
                 strength = lifts ? Mathf.Clamp01(path.influenceStrength) : 1f,
                 shelf    = RunWallsOff(path) ? landscapeShelf : -1f,
+                cutGap   = path != null ? path.cutoutGap : -LandscapeHillHeight.RiverEdgeTuck,
+                smooth   = lifts ? Mathf.Max(0f, path.influenceSmoothFactor) : 0f,
             });
         }
     }
@@ -293,12 +344,15 @@ public partial class LevelSelectDesignerWindow
     // Into the shader's layout (see LandscapeTool.riverEdgePoints), thinned until it fits.
     private static void PackRiverEdges(List<RiverEdgeLine> lines,
                                        out List<Vector4> points, out List<float> reach,
-                                       out List<float> strength, out List<float> shelf)
+                                       out List<float> strength, out List<float> shelf,
+                                       out List<float> cutGap, out List<float> smooth)
     {
         points   = new List<Vector4>();
         reach    = new List<float>();
         strength = new List<float>();
         shelf    = new List<float>();
+        cutGap   = new List<float>();
+        smooth   = new List<float>();
 
         float tolerance = RiverEdgeTolerance;
         for (int attempt = 0; attempt < 16; attempt++)
@@ -307,18 +361,25 @@ public partial class LevelSelectDesignerWindow
             reach.Clear();
             strength.Clear();
             shelf.Clear();
+            cutGap.Clear();
+            smooth.Clear();
 
             foreach (var line in lines)
             {
-                var thin = line.points.Count > 2 ? Thin(line.points, tolerance) : line.points;
-                for (int i = 0; i < thin.Count; i++)
+                var keep = line.points.Count > 2
+                         ? ThinIndices(line.points, line.halves, tolerance)
+                         : Enumerable.Range(0, line.points.Count).ToList();
+                for (int i = 0; i < keep.Count; i++)
                 {
-                    Vector3 p = thin[i];
-                    float   w = i == thin.Count - 1 ? -line.half : line.half;
+                    Vector3 p    = line.points[keep[i]];
+                    float   half = line.halves != null ? line.halves[keep[i]] : line.half;
+                    float   w    = i == keep.Count - 1 ? -half : half;
                     points.Add(new Vector4(p.x, p.y, p.z, w));
                     reach.Add(line.reach);
                     strength.Add(line.strength);
                     shelf.Add(line.shelf);
+                    cutGap.Add(line.cutGap);
+                    smooth.Add(line.smooth);
                 }
             }
 
@@ -338,14 +399,17 @@ public partial class LevelSelectDesignerWindow
             reach.RemoveRange(LandscapeTool.MaxRiverEdgePoints, reach.Count - LandscapeTool.MaxRiverEdgePoints);
             strength.RemoveRange(LandscapeTool.MaxRiverEdgePoints, strength.Count - LandscapeTool.MaxRiverEdgePoints);
             shelf.RemoveRange(LandscapeTool.MaxRiverEdgePoints, shelf.Count - LandscapeTool.MaxRiverEdgePoints);
+            cutGap.RemoveRange(LandscapeTool.MaxRiverEdgePoints, cutGap.Count - LandscapeTool.MaxRiverEdgePoints);
+            smooth.RemoveRange(LandscapeTool.MaxRiverEdgePoints, smooth.Count - LandscapeTool.MaxRiverEdgePoints);
             var last = points[points.Count - 1];
             points[points.Count - 1] = new Vector4(last.x, last.y, last.z, -Mathf.Abs(last.w));
         }
     }
 
     // Keeps only the points needed to stay within tolerance of the line — straight stretches
-    // collapse to their ends, bends keep their points. Ends always kept.
-    private static List<Vector3> Thin(List<Vector3> line, float tolerance)
+    // collapse to their ends, bends keep their points. Ends always kept. With a half width at each
+    // point, one whose width the kept ends either side would not give it is kept too.
+    private static List<int> ThinIndices(List<Vector3> line, List<float> halves, float tolerance)
     {
         var keep = new bool[line.Count];
         keep[0] = keep[line.Count - 1] = true;
@@ -360,6 +424,15 @@ public partial class LevelSelectDesignerWindow
             for (int i = from + 1; i < to; i++)
             {
                 float d = DistanceToSegment(line[i], line[from], line[to]);
+                if (halves != null)
+                {
+                    // How far the width read off the ends either side misses this point's own.
+                    Vector3 ab = line[to] - line[from]; ab.y = 0f;
+                    Vector3 ap = line[i] - line[from];  ap.y = 0f;
+                    float   t  = ab.sqrMagnitude < 1e-12f ? 0f
+                               : Mathf.Clamp01(Vector3.Dot(ap, ab) / ab.sqrMagnitude);
+                    d = Mathf.Max(d, Mathf.Abs(halves[i] - Mathf.Lerp(halves[from], halves[to], t)));
+                }
                 if (d > worst) { worst = d; at = i; }
             }
             if (at < 0 || worst <= tolerance) continue;
@@ -369,8 +442,8 @@ public partial class LevelSelectDesignerWindow
             stack.Push((at, to));
         }
 
-        var thin = new List<Vector3>();
-        for (int i = 0; i < line.Count; i++) if (keep[i]) thin.Add(line[i]);
+        var thin = new List<int>();
+        for (int i = 0; i < line.Count; i++) if (keep[i]) thin.Add(i);
         return thin;
     }
 

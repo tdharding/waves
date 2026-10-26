@@ -155,6 +155,54 @@ public static class SoulRouteCurve
         }
     }
 
+    /// <summary>
+    /// The fewest points of <paramref name="line"/> that keep it within <paramref name="tolerance"/>
+    /// of itself, seen from above, with the arc length to each — close together round a pool's
+    /// ring or a tight bend, far apart down a straight. The first and last points are always kept.
+    /// </summary>
+    public static void Simplify(List<Vector3> line, List<float> cumArc, float tolerance,
+                                List<Vector3> outPoints, List<float> outArc)
+    {
+        outPoints.Clear();
+        outArc.Clear();
+        if (line.Count == 0) return;
+
+        var keep = new bool[line.Count];
+        keep[0] = keep[line.Count - 1] = true;
+
+        var stack = new Stack<(int from, int to)>();
+        if (line.Count > 2) stack.Push((0, line.Count - 1));
+        while (stack.Count > 0)
+        {
+            var (from, to) = stack.Pop();
+            Vector2 a  = new Vector2(line[from].x, line[from].z);
+            Vector2 ab = new Vector2(line[to].x, line[to].z) - a;
+            float   l2 = ab.sqrMagnitude;
+
+            int   worst = -1;
+            float most  = tolerance;
+            for (int i = from + 1; i < to; i++)
+            {
+                Vector2 ap = new Vector2(line[i].x, line[i].z) - a;
+                float   h  = l2 > 1e-12f ? Mathf.Clamp01(Vector2.Dot(ap, ab) / l2) : 0f;
+                float   d  = (ap - ab * h).magnitude;
+                if (d > most) { most = d; worst = i; }
+            }
+            if (worst < 0) continue;
+
+            keep[worst] = true;
+            if (worst - from > 1) stack.Push((from, worst));
+            if (to - worst > 1)   stack.Push((worst, to));
+        }
+
+        for (int i = 0; i < line.Count; i++)
+        {
+            if (!keep[i]) continue;
+            outPoints.Add(line[i]);
+            outArc.Add(cumArc[i]);
+        }
+    }
+
     /// <summary>The point <paramref name="s"/> world units along <paramref name="line"/>.</summary>
     public static Vector3 PointAt(List<Vector3> line, List<float> cumArc, float s)
     {

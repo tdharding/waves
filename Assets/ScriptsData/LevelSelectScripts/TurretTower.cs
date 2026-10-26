@@ -81,7 +81,9 @@ public class TurretTower
         var kinds = new List<float>();
         var parts = new List<int>();
 
-        (body ?? new LollipopTower()).Append(verts, norms, uvs, tris, Vector3.zero, kinds, shading, parts,
+        // The body takes the Turret Towers choices, not the lollipop towers'.
+        (body ?? new LollipopTower()).Append(verts, norms, uvs, tris, Vector3.zero, kinds,
+                                             RiverRunShadingSettings.ForTurret(shading), parts,
                                              withOrb: false);
 
         return Finish("TurretTowerBody", verts, norms, uvs, tris, kinds, parts, 0f);
@@ -97,7 +99,8 @@ public class TurretTower
         var kinds = new List<float>();
 
         LollipopTower.AppendOrb(verts, norms, uvs, tris, Vector3.zero, Mathf.Max(0.001f, body.orbRadius));
-        StoneFaces.Tag(kinds, tris, shading != null ? shading.towerOrb : StoneFaceKind.Auto);
+        StoneFaces.Tag(kinds, tris, shading != null ? shading.turretHead : StoneFaceKind.Auto);
+        PartLabels.Mark("Head", verts, tris);
 
         // Its origin is the orb's centre, so the rim top the waterline is placed off is below it.
         return Finish("TurretTowerHead", verts, norms, uvs, tris, kinds, null, -OrbCentreY);
@@ -142,7 +145,8 @@ public class TurretTower
         // ── Back, in case a nose wider than its orb shows it ──
         AppendDisc(verts, norms, uvs, tris, zBack, 0f, ro, Vector3.back);
 
-        StoneFaces.Tag(kinds, tris, shading != null ? shading.towerStem : StoneFaceKind.Auto);
+        StoneFaces.Tag(kinds, tris, shading != null ? shading.turretNose : StoneFaceKind.Auto);
+        PartLabels.Mark("Nose", verts, tris);
 
         return Finish("TurretTowerNose", verts, norms, uvs, tris, kinds, null, -OrbCentreY);
     }
@@ -159,7 +163,8 @@ public class TurretTower
 
         // River run stone shading, the same as a lollipop tower's, each part in the colour the
         // tower settings give it.
-        return RiverMeshBuilder.ShadeAsStone(mesh, rimTopY, rimTopY, kinds, parts);
+        return RiverMeshBuilder.ShadeAsStone(mesh, rimTopY, rimTopY, kinds, parts,
+                                             designation: StoneDesignation.TurretTowers);
     }
 
     // A tube of radius r along z, from z0 to z1, facing out or in.

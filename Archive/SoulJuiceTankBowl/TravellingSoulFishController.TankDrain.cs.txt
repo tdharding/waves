@@ -1,0 +1,268 @@
+    /// <summary>
+    /// What pressing E at the soul juice tank standing in <paramref name="poolNodeId"/> does:
+    /// the bowl drains, the pool round the tank fills, and then every route beginning there is
+    /// drawn out (<see cref="AdvanceBowls"/>). True when the release started.
+    /// </summary>
+    public bool ReleaseSoulJuiceTank(string poolNodeId)
+    {
+        if (!CanRelease(poolNodeId)) return false;
+
+        // No tank in the scene to drain — straight out.
+        if (!_bowlStates.TryGetValue(poolNodeId, out var state)) return ReleaseRoutesAt(poolNodeId) > 0;
+
+        state.phase = BowlPhase.Draining;
+        Debug.Log($"[TravelFish] Soul juice tank on '{poolNodeId}' draining — its path draws out once the " +
+                  "pool round it has filled.");
+        return true;
+    }
+
+    /// <summary>Whether E at the tank on <paramref name="poolNodeId"/> has anything to do.</summary>
+    public bool CanRelease(string poolNodeId)
+    {
+        if (designerData == null || string.IsNullOrEmpty(poolNodeId)) return false;
+        if (!TankHasRoutes(poolNodeId) || TowerReleased(poolNodeId)) return false;
+        return !_bowlStates.TryGetValue(poolNodeId, out var state) || state.phase == BowlPhase.Holding;
+    }
+
+    /// <summary>Opens every route that begins at <paramref name="poolNodeId"/>. Returns how many opened.</summary>
+    private int ReleaseRoutesAt(string poolNodeId)
+    {
+        int opened = 0;
+        foreach (var route in designerData.soulRoutes)
+            if (route != null && route.originNodeId == poolNodeId && route.points.Count > 0 &&
+                SoulJourneyData.OpenLegOf(route.routeId) < 0 && ReleaseTower(route.routeId))
+                opened++;
+
+        return opened;
+    }
+
+    /// <summary>Whether a route with somewhere to go begins at the tank on <paramref name="poolNodeId"/>.</summary>
+    private bool TankHasRoutes(string poolNodeId)
+        => designerData.soulRoutes.Exists(r => r != null && r.originNodeId == poolNodeId && r.points.Count > 0 &&
+                                               designerData.RouteStartsAtSoulJuiceTank(r));
+
+    /// <summary>
+    /// The route's souls still waiting at its origin. Only the pool: a soul already travelling,
+    /// arrived or caught keeps what it is doing, so nothing here can drag one backwards. A soul
+    /// juice tank's route has none — it carries no fish.
+    /// </summary>
+    private List<int> HeldSouls(LevelSelectDesignerData.SoulRoute route)
+    {
+        _held.Clear();
+        if (route?.souls == null || !RouteCarriesFish(route)) return _held;
+
+        foreach (var soul in route.souls)
+        {
+            if (soul == null || soul.soulDataIdentity <= 0) continue;
+            if (!SoulJourneyData.HasRecord(soul.soulDataIdentity)) continue;
+            if (SoulJourneyData.Where(soul.soulDataIdentity).place != SoulPlace.OriginPool) continue;
+            _held.Add(soul.soulDataIdentity);
+        }
+
+        return _held;
+    }
+
+    private readonly List<int> _held = new List<int>();
+
+    // ─────────────────────────────────────────────
+    // SOUL JUICE TANKS
+    // ─────────────────────────────────────────────
+
+    // Every generated soul juice tank in the scene, by the pool node it stands on.
+    private readonly Dictionary<string, SoulJuiceTankBowl> _bowls = new Dictionary<string, SoulJuiceTankBowl>();
+
+    private void FindTowerBowls()
+    {
+        _bowls.Clear();
+        foreach (var bowl in FindObjectsOfType<SoulJuiceTankBowl>())
+            if (bowl != null && !string.IsNullOrEmpty(bowl.poolNodeId))
+                _bowls[bowl.poolNodeId] = bowl;
+    }
+
+    // Releasing a tank: Holding (the full bowl of soul juice) → Draining (the juice lowers) →
+    // Filling (gone down the hole; the zone grows across the pool round the tank) → Done (its
+    // routes drawn out; the pool stays filled).
+    private enum BowlPhase { Holding, Draining, Filling, Done }
+
+    private class BowlState
+    {
+        public BowlPhase phase;
+        public float     fill;       // the pool fill's radius while Filling, world units
+        public float     poolRadius;   // the pool it fills, world units — looked up once
+        public float     islandRadius; // the island in the middle of it, world units
+
+        // Pool Fill Radius as a proportion of the water, from the island's edge out to the pool's.
+        public float FillRadius(float proportion)
+            => islandRadius + (poolRadius - islandRadius) * Mathf.Clamp01(proportion);
+    }
+
+    private readonly Dictionary<string, BowlState> _bowlStates = new Dictionary<string, BowlState>();
+
+    /// <summary>
+    /// The phase isn't saved — read off its routes instead: a tank whose routes are all open was
+    /// released before, so it loads drained, with the pool round it filled.
+    /// </summary>
+    private void InitBowlStates()
+    {
+        _bowlStates.Clear();
+        foreach (var pair in _bowls)
+        {
+            bool released = TowerReleased(pair.Key);
+            _bowlStates[pair.Key] = new BowlState { phase = released ? BowlPhase.Done : BowlPhase.Holding };
+            var st = _bowlStates[pair.Key];
+            st.poolRadius = PoolFillRadius(pair.Value, out st.islandRadius);
+            if (released && pair.Value != null) pair.Value.Empty();
+        }
+    }
+
+    private bool TowerReleased(string poolNodeId)
+    {
+        bool any = false;
+        foreach (var route in designerData.soulRoutes)
+        {
+            if (route == null || route.originNodeId != poolNodeId || route.points.Count == 0 ||
+                !designerData.RouteStartsAtSoulJuiceTank(route)) continue;
+            any = true;
+            if (SoulJourneyData.OpenLegOf(route.routeId) < 0) return false;
+        }
+        return any;
+    }
+
+    /// <summary>Drains each released tower's bowl, then fills the pool round it, then lets its souls out.</summary>
+    private void AdvanceBowls()
+    {
+        var look = RiverSoulZoneSettings.Resolve(designerData.waterPreset != null ? designerData.waterPreset.soulZone : null);
+
+        foreach (var pair in _bowlStates)
+        {
+            var state = pair.Value;
+            _bowls.TryGetValue(pair.Key, out var bowl);
+
+            if (state.phase == BowlPhase.Draining)
+            {
+                if (bowl != null) bowl.Lower(Mathf.Max(look.drainSpeed, 0.001f) * Time.deltaTime);
+                if (bowl == null || bowl.Drained)
+                {
+                    state.phase = BowlPhase.Filling;
+                    state.fill  = state.islandRadius;   // nothing to fill on the island itself
+                }
+            }
+            else if (state.phase == BowlPhase.Filling)
+            {
+                float target = state.FillRadius(look.poolFillRadius);
+                state.fill = Mathf.MoveTowards(state.fill, target, Mathf.Max(look.fillSpeed, 0.01f) * Time.deltaTime);
+                if (state.fill >= target)
+                {
+                    state.phase = BowlPhase.Done;
+                    ReleaseRoutesAt(pair.Key);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// The radius of the pool the tower stands in, and of its island, world units — the generated
+    /// pool nearest the tower that reaches it. The tuner's Pool Fill Radius is a proportion of
+    /// the water between the two.
+    /// </summary>
+    private float PoolFillRadius(SoulJuiceTankBowl bowl, out float island)
+    {
+        island = 0f;
+        if (bowl == null) return 0f;
+
+        Vector3 c    = bowl.transform.position;
+        float   best = float.MaxValue, radius = 0f;
+        foreach (var pool in FindObjectsOfType<RiverPoolMesh>())
+        {
+            Vector3 p    = pool.transform.position;
+            float   r    = pool.poolRadius * Mathf.Abs(pool.transform.lossyScale.x);
+            float   dist = new Vector2(p.x - c.x, p.z - c.z).magnitude;
+            if (dist <= r && dist < best)
+            {
+                best   = dist;
+                radius = r;
+                island = Mathf.Min(r, pool.islandRadius * Mathf.Abs(pool.transform.lossyScale.x));
+            }
+        }
+
+        if (radius <= 0f)
+            Debug.LogWarning($"[TravelFish] No generated pool round the soul juice tank on '{bowl.poolNodeId}' — " +
+                             "nothing for the zone to fill.", bowl);
+        return radius;
+    }
+
+    private bool SoulsInBowl(string poolNodeId)
+        => !_bowlStates.TryGetValue(poolNodeId, out var state) ||
+           state.phase == BowlPhase.Holding || state.phase == BowlPhase.Draining;
+
+    /// <summary>
+    /// A soul let out of a tower that has not set off yet — held at the start of its route behind
+    /// the one ahead. It is drawn swimming round the pool the tower stands in, come up from the hole.
+    /// </summary>
+    private bool TryPoolPose(SoulJourneyEntry entry, out Vector3 position, out float heading)
+    {
+        position = Vector3.zero;
+        heading  = 0f;
+
+        if (entry.legIndex != 0 || entry.progress > 0f) return false;
+        if (!_shapes.TryGetValue(entry.routeId ?? string.Empty, out var shape) || shape.polyline.Count == 0) return false;
+
+        var route = designerData.soulRoutes.Find(r => r != null && r.routeId == entry.routeId);
+        if (route == null || !designerData.RouteStartsAtSoulJuiceTank(route)) return false;
+        if (!_bowls.TryGetValue(route.originNodeId, out var bowl) || bowl == null) return false;
+
+        // Round the pool, on the ring the route starts from.
+        Vector3 c      = bowl.transform.position;
+        Vector3 start  = shape.polyline[0];
+        float   radius = new Vector2(start.x - c.x, start.z - c.z).magnitude;
+        if (radius < 0.01f) return false;
+
+        var   rng   = new System.Random(entry.identity * 7919 + 17);
+        float angle = (float)rng.NextDouble() * Mathf.PI * 2f + Time.time * swimSpeed / radius;
+
+        position = new Vector3(c.x + Mathf.Cos(angle) * radius, start.y, c.z + Mathf.Sin(angle) * radius);
+        heading  = Mathf.Atan2(-Mathf.Sin(angle), Mathf.Cos(angle));
+        return true;
+    }
+
+    /// <summary>
+    /// Where a soul waiting in a tower's bowl is now, circling. Each soul keeps its own lane — a
+    /// radius and a starting point seeded off its identity — and drifts gently in and out of it,
+    /// so the shoal reads as swimming round the bowl rather than riding one ring. All go the same
+    /// way round.
+    /// </summary>
+    // Where round the bowl each waiting soul has got to, radians.
+    private readonly Dictionary<int, float> _bowlAngles = new Dictionary<int, float>();
+
+    private void BowlPose(SoulJuiceTankBowl bowl, int identity, float fishSize,
+                          out Vector3 position, out float heading)
+    {
+        float wet = Mathf.Max(0.0001f, bowl.WorldWaterRadius);
+
+        // Keep the whole fish inside the water: lanes run from the middle out to its edge less half a fish.
+        float reach = Mathf.Max(0f, wet - fishSize * 0.5f);
+
+        var   rng   = new System.Random(identity * 7919 + 17);
+        float lane  = Mathf.Lerp(0.3f, 0.85f, (float)rng.NextDouble()) * reach;
+        float start = (float)rng.NextDouble() * Mathf.PI * 2f;
+        float drift = (float)rng.NextDouble() * Mathf.PI * 2f;
+
+        float radius = Mathf.Clamp(lane + Mathf.Sin(Time.time * 0.7f + drift) * 0.12f * reach, 0.05f * reach, reach);
+
+        // Stepped on each frame, not worked out from the clock: as the bowl drains the lanes
+        // narrow, and dividing all the time so far by a shrinking lane spun the fish faster and
+        // faster. This keeps them swimming at the same speed.
+        float turn = bowlSwimSpeed / Mathf.Max(0.05f * wet, lane);
+        if (!_bowlAngles.TryGetValue(identity, out float angle))
+            angle = start + Time.time * turn;
+        else
+            angle += Time.deltaTime * turn;
+        _bowlAngles[identity] = angle;
+
+        Vector3 c = bowl.WaterCentre;
+        position = new Vector3(c.x + Mathf.Cos(angle) * radius, c.y, c.z + Mathf.Sin(angle) * radius);
+
+        // Moving along the circle: the tangent of increasing angle.
+        heading = Mathf.Atan2(-Mathf.Sin(angle), Mathf.Cos(angle));
+    }
+

@@ -234,6 +234,8 @@ public partial class LevelSelectDesignerWindow
 
             Undo.RecordObject(_data, "Move");
             clamp.targetAt = at;
+            // A View Target holds its height — the clamp moves it across the map only.
+            if (CameraSequenceViewTargets.HeightHeld(clamp.cameraLink)) delta.y = 0f;
 
             var link = CameraSequenceLink.Find(clamp.cameraLink);
             if (link != null)
@@ -267,7 +269,7 @@ public partial class LevelSelectDesignerWindow
     private void DrawShotCameras()
     {
         if (Event.current.type != EventType.Repaint) return;
-        if (!LevelSelectDesignerSettings.ShotCameras) return;
+        if (!LevelSelectDesignerSettings.ShowCameras || !LevelSelectDesignerSettings.ShotCameras) return;
         RefreshShotCameras();
 
         float w = LevelSelectDesignerSettings.ShotCameraSize;
@@ -288,7 +290,7 @@ public partial class LevelSelectDesignerWindow
     private bool FindShotCameraAtCanvas(Vector2 canvas, out string link)
     {
         link = null;
-        if (!LevelSelectDesignerSettings.ShotCameras) return false;
+        if (!LevelSelectDesignerSettings.ShowCameras || !LevelSelectDesignerSettings.ShotCameras) return false;
         RefreshShotCameras();
 
         float reach = Mathf.Max(8f, LevelSelectDesignerSettings.ShotCameraSize * 0.6f);

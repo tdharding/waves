@@ -55,18 +55,6 @@ public class FogRepellerSource : MonoBehaviour, IFogRepeller
 
     void OnEnable()  => FogFieldManager.Register(this);
     void OnDisable() => FogFieldManager.Unregister(this);
-
-#if UNITY_EDITOR
-    void OnDrawGizmosSelected()
-    {
-        Vector3 c = RepelCentre; c.y += 0.02f;
-        // Solid discs: the filled area is the exclusion, and the ring between them is the clear radius.
-        UnityEditor.Handles.color = new Color(0.95f, 0.55f, 0.35f, 0.16f);
-        UnityEditor.Handles.DrawSolidDisc(c, Vector3.up, radius + clearRadius);
-        UnityEditor.Handles.color = new Color(0.95f, 0.4f, 0.25f, 0.22f);
-        UnityEditor.Handles.DrawSolidDisc(c, Vector3.up, radius);
-    }
-#endif
 }
 
 /// <summary>

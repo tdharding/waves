@@ -60,13 +60,16 @@ public partial class LevelSelectDesignerWindow
 
         // The river edges too, so a spike beside a run with Landscape Influence stands on the
         // lifted ground.
-        return SpikeBaselineY + LandscapeHillHeight.At(_data.hillPoints, positionXZ,
+        return SpikeBaselineY + LandscapeHillHeight.At(ActiveHillPoints, positionXZ,
                                                         globalHeight, _data.landscapeNoiseScale,
                                                         tool != null ? tool.riverEdgePoints : null,
                                                         tool != null ? tool.riverEdgeReach  : null,
                                                         tool != null ? tool.riverEdgeStrength : null,
                                                         SpikeBaselineY,
-                                                        tool != null ? tool.riverEdgeShelf : null);
+                                                        tool != null ? tool.riverEdgeShelf : null,
+                                                        tool != null ? tool.riverEdgeSmooth : null,
+                                                        tool != null ? tool.maps : null,
+                                                        tool != null ? tool.mapArea : default);
     }
 
     // ─────────────────────────────────────────────
@@ -443,6 +446,8 @@ public partial class LevelSelectDesignerWindow
             RebuildAfterEdit(spike, () => RebuildSpike(spike));
         }
 
+        if (OcclusionToggle(ref spike.occlusion, ref spike.occlusionStyle)) RebuildSpike(spike);
+
         // The studio's stage in the map's look, the rock standing on this spike's own spot so the
         // map's light falls on it the way it does here.
         if (GUILayout.Button(new GUIContent("Edit Shape",
@@ -581,6 +586,8 @@ public partial class LevelSelectDesignerWindow
 
         // She stands on the tip the mesh was just built to.
         ApplyPerch(go, spike.perch, Vector3.up * profile.topY);
+
+        ApplyOcclusion(go, spike.occlusion, spike.occlusionStyle);
     }
 
     /// <summary>Stands the rock where it belongs — its surface line on the landscape under it.</summary>

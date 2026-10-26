@@ -48,8 +48,12 @@ holding it goes on holding it.
 Where the scatter is decided
 ----------------------------
 
-Not here. Amount, Spacing and the two Scales are in the tuner, saved on the structure preset, and
-pushed to the shader as bare $Globals every frame like all the rest of the run shading. Amount at
-0 draws none of them, which is what a preset that has never heard of decals gets.
+Not here. In the tuner's Decal Groups: each group ticks which of these drawings it uses and has
+its own Amount, Opacity, Spacing, Scales and rotation. Each stone type then ticks the groups it
+takes. Saved on the structure preset, and pushed to the shader as bare $Globals every frame like
+all the rest of the run shading. A stone ticking no group draws no decals.
+
+Groups tick drawings by their asset GUID, so renaming a drawing keeps it in its groups (it still
+moves cell on the sheet, so rebuild).
 
 The stamping itself is in RiverRunShading.hlsl, one folder up.

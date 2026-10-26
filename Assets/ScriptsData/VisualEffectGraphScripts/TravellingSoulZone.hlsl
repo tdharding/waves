@@ -32,6 +32,10 @@ float  _TravelSoulZoneGrainSize;     // world units per grain cell; 0 = no grain
 float  _TravelSoulZoneGrainStrength; // how far the grain lifts the base colour towards white, 0..1; 0 = no grain
 float  _TravelSoulZoneScrollSpeed;   // world units per second the grain flows down the route
 
+// The band's middle swung from side to side of the route's line along it, an even wave:
+// x how far either side (world units; 0 = straight), y the distance along the route per swing.
+float4 _TravelSoulZoneMeander;
+
 // The river stone's gradient noise (RiverRunShading.hlsl), copied under its own names so both
 // can sit in one graph: the same hash and quintic fade as the Gradient Noise node, about zero.
 float2 TravelZoneNoiseDir(float2 p)
@@ -69,6 +73,9 @@ void TravellingSoulZone_float(
     int   count = min((int)_TravelSoulZoneCount, TRAVELZONE_MAX_POINTS);
     float width = max(_TravelSoulZoneWidth, 0.0001);
 
+    float meanderWidth = max(_TravelSoulZoneMeander.x, 0.0);
+    float meanderSpace = max(_TravelSoulZoneMeander.y, 0.1);
+
     // Nearest point of any route, as a fraction of the band's half-width there: 0 = centre, 1 = edge.
     float  bestT  = 1e9;
     float2 bestUV = float2(0.0, 0.0);
@@ -92,17 +99,22 @@ void TravellingSoulZone_float(
                 float segLen = sqrt(segLen2);
                 float h      = saturate(dot(pa, ba) / segLen2);
                 float ds     = length(pa - ba * h);
+                float crossZ = ba.x * pa.y - ba.y * pa.x;   // > 0 = left of travel
+                float along  = s + h * segLen;
+
+                // Across from the band's middle, which the meander swings off the line.
+                float across = (crossZ >= 0.0 ? ds : -ds)
+                             - meanderWidth * sin(6.28318530718 * along / meanderSpace);
 
                 // The width eases from this point's to the next one's, so two routes of different
                 // Band Width meeting at a shared stretch do not step.
                 float rSeg = lerp(r, max(_TravelSoulZonePositions[i + 1].y * width, 0.0001), h);
-                float t    = ds / rSeg;
+                float t    = abs(across) / rSeg;
 
                 if (t < bestT)
                 {
-                    bestT = t;
-                    float crossZ = ba.x * pa.y - ba.y * pa.x;   // > 0 = left of travel
-                    bestUV = float2(s + h * segLen, crossZ >= 0.0 ? ds : -ds);
+                    bestT  = t;
+                    bestUV = float2(along, across);
                 }
                 continue;
             }

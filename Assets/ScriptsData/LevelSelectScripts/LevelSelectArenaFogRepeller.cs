@@ -38,26 +38,4 @@ public class LevelSelectArenaFogRepeller : MonoBehaviour, IFogRepeller
     }
 
     void OnDisable() => FogFieldManager.Unregister(this);
-
-#if UNITY_EDITOR
-    // Drawn at the wall's own height, for lining the circle up against the arena it covers.
-    void OnDrawGizmosSelected()
-    {
-        var wall = GetComponent<LevelSelectArenaWallMesh>();
-        if (wall == null || wall.profile == null) return;
-
-        float radius = wall.profile.OuterRadius + FogFieldManager.ArenaRepelRadius;
-        bool  on     = FogFieldManager.ArenasRepel;
-
-        UnityEditor.Handles.color = on ? new Color(0.95f, 0.55f, 0.35f, 0.14f)
-                                       : new Color(0.55f, 0.55f, 0.58f, 0.10f);
-        UnityEditor.Handles.DrawSolidDisc(transform.position, Vector3.up, radius);
-        UnityEditor.Handles.color = on ? new Color(0.95f, 0.45f, 0.30f, 0.5f)
-                                       : new Color(0.55f, 0.55f, 0.58f, 0.4f);
-        UnityEditor.Handles.DrawWireDisc(transform.position, Vector3.up, radius);
-
-        UnityEditor.Handles.color = Color.white;
-        UnityEditor.Handles.Label(transform.position, on ? "fog arena" : "fog arena (arenas repel off)");
-    }
-#endif
 }

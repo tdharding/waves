@@ -36,6 +36,11 @@ float  _WaterSurfaceStepRate; // _WaveStepRate
 float _WavePhase;             // shared accumulated phase (WaveMaterialController / tuner)
 #endif
 
+// Guarded because RiverRunShading.hlsl includes this too, so a graph holding both that and a
+// WaterlineMask node doesn't define these twice.
+#ifndef WATER_SURFACE_HEIGHT_INCLUDED
+#define WATER_SURFACE_HEIGHT_INCLUDED
+
 void WaterSurfaceHeight_float(
     float3 WorldPos,
     float  Feather,
@@ -69,3 +74,5 @@ void WaterSurfaceHeight_half(
     SurfaceY  = (half)_WaterSurfaceOrigin.y - wave;
     BelowMask = saturate((SurfaceY - WorldPos.y) / max(Feather, 1e-4h));
 }
+
+#endif // WATER_SURFACE_HEIGHT_INCLUDED

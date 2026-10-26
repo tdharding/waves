@@ -46,11 +46,13 @@ public static class RoundStructureMesh
         // ── The outside, top of the wall down to the drop ──
         InstallationOutpostMesh.AppendColumn(verts, norms, uvs, tris, Vector3.zero, R, yB, yT, Sides);
         StoneFaces.Tag(kinds, tris, Choice(s => s.outpostOutsideWalls));
+        PartLabels.Mark("Round Column", verts, tris);
 
         if (!walled)
         {
             InstallationOutpostMesh.AppendColumnCap(verts, norms, uvs, tris, Vector3.up * yF, R, Sides);
             StoneFaces.Tag(kinds, tris, Choice(s => s.outpostFloor));
+            PartLabels.Mark("Round Column", verts, tris);
         }
         else
         {
@@ -59,14 +61,17 @@ public static class RoundStructureMesh
             // ── Top of the ring wall ──
             AppendAnnulus(verts, norms, uvs, tris, yT, ri, R);
             StoneFaces.Tag(kinds, tris, Choice(s => s.outpostWallTop));
+            PartLabels.Mark("Wall", verts, tris);
 
             // ── Inside of the ring wall, facing in across the floor ──
             AppendInnerWall(verts, norms, uvs, tris, ri, yF, yT);
             StoneFaces.Tag(kinds, tris, Choice(s => s.outpostInsideWalls));
+            PartLabels.Mark("Wall", verts, tris);
 
             // ── The floor ──
             InstallationOutpostMesh.AppendColumnCap(verts, norms, uvs, tris, Vector3.up * yF, ri, Sides);
             StoneFaces.Tag(kinds, tris, Choice(s => s.outpostFloor));
+            PartLabels.Mark("Floor", verts, tris);
         }
 
         // ── The columns on the ring, from the drop up past the floor ──
@@ -76,15 +81,21 @@ public static class RoundStructureMesh
             if (!(plusX ? columns.plusX : columns.minusX)) continue;
             Vector3 top = ColumnTop(radius, height, wallThickness, wallHeight, columnHeight, plusX);
             InstallationOutpostMesh.AppendColumn(verts, norms, uvs, tris, new Vector3(top.x, 0f, top.z), r, yB, top.y);
-            StoneFaces.Tag(kinds, tris, Choice(s => s.outpostOutsideWalls));
+            StoneFaces.Tag(kinds, tris, Choice(s => s.outpostColumnSides));
+            PartLabels.Mark("Column", verts, tris);
             InstallationOutpostMesh.AppendColumnCap(verts, norms, uvs, tris, top, r);
-            StoneFaces.Tag(kinds, tris, Choice(s => s.outpostWallTop));
+            StoneFaces.Tag(kinds, tris, Choice(s => s.outpostColumnTop));
+            PartLabels.Mark("Column", verts, tris);
         }
 
+        // The towers take the tower Designation's Scale, as they take its colours.
+        var designations = new List<StoneDesignation>();
+        StoneFaces.Designate(designations, tris, RiverRunShadingSettings.OutpostAs(shading));
         if (tower != null)
             foreach (var towerBase in TowerBases(radius, height, wallThickness, wallHeight,
                                                  towerOffset, columns, columnHeight))
                 tower.Append(verts, norms, uvs, tris, towerBase, kinds, shading, parts);
+        StoneFaces.Designate(designations, tris, RiverRunShadingSettings.TowerAs(shading));
 
         var mesh = new Mesh { name = "RoundStructure" };
         mesh.SetVertices(verts);
@@ -93,7 +104,8 @@ public static class RoundStructureMesh
         mesh.SetTriangles(tris, 0);
         mesh.RecalculateBounds();
 
-        return RiverMeshBuilder.ShadeAsStone(mesh, rimTopY, yT, kinds, parts);
+        return RiverMeshBuilder.ShadeAsStone(mesh, rimTopY, yT, kinds, parts,
+                                             faceDesignations: designations);
     }
 
     /// <summary>

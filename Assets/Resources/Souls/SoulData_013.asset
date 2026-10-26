@@ -17,6 +17,6 @@ MonoBehaviour:
   homeLevelID: LargeLevel1
   associatedWavePreset: {fileID: 11400000, guid: e2b65eb57f36e0c47a22976faa87ca42, type: 2}
   allocated: 1
-  allocatedToLevelID: pool:75c845e2
+  allocatedToLevelID: soulfisharea:d5dc6d03-edde-45fd-8a5f-bc4863bb4e7a
   soulName: Soul #13
   videoClip: {fileID: 32900000, guid: a0081b150ecf4994c9e3a025d8879995, type: 3}

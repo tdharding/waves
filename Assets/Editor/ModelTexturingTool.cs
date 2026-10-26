@@ -24,7 +24,8 @@ using UnityEngine.SceneManagement;
 // (the model's own copy of the AngelMaterialTransparent graph, with a "<group>_Transparency" property
 // per Transparency group — see EnsureTransparentGraph), and shows a live, unsaved preview of the map
 // on it. Bake puts the replicant and its materials on the real model.
-// Add Lighting / Add White Fade switch the level select's light and white fade on, per material;
+// Add Lighting / Add Baked Lighting / Add White Fade switch the level select's light, its baked
+// shadows + River Glow (Level Select Lighting window) and white fade on, per material;
 // the stage copy always shows the model without them (see HideLevelSelectEffects).
 // Experimental: groups are stored as triangle indices (see ModelTexturingData).
 public class ModelTexturingTool : EditorWindow
@@ -33,6 +34,7 @@ public class ModelTexturingTool : EditorWindow
     const string BaseColourProp = "_BaseColour";
     const string DoubleSidedProp = "_DoubleSided";
     const string AddLightingProp = "_AddLighting";
+    const string AddBakedLightingProp = "_AddBakedLighting";
     const string AddWhiteFadeProp = "_AddWhiteFade";
     const string OpaqueGraph = "AngelMaterial";
     const string TransparentGraph = "AngelMaterialTransparent";
@@ -198,25 +200,7 @@ public class ModelTexturingTool : EditorWindow
             return;
         }
 
-        if (!HasUV2)
-        {
-            EditorGUILayout.HelpBox(
-                "This mesh has no unique UVs to bake onto. Generating them turns on the model's " +
-                "Generate Lightmap UVs import setting; the groups bake onto those, not onto your own UV map.",
-                MessageType.Warning);
-            if (GUILayout.Button("Generate Unique UVs")) GenerateUniqueUVs();
-        }
-
-        if (ReordersFaces())
-        {
-            EditorGUILayout.HelpBox(
-                "Unity reorders this model's faces when it imports it (its Optimize Mesh setting), and " +
-                "reorders them differently whenever the shape changes — so reshaping it in Blender " +
-                "scrambles the groups. Keeping Blender's order turns that setting off and finds every " +
-                "group's faces again under their new numbers.",
-                MessageType.Warning);
-            if (GUILayout.Button("Keep Blender's Face Order")) KeepBlenderFaceOrder();
-        }
+        if ((!HasUV2 || ReordersFaces()) && GUILayout.Button("Replicate Mesh")) ReplicateMesh();
 
         EditorGUILayout.Space();
         EditorGUILayout.BeginHorizontal();
@@ -299,7 +283,7 @@ public class ModelTexturingTool : EditorWindow
             DrawMaterialRow(MaterialTitle + "Transparent", "Transparent", FaceCount(seeThrough), _data.transparentMaterial, true);
     }
 
-    // One row per material: its own Double Sided, Add White Fade and Add Lighting boxes, so the opaque
+    // One row per material: its own Double Sided, Add White Fade, Add Lighting and Add Baked Lighting boxes, so the opaque
     // and transparent faces can differ. A transparent material starts with the opaque one's settings
     // (see EnsureMaterial).
     void DrawMaterialRow(string name, string kind, int faces, Material made, bool transparent)
@@ -315,6 +299,8 @@ public class ModelTexturingTool : EditorWindow
             "The level select's white fade round the boat, laid on last. Never shown in the stage.", 110);
         DrawMaterialBox(made, exists, AddLightingProp, "Add Lighting",
             "The level select's light (the scene's LevelSelectLight), the same as the river runs and hills. Never shown in the stage.", 95);
+        DrawMaterialBox(made, exists, AddBakedLightingProp, "Add Baked Lighting",
+            "The level select's baked Shadows and River Glow (Level Select Lighting window), laid on after Add Lighting, the same as the river runs and hills. Never shown in the stage.", 130);
         using (new EditorGUI.DisabledScope(!exists))
             if (GUILayout.Button(exists ? "Ping" : "Not made", GUILayout.Width(70))) EditorGUIUtility.PingObject(made);
         EditorGUILayout.EndHorizontal();
@@ -389,6 +375,7 @@ public class ModelTexturingTool : EditorWindow
         }
         EditorGUI.EndDisabledGroup();
         EditorGUILayout.EndHorizontal();
+        if (GUILayout.Button("Select Ungrouped Faces")) SelectUngroupedFaces();
 
         EditorGUILayout.LabelField($"{_lineSelection.Count} lines selected", EditorStyles.miniLabel);
         EditorGUILayout.BeginHorizontal();
@@ -3094,6 +3081,15 @@ public class ModelTexturingTool : EditorWindow
         SceneView.RepaintAll();
     }
 
+    // Readies the model's import settings for the tool: Unity keeps Blender's face order (Optimize
+    // Mesh off, so a reshape in Blender doesn't scramble the groups) and generates the unique UVs
+    // the groups bake onto (Generate Lightmap UVs on).
+    void ReplicateMesh()
+    {
+        if (ReordersFaces() && !KeepBlenderFaceOrder()) return;
+        if (EnsureCache() && !HasUV2) GenerateUniqueUVs();
+    }
+
     void GenerateUniqueUVs()
     {
         string path = AssetDatabase.GetAssetPath(_cachedMesh);
@@ -3117,12 +3113,24 @@ public class ModelTexturingTool : EditorWindow
     // order and a reshape in Blender keeps every face's number. The reimport renumbers them once
     // (the shape hasn't changed, so each face is found again by where its corners sit), then
     // gradient lines and decals are pinned again from their rest-pose points.
-    void KeepBlenderFaceOrder()
+    bool KeepBlenderFaceOrder()
     {
-        if (_data == null || !EnsureCache()) return;
+        if (!EnsureCache()) return false;
         Mesh source = _cachedMesh;
         string path = AssetDatabase.GetAssetPath(source);
-        if (!(AssetImporter.GetAtPath(path) is ModelImporter mi)) return;
+        if (!(AssetImporter.GetAtPath(path) is ModelImporter mi)) return false;
+
+        // No groups yet: nothing to find again.
+        if (_data == null)
+        {
+            mi.meshOptimizationFlags = 0;
+            mi.SaveAndReimport();
+            _selection.Clear();
+            _cachedMesh = null;
+            _layout = null;
+            _previewDirty = true;
+            return true;
+        }
 
         // Every line and decal back onto its rest-pose points, unpinned, while the numbers still hold.
         foreach (var g in _data.fills)
@@ -3168,7 +3176,7 @@ public class ModelTexturingTool : EditorWindow
             _layout = null;
             EditorUtility.SetDirty(_data);
             ShowNotification(new GUIContent("Couldn't find every face again — left the model as it was"));
-            return;
+            return false;
         }
 
         foreach (var g in _data.fills)
@@ -3189,6 +3197,7 @@ public class ModelTexturingTool : EditorWindow
         Debug.Log($"[ModelTexturing] Kept Blender's face order on '{path}': {map.Length} faces renumbered, " +
                   $"{CountMoved(map)} moved");
         ShowNotification(new GUIContent("Faces now keep Blender's order"));
+        return true;
     }
 
     static int CountMoved(int[] map)
@@ -3652,6 +3661,19 @@ public class ModelTexturingTool : EditorWindow
             if (t >= 0 && t < TriCount) _selection.Add(t);
         _editingGroup = g;
         _editingSnapshot = new HashSet<int>(_selection);
+        Repaint();
+        SceneView.RepaintAll();
+    }
+
+    // Adds every face that isn't in a group to the face selection.
+    void SelectUngroupedFaces()
+    {
+        if (_target == null || !EnsureCache()) return;
+        var grouped = new HashSet<int>();
+        if (_data != null)
+            foreach (var g in _data.fills) grouped.UnionWith(g.triangles);
+        for (int t = 0; t < TriCount; t++)
+            if (!grouped.Contains(t)) _selection.Add(t);
         Repaint();
         SceneView.RepaintAll();
     }
@@ -4661,6 +4683,7 @@ public class ModelTexturingTool : EditorWindow
         _block ??= new MaterialPropertyBlock();
         _target.GetPropertyBlock(_block);
         _block.SetFloat(AddLightingProp, 0f);
+        _block.SetFloat(AddBakedLightingProp, 0f);
         _block.SetFloat(AddWhiteFadeProp, 0f);
         _target.SetPropertyBlock(_block);
     }

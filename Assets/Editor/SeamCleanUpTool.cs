@@ -34,6 +34,7 @@ public class SeamCleanUpTool : EditorWindow
     Mode    _mode;
     bool    _showDisplay;
     bool    _hideOverlays;   // Scene view drawing (and clicking) off, mode kept
+    bool    _hideRemoved;    // removed lines not drawn (nor clickable), only the seams still there
     Vector2 _scroll;
     readonly HashSet<int> _shutGroups     = new HashSet<int>();   // chunk groups folded shut; -1 = Not Found
     readonly HashSet<int> _shutFaceGroups = new HashSet<int>();   // face groups folded shut
@@ -53,6 +54,7 @@ public class SeamCleanUpTool : EditorWindow
 
     // Display — the user's own, kept between sessions.
     float _lineWidth;
+    float _stackedExtra;   // pixels wider per line lying on top
     float _pickPixels;
     Color _seamColour, _hoverColour, _removedColour;
     Color _groupColour, _currentGroupColour;
@@ -63,6 +65,7 @@ public class SeamCleanUpTool : EditorWindow
     {
         _wallId        = EditorPrefs.GetString(K + "Wall", "");
         _lineWidth     = EditorPrefs.GetFloat(K + "LineWidth", 5f);
+        _stackedExtra  = EditorPrefs.GetFloat(K + "StackedExtraWidth", 4f);
         _pickPixels    = EditorPrefs.GetFloat(K + "PickPixels", 10f);
         _seamColour    = LoadColour("SeamColour",    new Color(0.25f, 0.8f, 1f, 1f));
         _hoverColour   = LoadColour("HoverColour",   new Color(1f, 0.85f, 0.2f, 1f));
@@ -169,6 +172,18 @@ public class SeamCleanUpTool : EditorWindow
             _hoverPatch   = -1;
             SceneView.RepaintAll();
         }
+
+        bool hideRemoved = EditorGUILayout.ToggleLeft(
+            new GUIContent("Hide Removed", "Draw only the seams still there. Removed ones can't be clicked back while " +
+                                           "they're hidden — bring them back from the list."), _hideRemoved);
+        if (hideRemoved != _hideRemoved)
+        {
+            _hideRemoved = hideRemoved;
+            _hoverLine   = -1;
+            SceneView.RepaintAll();
+        }
+
+        DrawLineWidths();
 
         var report = designer.WallSeams(_wallId);
         var spots  = designer.RemovedWallSeams(_wallId);
@@ -418,6 +433,21 @@ public class SeamCleanUpTool : EditorWindow
         view.Frame(bounds, false);
     }
 
+    void DrawLineWidths()
+    {
+        EditorGUI.BeginChangeCheck();
+        float width = EditorGUILayout.Slider(new GUIContent("Line Width", "How thick the seam lines are drawn, in pixels."),
+                                             _lineWidth, 1f, 16f);
+        float extra = EditorGUILayout.Slider(new GUIContent("Stacked Extra Width",
+            "How much wider a seam line lying under another one is drawn, in pixels, for each line on top of it — " +
+            "so its edges show round them. 0 draws them all the same."), _stackedExtra, 0f, 16f);
+        if (!EditorGUI.EndChangeCheck()) return;
+
+        _lineWidth    = width; EditorPrefs.SetFloat(K + "LineWidth", width);
+        _stackedExtra = extra; EditorPrefs.SetFloat(K + "StackedExtraWidth", extra);
+        SceneView.RepaintAll();
+    }
+
     void DrawDisplay()
     {
         EditorGUILayout.Space(6);
@@ -425,8 +455,6 @@ public class SeamCleanUpTool : EditorWindow
         if (!_showDisplay) return;
 
         EditorGUI.BeginChangeCheck();
-        float width   = EditorGUILayout.Slider(new GUIContent("Line Width", "How thick the seam lines are drawn, in pixels."),
-                                               _lineWidth, 1f, 16f);
         float pick    = EditorGUILayout.Slider(new GUIContent("Pick Distance", "How near the mouse has to be to a line, in pixels."),
                                                _pickPixels, 2f, 30f);
         Color seam    = EditorGUILayout.ColorField("Seam", _seamColour);
@@ -440,8 +468,7 @@ public class SeamCleanUpTool : EditorWindow
         _groupColour = grouped;         SaveColour("GroupColour", grouped);
         _currentGroupColour = currentG; SaveColour("CurrentGroupColour", currentG);
 
-        _lineWidth = width;   EditorPrefs.SetFloat(K + "LineWidth", width);
-        _pickPixels = pick;   EditorPrefs.SetFloat(K + "PickPixels", pick);
+        _pickPixels = pick;  EditorPrefs.SetFloat(K + "PickPixels", pick);
         _seamColour = seam;       SaveColour("SeamColour", seam);
         _hoverColour = hover;     SaveColour("HoverColour", hover);
         _removedColour = removed; SaveColour("RemovedColour", removed);
@@ -656,7 +683,7 @@ public class SeamCleanUpTool : EditorWindow
         for (int j = 0; j < report.lines.Count; j++)
         {
             var pts = report.lines[j].points;
-            if (pts == null || pts.Length < 2) continue;
+            if (pts == null || pts.Length < 2 || Skipped(report.lines[j])) continue;
             var world = new Vector3[pts.Length];
             for (int i = 0; i < pts.Length; i++) world[i] = pts[i] + origin;
             float d = HandleUtility.DistanceToPolyLine(world);
@@ -720,10 +747,15 @@ public class SeamCleanUpTool : EditorWindow
         var zTest = Handles.zTest;
         Handles.zTest = CompareFunction.LessEqual;
 
+        // Lines are drawn in order, so a later one lands on top of an earlier one lying under it;
+        // each line underneath is drawn wider by Stacked Extra Width per line on top of it, so its
+        // edges show round them.
+        int[] onTop = LinesOnTop(report);
+
         for (int j = 0; j < report.lines.Count; j++)
         {
             var line = report.lines[j];
-            if (line.points == null || line.points.Length < 2) continue;
+            if (line.points == null || line.points.Length < 2 || Skipped(line)) continue;
 
             // Drawn a hair towards the camera, so the line sits on the stone rather than in it.
             var pts = new Vector3[line.points.Length];
@@ -738,10 +770,114 @@ public class SeamCleanUpTool : EditorWindow
             Handles.color = j == _hoverLine          ? _hoverColour
                           : line.removedBy.Count > 0 ? _removedColour
                                                      : _seamColour;
-            Handles.DrawAAPolyLine(Texture2D.whiteTexture, _lineWidth, pts);
+            Handles.DrawAAPolyLine(Texture2D.whiteTexture, _lineWidth + onTop[j] * _stackedExtra, pts);
         }
 
         Handles.zTest = zTest;
+    }
+
+    // ── Stacked seams ────────────────────────────
+
+    // How near two lines have to lie, and how far along one another, to be on top of one another.
+    // Tighter than a removed spot's reach: stacked seams come from faces in the same place, so they
+    // lie exactly together, and lines merely meeting end to end must not count.
+    const float StackReach   = 0.001f;
+    const float StackPiece   = 0.002f;   // length a line is tested along in
+    const float StackOverlap = 0.01f;    // or half the shorter line, if that's less
+
+    WallMesh.SeamReport _onTopFor;
+    int                 _onTopCount;
+    bool                _onTopHidRemoved;
+    int[]               _onTop;
+
+    // A removed line while Hide Removed is on — not drawn, not clickable, not counted on top.
+    bool Skipped(WallMesh.SeamLine line) => _hideRemoved && line.removedBy.Count > 0;
+
+    /// <summary>
+    /// For each line, how many later lines of the same chunk are drawn on top of it. Lines in two
+    /// chunks at a chunk join aren't counted — one click already takes both.
+    /// </summary>
+    int[] LinesOnTop(WallMesh.SeamReport report)
+    {
+        var lines = report.lines;
+        if (_onTop != null && ReferenceEquals(_onTopFor, report) && _onTopCount == lines.Count &&
+            _onTopHidRemoved == _hideRemoved) return _onTop;
+
+        var onTop  = new int[lines.Count];
+        var bounds = new Bounds[lines.Count];
+        var length = new float[lines.Count];
+        for (int j = 0; j < lines.Count; j++)
+        {
+            var pts = lines[j].points;
+            if (pts == null || pts.Length < 2 || Skipped(lines[j])) continue;
+            bounds[j] = new Bounds(pts[0], Vector3.zero);
+            for (int i = 1; i < pts.Length; i++)
+            {
+                bounds[j].Encapsulate(pts[i]);
+                length[j] += Vector3.Distance(pts[i - 1], pts[i]);
+            }
+            bounds[j].Expand(StackReach * 2f);
+        }
+
+        for (int a = 0; a < lines.Count; a++)
+        {
+            if (length[a] <= 0f) continue;
+            for (int b = a + 1; b < lines.Count; b++)
+            {
+                if (length[b] <= 0f || lines[a].chunk != lines[b].chunk || !bounds[a].Intersects(bounds[b])) continue;
+                float need = Mathf.Min(StackOverlap, 0.5f * Mathf.Min(length[a], length[b]));
+                if (LengthLyingOn(lines[b].points, lines[a].points) >= need ||
+                    LengthLyingOn(lines[a].points, lines[b].points) >= need)
+                    onTop[a]++;
+            }
+        }
+
+        _onTopFor        = report;
+        _onTopCount      = lines.Count;
+        _onTopHidRemoved = _hideRemoved;
+        _onTop           = onTop;
+        return onTop;
+    }
+
+    // How much of one line lies along another, running the same way.
+    static float LengthLyingOn(Vector3[] pts, Vector3[] other)
+    {
+        float total = 0f;
+        for (int i = 0; i + 1 < pts.Length; i++)
+        {
+            Vector3 seg = pts[i + 1] - pts[i];
+            float   len = seg.magnitude;
+            if (len < 1e-6f) continue;
+            Vector3 dir    = seg / len;
+            int     pieces = Mathf.Clamp(Mathf.CeilToInt(len / StackPiece), 1, 256);
+            float   piece  = len / pieces;
+            for (int k = 0; k < pieces; k++)
+            {
+                Vector3 mid = pts[i] + seg * ((k + 0.5f) / pieces);
+                if (DistanceToLine(other, mid, out Vector3 runs) <= StackReach && Mathf.Abs(Vector3.Dot(runs, dir)) >= 0.7f)
+                    total += piece;
+            }
+        }
+        return total;
+    }
+
+    // How far a point is from a line, and which way the line runs at its nearest.
+    static float DistanceToLine(Vector3[] pts, Vector3 p, out Vector3 runs)
+    {
+        float best = float.MaxValue;
+        runs = Vector3.zero;
+        for (int i = 0; i + 1 < pts.Length; i++)
+        {
+            Vector3 seg = pts[i + 1] - pts[i];
+            float   sq  = seg.sqrMagnitude;
+            if (sq < 1e-12f) continue;
+            float   t = Mathf.Clamp01(Vector3.Dot(p - pts[i], seg) / sq);
+            float   d = (pts[i] + seg * t - p).magnitude;
+            if (d >= best) continue;
+            best = d;
+            runs = seg / Mathf.Sqrt(sq);
+        }
+        return best;
     }
 }
 

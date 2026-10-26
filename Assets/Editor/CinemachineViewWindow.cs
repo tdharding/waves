@@ -14,6 +14,8 @@ using UnityEngine.UIElements;
 // is parked on the chosen vcam's state each repaint and rendered into a texture of its own.
 // Beside the view sits a panel with the watched camera's own inspectors (its Transform and every
 // Cinemachine component on it), so its settings can be adjusted while watching the result.
+// Opened from a Camera Sequence storyboard thumbnail, the panel starts with that shot's card, and its
+// Set View Target picks the shot's View Target by clicking it in the view.
 public class CinemachineViewWindow : EditorWindow
 {
     // Which camera is being watched has to outlive a domain reload, entering play mode (the scene is
@@ -22,6 +24,8 @@ public class CinemachineViewWindow : EditorWindow
     const string WatchedIdKey = "Waves.CinemachineView.WatchedId";
     const string SplitKey     = "Waves.CinemachineView.Split";
     const string ViewMoveKey  = "Waves.CinemachineView.ViewMove";
+    const string ViewMoveCopyKey   = "Waves.CinemachineView.ViewMoveCopy";
+    const string ViewMoveCopiedKey = "Waves.CinemachineView.ViewMoveCopied";
     const float  PanelStartWidth = 320f;
 
     [SerializeField] CinemachineVirtualCameraBase watched;
@@ -40,6 +44,15 @@ public class CinemachineViewWindow : EditorWindow
     readonly List<Component>     panelComponents = new();
     readonly List<FloatField>    viewMoveFields  = new();
 
+    // The Camera Sequence shot the window was opened for, shown at the top of the panel. Cleared when
+    // another camera is watched.
+    [SerializeField] CameraSequence shotSequence;
+    [SerializeField] int            shotIndex = -1;
+    IMGUIContainer shotArea;
+    double         nextShotRepaint;
+    // Set View Target: the next click in the view picks the shot's View Target.
+    bool pickingTarget;
+
     [MenuItem("Tools/Camera/Cinemachine View", false, 701)]
     static void Open()
     {
@@ -53,6 +66,19 @@ public class CinemachineViewWindow : EditorWindow
         var window = GetWindow<CinemachineViewWindow>("Cm View");
         window.minSize = new Vector2(180f, 140f);
         window.SetWatched(cam);
+    }
+
+    // Opens the window watching a Camera Sequence shot's camera, with the shot's card at the top of the panel.
+    public static void WatchShot(CameraSequence sequence, int index)
+    {
+        if (sequence == null || index < 0 || index >= sequence.shots.Count) return;
+        var window = GetWindow<CinemachineViewWindow>("Cm View");
+        window.minSize = new Vector2(180f, 140f);
+        window.shotSequence  = sequence;
+        window.shotIndex     = index;
+        window.pickingTarget = false;
+        window.SetWatched(sequence.shots[index].camera);
+        window.shotArea?.MarkDirtyRepaint();
     }
 
     void OnEnable()
@@ -84,6 +110,16 @@ public class CinemachineViewWindow : EditorWindow
     {
         if (panel != null && PanelIsStale()) RebuildPanel();
 
+        // The shot's card catches up a few times a second (the View Target Height is relearned off the
+        // editor tick, after the camera moves), not every frame. So does an influence camera's section, after
+        // edits in the designer's node row.
+        if (shotArea != null && (shotSequence != null || CameraInfluencePreview.InfluenceOn(watched) != null) &&
+            EditorApplication.timeSinceStartup >= nextShotRepaint)
+        {
+            nextShotRepaint = EditorApplication.timeSinceStartup + 0.25;
+            shotArea.MarkDirtyRepaint();
+        }
+
         if (watched == null) return;
         if (viewArea != null) viewArea.MarkDirtyRepaint();
         else                  Repaint();
@@ -93,6 +129,7 @@ public class CinemachineViewWindow : EditorWindow
     // title bars) change what the panel should hold.
     void OnObjectChanges(ref ObjectChangeEventStream stream)
     {
+        shotArea?.MarkDirtyRepaint();
         if (panel == null || watched == null) return;
         if (!panelComponents.SequenceEqual(PanelComponentsOf(watched))) RebuildPanel();
     }
@@ -114,6 +151,13 @@ public class CinemachineViewWindow : EditorWindow
 
     void SetWatched(CinemachineVirtualCameraBase cam)
     {
+        // Another camera: the shot shown no longer belongs here.
+        if (shotSequence != null && !ShotCameraIs(cam))
+        {
+            shotSequence  = null;
+            shotIndex     = -1;
+            pickingTarget = false;
+        }
         watched = cam;
 
         if (cam == null)
@@ -180,6 +224,10 @@ public class CinemachineViewWindow : EditorWindow
             return;
         }
 
+        if (pickingTarget && ((shotSequence == null && CameraInfluencePreview.InfluenceOn(watched) == null) ||
+                              Application.isPlaying)) pickingTarget = false;
+        if (pickingTarget) HandlePick(view);
+
         if (Event.current.type != EventType.Repaint) return;
 
         if (!TryRender(view))
@@ -189,6 +237,13 @@ public class CinemachineViewWindow : EditorWindow
         }
 
         GUI.DrawTexture(view, target, ScaleMode.StretchToFill, false);
+
+        if (pickingTarget)
+        {
+            var banner = new Rect(view.x, view.y, view.width, 22f);
+            EditorGUI.DrawRect(banner, new Color(0f, 0f, 0f, 0.6f));
+            GUI.Label(banner, "Set View Target: click it in the view  ·  Esc cancels", EditorStyles.whiteLabel);
+        }
     }
 
     void DrawToolbar()
@@ -200,10 +255,16 @@ public class CinemachineViewWindow : EditorWindow
                 watched, typeof(CinemachineVirtualCameraBase), true, GUILayout.MinWidth(80f));
             if (EditorGUI.EndChangeCheck()) SetWatched(picked);
 
-            var sequence = CameraSequenceFogPreview.SequenceFor(watched);
-            if (sequence != null)
-                GUILayout.Label(new GUIContent($"Fog: {sequence.name} ({CameraSequenceFogPreview.CentreFor(sequence, watched)})",
-                    "This camera is a shot in that Camera Sequence, so the view wears its Override Fog."),
+            var shot = WornShot(out var sequence, out int index);
+            if (shot != null)
+                GUILayout.Label(new GUIContent($"Shot {index + 1} of {sequence.name}: {CameraSequenceFogPreview.Describe(shot)}",
+                    "This camera is a shot in that Camera Sequence, so the view wears the shot's Fog Centre, Fog Distance " +
+                    "and focus, as it will at runtime."),
+                    EditorStyles.miniLabel, GUILayout.ExpandWidth(false));
+            else if (CameraInfluencePreview.InfluenceOn(watched) is LevelSelectCameraInfluence influence)
+                GUILayout.Label(new GUIContent($"Camera Influence, {LevelSelectDesignerWindow.CameraInfluenceNodeLabel(influence)}: {CameraInfluencePreview.Describe(influence)}",
+                    "This is a node's Camera Influence camera, so the view wears its Fog Distance and focus as they will " +
+                    "look with the boat in its box: the fog on the boat there, and the follow camera's depth of field."),
                     EditorStyles.miniLabel, GUILayout.ExpandWidth(false));
         }
     }
@@ -242,11 +303,122 @@ public class CinemachineViewWindow : EditorWindow
 
         if (watched == null) return;
 
+        // Draws nothing (and takes no room) unless a shot, or a node's Camera Influence camera, is being shown.
+        shotArea = new IMGUIContainer(DrawShotSection);
+        panel.Add(shotArea);
+
         panel.Add(ViewMoveSection());
 
         panelComponents.AddRange(PanelComponentsOf(watched));
         foreach (var component in panelComponents)
             panel.Add(ComponentSection(component));
+    }
+
+    // -------------------------------------------------------------------------
+    // Shot - the Camera Sequence shot the window was opened for
+    // -------------------------------------------------------------------------
+
+    bool ShotCameraIs(CinemachineVirtualCameraBase cam)
+    {
+        return shotSequence != null && cam != null && shotIndex >= 0 && shotIndex < shotSequence.shots.Count
+            && shotSequence.shots[shotIndex].camera == cam;
+    }
+
+    // The shot's card, drawn by the storyboard. If the shots were reordered under it, it follows the
+    // first shot using the watched camera; with none left it goes.
+    void DrawShotSection()
+    {
+        if (DrawInfluenceSection()) return;
+        if (shotSequence == null || watched == null) return;
+        if (!ShotCameraIs(watched))
+        {
+            shotIndex = shotSequence.shots.FindIndex(s => s.camera == watched);
+            if (shotIndex < 0)
+            {
+                shotSequence  = null;
+                pickingTarget = false;
+                return;
+            }
+        }
+
+        EditorGUILayout.Space(2);
+        if (!CameraSequenceWindow.DrawShotInCmView(shotSequence, shotIndex, StartPickingTarget))
+        {
+            EditorGUILayout.HelpBox($"Open the Camera Sequence storyboard on '{shotSequence.name}' to edit shot {shotIndex + 1} here.",
+                                    MessageType.Info);
+            pickingTarget = false;
+        }
+        if (pickingTarget)
+            EditorGUILayout.HelpBox("Click what the camera should keep its height to, in the view. Esc cancels.", MessageType.None);
+        EditorGUILayout.Space(4);
+    }
+
+    // A node's Camera Influence camera: its Fog Distance and View Target, as in the Level Select Designer's
+    // node row. False when the watched camera isn't one.
+    bool DrawInfluenceSection()
+    {
+        var influence = CameraInfluencePreview.InfluenceOn(watched);
+        if (influence == null) return false;
+
+        EditorGUILayout.Space(2);
+        if (!LevelSelectDesignerWindow.DrawCameraInfluenceInCmView(influence, StartPickingTarget))
+        {
+            EditorGUILayout.HelpBox("Open the Level Select Designer on this level to edit this camera's fog and focus here.",
+                                    MessageType.Info);
+            pickingTarget = false;
+        }
+        if (pickingTarget)
+            EditorGUILayout.HelpBox("Click what the depth of field should focus on, in the view. Esc cancels.", MessageType.None);
+        EditorGUILayout.Space(4);
+        return true;
+    }
+
+    void StartPickingTarget()
+    {
+        pickingTarget = true;
+        if (viewArea != null)
+        {
+            viewArea.focusable = true;
+            viewArea.Focus();
+        }
+        shotArea?.MarkDirtyRepaint();
+    }
+
+    void StopPickingTarget()
+    {
+        pickingTarget = false;
+        shotArea?.MarkDirtyRepaint();
+    }
+
+    // Set View Target: the click goes through the view to the nearest thing drawn there.
+    void HandlePick(Rect view)
+    {
+        var e = Event.current;
+        EditorGUIUtility.AddCursorRect(view, MouseCursor.ArrowPlus);
+
+        if (e.type == EventType.KeyDown && e.keyCode == KeyCode.Escape)
+        {
+            StopPickingTarget();
+            e.Use();
+            return;
+        }
+        if (e.type != EventType.MouseDown || e.button != 0 || !view.Contains(e.mousePosition)) return;
+        e.Use();
+
+        var viewport = new Vector2((e.mousePosition.x - view.x) / view.width,
+                                   1f - (e.mousePosition.y - view.y) / view.height);
+        if (rig == null || !rig.TryViewportRay(viewport, out Ray ray, out int cullingMask)) return;
+
+        var picked = CameraSequenceViewTargets.PickDrawn(ray, cullingMask);
+        if (picked == null)
+        {
+            ShowNotification(new GUIContent("Nothing drawn there — try again, or Esc"));
+            return;
+        }
+        var influence = CameraInfluencePreview.InfluenceOn(watched);
+        if (influence != null) LevelSelectDesignerWindow.SetInfluenceViewTarget(influence, picked);
+        else                   CameraSequenceViewTargets.SetTarget(shotSequence, shotIndex, picked);
+        StopPickingTarget();
     }
 
     // The Transform plus every Cinemachine component on the camera: the camera itself, its
@@ -309,7 +481,49 @@ public class CinemachineViewWindow : EditorWindow
         foldout.Add(ViewMoveField("X  Right",   Vector3.right));
         foldout.Add(ViewMoveField("Y  Up",      Vector3.up));
         foldout.Add(ViewMoveField("Z  Forward", Vector3.forward));
+
+        var buttons = new VisualElement();
+        buttons.style.flexDirection = FlexDirection.Row;
+
+        var copy = new Button(CopyViewMove) { text = "Copy",
+            tooltip = "Remembers these X, Y and Z, to paste into another camera's View Move." };
+        var paste = new Button(PasteViewMove) { text = "Paste",
+            tooltip = "Puts the copied X, Y and Z into these fields, moving this camera along its own view to match." };
+        copy.style.flexGrow  = 1f;
+        paste.style.flexGrow = 1f;
+        buttons.Add(copy);
+        buttons.Add(paste);
+        foldout.Add(buttons);
         return foldout;
+    }
+
+    // The copied View Move lasts the editor session, through domain reloads.
+    void CopyViewMove()
+    {
+        var move = new Vector3(viewMoveFields[0].value, viewMoveFields[1].value, viewMoveFields[2].value);
+        SessionState.SetVector3(ViewMoveCopyKey, move);
+        SessionState.SetBool(ViewMoveCopiedKey, true);
+        ShowNotification(new GUIContent($"Copied View Move  {move.x:0.00}, {move.y:0.00}, {move.z:0.00}"));
+    }
+
+    // Setting the fields moves the camera by the change, as typing the numbers in would. One undo step.
+    void PasteViewMove()
+    {
+        if (watched == null) return;
+        if (!SessionState.GetBool(ViewMoveCopiedKey, false))
+        {
+            ShowNotification(new GUIContent("Nothing copied yet"));
+            return;
+        }
+
+        var move = SessionState.GetVector3(ViewMoveCopyKey, Vector3.zero);
+        Undo.IncrementCurrentGroup();
+        int group = Undo.GetCurrentGroup();
+        viewMoveFields[0].value = move.x;
+        viewMoveFields[1].value = move.y;
+        viewMoveFields[2].value = move.z;
+        Undo.SetCurrentGroupName("Paste View Move");
+        Undo.CollapseUndoOperations(group);
     }
 
     FloatField ViewMoveField(string label, Vector3 viewAxis)
@@ -328,7 +542,7 @@ public class CinemachineViewWindow : EditorWindow
 
             var t = watched.transform;
             Undo.RecordObject(t, "Move Camera Along View");
-            t.position += ViewRotation() * viewAxis * amount;
+            t.position += ViewRotation(watched) * viewAxis * amount;
         });
 
         return field;
@@ -339,23 +553,35 @@ public class CinemachineViewWindow : EditorWindow
     void OnUndoRedo()
     {
         foreach (var field in viewMoveFields) field.SetValueWithoutNotify(0f);
+        shotArea?.MarkDirtyRepaint();
     }
 
     // The way the camera is looking as the view shows it - noise left out, so a shaking camera still
     // moves along steady axes. Same live/not-live rule as ApplyWatchedState.
-    Quaternion ViewRotation()
+    static Quaternion ViewRotation(CinemachineVirtualCameraBase cam)
     {
-        var stage = PrefabStageUtility.GetPrefabStage(watched.gameObject);
-        var scene = stage != null ? stage.scene : watched.gameObject.scene;
+        var stage = PrefabStageUtility.GetPrefabStage(cam.gameObject);
+        var scene = stage != null ? stage.scene : cam.gameObject.scene;
         bool isolated = scene.IsValid() && EditorSceneManager.IsPreviewScene(scene);
-        bool live     = watched.isActiveAndEnabled && !isolated;
+        bool live     = cam.isActiveAndEnabled && !isolated;
 
-        return live ? watched.State.RawOrientation : watched.transform.rotation;
+        return live ? cam.State.RawOrientation : cam.transform.rotation;
     }
 
     // -------------------------------------------------------------------------
     // Rendering
     // -------------------------------------------------------------------------
+
+    // The Camera Sequence shot whose fog and focus the view wears: the shot the window was opened for, else
+    // the first shot in the scene's sequences using the watched camera. Null when it is no shot's camera.
+    CameraSequence.Shot WornShot(out CameraSequence sequence, out int index)
+    {
+        sequence = ShotCameraIs(watched) ? shotSequence : CameraSequenceFogPreview.SequenceFor(watched);
+        index    = CameraSequenceFogPreview.ShotIndexFor(sequence, watched, sequence == shotSequence ? shotIndex : -1);
+        return index >= 0 ? sequence.shots[index] : null;
+    }
+
+    string lastFocusDebug;
 
     bool TryRender(Rect view)
     {
@@ -364,15 +590,29 @@ public class CinemachineViewWindow : EditorWindow
         CinemachinePreviewRig.EnsureTarget(ref target, view, "Cinemachine View Target");
         rig ??= new CinemachinePreviewRig();
 
-        // A Camera Sequence shot camera shows that sequence's fog, when it overrides the world's.
-        var sequence = CameraSequenceFogPreview.SequenceFor(watched);
-        var saved    = default(CameraSequenceFogPreview.Saved);
+        // A Camera Sequence shot camera shows that shot's fog and focus, as it will at runtime; so does a
+        // node's Camera Influence camera, seen through the follow camera's depth of field.
+        var shot      = WornShot(out var shotSeq, out var shotIdx);
+        var influence = shot == null ? CameraInfluencePreview.InfluenceOn(watched) : null;
+        // [CmFocusDebug] — temporary.
+        string focusDebug = $"[CmFocusDebug] Cm View '{(watched != null ? watched.name : "null")}': shot {shotIdx + 1} of " +
+                            $"'{(shotSeq != null ? shotSeq.name : "null")}' (opened for {shotIndex + 1}), " +
+                            $"focusViewTarget={(shot != null && shot.focusViewTarget)}, " +
+                            $"viewTarget={(shot != null && shot.viewTarget != null ? shot.viewTarget.name : "null")}, " +
+                            $"volume={(shot != null && shot.volumeProfile != null ? shot.volumeProfile.name : "null")}, " +
+                            $"influence={(influence != null)}";
+        if (focusDebug != lastFocusDebug) { lastFocusDebug = focusDebug; Debug.Log(focusDebug); }
+        var saved     = default(CameraSequenceFogPreview.Saved);
         try
         {
             return rig.Render(watched, target, previewCam =>
             {
-                if (sequence != null) saved = CameraSequenceFogPreview.Wear(sequence, watched, previewCam);
-            });
+                if (shot != null)           saved = CameraSequenceFogPreview.Wear(shot, previewCam);
+                else if (influence != null) saved = CameraInfluencePreview.Wear(influence);
+            },
+            influence != null ? influence.FocusTarget : CameraSequenceFogPreview.FocusFor(shot),
+            influence != null ? CameraInfluencePreview.FollowPost() : null,
+            shot?.volumeProfile);
         }
         finally
         {

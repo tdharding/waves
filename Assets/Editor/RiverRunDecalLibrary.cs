@@ -58,6 +58,13 @@ public static class RiverRunDecalLibrary
     public const string SheetPath = SheetFolder + "/RiverRunDecalSheet.asset";
 
     /// <summary>
+    /// Where the normal maps for the normal map decal groups are kept — a subfolder, so the colour
+    /// sheet never gathers them — and where their own sheet goes.
+    /// </summary>
+    public const string NormalFolder    = Folder + "/NormalMaps";
+    public const string NormalSheetPath = NormalFolder + "/Generated/RiverRunNormalDecalSheet.asset";
+
+    /// <summary>
     /// The most pixels one cell of the sheet is given. A decal is stamped a few centimetres
     /// across on stone this size, so a cell beyond this is detail nothing will ever be close
     /// enough to see, paid for in a sheet that has to be held in memory whole.
@@ -74,7 +81,8 @@ public static class RiverRunDecalLibrary
     /// <summary>
     /// Transparent pixels left round the edge of every cell. Without them the sheet's mips —
     /// which know nothing about cells — average across the boundary and let one drawing's edge
-    /// show faintly round another's.
+    /// show faintly round another's. RiverRunShading.hlsl's RIVER_RUN_DECAL_PADDING must match:
+    /// Tiled decals read inside it so their joins do not show.
     /// </summary>
     private const int Padding = 2;
 
@@ -93,15 +101,21 @@ public static class RiverRunDecalLibrary
     /// order is what decides which cell each drawing lands in, and a sheet whose cells moved
     /// about between rebuilds would move every decal in the world with them.
     /// </summary>
-    public static List<Texture2D> All()
-    {
-        if (!AssetDatabase.IsValidFolder(Folder)) return new List<Texture2D>();
+    public static List<Texture2D> All() => All(Folder);
 
-        return AssetDatabase.FindAssets("t:Texture2D", new[] { Folder })
+    /// <summary>
+    /// The same for any decal folder — the landscape's decals (<see cref="LandscapeDecalLibrary"/>)
+    /// are gathered by this library too, from a folder of their own.
+    /// </summary>
+    public static List<Texture2D> All(string folder)
+    {
+        if (!AssetDatabase.IsValidFolder(folder)) return new List<Texture2D>();
+
+        return AssetDatabase.FindAssets("t:Texture2D", new[] { folder })
                             .Select(AssetDatabase.GUIDToAssetPath)
                             .Where(p => !string.IsNullOrEmpty(p))
                             .Distinct()
-                            .Where(p => Path.GetDirectoryName(p).Replace('\\', '/') == Folder)
+                            .Where(p => Path.GetDirectoryName(p).Replace('\\', '/') == folder)
                             .OrderBy(Path.GetFileNameWithoutExtension,
                                      StringComparer.OrdinalIgnoreCase)
                             .Select(AssetDatabase.LoadAssetAtPath<Texture2D>)
@@ -110,7 +124,55 @@ public static class RiverRunDecalLibrary
     }
 
     /// <summary>The built sheet, or null if none has been built.</summary>
-    public static Texture2D Sheet() => AssetDatabase.LoadAssetAtPath<Texture2D>(SheetPath);
+    public static Texture2D Sheet() => Sheet(SheetPath);
+
+    public static Texture2D Sheet(string sheetPath) => AssetDatabase.LoadAssetAtPath<Texture2D>(sheetPath);
+
+    /// <summary>
+    /// What a decal group ticks a drawing by — its asset GUID, so renaming or redrawing it keeps
+    /// it in every group it was ticked into.
+    /// </summary>
+    public static string Guid(Texture2D decal) =>
+        AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(decal));
+
+    /// <summary>
+    /// Settles what a preset saved before decal groups could not say. Its sheet was built from
+    /// every drawing in the folder in name order, so while the folder still holds that many, the
+    /// sheet's cells are named from it; and a group made from a stone's old decals, which had
+    /// every drawing, gets every drawing ticked for real. Returns whether anything changed.
+    /// </summary>
+    public static bool AdoptOldSheet(RiverRunShadingSettings settings)
+    {
+        if (settings == null || settings.decalGroups == null) return false;
+
+        bool changed = false;
+        var  decals  = All();
+
+        if (settings.decalSheetDrawings.Count == 0 && settings.decalSheetHeld > 0 &&
+            settings.decalSheetHeld == decals.Count)
+        {
+            settings.decalSheetDrawings = decals.Select(Guid).ToList();
+            changed = true;
+        }
+
+        // Ticked from the sheet while it is known, or from the folder while there is no sheet;
+        // otherwise left whole-sheet until a rebuild says which drawings the cells hold.
+        bool sheetKnown = settings.decalSheetHeld > 0 &&
+                          settings.decalSheetDrawings.Count == settings.decalSheetHeld;
+        bool noSheet    = settings.decalSheetHeld <= 0;
+
+        foreach (var group in settings.decalGroups)
+        {
+            if (group == null || !group.allDrawings || !(sheetKnown || noSheet)) continue;
+
+            group.drawings    = sheetKnown ? new List<string>(settings.decalSheetDrawings)
+                                           : decals.Select(Guid).ToList();
+            group.allDrawings = false;
+            changed = true;
+        }
+
+        return changed;
+    }
 
     /// <summary>
     /// Why the sheet no longer matches the folder, in a sentence — or null when it does.
@@ -125,14 +187,35 @@ public static class RiverRunDecalLibrary
     {
         if (settings == null) return null;
 
-        var decals = All();
-        var sheet  = Sheet();
+        return Behind(Folder, SheetPath, settings.decalSheet, settings.decalSheetHeld,
+                      settings.decalSheetDrawings);
+    }
+
+    /// <summary>The same for the normal maps and their sheet.</summary>
+    public static string BehindNormals(RiverRunShadingSettings settings)
+    {
+        if (settings == null) return null;
+
+        return Behind(NormalFolder, NormalSheetPath, settings.normalDecalSheet,
+                      settings.normalDecalSheetHeld, settings.normalDecalSheetDrawings);
+    }
+
+    /// <summary>
+    /// The same for any decal folder and sheet, against what some settings hold: the sheet, how
+    /// many drawings it was built from, and the GUID in each of its cells.
+    /// </summary>
+    public static string Behind(string folder, string sheetPath, Texture2D heldSheet,
+                                int heldCount, List<string> heldDrawings)
+    {
+        var decals = All(folder);
+        var sheet  = Sheet(sheetPath);
+        heldDrawings = heldDrawings ?? new List<string>();
 
         if (decals.Count == 0)
         {
-            return settings.decalSheetHeld > 0 || settings.decalSheet != null
+            return heldCount > 0 || heldSheet != null
                  ? "There are no drawings in the folder, but the sheet still holds " +
-                   Mathf.Max(settings.decalSheetHeld, 0) + ". Rebuild to clear it."
+                   Mathf.Max(heldCount, 0) + ". Rebuild to clear it."
                  : null;
         }
 
@@ -140,18 +223,26 @@ public static class RiverRunDecalLibrary
             return decals.Count + Some(decals.Count, " drawing", " drawings") +
                    " in the folder, and no sheet built from them yet.";
 
-        if (settings.decalSheet != sheet)
+        if (heldSheet != sheet)
             return "The sheet in the folder is not the one these settings are holding. Rebuild " +
                    "to point them at it.";
 
-        if (settings.decalSheetHeld != decals.Count)
+        if (heldCount != decals.Count)
             return "The folder holds " + decals.Count +
                    Some(decals.Count, " drawing", " drawings") + " and the sheet was built from " +
-                   settings.decalSheetHeld + ".";
+                   heldCount + ".";
+
+        // The same count, but not the same drawings in the same cells — one renamed so it sorts
+        // elsewhere, or one swapped for another. The groups find their drawings by these.
+        for (int i = 0; i < decals.Count; i++)
+        {
+            if (i >= heldDrawings.Count || heldDrawings[i] != Guid(decals[i]))
+                return "The folder's drawings have changed since the sheet was built.";
+        }
 
         // A drawing changed without the count changing — redrawn rather than added. Compared by
         // file time because that is the only thing that moves when a PNG is overwritten in place.
-        DateTime built = LastWrite(SheetPath);
+        DateTime built = LastWrite(sheetPath);
         foreach (var decal in decals)
         {
             if (LastWrite(AssetDatabase.GetAssetPath(decal)) > built)
@@ -184,11 +275,72 @@ public static class RiverRunDecalLibrary
     {
         if (into == null) { message = "No settings to build into."; return false; }
 
-        var decals = All();
+        bool ok = BuildSheet(Folder, SheetPath, out BuiltSheet built, out message);
+
+        // A failed build leaves the settings holding no sheet when there was nothing to gather,
+        // and as they were when the sheet itself could not be written.
+        if (!ok && built.Held < 0) return false;
+
+        into.decalSheet           = built.Sheet;
+        into.decalSheetColumns    = built.Columns;
+        into.decalSheetRows       = built.Rows;
+        into.decalSheetHeld       = built.Held;
+        into.decalSheetCellPixels = built.CellPixels;
+        into.decalSheetDrawings   = built.Drawings;
+        return ok;
+    }
+
+    /// <summary>
+    /// The same for the normal maps, onto a LINEAR sheet: the shader reads each texel straight
+    /// back as a direction, which an sRGB sheet would bend on the way.
+    /// </summary>
+    public static bool BuildNormals(RiverRunShadingSettings into, out string message)
+    {
+        if (into == null) { message = "No settings to build into."; return false; }
+
+        bool ok = BuildSheet(NormalFolder, NormalSheetPath, out BuiltSheet built, out message, linear: true);
+        if (!ok && built.Held < 0) return false;
+
+        into.normalDecalSheet           = built.Sheet;
+        into.normalDecalSheetColumns    = built.Columns;
+        into.normalDecalSheetRows       = built.Rows;
+        into.normalDecalSheetHeld       = built.Held;
+        into.normalDecalSheetCellPixels = built.CellPixels;
+        into.normalDecalSheetDrawings   = built.Drawings;
+        return ok;
+    }
+
+    /// <summary>
+    /// What a build laid out: the sheet, its columns and rows, how many cells hold a drawing, how
+    /// many pixels one cell is, and the GUID in each cell. An empty one (Held 0, no sheet) is what
+    /// settings hold to draw no decals; Held -1 means leave the settings as they were.
+    /// </summary>
+    public struct BuiltSheet
+    {
+        public Texture2D    Sheet;
+        public int          Columns;
+        public int          Rows;
+        public int          Held;
+        public int          CellPixels;
+        public List<string> Drawings;
+
+        public static BuiltSheet Empty => new BuiltSheet { Drawings = new List<string>() };
+    }
+
+    /// <summary>
+    /// Gathers any decal folder onto the sheet at <paramref name="sheetPath"/> — the river's and
+    /// the landscape's both come through here, so the two can never fit drawings differently.
+    /// <paramref name="linear"/> makes a new sheet linear rather than sRGB, for normal maps.
+    /// </summary>
+    public static bool BuildSheet(string folder, string sheetPath, out BuiltSheet built,
+                                  out string message, bool linear = false)
+    {
+        built = BuiltSheet.Empty;
+
+        var decals = All(folder);
         if (decals.Count == 0)
         {
-            Forget(into);
-            message = "There are no drawings in " + Folder + " to gather.";
+            message = "There are no drawings in " + folder + " to gather.";
             return false;
         }
 
@@ -199,14 +351,13 @@ public static class RiverRunDecalLibrary
 
         foreach (var decal in decals)
         {
-            if (TryRead(decal, out Drawing drawing)) read.Add(drawing);
+            if (TryRead(decal, out Drawing drawing)) { drawing.Guid = Guid(decal); read.Add(drawing); }
             else                                    closed.Add(decal.name);
         }
 
         if (read.Count == 0)
         {
-            Forget(into);
-            message = "None of the drawings in " + Folder + " could be read: " +
+            message = "None of the drawings in " + folder + " could be read: " +
                       string.Join(", ", closed);
             return false;
         }
@@ -260,18 +411,23 @@ public static class RiverRunDecalLibrary
         // its own colour bled outward it keeps it.
         Bleed(pixels, width, height);
 
-        Texture2D sheet = Write(pixels, width, height);
+        Texture2D sheet = Write(pixels, width, height, sheetPath, linear);
         if (sheet == null)
         {
-            message = "The sheet could not be written to " + SheetPath + ".";
+            built.Held = -1;
+            message = "The sheet could not be written to " + sheetPath + ".";
             return false;
         }
 
-        into.decalSheet           = sheet;
-        into.decalSheetColumns    = columns;
-        into.decalSheetRows       = rows;
-        into.decalSheetHeld       = read.Count;
-        into.decalSheetCellPixels = cell;
+        built = new BuiltSheet
+        {
+            Sheet      = sheet,
+            Columns    = columns,
+            Rows       = rows,
+            Held       = read.Count,
+            CellPixels = cell,
+            Drawings   = read.Select(d => d.Guid).ToList(),
+        };
 
         message = "Gathered " + read.Count + Some(read.Count, " drawing", " drawings") +
                   " onto a " + width + "x" + height + " sheet, " + columns + "x" + rows +
@@ -280,20 +436,6 @@ public static class RiverRunDecalLibrary
         if (closed.Count > 0) message += " Could not read: " + string.Join(", ", closed) + ".";
 
         return true;
-    }
-
-    /// <summary>
-    /// Leaves the settings holding no sheet, which is what the shader reads as no decals — it
-    /// checks the count before it ever samples, because there is no such thing as a transparent
-    /// default texture for an unbound sampler to fall back on.
-    /// </summary>
-    private static void Forget(RiverRunShadingSettings into)
-    {
-        into.decalSheet           = null;
-        into.decalSheetColumns    = 0;
-        into.decalSheetRows       = 0;
-        into.decalSheetHeld       = 0;
-        into.decalSheetCellPixels = 0;
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -305,6 +447,7 @@ public static class RiverRunDecalLibrary
         public Color[] Pixels;
         public int     Width;
         public int     Height;
+        public string  Guid;
     }
 
     /// <summary>
@@ -539,23 +682,32 @@ public static class RiverRunDecalLibrary
     /// guid — so a preset holding the sheet goes on holding it through a rebuild rather than
     /// being left pointing at nothing.
     /// </summary>
-    private static Texture2D Write(Color[] pixels, int width, int height)
+    private static Texture2D Write(Color[] pixels, int width, int height, string sheetPath, bool linear)
     {
-        LevelSelectRiverPresetLibrary.EnsureFolder(SheetFolder);
+        LevelSelectRiverPresetLibrary.EnsureFolder(Path.GetDirectoryName(sheetPath).Replace('\\', '/'));
 
-        var  sheet = Sheet();
+        var  sheet = Sheet(sheetPath);
         bool made  = sheet == null;
+
+        // Linear or sRGB is fixed when a texture is made, so a linear sheet found made sRGB is made
+        // again. Only ever asked of a linear sheet: the colour sheets' GUIDs are held by presets.
+        if (!made && linear && sheet.isDataSRGB)
+        {
+            AssetDatabase.DeleteAsset(sheetPath);
+            sheet = null;
+            made  = true;
+        }
 
         if (made)
         {
-            sheet = new Texture2D(width, height, TextureFormat.RGBA32, true, false);
+            sheet = new Texture2D(width, height, TextureFormat.RGBA32, true, linear);
         }
         else if (sheet.width != width || sheet.height != height)
         {
             sheet.Reinitialize(width, height, TextureFormat.RGBA32, true);
         }
 
-        sheet.name       = Path.GetFileNameWithoutExtension(SheetPath);
+        sheet.name       = Path.GetFileNameWithoutExtension(sheetPath);
         sheet.filterMode = FilterMode.Bilinear;
 
         // Clamped rather than repeated: every read is inside one cell, and a read straying a
@@ -566,11 +718,11 @@ public static class RiverRunDecalLibrary
         sheet.SetPixels(pixels);
         sheet.Apply(true, false);
 
-        if (made) AssetDatabase.CreateAsset(sheet, SheetPath);
+        if (made) AssetDatabase.CreateAsset(sheet, sheetPath);
         else      EditorUtility.SetDirty(sheet);
 
         AssetDatabase.SaveAssets();
 
-        return Sheet();
+        return Sheet(sheetPath);
     }
 }

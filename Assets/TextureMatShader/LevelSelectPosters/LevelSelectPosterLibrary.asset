@@ -15,3 +15,5 @@ MonoBehaviour:
   posters:
   - posterName: 1stPoster
     image: {fileID: 3586721709750568807, guid: 96bc969302a83f94db9b92d537cf5958, type: 3}
+  - posterName: 2ndPoster
+    image: {fileID: 3401968630788758777, guid: ab2c1f099e6623a448c67fd3898f4fa9, type: 3}

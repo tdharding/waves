@@ -116,6 +116,7 @@ public class InstallationOutpostMesh : MonoBehaviour
              new Vector3(hw, yB, 0f), new Vector3(hw, yB, d),
              new Vector3(hw, yT, d),  new Vector3(hw, yT, 0f), UvZ);
         StoneFaces.Tag(kinds, tris, Choice(s => s.outpostOutsideWalls));
+        PartLabels.Mark("Block", verts, tris);
 
         if (!walled)
         {
@@ -123,6 +124,7 @@ public class InstallationOutpostMesh : MonoBehaviour
                  new Vector3(-hw, yF, 0f), new Vector3(hw, yF, 0f),
                  new Vector3(hw, yF, d),   new Vector3(-hw, yF, d), UvTop);
             StoneFaces.Tag(kinds, tris, Choice(s => s.outpostFloor));
+            PartLabels.Mark("Block", verts, tris);
         }
         else
         {
@@ -160,6 +162,7 @@ public class InstallationOutpostMesh : MonoBehaviour
                  new Vector3(ix1, yT, iz0), new Vector3(hw, yT, 0f),
                  new Vector3(hw, yT, d),    new Vector3(ix1, yT, iz1), UvTop);
             StoneFaces.Tag(kinds, tris, Choice(s => s.outpostWallTop));
+            PartLabels.Mark("Wall", verts, tris);
 
             // ── Inside faces of the wall, facing in across the floor ──
             if (!cut)
@@ -176,6 +179,8 @@ public class InstallationOutpostMesh : MonoBehaviour
                 Quad(verts, norms, uvs, tris, Vector3.forward,
                      new Vector3(ix1, yF, iz0), new Vector3(g1, yF, iz0),
                      new Vector3(g1, yT, iz0),  new Vector3(ix1, yT, iz0), UvX);
+                StoneFaces.Tag(kinds, tris, Choice(s => s.outpostInsideWalls));
+                PartLabels.Mark("Wall", verts, tris);
 
                 // The two sides of the gap, facing each other across it.
                 Quad(verts, norms, uvs, tris, Vector3.right,
@@ -184,6 +189,8 @@ public class InstallationOutpostMesh : MonoBehaviour
                 Quad(verts, norms, uvs, tris, Vector3.left,
                      new Vector3(g1, yF, iz0), new Vector3(g1, yF, 0f),
                      new Vector3(g1, yT, 0f),  new Vector3(g1, yT, iz0), UvZ);
+                StoneFaces.Tag(kinds, tris, Choice(s => s.outpostOpeningSides));
+                PartLabels.Mark("Opening", verts, tris);
             }
             Quad(verts, norms, uvs, tris, Vector3.back,
                  new Vector3(ix0, yF, iz1), new Vector3(ix1, yF, iz1),
@@ -195,6 +202,7 @@ public class InstallationOutpostMesh : MonoBehaviour
                  new Vector3(ix1, yF, iz1), new Vector3(ix1, yF, iz0),
                  new Vector3(ix1, yT, iz0), new Vector3(ix1, yT, iz1), UvZ);
             StoneFaces.Tag(kinds, tris, Choice(s => s.outpostInsideWalls));
+            PartLabels.Mark("Wall", verts, tris);
 
             // ── The floor ──
             if (!cut)
@@ -217,11 +225,18 @@ public class InstallationOutpostMesh : MonoBehaviour
                 Quad(verts, norms, uvs, tris, Vector3.up,
                      new Vector3(g1, yF, iz0),  new Vector3(ix1, yF, iz0),
                      new Vector3(ix1, yF, iz1), new Vector3(g1, yF, iz1), UvTop);
+                StoneFaces.Tag(kinds, tris, Choice(s => s.outpostFloor));
+                PartLabels.Mark("Floor", verts, tris);
+
+                // The strip of floor through the gap itself.
                 Quad(verts, norms, uvs, tris, Vector3.up,
                      new Vector3(g0, yF, 0f),  new Vector3(g1, yF, 0f),
                      new Vector3(g1, yF, iz0), new Vector3(g0, yF, iz0), UvTop);
+                StoneFaces.Tag(kinds, tris, Choice(s => s.outpostOpeningFloor));
+                PartLabels.Mark("Opening", verts, tris);
             }
             StoneFaces.Tag(kinds, tris, Choice(s => s.outpostFloor));
+            PartLabels.Mark("Floor", verts, tris);
         }
 
         // ── The slope on the walkway, in front of the opening ──
@@ -246,7 +261,8 @@ public class InstallationOutpostMesh : MonoBehaviour
                 Quad(verts, norms, uvs, tris, slopeUp,
                      new Vector3(xL, yF, zO), new Vector3(xS, yW, zO),
                      new Vector3(xS, yW, 0f), new Vector3(xL, yF, 0f), UvTop);
-                StoneFaces.Tag(kinds, tris, Choice(st => st.walkwayTop));
+                StoneFaces.Tag(kinds, tris, Choice(st => st.outpostSlopeTop));
+                PartLabels.Mark("Slope", verts, tris);
 
                 // Its two long sides: the river side, and the side against the block.
                 foreach (var (z, n) in new[] { (zO, Vector3.back), (0f, Vector3.forward) })
@@ -257,13 +273,15 @@ public class InstallationOutpostMesh : MonoBehaviour
                     Tri(verts, norms, uvs, tris, n,
                         new Vector3(xL, yW, z), new Vector3(xS, yW, z), new Vector3(xL, yF, z), UvX);
                 }
-                StoneFaces.Tag(kinds, tris, Choice(st => st.walkwayOuterWall));
+                StoneFaces.Tag(kinds, tris, Choice(st => st.outpostSlopeSides));
+                PartLabels.Mark("Slope", verts, tris);
 
                 // The square end behind the flat.
                 Quad(verts, norms, uvs, tris, s > 0f ? Vector3.left : Vector3.right,
                      new Vector3(xA, yW, zO), new Vector3(xA, yW, 0f),
                      new Vector3(xA, yF, 0f), new Vector3(xA, yF, zO), UvZ);
-                StoneFaces.Tag(kinds, tris, Choice(st => st.walkwayEnds));
+                StoneFaces.Tag(kinds, tris, Choice(st => st.outpostSlopeEnd));
+                PartLabels.Mark("Slope", verts, tris);
             }
         }
 
@@ -274,18 +292,23 @@ public class InstallationOutpostMesh : MonoBehaviour
             if (!(plusX ? columns.plusX : columns.minusX)) continue;
             Vector3 top = ColumnTop(width, depth, height, wallThickness, wallHeight, columnHeight, plusX);
             AppendColumn(verts, norms, uvs, tris, new Vector3(top.x, 0f, top.z), r, yB, top.y);
-            StoneFaces.Tag(kinds, tris, Choice(s => s.outpostOutsideWalls));
+            StoneFaces.Tag(kinds, tris, Choice(s => s.outpostColumnSides));
+            PartLabels.Mark("Column", verts, tris);
             AppendColumnCap(verts, norms, uvs, tris, top, r);
-            StoneFaces.Tag(kinds, tris, Choice(s => s.outpostWallTop));
+            StoneFaces.Tag(kinds, tris, Choice(s => s.outpostColumnTop));
+            PartLabels.Mark("Column", verts, tris);
         }
 
         // The towers stand on the columns picked to carry one — or, when none does, the one tower
         // stands on the floor, moved off its centre by the offset. Their parts take the stone
-        // colours the tower settings give them.
+        // colours the tower settings give them, and the tower Designation's Scale.
+        var designations = new List<StoneDesignation>();
+        StoneFaces.Designate(designations, tris, RiverRunShadingSettings.OutpostAs(shading));
         if (tower != null)
             foreach (var towerBase in TowerBases(width, depth, height, wallThickness, wallHeight,
                                                  towerOffset, columns, columnHeight))
                 tower.Append(verts, norms, uvs, tris, towerBase, kinds, shading, parts);
+        StoneFaces.Designate(designations, tris, RiverRunShadingSettings.TowerAs(shading));
 
         var mesh = new Mesh { name = "InstallationOutpost" };
         mesh.SetVertices(verts);
@@ -297,7 +320,8 @@ public class InstallationOutpostMesh : MonoBehaviour
         // River run stone shading. The waterline is placed off the run's rim top, which is this
         // mesh's y = 0; the outpost's own lip is the top of its wall, which is what any part left
         // on Auto has its colour worked out from.
-        return RiverMeshBuilder.ShadeAsStone(mesh, rimTopY, yT, kinds, parts);
+        return RiverMeshBuilder.ShadeAsStone(mesh, rimTopY, yT, kinds, parts,
+                                             faceDesignations: designations);
     }
 
     /// <summary>

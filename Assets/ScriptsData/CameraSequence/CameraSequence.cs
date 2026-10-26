@@ -1,6 +1,8 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 using Unity.Cinemachine;
 
 /// <summary>
@@ -94,8 +96,36 @@ public class CameraSequence : MonoBehaviour
 
         [Tooltip("Where the fog's clear middle sits for this shot, set once as the shot starts and held still " +
                  "through its animation. View: the spot the camera looks at (the middle of its view on the water). " +
-                 "Boat: on the boat. Camera Position: on the water under the camera. Only used when Override Fog is on.")]
+                 "Boat: on the boat. Camera Position: on the water under the camera.")]
         public FogCentre fogCentre = FogCentre.View;
+
+        [Tooltip("On: for this shot the fog is full at Fog Distance from its centre, instead of the world's White Fade " +
+                 "Radius. Set as the shot starts; the world's Radius comes back for shots without it, and at the hand back.")]
+        public bool overrideFogDistance;
+
+        [Tooltip("Metres from the fog's centre to where it is full, for this shot. Only used when Fog Distance Override is on.")]
+        [Min(0f)] public float fogDistance;
+
+        [Tooltip("Optional. What the camera keeps its height to. As the shot starts the camera is raised or lowered to stand " +
+                 "View Target Height above it, and its whole movement goes with it. Picked in the Cm View with Set View Target.")]
+        public Transform viewTarget;
+
+        // Where the View Target sits in the hierarchy, kept up to date in the editor. GENERATE builds the
+        // Level Select's pieces again as new objects — the shot finds its target's rebuilt self by this.
+        [HideInInspector] public string viewTargetPath;
+
+        [Tooltip("How far above the View Target the camera stands for this shot. Learned from where the camera is placed; " +
+                 "moving the camera up or down changes it.")]
+        public float viewTargetHeight;
+
+        [Tooltip("On: as the shot starts its Depth of Field Focus Distance is set to how far the camera stands from the " +
+                 "View Target, once — it stays there while the camera animates. Off: the shot's Volume's own Focus Distance.")]
+        public bool focusViewTarget;
+
+        [Tooltip("This shot's own post processing — its colour, depth of field and the rest — worn by the camera's Cinemachine " +
+                 "Volume Settings while the shot is on, with Focus Tracking off. The storyboard makes it, a copy of the Level " +
+                 "Select profile; edit it in the Cm View opened from the storyboard.")]
+        public VolumeProfile volumeProfile;
 
         [Tooltip("On: the camera moves while the shot plays (see Animation). It goes back to where it was placed when the sequence ends.")]
         public bool animated;
@@ -151,15 +181,6 @@ public class CameraSequence : MonoBehaviour
     public CinemachineBlendDefinition endBlend =
         new CinemachineBlendDefinition(CinemachineBlendDefinition.Styles.EaseInOut, 2f);
 
-    [Header("Fog")]
-    [Tooltip("On: the White Fade below replaces the world's (its White Fade preset) on the river runs, landscape and " +
-             "spikes while the sequence plays. The world's comes back at the hand back. Off: the world's fog is untouched.")]
-    public bool overrideFog;
-
-    [Tooltip("The fog while the sequence plays. Only used when Override Fog is on. Where its middle sits is " +
-             "each shot's Fog Centre.")]
-    public WhiteFadeSettings fog = new WhiteFadeSettings();
-
     [Header("Playback")]
     [Tooltip("On: plays once per save — after that it never plays again until New Game. Off: plays every time. Saved with the preset.")]
     public bool playOnce = true;
@@ -195,7 +216,7 @@ public class CameraSequence : MonoBehaviour
     private Coroutine _audioFade;
     private bool _holdingMusic;
 
-    // Fog Centre: while the override is on, the fog's centre is held on the shot's spot (unless it is the boat's).
+    // Fog Centre: while the sequence plays, the fog's centre is held on the shot's spot (unless it is the boat's).
     private static readonly int BoatCentreId      = Shader.PropertyToID("_BoatWorldCenter");
     private static readonly int WhiteFadeCentreId = Shader.PropertyToID("_WhiteFadeCentre");
     private bool _holdingFogCentre;
@@ -353,7 +374,9 @@ public class CameraSequence : MonoBehaviour
         copy.camera     = shot.camera;
         copy.orbitPoint = shot.orbitPoint;
         copy.endCamera  = shot.endCamera;
+        copy.viewTarget = shot.viewTarget;
         copy.audio      = shot.audio;
+        copy.volumeProfile = shot.volumeProfile;
         for (int i = 0; i < copy.characterAnimations.Count; i++)
             copy.characterAnimations[i].character = shot.characterAnimations[i].character;
         return copy;
@@ -414,7 +437,9 @@ public class CameraSequence : MonoBehaviour
 
             PlayLines(shot, i == shots.Count - 1);
             PlayShotAudio(shot);
-            if (shot.animated) StartAnimation(shot);
+            float lift = LiftToViewTarget(shot, i);
+            WearShotVolume(shot, i);
+            if (shot.animated) StartAnimation(shot, lift);
             PlayCharacterAnimations(shot, i);
             PinFog(shot, i);
             if (shot.pressAnyKey && MovesOnWithLines(shot))
@@ -530,7 +555,45 @@ public class CameraSequence : MonoBehaviour
         return dialogue != null && (dialogue.KeyLinesPending || dialogue.KeyTakenThisFrame);
     }
 
-    private void StartAnimation(Shot shot)
+    /// <summary>
+    /// A shot with a View Target: its camera is raised or lowered to stand View Target Height above the target
+    /// as it is now, and goes back to where it was placed at the end. Returns how far it moved, so the shot's
+    /// movement can be moved with it.
+    /// </summary>
+    private float LiftToViewTarget(Shot shot, int index)
+    {
+        if (shot.viewTarget == null) return 0f;
+        var cam = shot.camera;
+        float lift = ViewTargetLift(shot, cam.transform.position);
+        if (Mathf.Abs(lift) < 1e-4f)
+        {
+            Debug.Log($"[CameraSequence] Shot {index + 1}: '{cam.name}' already {shot.viewTargetHeight:F2} above '{shot.viewTarget.name}'.");
+            return 0f;
+        }
+
+        if (!_placedAt.ContainsKey(cam)) _placedAt[cam] = new Pose(cam.transform.position, cam.transform.rotation);
+        // An earlier shot's movement still running on this camera would undo the lift.
+        if (_moves.TryGetValue(cam, out var running) && running != null) StopCoroutine(running);
+        _moves.Remove(cam);
+
+        cam.transform.position += Vector3.up * lift;
+        Debug.Log($"[CameraSequence] Shot {index + 1}: '{cam.name}' moved {lift:+0.00;-0.00} to stand {shot.viewTargetHeight:F2} " +
+                  $"above '{shot.viewTarget.name}' (target at y {shot.viewTarget.position.y:F2}).");
+        return lift;
+    }
+
+    /// <summary>
+    /// How far the shot's camera, standing at <paramref name="cameraPosition"/>, must rise (negative: drop) to stand
+    /// View Target Height above its View Target. 0 with no View Target. The storyboard's Preview uses this too.
+    /// </summary>
+    public static float ViewTargetLift(Shot shot, Vector3 cameraPosition)
+        => shot.viewTarget != null ? shot.viewTarget.position.y + shot.viewTargetHeight - cameraPosition.y : 0f;
+
+    /// <summary>A mark of the shot's movement (Orbit Point, End Camera) that is the View Target or sits under it already moves with it.</summary>
+    public static bool RidesWithViewTarget(Shot shot, Transform mark)
+        => shot.viewTarget != null && mark != null && mark.IsChildOf(shot.viewTarget);
+
+    private void StartAnimation(Shot shot, float lift)
     {
         var cam = shot.camera;
         if (shot.animation == ShotAnimation.Orbit && shot.orbitPoint == null)
@@ -546,7 +609,7 @@ public class CameraSequence : MonoBehaviour
         if (!_placedAt.ContainsKey(cam)) _placedAt[cam] = new Pose(cam.transform.position, cam.transform.rotation);
         // The same camera in a later shot takes over from its last movement, from where it stands.
         if (_moves.TryGetValue(cam, out var running) && running != null) StopCoroutine(running);
-        _moves[cam] = StartCoroutine(Animate(cam, shot));
+        _moves[cam] = StartCoroutine(Animate(cam, shot, lift));
     }
 
     private void PlayCharacterAnimations(Shot shot, int index)
@@ -588,37 +651,45 @@ public class CameraSequence : MonoBehaviour
             : "Orbit (no point)";
     }
 
-    // Runs its own Time, even past the shot's end, then holds.
-    private IEnumerator Animate(CinemachineCamera cam, Shot shot)
+    // Runs its own Time, even past the shot's end, then holds. Lift: how far the View Target moved the camera
+    // as the shot started — the Orbit Point and End Camera move with it.
+    private IEnumerator Animate(CinemachineCamera cam, Shot shot, float lift)
     {
         Transform t = cam.transform;
         var from = new Pose(t.position, t.rotation);
-        Vector3 centre = OrbitCentre(shot, from);
+        Vector3 centre = OrbitCentre(shot, from, lift);
 
         float elapsed = 0f;
         while (elapsed < shot.animationTime)
         {
             elapsed += Time.deltaTime;
-            var pose = PoseAt(shot, from, centre, elapsed);
+            var pose = PoseAt(shot, from, centre, elapsed, lift);
             t.SetPositionAndRotation(pose.position, pose.rotation);
             yield return null;
         }
-        var end = PoseAt(shot, from, centre, shot.animationTime);
+        var end = PoseAt(shot, from, centre, shot.animationTime, lift);
         t.SetPositionAndRotation(end.position, end.rotation);
         _moves.Remove(cam);
     }
 
-    /// <summary>Where an Orbit circles: the Orbit Point as the movement starts (the camera itself if there is none).</summary>
-    public static Vector3 OrbitCentre(Shot shot, Pose from)
-        => shot.orbitPoint != null ? shot.orbitPoint.position : from.position;
+    /// <summary>
+    /// Where an Orbit circles: the Orbit Point as the movement starts (the camera itself if there is none), moved
+    /// up by <paramref name="lift"/> (the View Target's move) unless it already moves with the View Target.
+    /// </summary>
+    public static Vector3 OrbitCentre(Shot shot, Pose from, float lift = 0f)
+    {
+        if (shot.orbitPoint == null) return from.position;
+        return shot.orbitPoint.position + (RidesWithViewTarget(shot, shot.orbitPoint) ? Vector3.zero : Vector3.up * lift);
+    }
 
     /// <summary>
     /// Where the shot's movement has the camera <paramref name="elapsed"/> seconds in, from where it started.
     /// Zoom: forward the way it faced. Orbit: round the centre on the world up axis, looking at the
-    /// centre the whole way. Animate 2 Shot: straight to the End Camera, turning to face its way.
+    /// centre the whole way. Animate 2 Shot: straight to the End Camera (moved up by <paramref name="lift"/>, the
+    /// View Target's move, unless it already moves with the View Target), turning to face its way.
     /// The storyboard's Preview plays this same path.
     /// </summary>
-    public static Pose PoseAt(Shot shot, Pose from, Vector3 orbitCentre, float elapsed)
+    public static Pose PoseAt(Shot shot, Pose from, Vector3 orbitCentre, float elapsed, float lift = 0f)
     {
         float k = shot.animationTime > 0f
             ? Ease(Mathf.Clamp01(elapsed / shot.animationTime), shot.easing)
@@ -633,7 +704,8 @@ public class CameraSequence : MonoBehaviour
         {
             if (shot.endCamera == null) return from;
             Transform end = shot.endCamera.transform;
-            return new Pose(Vector3.Lerp(from.position, end.position, k),
+            Vector3 endAt = end.position + (RidesWithViewTarget(shot, end) ? Vector3.zero : Vector3.up * lift);
+            return new Pose(Vector3.Lerp(from.position, endAt, k),
                             Quaternion.Slerp(from.rotation, end.rotation, k));
         }
         return new Pose(from.position + from.forward * (shot.zoomDistance * k), from.rotation);
@@ -695,6 +767,111 @@ public class CameraSequence : MonoBehaviour
         foreach (var placed in _placedAt)
             if (placed.Key != null) placed.Key.transform.SetPositionAndRotation(placed.Value.position, placed.Value.rotation);
         _placedAt.Clear();
+
+        // And their own post back.
+        foreach (var held in _volumeWas)
+        {
+            if (held.Key == null) continue;
+            held.Key.Profile       = held.Value.profile;
+            held.Key.FocusTracking = held.Value.tracking;
+            held.Key.InvalidateCachedProfile();
+        }
+        _volumeWas.Clear();
+        foreach (var copy in _focusCopies) DestroyFocusCopy(copy);
+        _focusCopies.Clear();
+    }
+
+    // Each shot camera's own profile and Focus Tracking, from before the sequence put a shot's Volume on it.
+    private readonly Dictionary<CinemachineVolumeSettings, (VolumeProfile profile, CinemachineVolumeSettings.FocusTrackingMode tracking)>
+        _volumeWas = new Dictionary<CinemachineVolumeSettings, (VolumeProfile, CinemachineVolumeSettings.FocusTrackingMode)>();
+
+    // Focus On View Target's copies of shot Volumes (the assets are never written), thrown away at the end.
+    private readonly List<VolumeProfile> _focusCopies = new List<VolumeProfile>();
+
+    /// <summary>
+    /// The shot camera wears the shot's own Volume, with Focus Tracking off. Focus On View Target: a copy of it
+    /// whose Focus Distance is how far the camera stands from the View Target as the shot starts — set once.
+    /// A shot with no Volume on a camera an earlier shot dressed puts that camera's own back.
+    /// </summary>
+    private void WearShotVolume(Shot shot, int index)
+    {
+        var volume = shot.camera.GetComponent<CinemachineVolumeSettings>();
+        if (volume == null)
+        {
+            Debug.LogWarning($"[CameraSequence] Shot {index + 1}: '{shot.camera.name}' has no Cinemachine Volume Settings — " +
+                             "its Volume isn't worn (open the storyboard to give it them).");
+            return;
+        }
+
+        if (shot.volumeProfile == null)
+        {
+            Debug.LogWarning($"[CameraSequence] Shot {index + 1}: no Volume of its own — '{shot.camera.name}' keeps its own post " +
+                             "(open the storyboard to make one).");
+            if (_volumeWas.TryGetValue(volume, out var was))
+            {
+                volume.Profile       = was.profile;
+                volume.FocusTracking = was.tracking;
+                volume.InvalidateCachedProfile();
+                _volumeWas.Remove(volume);
+            }
+            return;
+        }
+
+        if (!_volumeWas.ContainsKey(volume)) _volumeWas[volume] = (volume.Profile, volume.FocusTracking);
+        var profile = shot.volumeProfile;
+        if (shot.focusViewTarget && shot.viewTarget != null)
+        {
+            float distance = (shot.camera.transform.position - shot.viewTarget.position).magnitude;
+            profile = FocusedCopy(shot.volumeProfile, distance);
+            if (profile != shot.volumeProfile) _focusCopies.Add(profile);
+            Debug.Log($"[CameraSequence] Shot {index + 1}: '{shot.camera.name}' wears '{shot.volumeProfile.name}', " +
+                      $"focused {distance:F2} away on '{shot.viewTarget.name}'.");
+        }
+        else
+        {
+            Debug.Log($"[CameraSequence] Shot {index + 1}: '{shot.camera.name}' wears '{shot.volumeProfile.name}'.");
+        }
+
+        volume.FocusTracking = CinemachineVolumeSettings.FocusTrackingMode.None;
+        volume.Profile       = profile;
+        volume.InvalidateCachedProfile();
+    }
+
+    /// <summary>
+    /// A copy of <paramref name="source"/> (every override its own copy) with its Depth of Field Focus Distance set to
+    /// <paramref name="distance"/>. The source itself when it has no Depth of Field.
+    /// </summary>
+    public static VolumeProfile FocusedCopy(VolumeProfile source, float distance)
+    {
+        if (!source.Has<DepthOfField>())
+        {
+            Debug.LogWarning($"[CameraSequence] '{source.name}' has no Depth of Field — Focus On View Target has nothing to focus.");
+            return source;
+        }
+
+        var copy = ScriptableObject.CreateInstance<VolumeProfile>();
+        copy.name      = source.name + " (focused)";
+        copy.hideFlags = HideFlags.DontSave;
+        foreach (var component in source.components)
+        {
+            var c = Instantiate(component);
+            c.hideFlags = HideFlags.DontSave;
+            copy.components.Add(c);
+        }
+        copy.TryGet(out DepthOfField dof);
+        dof.focusDistance.overrideState = true;
+        dof.focusDistance.value         = Mathf.Max(0f, distance);
+        copy.isDirty = true;
+        return copy;
+    }
+
+    /// <summary>Throws away a <see cref="FocusedCopy"/> and its overrides.</summary>
+    public static void DestroyFocusCopy(VolumeProfile copy)
+    {
+        if (copy == null) return;
+        foreach (var component in copy.components)
+            if (component != null) DestroyImmediate(component);
+        DestroyImmediate(copy);
     }
 
     private void PlayShotAudio(Shot shot)
@@ -755,16 +932,10 @@ public class CameraSequence : MonoBehaviour
         if (music != null) music.Release();
     }
 
-    // The sequence's fog wins over the world's until the hand back. ApplyAesthetics keeps pushing
-    // every frame and picks the override up; pushed once here too so the first shot already has it.
+    // Each shot's Fog Centre holds the world's fog middle until the hand back. The fog's own numbers
+    // stay the world's, but for the distance of a shot with Fog Distance Override.
     private void HoldFog()
     {
-        if (!overrideFog) return;
-        WhiteFadeSettings.Override = fog;
-        fog.PushNow();
-        Debug.Log($"[CameraSequence] Fog override on: radius {fog.radius:F1}, outer {fog.outerOpacity:F2}, " +
-                  $"inner ÷{fog.innerDivision:F1} {fog.innerOpacity:F2}, gradient bottom {fog.gradientBottom:F1}.");
-
         if (!_holdingFogCentre)
         {
             _holdingFogCentre = true;
@@ -780,7 +951,9 @@ public class CameraSequence : MonoBehaviour
     /// </summary>
     private void PinFog(Shot shot, int index)
     {
-        if (!overrideFog) return;
+        WhiteFadeSettings.RadiusOverride = shot.overrideFogDistance ? shot.fogDistance : (float?)null;
+        if (shot.overrideFogDistance)
+            Debug.Log($"[CameraSequence] Shot {index + 1}: fog distance {shot.fogDistance:F1} (override).");
 
         if (shot.fogCentre == FogCentre.Boat)
         {
@@ -859,14 +1032,11 @@ public class CameraSequence : MonoBehaviour
             _holdingFogCentre = false;
             _fogPinned        = false;
             UnityEngine.Rendering.RenderPipelineManager.beginCameraRendering -= HoldFogCentre;
+            WhiteFadeSettings.RadiusOverride = null;
             // Straight back onto the boat, rather than waiting on its next LateUpdate.
             LevelSelectBoatToShaders.Push(boatControl);
+            Debug.Log("[CameraSequence] Fog Centre released — back on the boat.");
         }
-
-        // Only ours to clear — never another sequence's.
-        if (WhiteFadeSettings.Override != fog) return;
-        WhiteFadeSettings.Override = null;
-        Debug.Log("[CameraSequence] Fog override off — back to the world's White Fade.");
     }
 
     private CinemachineBlendDefinition OverrideBlend(ICinemachineCamera from, ICinemachineCamera to,
@@ -915,7 +1085,7 @@ public class CameraSequence : MonoBehaviour
         PutCamerasBack();
         // Never leave the music held by a dead sequence either.
         ReleaseMusic();
-        // Nor its fog over the world's.
+        // Nor its hold on the fog's centre.
         ReleaseFog();
         // Nor its own sound playing on, part faded.
         StopAudioFade();

@@ -54,6 +54,15 @@ public class FogMap : ScriptableObject
              "every fog pixel, so this is the GPU cost.")]
     [Range(0, FogFieldManager.FOG_OBSTACLE_SLOTS)] public int maskLimit = FogFieldManager.FOG_OBSTACLE_SLOTS;
 
+    // The height window. Measured from the fog sheet the boat is under, so a repel point down in a
+    // channel the fog plane passes over can be left out of both the push and the mask.
+    [Tooltip("How far BELOW the fog plane a repel point may sit and still count, in world units. " +
+             "One lower than this neither pushes fog nor cuts the mask.")]
+    [Min(0f)] public float heightWindowBelow = 100f;
+
+    [Tooltip("How far ABOVE the fog plane a repel point may sit and still count, in world units.")]
+    [Min(0f)] public float heightWindowAbove = 100f;
+
     [Header("Blob")]
     [Tooltip("What every mass on this arena is made of. One set of properties, not a list: a " +
              "list bought variety that the per-mass jitter and the size range already provide, " +
@@ -101,6 +110,11 @@ public class FogMap : ScriptableObject
              "how solid a mass reads from its middle to its edge — this turns all of it up and " +
              "down together.")]
     [Range(0f, 1f)] public float fogOpacity = 1f;
+
+    [Tooltip("Thins the fog in a soft circle round the boat on screen while the sheet stands " +
+             "between the camera and the boat — the CameraOccluderFader's Screen Circle, sized by " +
+             "its Circle Radius and Circle Feather.")]
+    public bool screenCircleOcclusion = true;
 
     [Header("Boat Mask")]
     [Tooltip("How far from the boat fog is drawn at all. Beyond this a mass paints nothing, so a " +
@@ -249,7 +263,8 @@ public class FogMap : ScriptableObject
 
     [Tooltip("Whether Landscape Natural River Runs are strung with fog repellers too. Off leaves " +
              "them out, so fog lies over them like the rest of the landscape; the structural runs " +
-             "still repel. Needs Runs Repel on.")]
+             "still repel. Pools on natural runs are left out too. Needs Runs Repel on (Pools " +
+             "Repel for the pools).")]
     public bool naturalRunsRepel = true;
 
     [Tooltip("How far apart the circles are strung along a run, IN WORLD UNITS. This is the " +

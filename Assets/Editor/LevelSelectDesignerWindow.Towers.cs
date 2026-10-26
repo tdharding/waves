@@ -36,6 +36,9 @@ public partial class LevelSelectDesignerWindow
     private readonly System.Collections.Generic.Dictionary<object, System.Action> _pendingTowerRebuilds = new();
     private double _towerRebuildDueAt;
     private int    _towerRebuildUndoGroup;
+    // Set when the waiting edit was typed: the rebuild holds until the field is finished with
+    // (Enter, clicking away, or leaving the window), not just until the delay runs out.
+    private bool   _towerRebuildWaitsForTyping;
 
     /// <summary>
     /// True when the change being handled came from a value field — a drag on a number or
@@ -79,6 +82,9 @@ public partial class LevelSelectDesignerWindow
         _pendingTowerRebuilds[key] = rebuild;
         _towerRebuildDueAt     = EditorApplication.timeSinceStartup + TowerRebuildDelay;
         _towerRebuildUndoGroup = Undo.GetCurrentGroup();
+        var e = Event.current;
+        if (e != null && e.rawType == EventType.KeyDown && EditorGUIUtility.editingTextField)
+            _towerRebuildWaitsForTyping = true;
         EditorApplication.update -= TowerRebuildTick;
         EditorApplication.update += TowerRebuildTick;
     }
@@ -89,6 +95,9 @@ public partial class LevelSelectDesignerWindow
     private void TowerRebuildTick()
     {
         if (EditorApplication.timeSinceStartup < _towerRebuildDueAt) return;
+        // A typed value waits until it is finished with, so half-typed numbers never rebuild.
+        if (_towerRebuildWaitsForTyping && EditorGUIUtility.editingTextField && focusedWindow == this)
+            return;
         FlushTowerRebuilds();
     }
 
@@ -96,6 +105,7 @@ public partial class LevelSelectDesignerWindow
     private void FlushTowerRebuilds()
     {
         EditorApplication.update -= TowerRebuildTick;
+        _towerRebuildWaitsForTyping = false;
         if (_pendingTowerRebuilds.Count == 0) return;
 
         var due = new System.Collections.Generic.List<System.Action>(_pendingTowerRebuilds.Values);
@@ -117,6 +127,7 @@ public partial class LevelSelectDesignerWindow
         EditorApplication.update -= TowerRebuildTick;
         _pendingTowerRebuilds.Clear();
         s_towerFieldsEdited = false;
+        _towerRebuildWaitsForTyping = false;
     }
 
     // ─────────────────────────────────────────────
@@ -140,7 +151,8 @@ public partial class LevelSelectDesignerWindow
         {
             if (outpost == null) continue;
             var o = outpost;
-            if (TakePreset(o, preset) | TakePreset(o.bothLeft, preset))
+            if (TakePreset(o, preset) | TakePreset(o.bothLeft, preset)
+                | HoldsInner(o.tower, preset) | HoldsInner(o.bothLeft?.tower, preset))
                 rebuilds[o] = () => RebuildOutpost(o);
         }
 
@@ -152,6 +164,7 @@ public partial class LevelSelectDesignerWindow
             if (changed) SyncStructureOutpost(s);
             if (preset is LollipopTowerPreset sl && s.towerPreset  == sl) { s.tower  = sl.Build(); changed = true; }
             if (preset is TurretTowerPreset   st && s.turretPreset == st) { s.turret = st.Build(); changed = true; }
+            if (HoldsInner(s.tower, preset) || HoldsInner(s.outpost?.tower, preset)) changed = true;
             if (changed) rebuilds[s] = () => RebuildStructure(s);
         }
 
@@ -162,9 +175,24 @@ public partial class LevelSelectDesignerWindow
             bool changed = false;
             if (preset is LollipopTowerPreset  pl && p.towerPreset     == pl) { p.tower     = pl.Build(); changed = true; }
             if (preset is TurretTowerPreset    pt && p.turretPreset    == pt) { p.turret    = pt.Build(); changed = true; }
-            if (preset is SoulsPoolTowerPreset ps && p.soulsPoolPreset == ps) { p.soulsPool = ps.Build(); changed = true; }
+            if (preset is SoulJuiceTankPreset ps && p.soulJuiceTankPreset == ps) { p.soulJuiceTank = ps.Build(); changed = true; }
+            if (preset is SoulFishBowlPreset  pf && p.soulFishBowlPreset  == pf) { p.soulFishBowl  = pf.Build(); changed = true; }
+            if (preset is NomKabarTreePreset   pn && p.nomKabarTreePreset == pn) { p.nomKabarTree = pn.Build(); changed = true; }
+            if (HoldsInner(p.tower, preset)) changed = true;
             if (changed) rebuilds[p] = () => RebuildPoolTower(p);
         }
+
+        foreach (var arena in _data.arenas)
+        {
+            if (arena == null) continue;
+            var a = arena;
+            bool changed = false;
+            if (preset is LollipopTowerPreset al && a.centreTowerPreset == al) { a.centreTower = al.Build(); changed = true; }
+            if (HoldsInner(a.centreTower, preset)) changed = true;
+            if (changed) rebuilds[a] = () => RebuildArenaCentreTower(a);
+        }
+
+        TakeNomKabarTreePreset(preset as NomKabarTreePreset, rebuilds);
 
         foreach (var wall in _data.walls)
         {
@@ -177,6 +205,7 @@ public partial class LevelSelectDesignerWindow
                 if (node == null) continue;
                 if (preset is LollipopTowerPreset wl && node.towerPreset  == wl) { node.tower  = wl.Build(); changed = true; }
                 if (preset is TurretTowerPreset   wt && node.turretPreset == wt) { node.turret = wt.Build(); changed = true; }
+                if (HoldsInner(node.tower, preset)) changed = true;
             }
             if (changed) rebuilds[w] = () => RebuildWall(w);
         }
@@ -195,6 +224,7 @@ public partial class LevelSelectDesignerWindow
                 if (rim.turretPreset == rt)                                   { rim.turret = rt.Build();          changed = true; }
                 if (rim.bothLeft != null && rim.bothLeft.turretPreset == rt) { rim.bothLeft.turret = rt.Build(); changed = true; }
             }
+            if (HoldsInner(rim.tower, preset) || HoldsInner(rim.bothLeft?.tower, preset)) changed = true;
             string nodeId = rim.nodeId;
             if (changed) rebuilds["RimNode:" + nodeId] = () => RebuildRimNodesAt(nodeId);
         }
@@ -222,6 +252,15 @@ public partial class LevelSelectDesignerWindow
     }
 
     /// <summary>
+    /// True when <paramref name="tower"/> has an inner lollipop built from
+    /// <paramref name="preset"/>. The inner one is read from its preset when the tower is built, so
+    /// nothing is copied — the tower only needs rebuilding.
+    /// </summary>
+    private static bool HoldsInner(LollipopTower tower, ScriptableObject preset)
+        => preset is LollipopTowerPreset lp && tower != null && tower.destruction && tower.innerLollipop
+           && tower.innerLollipopPreset == lp;
+
+    /// <summary>
     /// Puts <paramref name="preset"/> back on one outpost's settings when they use it — the whole
     /// outpost preset, or just its lollipop or turret. True when anything changed.
     /// </summary>
@@ -246,9 +285,12 @@ public partial class LevelSelectDesignerWindow
 
     /// <summary>
     /// Stem and orb fields for a tower. Hands back an edited copy, so the caller writes it only
-    /// inside its own change check.
+    /// inside its own change check. A turret's body leaves out Destruction — its head is its own.
+    /// <paramref name="onInnerPresetCreated"/> is handed the preset the Inner Lollipop row's New
+    /// makes, after this GUI pass, to put on the tower itself.
     /// </summary>
-    internal static LollipopTower DrawLollipopTowerFields(LollipopTower tower)
+    internal static LollipopTower DrawLollipopTowerFields(LollipopTower tower, bool withDestruction = true,
+                                                          System.Action<LollipopTowerPreset> onInnerPresetCreated = null)
     {
         var edited = (tower ?? new LollipopTower()).Clone();
         EditorGUI.BeginChangeCheck();
@@ -284,6 +326,85 @@ public partial class LevelSelectDesignerWindow
         edited.base2Height = Mathf.Max(0f, EditorGUILayout.FloatField(
             new GUIContent("Base 2 Height", "Height of the second base, on top of the upper ramp. 0 = no second base."),
             edited.base2Height));
+
+        if (withDestruction)
+        {
+            EditorGUILayout.Space(4);
+            edited.destruction = EditorGUILayout.Toggle(
+                new GUIContent("Destruction", "Breaks a hole into the orb. The orb becomes a hollow shell, " +
+                                              "seen inside through the hole."),
+                edited.destruction);
+            using (new EditorGUI.DisabledScope(!edited.destruction))
+            {
+                EditorGUI.indentLevel++;
+                edited.holeAround = EditorGUILayout.Slider(
+                    new GUIContent("Hole Around", "Where the hole sits round the orb, in degrees."),
+                    edited.holeAround, -180f, 180f);
+                edited.holeUpDown = EditorGUILayout.Slider(
+                    new GUIContent("Hole Up/Down", "How far the hole sits above (+) or below (−) the orb's " +
+                                                   "middle, in degrees. 90 = right on top."),
+                    edited.holeUpDown, -90f, 90f);
+                edited.holeSize = EditorGUILayout.Slider(
+                    new GUIContent("Hole Size", "How big the hole is: degrees from its middle out to its " +
+                                                "edge, before the edge's rounded shapes."),
+                    edited.holeSize, 1f, 150f);
+                edited.holeEdgeComplexity = EditorGUILayout.IntSlider(
+                    new GUIContent("Hole Edge Complexity", "How many rounded shapes run round the hole's " +
+                                                           "edge. 0 = a plain round hole."),
+                    edited.holeEdgeComplexity, 0, 16);
+                edited.holeEdgeDepth = EditorGUILayout.Slider(
+                    new GUIContent("Hole Edge Depth", "How far the edge's rounded shapes reach out past the " +
+                                                      "hole, as a share of Hole Size."),
+                    edited.holeEdgeDepth, 0f, 1f);
+                edited.holeEdgeUnevenness = EditorGUILayout.Slider(
+                    new GUIContent("Hole Edge Unevenness", "How much the edge's rounded shapes differ from " +
+                                                           "each other in length, width and spacing. 0 = all alike."),
+                    edited.holeEdgeUnevenness, 0f, 1f);
+                edited.holeEdgeRoundness = EditorGUILayout.Slider(
+                    new GUIContent("Hole Edge Roundness", "The shape of each rounded shape on the edge: low = " +
+                                                          "broad gentle waves, high = full rounded tips."),
+                    edited.holeEdgeRoundness, 0f, 1f);
+                edited.holeEdgeThickness = Mathf.Max(0.001f, EditorGUILayout.FloatField(
+                    new GUIContent("Hole Edge Thickness", "How thick the orb's shell is — the band you see " +
+                                                          "round the hole's edge."),
+                    edited.holeEdgeThickness));
+
+                EditorGUILayout.Space(2);
+                edited.innerLollipop = EditorGUILayout.Toggle(
+                    new GUIContent("Inner Lollipop", "Stands a small lollipop inside the broken orb, on the " +
+                                                     "lowest point of its floor."),
+                    edited.innerLollipop);
+                if (edited.innerLollipop)
+                {
+                    EditorGUI.indentLevel++;
+                    var source = tower;
+                    edited.innerLollipopPreset = LevelSelectPresetEditorWindow.DrawPresetLink(
+                        new GUIContent("Inner Lollipop Preset", "The lollipop tower preset the inner lollipop is " +
+                                                                "built from. Always built whole — its own " +
+                                                                "Destruction and Inner Lollipop are ignored."),
+                        edited.innerLollipopPreset, LollipopPresetFolder, "Lollipop Tower",
+                        () =>
+                        {
+                            // From the inner lollipop already chosen, or else this tower, whole.
+                            var made = CreateInstance<LollipopTowerPreset>();
+                            var from = source?.innerLollipopPreset != null ? source.innerLollipopPreset.Build()
+                                                                           : (source ?? new LollipopTower()).Clone();
+                            from.destruction   = false;
+                            from.innerLollipop = false;
+                            made.CopyFrom(from);
+                            return made;
+                        },
+                        made => onInnerPresetCreated?.Invoke(made));
+                    edited.innerLollipopSize = EditorGUILayout.Slider(
+                        new GUIContent("Inner Lollipop Size", "How tall the inner lollipop stands, as a share of " +
+                                                              "the space inside the orb above where it stands. " +
+                                                              "1 = its orb touches the top of the hollow."),
+                        edited.innerLollipopSize, 0.05f, 1f);
+                    EditorGUI.indentLevel--;
+                }
+                EditorGUI.indentLevel--;
+            }
+        }
 
         if (EditorGUI.EndChangeCheck()) s_towerFieldsEdited = true;
         return edited;
@@ -385,43 +506,123 @@ public partial class LevelSelectDesignerWindow
 
     /// <summary>
     /// The Lollipop / Turret choice for a place a tower stands. A pool island passes
-    /// <paramref name="allowSoulsPool"/> to offer the Souls Pool tower too — nowhere else can.
+    /// <paramref name="allowSoulJuiceTank"/> to offer the Soul Juice Tank and the Soul Fish Bowl
+    /// too — nowhere else can — and a natural pool's island <paramref name="allowNomKabarTree"/>
+    /// for a NomKabarTree as well.
     /// </summary>
     internal static LevelSelectDesignerData.TowerKind DrawTowerKindField(LevelSelectDesignerData.TowerKind kind,
-                                                                        bool allowSoulsPool = false)
+                                                                        bool allowSoulJuiceTank = false,
+                                                                        bool allowNomKabarTree = false)
     {
-        var label = new GUIContent("Kind", allowSoulsPool
-            ? "A lollipop tower, a turret whose head turns and whose nose tilts, or a souls pool — " +
-              "a bowl on a column where a soul route's souls begin."
+        var label = new GUIContent("Kind", allowSoulJuiceTank
+            ? "A lollipop tower, a turret whose head turns and whose nose tilts, a soul juice tank — " +
+              "a lollipop with an intake and a tap, where a soul route begins — or a soul fish bowl, " +
+              "a bowl of water on a column." +
+              (allowNomKabarTree ? " A natural pool's island can stand a NomKabarTree instead." : "")
             : "A lollipop tower, or a turret whose head turns and whose nose tilts.");
 
-        string[] names = allowSoulsPool
-            ? new[] { "Lollipop", "Turret", "Souls Pool" }
-            : new[] { "Lollipop", "Turret" };
+        var kinds = new System.Collections.Generic.List<LevelSelectDesignerData.TowerKind>
+            { LevelSelectDesignerData.TowerKind.Lollipop, LevelSelectDesignerData.TowerKind.Turret };
+        var names = new System.Collections.Generic.List<string> { "Lollipop", "Turret" };
+        if (allowSoulJuiceTank)
+        {
+            kinds.Add(LevelSelectDesignerData.TowerKind.SoulJuiceTank); names.Add("Soul Juice Tank");
+            kinds.Add(LevelSelectDesignerData.TowerKind.SoulFishBowl);  names.Add("Soul Fish Bowl");
+        }
+        if (allowSoulJuiceTank && allowNomKabarTree)
+        {
+            kinds.Add(LevelSelectDesignerData.TowerKind.NomKabarTree);  names.Add("NomKabar Tree");
+        }
 
-        int index = Mathf.Clamp((int)kind, 0, names.Length - 1);
-        return (LevelSelectDesignerData.TowerKind)EditorGUILayout.Popup(label, index,
-                                                                        System.Array.ConvertAll(names, n => new GUIContent(n)));
+        int index = Mathf.Max(0, kinds.IndexOf(kind));
+        index = EditorGUILayout.Popup(label, index, names.ConvertAll(n => new GUIContent(n)).ToArray());
+        return kinds[Mathf.Clamp(index, 0, kinds.Count - 1)];
     }
 
-    internal const string SoulsPoolPresetFolder = "Assets/ScriptsData/DataScripts/SoulsPoolTowerPresets";
+    internal const string SoulJuiceTankPresetFolder = "Assets/ScriptsData/DataScripts/SoulJuiceTankPresets";
 
-    /// <summary>The same preset row as a lollipop's, for a souls pool tower — its sizes.</summary>
-    private bool DrawSoulsPoolPresetRow(SoulsPoolTowerPreset current, SoulsPoolTower tower,
-                                        System.Action<SoulsPoolTowerPreset> setPreset,
-                                        System.Action<SoulsPoolTower> setTower)
+    /// <summary>The same preset row as a lollipop's, for a soul juice tank — its sizes.</summary>
+    private bool DrawSoulJuiceTankPresetRow(SoulJuiceTankPreset current, SoulJuiceTank tower,
+                                        System.Action<SoulJuiceTankPreset> setPreset,
+                                        System.Action<SoulJuiceTank> setTower)
         => DrawTowerPresetRow(current, tower, setPreset, setTower,
-                              SoulsPoolPresetFolder, "Souls Pool Preset", "Souls Pool Tower",
+                              SoulJuiceTankPresetFolder, "Soul Juice Tank Preset", "Soul Juice Tank",
                               p => p.Build(), (p, t) => p.CopyFrom(t),
-                              t => (t ?? new SoulsPoolTower()).Clone());
+                              t => (t ?? new SoulJuiceTank()).Clone());
 
     /// <summary>
-    /// A souls pool tower's base, column and bowl fields. Hands back an edited copy, so the caller
+    /// A soul juice tank's fields: a lollipop's own (no Destruction), then its two hubs, the tap
+    /// and the intake. Hands back an edited copy, so the caller writes it only inside its own
+    /// change check.
+    /// </summary>
+    internal static SoulJuiceTank DrawSoulJuiceTankFields(SoulJuiceTank tower)
+    {
+        var edited = (tower ?? new SoulJuiceTank()).Clone();
+        EditorGUI.BeginChangeCheck();
+
+        var lolly = DrawLollipopTowerFields(edited.Lollipop(), withDestruction: false);
+        edited.stemRadius      = lolly.stemRadius;      edited.stemHeight      = lolly.stemHeight;
+        edited.orbRadius       = lolly.orbRadius;
+        edited.baseRadius      = lolly.baseRadius;      edited.baseHeight      = lolly.baseHeight;
+        edited.lowerRampHeight = lolly.lowerRampHeight; edited.lowerRampRadius = lolly.lowerRampRadius;
+        edited.rampHeight      = lolly.rampHeight;
+        edited.base2Radius     = lolly.base2Radius;     edited.base2Height     = lolly.base2Height;
+
+        EditorGUILayout.LabelField("Top Hub", EditorStyles.miniBoldLabel);
+        edited.topHubRadius = Mathf.Max(0.001f, EditorGUILayout.FloatField(
+            new GUIContent("Radius", "Radius of the round hub on top of the orb, the intake comes up out of."),
+            edited.topHubRadius));
+        edited.topHubThickness = Mathf.Max(0f, EditorGUILayout.FloatField(
+            new GUIContent("Thickness", "How far the top hub stands up past the orb."), edited.topHubThickness));
+
+        EditorGUILayout.LabelField("Side Hub", EditorStyles.miniBoldLabel);
+        edited.sideHubAround = EditorGUILayout.Slider(
+            new GUIContent("Around", "Where the side hub sits round the orb, in degrees."),
+            edited.sideHubAround, -180f, 180f);
+        edited.sideHubRadius = Mathf.Max(0.001f, EditorGUILayout.FloatField(
+            new GUIContent("Radius", "Radius of the round hub on the side of the orb, the tap comes out of."),
+            edited.sideHubRadius));
+        edited.sideHubThickness = Mathf.Max(0f, EditorGUILayout.FloatField(
+            new GUIContent("Thickness", "How far the side hub stands out past the orb."), edited.sideHubThickness));
+
+        EditorGUILayout.LabelField("Tap", EditorStyles.miniBoldLabel);
+        edited.tapThickness = Mathf.Max(0.002f, EditorGUILayout.FloatField(
+            new GUIContent("Thickness", "The tap's thickness, across the outside. Its bend is rounded to match it."),
+            edited.tapThickness));
+        edited.tapReach = Mathf.Max(0f, EditorGUILayout.FloatField(
+            new GUIContent("Reach Out", "How far the tap reaches out past the side hub before it turns down."),
+            edited.tapReach));
+        edited.tapDrop = Mathf.Max(0f, EditorGUILayout.FloatField(
+            new GUIContent("Drop", "How far the tap drops after it turns down."), edited.tapDrop));
+
+        EditorGUILayout.LabelField("Intake", EditorStyles.miniBoldLabel);
+        edited.intakeThickness = Mathf.Max(0.002f, EditorGUILayout.FloatField(
+            new GUIContent("Thickness", "The intake's thickness, across the outside. Which pipe hub it goes " +
+                                        "up to is picked on each pool, under Intake Hub."),
+            edited.intakeThickness));
+
+        if (EditorGUI.EndChangeCheck()) s_towerFieldsEdited = true;
+        return edited;
+    }
+
+    internal const string SoulFishBowlPresetFolder = "Assets/ScriptsData/DataScripts/SoulFishBowlPresets";
+
+    /// <summary>The same preset row as a lollipop's, for a soul fish bowl — its sizes.</summary>
+    private bool DrawSoulFishBowlPresetRow(SoulFishBowlPreset current, SoulFishBowl tower,
+                                           System.Action<SoulFishBowlPreset> setPreset,
+                                           System.Action<SoulFishBowl> setTower)
+        => DrawTowerPresetRow(current, tower, setPreset, setTower,
+                              SoulFishBowlPresetFolder, "Soul Fish Bowl Preset", "Soul Fish Bowl",
+                              p => p.Build(), (p, t) => p.CopyFrom(t),
+                              t => (t ?? new SoulFishBowl()).Clone());
+
+    /// <summary>
+    /// A soul fish bowl's base, column and bowl fields. Hands back an edited copy, so the caller
     /// writes it only inside its own change check.
     /// </summary>
-    internal static SoulsPoolTower DrawSoulsPoolTowerFields(SoulsPoolTower tower)
+    internal static SoulFishBowl DrawSoulFishBowlFields(SoulFishBowl tower)
     {
-        var edited = (tower ?? new SoulsPoolTower()).Clone();
+        var edited = (tower ?? new SoulFishBowl()).Clone();
         EditorGUI.BeginChangeCheck();
 
         EditorGUILayout.LabelField("Base", EditorStyles.miniBoldLabel);
@@ -466,7 +667,7 @@ public partial class LevelSelectDesignerWindow
                                          "basin depth, or there is no water."), edited.waterDrop));
         edited.holeRadius = Mathf.Max(0f, EditorGUILayout.FloatField(
             new GUIContent("Hole Radius", "Radius of the hole in the middle of the basin, seen once the water " +
-                                          "has drained when the souls are released. 0 = no hole."), edited.holeRadius));
+                                          "has drained. 0 = no hole."), edited.holeRadius));
 
         if (edited.BasinDepth < edited.basinDepth - 0.0001f)
             EditorGUILayout.LabelField($"Basin held to {edited.BasinDepth:F3} so it stays above the underside.",
@@ -488,7 +689,7 @@ public partial class LevelSelectDesignerWindow
         var edited = (turret ?? new TurretTower()).Clone();
         EditorGUI.BeginChangeCheck();
 
-        edited.body = DrawLollipopTowerFields(edited.body);
+        edited.body = DrawLollipopTowerFields(edited.body, withDestruction: false);
 
         EditorGUILayout.LabelField("Nose", EditorStyles.miniBoldLabel);
         edited.noseLength = Mathf.Max(0f, EditorGUILayout.FloatField(
@@ -513,10 +714,13 @@ public partial class LevelSelectDesignerWindow
 
     // ── Sizes for the canvas and the perch, whichever kind stands there ──
 
-    // A souls pool tower is sized for the canvas by its bowl — what is seen from above.
+    // A soul juice tank is sized for the canvas by its orb, a soul fish bowl by its bowl — what is
+    // seen from above.
     private static float PoolTowerCanvasRadius(LevelSelectDesignerData.DesignerPool pool)
-        => pool.towerKind == LevelSelectDesignerData.TowerKind.SoulsPool
-            ? (pool.soulsPool ?? new SoulsPoolTower()).Scaled(pool.towerScale).bowlRadius
+        => pool.towerKind == LevelSelectDesignerData.TowerKind.SoulJuiceTank
+            ? (pool.soulJuiceTank ?? new SoulJuiceTank()).Scaled(pool.towerScale).orbRadius
+         : pool.towerKind == LevelSelectDesignerData.TowerKind.SoulFishBowl
+            ? (pool.soulFishBowl ?? new SoulFishBowl()).Scaled(pool.towerScale).bowlRadius
             : TowerOrbRadius(pool.towerKind, pool.tower, pool.turret, pool.towerScale);
 
     private static float TowerOrbRadius(LevelSelectDesignerData.TowerKind kind, LollipopTower tower,
@@ -550,7 +754,11 @@ public partial class LevelSelectDesignerWindow
         var            kind   = pool.towerKind;
         LollipopTower  tower  = pool.tower;
         TurretTower    turret = pool.turret;
-        SoulsPoolTower souls  = pool.soulsPool;
+        SoulJuiceTank souls  = pool.soulJuiceTank;
+        SoulFishBowl   fishBowl = pool.soulFishBowl;
+        string         tankHub  = pool.tankHubId;
+        NomKabarTree   nkTree = pool.nomKabarTree;
+        float          nkTurn = pool.nomKabarTreeTurn;
         float          scale  = pool.towerScale;
         var            perch  = pool.towerPerch;
         if (hasTower)
@@ -560,14 +768,50 @@ public partial class LevelSelectDesignerWindow
                     "This pool has no island — a tower is only built on one.",
                     EditorStyles.miniLabel);
 
-            kind = DrawTowerKindField(pool.towerKind, allowSoulsPool: true);
-            if (kind == LevelSelectDesignerData.TowerKind.SoulsPool)
+            // A NomKabarTree is a natural feature, so only a natural pool offers one — a pool that
+            // already has one keeps showing it, so it can be changed back.
+            bool natural = IsNaturalRun(PoolPath(pool));
+            kind = DrawTowerKindField(pool.towerKind, allowSoulJuiceTank: true,
+                                      allowNomKabarTree: natural ||
+                                                         pool.towerKind == LevelSelectDesignerData.TowerKind.NomKabarTree);
+            if (kind == LevelSelectDesignerData.TowerKind.NomKabarTree)
             {
-                DrawSoulsPoolPresetRow(pool.soulsPoolPreset, pool.soulsPool,
-                                       p => pool.soulsPoolPreset = p, t => pool.soulsPool = t);
-                souls = pool.soulsPool;   // read back: picking a preset just loaded it
+                if (!natural)
+                    EditorGUILayout.LabelField("This pool's river is no longer a natural run — the tree still stands.",
+                                               EditorStyles.wordWrappedMiniLabel);
+
+                // First picked, it starts as the Default NomKabarTree.
+                if (nkTree == null || nkTree.IsUnset)
+                {
+                    Undo.RecordObject(_data, "Fill NomKabar Tree");
+                    pool.nomKabarTree = DefaultNomKabarTree();
+                    MarkDirty();
+                }
+
+                DrawNomKabarTreePresetRow(pool.nomKabarTreePreset, pool.nomKabarTree,
+                                          p => pool.nomKabarTreePreset = p, t => pool.nomKabarTree = t);
+                scale  = DrawLollipopScaleField(pool.towerScale);
+                nkTurn = EditorGUILayout.Slider(
+                    new GUIContent("Turn", "How far the whole tree is turned about its stem, in degrees."),
+                    pool.nomKabarTreeTurn, 0f, 360f);
+                nkTree = DrawPlacedNomKabarTreeFields(pool.nomKabarTree, pool.nomKabarTreePreset,
+                                                      "Pool:" + pool.nodeId);
+            }
+            else if (kind == LevelSelectDesignerData.TowerKind.SoulJuiceTank)
+            {
+                DrawSoulJuiceTankPresetRow(pool.soulJuiceTankPreset, pool.soulJuiceTank,
+                                       p => pool.soulJuiceTankPreset = p, t => pool.soulJuiceTank = t);
+                souls = pool.soulJuiceTank;   // read back: picking a preset just loaded it
                 scale = DrawLollipopScaleField(pool.towerScale);
-                DrawSoulsPoolRoutesNote(pool);
+                tankHub = DrawTankIntakeHubField(pool);
+                DrawSoulJuiceTankRoutesNote(pool);
+            }
+            else if (kind == LevelSelectDesignerData.TowerKind.SoulFishBowl)
+            {
+                DrawSoulFishBowlPresetRow(pool.soulFishBowlPreset, pool.soulFishBowl,
+                                          p => pool.soulFishBowlPreset = p, t => pool.soulFishBowl = t);
+                fishBowl = pool.soulFishBowl;   // read back: picking a preset just loaded it
+                scale    = DrawLollipopScaleField(pool.towerScale);
             }
             else if (kind == LevelSelectDesignerData.TowerKind.Turret)
             {
@@ -584,44 +828,54 @@ public partial class LevelSelectDesignerWindow
                 scale = DrawLollipopScaleField(pool.towerScale);
             }
 
-            // The souls pool's top is water, so there is nothing on it for the angel to land on.
-            if (kind != LevelSelectDesignerData.TowerKind.SoulsPool)
+            // Neither has a perch: the tank never had one, and the fish bowl's top is water.
+            if (kind != LevelSelectDesignerData.TowerKind.SoulJuiceTank &&
+                kind != LevelSelectDesignerData.TowerKind.SoulFishBowl)
                 perch = DrawPerchBlock(pool.towerPerch);
         }
 
         if (EditorGUI.EndChangeCheck())
         {
             Undo.RecordObject(_data, "Edit Pool Tower");
+            string oldHub = pool.tankHubId;
             pool.hasTower   = hasTower;
             pool.towerKind  = kind;
             pool.tower      = tower;
             pool.turret     = turret;
-            pool.soulsPool  = souls;
+            pool.soulJuiceTank  = souls;
+            pool.soulFishBowl   = fishBowl;
+            pool.tankHubId      = tankHub;
+
+            // The hub let go of turns its ring back to its own side.
+            if (oldHub != tankHub && FindPipeHub(oldHub, out var oldPipe, out _)) BuildPipeIfGenerated(oldPipe);
+            pool.nomKabarTree     = kind == LevelSelectDesignerData.TowerKind.NomKabarTree ? nkTree : pool.nomKabarTree;
+            pool.nomKabarTreeTurn = nkTurn;
             pool.towerScale = scale;
             pool.towerPerch = perch;
             MarkDirty();
             RebuildAfterTowerEdit(pool, () => RebuildPoolTower(pool));
         }
 
+        if (pool.hasTower && OcclusionToggle(ref pool.occlusion, ref pool.occlusionStyle)) RebuildPoolTower(pool);
+
         // Outside the tower's change check — the cinematic is written onto the tower, never rebuilds it.
-        if (pool.hasTower && pool.towerKind == LevelSelectDesignerData.TowerKind.SoulsPool)
+        if (pool.hasTower && pool.towerKind == LevelSelectDesignerData.TowerKind.SoulJuiceTank)
             DrawTowerCinematic(pool);
     }
 
-    /// <summary>Which soul routes begin at this souls pool tower — the souls in its bowl.</summary>
-    private void DrawSoulsPoolRoutesNote(LevelSelectDesignerData.DesignerPool pool)
+    /// <summary>Which soul juice paths begin at this tank.</summary>
+    private void DrawSoulJuiceTankRoutesNote(LevelSelectDesignerData.DesignerPool pool)
     {
         var starting = _data.soulRoutes.FindAll(r => r != null && r.originNodeId == pool.nodeId);
         if (starting.Count == 0)
         {
-            EditorGUILayout.LabelField("No soul route starts here yet — pick this tower as a route's origin " +
+            EditorGUILayout.LabelField("No soul route starts here yet — pick this tank as a route's origin " +
                                        "in Souls mode.", EditorStyles.wordWrappedMiniLabel);
             return;
         }
 
         foreach (var route in starting)
-            EditorGUILayout.LabelField($"Route '{route.displayName}' starts here — {CountAssigned(route)} soul(s).",
-                                       EditorStyles.miniLabel);
+            EditorGUILayout.LabelField($"Route '{route.displayName}' starts here.", EditorStyles.miniLabel);
     }
 
     // ─────────────────────────────────────────────
@@ -647,26 +901,83 @@ public partial class LevelSelectDesignerWindow
         Transform existing  = poolRoot.Find(towerName);
 
         bool isTurret = pool.towerKind == LevelSelectDesignerData.TowerKind.Turret;
-        bool isSouls  = pool.towerKind == LevelSelectDesignerData.TowerKind.SoulsPool;
+        bool isSouls  = pool.towerKind == LevelSelectDesignerData.TowerKind.SoulJuiceTank;
+        bool isBowl   = pool.towerKind == LevelSelectDesignerData.TowerKind.SoulFishBowl;
+        bool isTree   = pool.towerKind == LevelSelectDesignerData.TowerKind.NomKabarTree;
         bool wanted   = pool.hasTower &&
-                        (isSouls ? pool.soulsPool != null : isTurret ? pool.turret != null : pool.tower != null) &&
+                        (isTree   ? pool.nomKabarTree != null && !pool.nomKabarTree.IsUnset :
+                         isSouls  ? pool.soulJuiceTank != null :
+                         isBowl   ? pool.soulFishBowl != null :
+                         isTurret ? pool.turret != null : pool.tower != null) &&
                         record.islandRadius > LevelSelectDesignerData.PoolTowerMinIsland;
 
-        // A tower of another kind is cleared rather than reused — their pieces differ.
+        // A tower of another kind is cleared rather than reused — their pieces differ. A tank
+        // built before 2026-10-26 still has a bowl, so it is cleared and built again as well.
         if (existing != null &&
             (!wanted ||
              (existing.GetComponent<TurretTowerController>() != null) != isTurret ||
-             (existing.Find(SoulsPoolBowlChild) != null) != isSouls))
+             (existing.GetComponent<SoulJuiceTankBowl>() != null) != isSouls ||
+             (existing.Find(SoulJuiceTankBowlChild) != null) != isBowl))
         {
             Undo.DestroyObjectImmediate(existing.gameObject);
             existing = null;
         }
-        if (!wanted) return;
+        if (!wanted)
+        {
+            // A tank taken away lets go of its hub, so the ring goes back to its own side.
+            if (FindPipeHub(pool.tankHubId, out var freed, out _)) BuildPipeIfGenerated(freed);
+            return;
+        }
+
+        if (isBowl)
+        {
+            var bowlBuilt = PlaceSoulFishBowl(poolRoot, towerName, pool.soulFishBowl.Scaled(pool.towerScale),
+                                              _data.ProfileFor(_data.PoolRiverName(pool)), existing?.gameObject);
+            if (bowlBuilt == null) return;
+
+            // The island top is flush with the rim, which is the pool's origin.
+            bowlBuilt.transform.localPosition = Vector3.zero;
+            bowlBuilt.transform.localRotation = Quaternion.identity;
+            bowlBuilt.transform.localScale    = Vector3.one;
+            ApplyOcclusion(bowlBuilt, pool.occlusion, pool.occlusionStyle);
+            AssetDatabase.SaveAssets();
+            return;
+        }
+
+        if (isTree)
+        {
+            GameObject treeGO = existing != null ? existing.gameObject : null;
+            if (treeGO == null)
+            {
+                treeGO = new GameObject(towerName);
+                Undo.RegisterCreatedObjectUndo(treeGO, "Generate Pool NomKabar Tree");
+                treeGO.transform.SetParent(poolRoot, false);
+            }
+
+            // The island top is flush with the rim, which is the pool's origin. Placed before the
+            // mesh is built, since the landscape noise it wears is read where it stands.
+            treeGO.transform.localPosition = Vector3.zero;
+            treeGO.transform.localRotation = Quaternion.Euler(0f, pool.nomKabarTreeTurn, 0f);
+            treeGO.transform.localScale    = Vector3.one;
+
+            var placedTree = PlacedNomKabarTree(pool.nomKabarTree, pool.towerScale);
+            var built      = placedTree.Build();
+            ApplyLandscapeNoise(built, treeGO.transform.localToWorldMatrix);
+            var treeMesh = SaveGeneratedMesh(towerName, built);
+            if (treeMesh == null) return;
+            SetTurretPiece(treeGO, treeMesh, NomKabarTreeMaterial());
+
+            // She lands on top of the highest TreeNodeEnd.
+            ApplyPerch(treeGO, pool.towerPerch, NomKabarTreePerchTip(placedTree));
+            ApplyOcclusion(treeGO, pool.occlusion, pool.occlusionStyle);
+            AssetDatabase.SaveAssets();
+            return;
+        }
 
         if (isSouls)
         {
-            var built = PlaceSoulsPoolTower(poolRoot, towerName, pool.nodeId, pool.soulsPool.Scaled(pool.towerScale),
-                                            _data.ProfileFor(_data.PoolRiverName(pool)), existing?.gameObject);
+            var built = PlaceSoulJuiceTank(poolRoot, towerName, pool.nodeId, pool.soulJuiceTank.Scaled(pool.towerScale),
+                                           existing?.gameObject);
             if (built == null) return;
 
             // The island top is flush with the rim, which is the pool's origin.
@@ -674,8 +985,13 @@ public partial class LevelSelectDesignerWindow
             built.transform.localRotation = Quaternion.identity;
             built.transform.localScale    = Vector3.one;
 
-            AddSoulsPoolRelease(built, record.islandRadius,
+            // Its hub's ring turns to face where the tank now stands, then the intake is laid to it.
+            if (FindPipeHub(pool.tankHubId, out var linked, out _)) BuildPipeIfGenerated(linked);
+            RebuildTankIntake(pool);
+
+            AddSoulJuiceTankRelease(built, record.islandRadius,
                                 HasTowerCinematic(pool) ? pool.towerCinematicPreset : null);
+            ApplyOcclusion(built, pool.occlusion, pool.occlusionStyle);
 
             AssetDatabase.SaveAssets();
             return;
@@ -693,6 +1009,7 @@ public partial class LevelSelectDesignerWindow
             built.transform.localScale    = Vector3.one;
 
             ApplyPerch(built, pool.towerPerch, Vector3.up * turret.TopY);
+            ApplyOcclusion(built, pool.occlusion, pool.occlusionStyle);
             AssetDatabase.SaveAssets();
             return;
         }
@@ -731,6 +1048,7 @@ public partial class LevelSelectDesignerWindow
         // A tower in the middle of an island is about the most inviting thing on the map to land
         // on, so it carries its own perch block. The tip is the top of the orb.
         ApplyPerch(go, pool.towerPerch, Vector3.up * placed.TopY);
+        ApplyOcclusion(go, pool.occlusion, pool.occlusionStyle);
 
         AssetDatabase.SaveAssets();
     }
@@ -742,6 +1060,89 @@ public partial class LevelSelectDesignerWindow
 
     private static string PoolTowerMeshName(LevelSelectDesignerData.DesignerPool pool)
         => $"PoolTower_{SanitiseAssetName(pool.nodeId)}";
+
+    // ─────────────────────────────────────────────
+    // ARENA CENTRE TOWER
+    // ─────────────────────────────────────────────
+
+    private const string ArenaCentreTowerChild = "CentreTower";
+
+    /// <summary>The Centre Tower toggle and sizes for the selected arena, under its Wall.</summary>
+    private void DrawArenaCentreTowerFields(LevelSelectDesignerData.DesignerArena arena)
+    {
+        EditorGUI.BeginChangeCheck();
+        bool hasTower = EditorGUILayout.Toggle(
+            new GUIContent("Centre Tower", "Stand a lollipop tower in the middle of the arena, its base on the water."),
+            arena.hasCentreTower);
+
+        LollipopTower tower = arena.centreTower;
+        float         scale = arena.centreTowerScale;
+        if (hasTower)
+        {
+            DrawLollipopPresetRow(arena.centreTowerPreset, arena.centreTower,
+                                  p => arena.centreTowerPreset = p, t => arena.centreTower = t);
+            tower = arena.centreTower;   // read back: picking a preset just loaded it
+            scale = DrawLollipopScaleField(arena.centreTowerScale);
+        }
+
+        if (!EditorGUI.EndChangeCheck()) return;
+
+        Undo.RecordObject(_data, "Edit Arena Centre Tower");
+        arena.hasCentreTower   = hasTower;
+        arena.centreTower      = tower;
+        arena.centreTowerScale = scale;
+        MarkDirty();
+        RebuildAfterTowerEdit(arena, () => RebuildArenaCentreTower(arena));
+    }
+
+    /// <summary>
+    /// Builds, rebuilds or clears one arena's centre tower, as a child of its generated wall. The
+    /// wall's origin is the arena centre on the water surface, so that is where the tower's base
+    /// stands. Does nothing when the wall has not been generated.
+    /// </summary>
+    private void RebuildArenaCentreTower(LevelSelectDesignerData.DesignerArena arena)
+    {
+        if (arena == null || string.IsNullOrEmpty(arena.nodeId)) return;
+
+        var wall = FindObjectsOfType<LevelSelectArenaWallMesh>().FirstOrDefault(w => w.nodeId == arena.nodeId);
+        if (wall == null) return;
+
+        Transform existing = wall.transform.Find(ArenaCentreTowerChild);
+        if (!arena.hasCentreTower || arena.centreTower == null)
+        {
+            if (existing != null) Undo.DestroyObjectImmediate(existing.gameObject);
+            return;
+        }
+
+        // Standing on the water, the rivers' rim top — what the waterline shading is placed off —
+        // is the water's depth above its base.
+        var placed = arena.centreTower.Scaled(arena.centreTowerScale);
+        var mesh   = SaveGeneratedMesh(ArenaCentreTowerMeshName(arena),
+                                       placed.Build(StoneShadingForBuild, BoatSplineDrop));
+        if (mesh == null) return;
+
+        GameObject go;
+        if (existing != null)
+        {
+            go = existing.gameObject;
+        }
+        else
+        {
+            go = new GameObject(ArenaCentreTowerChild);
+            Undo.RegisterCreatedObjectUndo(go, "Generate Arena Centre Tower");
+            go.transform.SetParent(wall.transform, false);
+        }
+
+        go.transform.localPosition = Vector3.zero;
+        go.transform.localRotation = Quaternion.identity;
+        go.transform.localScale    = Vector3.one;
+        SetTurretPiece(go, mesh, _data.riverMaterial);
+
+        AssetDatabase.SaveAssets();
+    }
+
+    private static string ArenaCentreTowerMeshName(LevelSelectDesignerData.DesignerArena arena)
+        => $"ArenaCentreTower_{SanitiseAssetName(arena.nodeId)}";
 
     private const string TurretHeadChild = "Head";
     private const string TurretNoseChild = "Nose";
@@ -795,32 +1196,129 @@ public partial class LevelSelectDesignerWindow
         return go;
     }
 
-    private const string SoulsPoolBowlChild  = "Bowl";
-    private const string SoulsPoolWaterChild = "Water";
+    private const string SoulJuiceTankBowlChild  = "Bowl";
+    private const string SoulJuiceTankWaterChild = "Water";
+
+    private const string SoulJuiceTankIntakeChild = "Intake";
 
     /// <summary>
-    /// Builds a souls pool tower under <paramref name="parent"/>, base at its origin: the body
+    /// Builds a soul juice tank under <paramref name="parent"/>, base at its origin: the body
+    /// (lollipop, both hubs and the tap) on the root. The intake is an "Intake" child laid by
+    /// <see cref="RebuildTankIntake"/> once the root is placed, since it reaches out to a pipe.
+    /// The root carries a <see cref="SoulJuiceTankBowl"/> with no water, so the runtime knows
+    /// which pool the tank stands in.
+    ///
+    /// <paramref name="reuse"/>, when given, is one built before — its pieces are refilled. The
+    /// body mesh is saved as <paramref name="name"/>. The caller places the root.
+    /// </summary>
+    private GameObject PlaceSoulJuiceTank(Transform parent, string name, string poolNodeId, SoulJuiceTank placed,
+                                          GameObject reuse = null)
+    {
+        var bodyMesh = SaveGeneratedMesh(name, placed.BuildBody(StoneShadingForBuild));
+        if (bodyMesh == null) return null;
+
+        GameObject go = reuse;
+        if (go == null)
+        {
+            go = new GameObject(name);
+            Undo.RegisterCreatedObjectUndo(go, "Generate Soul Juice Tank");
+            go.transform.SetParent(parent, false);
+        }
+        SetTurretPiece(go, bodyMesh, _data.riverMaterial);
+
+        // Which pool the tank stands in, for the runtime to read. No bowl, so no water.
+        var marker = go.GetComponent<SoulJuiceTankBowl>();
+        if (marker == null) marker = Undo.AddComponent<SoulJuiceTankBowl>(go);
+        marker.poolNodeId  = poolNodeId;
+        marker.water       = null;
+        marker.waterRadius = 0f;
+        marker.innerRadius = 0f;
+        marker.basinDepth  = 0f;
+        marker.waterDrop   = 0f;
+        marker.emptyDrop   = 0f;
+        EditorUtility.SetDirty(marker);
+
+        return go;
+    }
+
+    /// <summary>
+    /// Lays, refills or clears a soul juice tank's intake: from its top hub up to the ring of the
+    /// pipe hub it is linked to. Needs both the tank and the pipe's hub; with no link, or a hub
+    /// that is gone, the intake is taken away. Built in the tank's own space, so it moves with it.
+    /// </summary>
+    private void RebuildTankIntake(LevelSelectDesignerData.DesignerPool pool)
+    {
+        if (pool == null) return;
+        var tank = FindGeneratedPoolTower(pool);
+        if (tank == null || tank.GetComponent<SoulJuiceTankBowl>() == null) return;
+
+        Transform existing = tank.Find(SoulJuiceTankIntakeChild);
+        PipeMesh.Hub hub = default;
+        bool wanted = pool.hasTower && pool.towerKind == LevelSelectDesignerData.TowerKind.SoulJuiceTank &&
+                      pool.soulJuiceTank != null &&
+                      FindPipeHub(pool.tankHubId, out var pipe, out int node) &&
+                      TryPipeHubWorld(pipe, node, out hub);
+        if (!wanted)
+        {
+            if (existing != null) Undo.DestroyObjectImmediate(existing.gameObject);
+            return;
+        }
+
+        var     placed = pool.soulJuiceTank.Scaled(pool.towerScale);
+        Vector3 face   = tank.InverseTransformPoint(hub.RingFace);
+        Vector3 dir    = tank.InverseTransformDirection(hub.ringDir);
+        var mesh = SaveGeneratedMesh(tank.name + "_Intake",
+                                     placed.BuildIntake(face, dir, hub.ringThickness, StoneShadingForBuild));
+        if (mesh == null) return;
+
+        Transform intake = TurretChild(tank, SoulJuiceTankIntakeChild);
+        intake.localPosition = Vector3.zero;
+        intake.localRotation = Quaternion.identity;
+        intake.localScale    = Vector3.one;
+        SetTurretPiece(intake.gameObject, mesh, _data.riverMaterial);
+    }
+
+    /// <summary>The intake of every soul juice tank linked to a hub, laid again.</summary>
+    private void RebuildTankIntakes()
+    {
+        foreach (var pool in _data.pools)
+            if (pool != null && !string.IsNullOrEmpty(pool.tankHubId)) RebuildTankIntake(pool);
+    }
+
+    /// <summary>The generated tower standing on <paramref name="pool"/>'s island, or null.</summary>
+    private Transform FindGeneratedPoolTower(LevelSelectDesignerData.DesignerPool pool)
+    {
+        string poolName = PoolMeshName(pool);
+        var record = FindObjectsOfType<RiverPoolMesh>().FirstOrDefault(r => r.meshAssetName == poolName);
+        if (record == null) return null;
+        Transform poolRoot = record.transform.parent != null ? record.transform.parent : record.transform;
+        return poolRoot.Find(PoolTowerMeshName(pool));
+    }
+
+    /// <summary>
+    /// Builds a soul fish bowl under <paramref name="parent"/>, base at its origin: the body
     /// (base tiers and column) on the root, a "Bowl" child carrying the bowl, and a "Water" child
     /// of the bowl at the bowl's water surface. The water is a pool's own water, built by the same
-    /// builder as a bowl with no island and no rivers, so it looks and moves like the rest and the
-    /// souls stamped on it draw the way they do on the river. It sits the tower's own Water Drop
-    /// below the bowl's rim — the world's Water Level is far deeper than any bowl.
+    /// builder as a bowl with no island and no rivers, so it looks and moves like the rest. It
+    /// sits the bowl's own Water Drop below its rim — the world's Water Level is far deeper than
+    /// any bowl. This was the soul juice tank until 2026-10-26; it starts no routes, so it has no
+    /// <see cref="SoulJuiceTankBowl"/> and nothing drains it yet.
     ///
     /// <paramref name="reuse"/>, when given, is one built before — its pieces are refilled. Meshes
     /// are saved as <paramref name="name"/>, name_Bowl and name_Water. The caller places the root.
     /// </summary>
-    private GameObject PlaceSoulsPoolTower(Transform parent, string name, string poolNodeId, SoulsPoolTower placed,
-                                           RiverProfile profile, GameObject reuse = null)
+    private GameObject PlaceSoulFishBowl(Transform parent, string name, SoulFishBowl placed,
+                                         RiverProfile profile, GameObject reuse = null)
     {
         var bodyMesh = SaveGeneratedMesh(name,           placed.BuildBody(StoneShadingForBuild));
-        var bowlMesh = SaveGeneratedMesh(name + "_Bowl", placed.BuildBowl(_data.WaterSurfaceDrop));
+        var bowlMesh = SaveGeneratedMesh(name + "_Bowl", placed.BuildBowl(_data.WaterSurfaceDrop, StoneShadingForBuild));
 
         // Fine enough to go round even a small bowl; the pool water's own grid is laid off this.
         float drop  = Mathf.Max(0f, placed.waterDrop);
         float inner = placed.InnerRadius;
         float edge  = Mathf.Min(MeshEdge, 2f * Mathf.PI * inner / 32f);
         var waterMesh = SaveGeneratedMesh(name + "_Water",
-            RiverMeshBuilder.BuildPoolWater(profile, drop, inner, 0f, edge, null, placed.BasinDepth, 0f));
+            RiverMeshBuilder.BuildPoolWater(profile, drop, inner, 0f, edge, null, placed.BasinDepth));
 
         if (bodyMesh == null || bowlMesh == null || waterMesh == null) return null;
 
@@ -828,37 +1326,25 @@ public partial class LevelSelectDesignerWindow
         if (go == null)
         {
             go = new GameObject(name);
-            Undo.RegisterCreatedObjectUndo(go, "Generate Souls Pool Tower");
+            Undo.RegisterCreatedObjectUndo(go, "Generate Soul Fish Bowl");
             go.transform.SetParent(parent, false);
         }
         SetTurretPiece(go, bodyMesh, _data.riverMaterial);
 
         // The bowl mesh is built in the tower's own space, so it sits at the root's origin.
-        Transform bowl = TurretChild(go.transform, SoulsPoolBowlChild);
+        Transform bowl = TurretChild(go.transform, SoulJuiceTankBowlChild);
         bowl.localPosition = Vector3.zero;
         bowl.localRotation = Quaternion.identity;
         bowl.localScale    = Vector3.one;
         SetTurretPiece(bowl.gameObject, bowlMesh, _data.riverMaterial);
 
         // The pool water builder works down from a rim at y = 0, so the water's origin is the rim.
-        Transform water = TurretChild(bowl, SoulsPoolWaterChild);
+        Transform water = TurretChild(bowl, SoulJuiceTankWaterChild);
         water.localPosition = Vector3.up * placed.RimTopY;
         water.localRotation = Quaternion.identity;
         water.localScale    = Vector3.one;
         SetTurretPiece(water.gameObject, waterMesh, _data.waterMaterial);
         SetWaterSorting(water.gameObject, PoolWaterSortingLayer, 0);
-
-        // Where the souls waiting in this tower swim, for the runtime to read.
-        var marker = go.GetComponent<SoulsPoolTowerBowl>();
-        if (marker == null) marker = Undo.AddComponent<SoulsPoolTowerBowl>(go);
-        marker.poolNodeId  = poolNodeId;
-        marker.water       = water;
-        marker.waterRadius = placed.WaterRadius;
-        marker.innerRadius = placed.InnerRadius;
-        marker.basinDepth  = placed.BasinDepth;
-        marker.waterDrop   = drop;
-        marker.emptyDrop   = Mathf.Max(drop, placed.EmptyDrop);
-        EditorUtility.SetDirty(marker);
 
         // Deliberately not made sampleable: the boat reads the water under it by raycast, and a
         // bowl held up over the island must never be taken for the river.
@@ -866,25 +1352,25 @@ public partial class LevelSelectDesignerWindow
     }
 
     /// <summary>
-    /// Press E at the tower to let its souls out: an interact point and a
-    /// <see cref="SoulsPoolTowerRelease"/> beside it. Added once — the prompt and reach are only
+    /// Press E at the tank to release its soul juice: an interact point and a
+    /// <see cref="SoulJuiceTankRelease"/> beside it. Added once — the prompt and reach are only
     /// set when the point is first made, so anything tuned on the component survives Generate.
     /// The reach starts past the island's edge, since the boat can only get as near as the water.
     /// The pool's Cinematic, if any, is written onto the release every time.
     /// </summary>
-    private static void AddSoulsPoolRelease(GameObject tower, float islandRadius, CameraSequencePreset cinematic)
+    private static void AddSoulJuiceTankRelease(GameObject tower, float islandRadius, CameraSequencePreset cinematic)
     {
         var point = tower.GetComponent<LevelSelectInteractPoint>();
         if (point == null)
         {
             point = Undo.AddComponent<LevelSelectInteractPoint>(tower);
-            point.prompt = "Release the souls";
+            point.prompt = "Release the soul juice";
             point.radius = islandRadius + 3f;
             EditorUtility.SetDirty(point);
         }
 
-        var release = tower.GetComponent<SoulsPoolTowerRelease>();
-        if (release == null) release = Undo.AddComponent<SoulsPoolTowerRelease>(tower);
+        var release = tower.GetComponent<SoulJuiceTankRelease>();
+        if (release == null) release = Undo.AddComponent<SoulJuiceTankRelease>(tower);
         release.cinematic = cinematic;
         EditorUtility.SetDirty(release);
     }
@@ -942,20 +1428,57 @@ public partial class LevelSelectDesignerWindow
             var node = _data.nodes.Find(n => n.id == pool.nodeId);
             if (node == null) continue;
 
+            // The perch range washed underneath, the same as a spike's. A soul juice tank or fish bowl has no perch.
+            var perch = pool.towerPerch;
+            if (pool.towerKind != LevelSelectDesignerData.TowerKind.SoulJuiceTank &&
+                pool.towerKind != LevelSelectDesignerData.TowerKind.SoulFishBowl &&
+                perch != null && perch.enabled && perch.perchRadius > 0f &&
+                LevelSelectDesignerSettings.ShowPerchRadius)
+            {
+                Handles.color = new Color(1f, 0.93f, 0.55f, pool.nodeId == _selectedPoolNodeId ? 0.16f : 0.08f);
+                Handles.DrawSolidDisc(WorldToCanvas(node.worldPosition), Vector3.forward,
+                                      perch.perchRadius * PerchCanvasScale);
+            }
+
+            // A NomKabarTree is drawn as it is seen from above, the same as a freestanding one.
+            if (pool.towerKind == LevelSelectDesignerData.TowerKind.NomKabarTree)
+            {
+                DrawNomKabarTreeShape(node.worldPosition, PlacedNomKabarTree(pool.nomKabarTree, pool.towerScale),
+                                      pool.nomKabarTreeTurn, pool.nodeId == _selectedPoolNodeId);
+                continue;
+            }
+
             float orb = PoolTowerCanvasRadius(pool);
-            Handles.color = pool.nodeId == _selectedPoolNodeId ? Color.white : LevelSelectDesignerSettings.RiverColour(pool.editorColor);
+            Handles.color = Faded(pool.nodeId == _selectedPoolNodeId ? Color.white : LevelSelectDesignerSettings.RiverColour(pool.editorColor));
             Handles.DrawSolidDisc(WorldToCanvas(node.worldPosition), Vector3.forward,
                                   Mathf.Max(2f, orb * _zoom));
 
-            // A souls pool shows its water as a dark fill inside the bowl, so it reads apart from
+            // A soul fish bowl shows its water as a dark fill inside the bowl, so it reads apart from
             // the solid towers at a glance.
-            if (pool.towerKind == LevelSelectDesignerData.TowerKind.SoulsPool && pool.soulsPool != null)
+            if (pool.towerKind == LevelSelectDesignerData.TowerKind.SoulFishBowl && pool.soulFishBowl != null)
             {
-                var placed = pool.soulsPool.Scaled(pool.towerScale);
-                Handles.color = new Color(0.05f, 0.1f, 0.2f, 1f);
+                var placed = pool.soulFishBowl.Scaled(pool.towerScale);
+                Handles.color = Faded(new Color(0.05f, 0.1f, 0.2f, 1f));
                 Handles.DrawSolidDisc(WorldToCanvas(node.worldPosition), Vector3.forward,
                                       Mathf.Max(1f, placed.WaterRadius * _zoom));
             }
+        }
+    }
+
+    /// <summary>A solid dot the size of the orb in the middle of every arena with a centre tower.</summary>
+    private void DrawArenaCentreTowers()
+    {
+        if (Event.current.type != EventType.Repaint) return;
+
+        foreach (var arena in _data.arenas)
+        {
+            if (arena == null || !arena.hasCentreTower || arena.centreTower == null) continue;
+            if (_data.nodes.Find(n => n.id == arena.nodeId) == null) continue;
+
+            float orb = arena.centreTower.Scaled(arena.centreTowerScale).orbRadius;
+            Handles.color = Faded(arena.nodeId == _selectedArenaNodeId ? Color.white : new Color(0.28f, 0.27f, 0.25f, 1f));
+            Handles.DrawSolidDisc(WorldToCanvas(GetTrueArenaCenter(arena)), Vector3.forward,
+                                  Mathf.Max(2f, orb * _zoom));
         }
     }
 }

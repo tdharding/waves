@@ -107,11 +107,58 @@ public class BrightnessGlowController : MonoBehaviour
              "(and nothing extra is drawn). Settable from code as AngelGlowOpacity for cinematics.")]
     [SerializeField, Range(0f, 1f)] float angelGlowOpacity = 0f;
 
-    [Tooltip("How far the glow reaches out from the angel, as a fraction of screen height.")]
+    [Tooltip("The angel the glow is sized against. With it set, the glow keeps the same size in the " +
+             "world — bigger as the camera comes in or zooms, smaller as it pulls away — using Size In " +
+             "World. Left empty, Angel Glow Size is used as a fixed fraction of screen height.")]
+    [SerializeField] Transform angelGlowTarget;
+
+    [Tooltip("How far the glow reaches out from the angel, in world units. Used while Angel Glow " +
+             "Target is set.")]
+    [SerializeField, Range(0f, 3f)] float angelGlowWorldSize = 0.3f;
+
+    [Tooltip("Camera distance from the angel where the glow starts to fade. Nearer than this it is at " +
+             "full Opacity. Used while Angel Glow Target is set.")]
+    [SerializeField, Min(0f)] float angelGlowFadeStart = 15f;
+
+    [Tooltip("Camera distance from the angel where the glow has faded out completely. Used while " +
+             "Angel Glow Target is set.")]
+    [SerializeField, Min(0f)] float angelGlowFadeEnd = 40f;
+
+    [Tooltip("How far the glow reaches out from the angel, as a fraction of screen height. Used while " +
+             "Angel Glow Target is empty.")]
     [SerializeField, Range(0f, 0.15f)] float angelGlowSize = 0.04f;
 
     [Tooltip("How bright and full the glow is. Higher keeps it solid further out before it fades.")]
     [SerializeField, Range(0f, 4f)] float angelGlowStrength = 1.5f;
+
+    [Header("Boat Glow")]
+    [Tooltip("Master fade for the outer glow around everything on the Boat Glow rendering layer. 0 = " +
+             "off (and nothing extra is drawn). Settable from code as BoatGlowOpacity for cinematics.")]
+    [SerializeField, Range(0f, 1f)] float boatGlowOpacity = 0f;
+
+    [Tooltip("The boat the glow is sized against. With it set, the glow keeps the same size in the " +
+             "world — bigger as the camera comes in or zooms, smaller as it pulls away — using Size In " +
+             "World. Left empty, Boat Glow Size is used as a fixed fraction of screen height.")]
+    [SerializeField] Transform boatGlowTarget;
+
+    [Tooltip("How far the glow reaches out from the boat, in world units. Used while Boat Glow " +
+             "Target is set.")]
+    [SerializeField, Range(0f, 3f)] float boatGlowWorldSize = 0.3f;
+
+    [Tooltip("Camera distance from the boat where the glow starts to fade. Nearer than this it is at " +
+             "full Opacity. Used while Boat Glow Target is set.")]
+    [SerializeField, Min(0f)] float boatGlowFadeStart = 15f;
+
+    [Tooltip("Camera distance from the boat where the glow has faded out completely. Used while " +
+             "Boat Glow Target is set.")]
+    [SerializeField, Min(0f)] float boatGlowFadeEnd = 40f;
+
+    [Tooltip("How far the glow reaches out from the boat, as a fraction of screen height. Used while " +
+             "Boat Glow Target is empty.")]
+    [SerializeField, Range(0f, 0.15f)] float boatGlowSize = 0.04f;
+
+    [Tooltip("How bright and full the glow is. Higher keeps it solid further out before it fades.")]
+    [SerializeField, Range(0f, 4f)] float boatGlowStrength = 1.5f;
 
     // Triggered glow (fish catch, events etc.)
     class TriggerEntry
@@ -143,6 +190,9 @@ public class BrightnessGlowController : MonoBehaviour
     static readonly int AngelGlowOpacityPID    = Shader.PropertyToID("_AngelGlowOpacity");
     static readonly int AngelGlowSizePID       = Shader.PropertyToID("_AngelGlowSize");
     static readonly int AngelGlowStrengthPID   = Shader.PropertyToID("_AngelGlowStrength");
+    static readonly int BoatGlowOpacityPID     = Shader.PropertyToID("_BoatGlowOpacity");
+    static readonly int BoatGlowSizePID        = Shader.PropertyToID("_BoatGlowSize");
+    static readonly int BoatGlowStrengthPID    = Shader.PropertyToID("_BoatGlowStrength");
 
     readonly Vector4[] pointBuffer = new Vector4[MAX_POINTS];   // xy = uv, z = radius, w = softness
     readonly Vector4[] paramBuffer = new Vector4[MAX_POINTS];   // x  = per-point opacity
@@ -173,6 +223,13 @@ public class BrightnessGlowController : MonoBehaviour
     {
         get => instance != null ? instance.angelGlowOpacity : 0f;
         set { if (instance != null) instance.angelGlowOpacity = Mathf.Clamp01(value); }
+    }
+
+    /// <summary>Boat glow fade, 0-1. Settable from code for cinematics; mirrors the inspector slider.</summary>
+    public static float BoatGlowOpacity
+    {
+        get => instance != null ? instance.boatGlowOpacity : 0f;
+        set { if (instance != null) instance.boatGlowOpacity = Mathf.Clamp01(value); }
     }
 
     // Domain-reload-safe: statics survive play-mode exit when "Reload Domain" is off.
@@ -394,9 +451,19 @@ public class BrightnessGlowController : MonoBehaviour
         Shader.SetGlobalVectorArray(GlowPointParamsPID, paramBuffer);
         Shader.SetGlobalFloat(GlowPointCountPID, count);
         Shader.SetGlobalFloat(GlowOpacityPID, opacity);
-        Shader.SetGlobalFloat(AngelGlowOpacityPID, angelGlowOpacity);
-        Shader.SetGlobalFloat(AngelGlowSizePID, angelGlowSize);
+        float glowSize    = OuterGlowScreenSize(cam, angelGlowTarget, angelGlowWorldSize, angelGlowSize);
+        float glowOpacity = angelGlowOpacity *
+                            OuterGlowDistanceFade(cam, angelGlowTarget, angelGlowFadeStart, angelGlowFadeEnd);
+        Shader.SetGlobalFloat(AngelGlowOpacityPID, glowOpacity);
+        Shader.SetGlobalFloat(AngelGlowSizePID, glowSize);
         Shader.SetGlobalFloat(AngelGlowStrengthPID, angelGlowStrength);
+
+        float boatSize    = OuterGlowScreenSize(cam, boatGlowTarget, boatGlowWorldSize, boatGlowSize);
+        float boatOpacity = boatGlowOpacity *
+                            OuterGlowDistanceFade(cam, boatGlowTarget, boatGlowFadeStart, boatGlowFadeEnd);
+        Shader.SetGlobalFloat(BoatGlowOpacityPID, boatOpacity);
+        Shader.SetGlobalFloat(BoatGlowSizePID, boatSize);
+        Shader.SetGlobalFloat(BoatGlowStrengthPID, boatGlowStrength);
 
         if (logThisFrame)
             Debug.Log($"[Glow] pushed _GlowPointCount {count}, _GlowOpacity {opacity:0.00}, " +
@@ -410,10 +477,49 @@ public class BrightnessGlowController : MonoBehaviour
             glowMaterial.SetFloat(BrightnessIntensityPID, brightnessIntensity);
             // Bare $Globals uniform: dual-write so a material-scoped read sees the same value.
             glowMaterial.SetFloat(GlowOpacityPID, opacity);
-            glowMaterial.SetFloat(AngelGlowOpacityPID, angelGlowOpacity);
-            glowMaterial.SetFloat(AngelGlowSizePID, angelGlowSize);
+            glowMaterial.SetFloat(AngelGlowOpacityPID, glowOpacity);
+            glowMaterial.SetFloat(AngelGlowSizePID, glowSize);
             glowMaterial.SetFloat(AngelGlowStrengthPID, angelGlowStrength);
+            glowMaterial.SetFloat(BoatGlowOpacityPID, boatOpacity);
+            glowMaterial.SetFloat(BoatGlowSizePID, boatSize);
+            glowMaterial.SetFloat(BoatGlowStrengthPID, boatGlowStrength);
         }
+    }
+
+    // Past this the 32-tap blur spreads too thin and turns to grain, so a camera right up against
+    // the angel or boat holds the glow here rather than letting it fill the screen.
+    const float MaxOuterGlowScreenSize = 0.3f;
+
+    // The shader wants the glow's reach as a fraction of screen height. With a target, that is the
+    // world size seen at the target's depth through this camera, so FOV zooms count as well as moves.
+    static float OuterGlowScreenSize(Camera cam, Transform target, float worldSize, float fixedSize)
+    {
+        if (target == null) return fixedSize;
+
+        float viewHeight;
+        if (cam.orthographic)
+            viewHeight = 2f * cam.orthographicSize;
+        else
+        {
+            float depth = Vector3.Dot(target.position - cam.transform.position, cam.transform.forward);
+            depth = Mathf.Max(depth, cam.nearClipPlane);
+            viewHeight = 2f * depth * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
+        }
+
+        return viewHeight > 0.0001f
+             ? Mathf.Min(worldSize / viewHeight, MaxOuterGlowScreenSize)
+             : fixedSize;
+    }
+
+    // Full strength up to Fade Start, nothing by Fade End. Fading to 0 also lets the renderer feature
+    // skip drawing the silhouette, so a far-off angel or boat costs nothing.
+    static float OuterGlowDistanceFade(Camera cam, Transform target, float fadeStart, float fadeEnd)
+    {
+        if (target == null) return 1f;
+
+        float dist = Vector3.Distance(cam.transform.position, target.position);
+        if (fadeEnd <= fadeStart) return dist <= fadeStart ? 1f : 0f;
+        return 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(fadeStart, fadeEnd, dist));
     }
 
     void TryAddPoint(Camera cam, GlowPoint p, ref int count)
@@ -600,6 +706,11 @@ public class BrightnessGlowController : MonoBehaviour
         Shader.SetGlobalFloat(GlowPointCountPID, 0f);
         Shader.SetGlobalFloat(GlowOpacityPID, 0f);
         Shader.SetGlobalFloat(AngelGlowOpacityPID, 0f);
-        if (glowMaterial != null) glowMaterial.SetFloat(AngelGlowOpacityPID, 0f);
+        Shader.SetGlobalFloat(BoatGlowOpacityPID, 0f);
+        if (glowMaterial != null)
+        {
+            glowMaterial.SetFloat(AngelGlowOpacityPID, 0f);
+            glowMaterial.SetFloat(BoatGlowOpacityPID, 0f);
+        }
     }
 }

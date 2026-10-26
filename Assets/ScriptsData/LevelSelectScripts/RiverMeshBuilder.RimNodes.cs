@@ -55,6 +55,9 @@ public static partial class RiverMeshBuilder
         public float   plinthHeight;   // how far the plinth's top stands above the platform's
         public bool    slanted;        // square ends, the river-side one a leaning face; no plinth
         public float   lean;           // how far that face leans out for each unit it drops
+        public float   screenSize;     // the width of the screen set into the river-side wall; 0 for none
+        public float   screenHeight;   // and its height
+        public float   waterDrop;      // how far the water stands below the rim — the screen stays above it
     }
 
     /// <summary>
@@ -108,6 +111,7 @@ public static partial class RiverMeshBuilder
     private const int RimWallPart   = 1;
     private const int RimBuriedPart = 2;
     private const int RimPlinthPart = 3;
+    private const int RimScreenPart = 4;   // the sides of a screen's opening, so it is outlined
 
     /// <summary>
     /// One platform, placed on the run: the middle of the rim it is centred on, the way its width
@@ -131,6 +135,19 @@ public static partial class RiverMeshBuilder
         public float   lean;
         public float   nearPush;   // how much further out the river-side end is — for the banks,
                                    // which trace a slanted face where the water meets it
+        public float   screenSize;     // width
+        public float   screenHeight;
+        public float   waterDrop;
+        public bool    levelTop;       // a slanted one with a screen: its top level at topY, not
+        public float   topY;           // tipping with the river, so it runs with the screen's top
+        public float   topRise;        // the most its top stands over the rim beneath it
+
+        /// <summary>The top's height over a point of the rim <paramref name="rimY"/> high.</summary>
+        public float TopOver(float rimY) => levelTop ? topY : rimY + height;
+
+        /// <summary>The run's section where it stands — its own channel width, when a width
+        /// override changes it along the run.</summary>
+        public RiverProfile profile;
 
         /// <summary>
         /// A slanted shape's two ends, across the rim: the far one out past the run's outer edge,
@@ -172,9 +189,10 @@ public static partial class RiverMeshBuilder
     /// </summary>
     public static Mesh BuildRimNodes(
         RiverProfile profile, IList<Vector3> centres, IList<Vector3> forwards,
-        IList<RimNode> rims, float edge)
+        IList<RimNode> rims, float edge, RiverRunShadingSettings shading = null)
     {
-        var b = new MeshBuild();
+        var kinds = RimKinds.From(shading);
+        var b = new MeshBuild { NextDesignation = StoneDesignation.RimNodes };
         if (profile == null || centres == null || forwards == null || centres.Count < 2 ||
             rims == null || rims.Count == 0)
             return b.ToMesh("RiverRimNodes");
@@ -185,16 +203,44 @@ public static partial class RiverMeshBuilder
 
         foreach (var shape in ResolveRimShapes(profile, rims, grid, false))
         {
-            if (shape.slanted) { BuildSlantedPlatform(b, profile, grid, shape, edge); continue; }
+            b.NextLabel = "Rim Node";
+            if (shape.slanted) { BuildSlantedPlatform(b, shape.profile, grid, shape, edge, kinds); continue; }
 
-            BuildPlatform(b, profile, grid, shape, edge);
-            BuildPlinth(b, profile, grid, shape, edge);
+            BuildPlatform(b, shape.profile, grid, shape, edge, kinds);
+            b.NextLabel = "Plinth";
+            BuildPlinth(b, shape.profile, grid, shape, edge, kinds);
         }
+        b.NextLabel = null;
 
         // Measured off the run's own rim line, so the top reads as rim and the walls as what
         // they stand beside.
         b.ShadeSeams(grid.centre, profile.jointGroove);
         return b.ToMesh("RiverRimNodes");
+    }
+
+    /// <summary>
+    /// The stone each part of a rim node takes, from the Run Shading Tuner's Rim Nodes section —
+    /// as kinds ready to bake. A part left on Auto is 0, worked out the way a run's own faces are,
+    /// so it follows the River Runs choices live. Wall dropping into the channel is the channel,
+    /// whatever these say.
+    /// </summary>
+    private struct RimKinds
+    {
+        public float top, sides, screen, plinthTop, plinthSides;
+
+        public static RimKinds From(RiverRunShadingSettings shading)
+        {
+            float Kind(StoneFaceKind k) => k == StoneFaceKind.Auto ? 0f : (float)k;
+            if (shading == null) return default;
+            return new RimKinds
+            {
+                top         = Kind(shading.rimNodeTop),
+                sides       = Kind(shading.rimNodeSides),
+                screen      = Kind(shading.rimNodeScreenEdges),
+                plinthTop   = Kind(shading.rimNodePlinthTop),
+                plinthSides = Kind(shading.rimNodePlinthSides),
+            };
+        }
     }
 
     /// <summary>The spot on a rim node anything stands on, and the flat way from there into the river.</summary>
@@ -233,11 +279,57 @@ public static partial class RiverMeshBuilder
             tops.Add(new RimNodeTop
             {
                 index   = shape.index,
-                top     = new Vector3(at.x, c.y + lift, at.z),
+                top     = new Vector3(at.x, shape.levelTop ? shape.topY : c.y + lift, at.z),
                 toRiver = -shape.axis,
             });
         }
         return tops;
+    }
+
+    /// <summary>A screen set into a rim node's river-side wall: its middle, the way it faces, its size.</summary>
+    public struct RimNodeScreen
+    {
+        public int     index;    // which of the rims handed in it is
+        public Vector3 centre;
+        public Vector3 facing;   // out into the river, square to the screen — tipped up on a slanted face
+        public float   width;
+        public float   height;
+    }
+
+    /// <summary>
+    /// The screen of every rim node <see cref="BuildRimNodes"/> cuts one into, from the same run
+    /// and rims, in the run's own local space — exactly the back of the opening it leaves.
+    /// </summary>
+    public static List<RimNodeScreen> RimNodeScreens(
+        RiverProfile profile, IList<Vector3> centres, IList<Vector3> forwards,
+        IList<RimNode> rims, float edge)
+    {
+        var screens = new List<RimNodeScreen>();
+        if (profile == null || centres == null || forwards == null || centres.Count < 2 ||
+            rims == null || rims.Count == 0)
+            return screens;
+
+        var grid = new RunGrid(profile, centres, forwards, Mathf.Max(edge, 0.005f));
+        if (grid.Rings < 2) return screens;
+
+        foreach (var shape in ResolveRimShapes(profile, rims, grid, true))
+        {
+            if (!SolveRimScreen(shape.profile, grid, shape, edge, out var cut)) continue;
+
+            // Halfway down, a leaning screen stands out by half its lean; its height is measured
+            // up the lean.
+            float   tall = cut.yTop - cut.yBot;
+            Vector3 mid  = cut.centre - shape.axis * (cut.lean * tall * 0.5f);
+            screens.Add(new RimNodeScreen
+            {
+                index  = shape.index,
+                centre = new Vector3(mid.x, 0.5f * (cut.yBot + cut.yTop), mid.z),
+                facing = (-shape.axis + Vector3.up * cut.lean).normalized,
+                width  = 2f * cut.half,
+                height = tall * Mathf.Sqrt(1f + cut.lean * cut.lean),
+            });
+        }
+        return screens;
     }
 
     /// <summary>
@@ -252,15 +344,17 @@ public static partial class RiverMeshBuilder
         var shapes = new List<RimShape>();
         if (profile == null || rims == null || rims.Count == 0 || grid.Rings < 2) return shapes;
 
-        float across = profile.innerWidth * 0.5f + profile.rimWidth * 0.5f;
-        float minR   = RimNodeMinRadius(profile);
-        float maxR   = RimNodeMaxRadius(profile);
-
         for (int i = 0; i < rims.Count; i++)
         {
             var rim = rims[i];
             if (rim.side == 0) continue;
             int side = rim.side > 0 ? 1 : -1;
+
+            // The section as it stands at this node, which a width override may have moved.
+            var   local  = grid.ProfileAtArc(ArcOnCentreline(grid, rim.at));
+            float across = local.innerWidth * 0.5f + local.rimWidth * 0.5f;
+            float minR   = RimNodeMinRadius(local);
+            float maxR   = RimNodeMaxRadius(local);
 
             OnCentreline(grid, rim.at, out Vector3 c, out Vector3 r);
             Vector3 axis = r * side;
@@ -282,7 +376,31 @@ public static partial class RiverMeshBuilder
                 index        = i,
                 slanted      = rim.slanted,
                 lean         = Mathf.Max(rim.lean, 0f),
+                screenSize   = Mathf.Max(rim.screenSize, 0f),
+                screenHeight = Mathf.Max(rim.screenHeight, 0f),
+                waterDrop    = Mathf.Max(rim.waterDrop, 0f),
+                profile      = local,
             };
+            shape.topRise = shape.height;
+
+            // A slanted one with a screen stands its top level, at its height over the highest of
+            // the rim beneath it — so where the river falls away, the top runs with the screen's
+            // top rather than tipping with the river.
+            if (shape.slanted && shape.screenSize > 0f && shape.screenHeight > 0f)
+            {
+                float hiRim = float.MinValue, loRim = float.MaxValue;
+                foreach (float u in new[] { shape.FarU(radius), 0f, shape.NearU(radius) })
+                foreach (float v in new[] { -radius, 0f, radius })
+                {
+                    Vector3 p = shape.centre + axis * u + shape.along * v;
+                    SideOfRun(grid, p, out float y, out _);
+                    hiRim = Mathf.Max(hiRim, y);
+                    loRim = Mathf.Min(loRim, y);
+                }
+                shape.levelTop = true;
+                shape.topY     = hiRim + shape.height;
+                shape.topRise  = shape.topY - loRim;
+            }
 
             if (ReachesRunEnd(grid, shape))
             {
@@ -309,13 +427,13 @@ public static partial class RiverMeshBuilder
         {
             far  = shape.centre + shape.axis * shape.FarU(shape.radius);
             near = shape.centre + shape.axis * (shape.NearU(shape.radius) -
-                   shape.lean * (shape.height + grid.profile.riverDepth));
+                   shape.lean * (shape.topRise + grid.profile.riverDepth));
         }
 
         foreach (int j in new[] { 0, grid.Rings - 1 })
         {
-            Vector3 a = grid.centre[j] - grid.right[j] * halfOuter;
-            Vector3 b = grid.centre[j] + grid.right[j] * halfOuter;
+            Vector3 a = grid.Line(j, -halfOuter);
+            Vector3 b = grid.Line(j,  halfOuter);
             if (FlatSegmentsDistance(near, far, a, b) < shape.radius) return true;
         }
         return false;
@@ -331,14 +449,30 @@ public static partial class RiverMeshBuilder
     /// outer wall.
     /// </summary>
     private static void BuildPlatform(MeshBuild b, RiverProfile profile, RunGrid grid,
-                                      RimShape shape, float edge)
+                                      RimShape shape, float edge, RimKinds kinds)
     {
         float halfInner = profile.innerWidth * 0.5f;
         float halfOuter = profile.OuterWidth * 0.5f;
 
-        var walk = PlatformOutline(grid, shape, edge, halfInner, halfOuter, out var outerBreaks);
+        // The screen's two upright edges, where the near cap's wall is that far either side of
+        // the point facing straight into the river (q = 2.5) — carried on the walk exactly.
+        bool  hasScreen = SolveRimScreen(profile, grid, shape, edge, out var screen);
+        float qOpen = 0f, qShut = 0f;
+        if (hasScreen)
+        {
+            float s = Mathf.Asin(screen.half / shape.radius) / Mathf.PI;
+            qOpen = 2.5f - s;                                  // along +half
+            qShut = 2.5f + s;                                  // along -half
+        }
+
+        var walk = PlatformOutline(grid, shape, edge, halfInner, halfOuter, out var outerBreaks,
+                                   hasScreen ? new[] { qOpen, qShut } : null);
         int n    = walk.Count;
         if (n < 3) return;
+
+        int kOpen = hasScreen ? walk.IndexOf(qOpen) : -1;
+        int kShut = hasScreen ? walk.IndexOf(qShut) : -1;
+        hasScreen = kOpen >= 0 && kShut > kOpen;
 
         var top    = new Vector3[n];
         var meet   = new Vector3[n];
@@ -371,8 +505,27 @@ public static partial class RiverMeshBuilder
                 // which the run buries. Down into the channel the showing part is the inside of
                 // the river; above the rim it is the step up to the top.
                 b.NextPart = RimWallPart;
-                b.NextKind = midA < halfInner ? RunPart(FaceInner) : 0f;
-                FacingQuad(b, meet[k], meet[k2], top[k2], top[k], outward);
+                b.NextKind = midA < halfInner ? RunPart(FaceInner) : kinds.sides;
+                if (hasScreen && k >= kOpen && k < kShut)
+                {
+                    // Across the screen: the wall below it and above it, and the sill and header
+                    // running back to it — with the side walls at either end of the opening.
+                    Vector3 lo1 = AtHeight(meet[k], screen.yBot), lo2 = AtHeight(meet[k2], screen.yBot);
+                    Vector3 hi1 = AtHeight(meet[k], screen.yTop), hi2 = AtHeight(meet[k2], screen.yTop);
+                    FacingQuad(b, meet[k], meet[k2], lo2, lo1, outward);
+                    FacingQuad(b, hi1, hi2, top[k2], top[k], outward);
+
+                    b.NextPart = RimScreenPart;
+                    if (kinds.screen != 0f) b.NextKind = kinds.screen;
+                    ScreenReveal(b, screen, shape.axis, lo1, lo2, Vector3.up);
+                    ScreenReveal(b, screen, shape.axis, hi1, hi2, Vector3.down);
+                    if (k  == kOpen) ScreenReveal(b, screen, shape.axis, lo1, hi1, -shape.along);
+                    if (k2 == kShut) ScreenReveal(b, screen, shape.axis, lo2, hi2,  shape.along);
+                }
+                else
+                {
+                    FacingQuad(b, meet[k], meet[k2], top[k2], top[k], outward);
+                }
 
                 b.NextPart = RimBuriedPart;
                 b.NextKind = 0f;
@@ -384,7 +537,7 @@ public static partial class RiverMeshBuilder
                 // crosses the run's outer edge, the wall carries the point it went into the run
                 // at, so the line it meets the run's outer wall along is an edge of the piece.
                 b.NextPart = RimWallPart;
-                b.NextKind = 0f;
+                b.NextKind = kinds.sides;
 
                 var poly = new List<Vector3> { top[k], top[k2] };
                 if (outerBreaks.Contains(k2)) poly.Add(meet[k2]);
@@ -396,10 +549,11 @@ public static partial class RiverMeshBuilder
         }
 
         // The top, and the bottom it stands on at the drop.
-        b.NextKind = 0f;
+        b.NextKind = kinds.top;
         b.NextPart = RimTopPart;
         FillFlat(b, grid, shape, walk, top, edge, shape.height, Vector3.up);
 
+        b.NextKind = 0f;
         b.NextPart = RimBuriedPart;
         FillFlat(b, grid, shape, walk, bottom, edge, -profile.depth, Vector3.down);
 
@@ -423,7 +577,7 @@ public static partial class RiverMeshBuilder
     /// outer edge, as the round one's walk does, for the same reasons.
     /// </summary>
     private static void BuildSlantedPlatform(MeshBuild b, RiverProfile profile, RunGrid grid,
-                                             RimShape shape, float edge)
+                                             RimShape shape, float edge, RimKinds kinds)
     {
         float halfInner = profile.innerWidth * 0.5f;
         float halfOuter = profile.OuterWidth * 0.5f;
@@ -446,10 +600,25 @@ public static partial class RiverMeshBuilder
             return y - SectionCut(profile, Mathf.Min(Mathf.Abs(a), halfOuter));
         }
 
-        // Rows, evenly across the width.
-        int nv = Mathf.Max(2, Mathf.CeilToInt(2f * r / step));
-        var vs = new float[nv + 1];
-        for (int j = 0; j <= nv; j++) vs[j] = -r + 2f * r * j / nv;
+        // Rows, evenly across the width — plus a screen's two upright edges, exactly.
+        bool hasScreen = SolveRimScreen(profile, grid, shape, edge, out var screen);
+
+        int nEven = Mathf.Max(2, Mathf.CeilToInt(2f * r / step));
+        var vList = new List<float>(nEven + 3);
+        for (int j = 0; j <= nEven; j++) vList.Add(-r + 2f * r * j / nEven);
+        if (hasScreen)
+        {
+            float rowGap = 2f * r / nEven;
+            vList.RemoveAll(v => Mathf.Abs(v) < r &&
+                                 Mathf.Abs(Mathf.Abs(v) - screen.half) < rowGap * 0.3f);
+            vList.Add(-screen.half);
+            vList.Add( screen.half);
+            vList.Sort();
+        }
+        var vs    = vList.ToArray();
+        int nv    = vs.Length - 1;
+        int jOpen = hasScreen ? vList.IndexOf(-screen.half) : -1;
+        int jShut = hasScreen ? vList.IndexOf( screen.half) : -1;
 
         // Columns down the top, far end to the top of the face: an even spread plus where either
         // side crosses the channel's edge or the outer edge.
@@ -493,7 +662,6 @@ public static partial class RiverMeshBuilder
         // Down the face, per row: how far it drops before it goes into the channel. A march
         // finds the first place it does, then halving pins it down.
         float lean = shape.lean;
-        float dMax = shape.height + profile.riverDepth + 0.001f;
         var   yTop = new float[nv + 1];
         var   dIn  = new float[nv + 1];
         float longest = 0f;
@@ -501,28 +669,50 @@ public static partial class RiverMeshBuilder
         for (int j = 0; j <= nv; j++)
         {
             SideOfRun(grid, Flat(uN, vs[j]), out float rimY, out _);
-            yTop[j] = rimY + shape.height;
-
-            float Gap(float d) => yTop[j] - d - ChannelY(Flat(uN - lean * d, vs[j]));
-
-            float lo = 0f, hi = dMax, dStep = step * 0.5f;
-            for (float d = dStep; d < dMax + dStep; d += dStep)
-            {
-                float dd = Mathf.Min(d, dMax);
-                if (Gap(dd) <= 0f) { hi = dd; break; }
-                lo = dd;
-            }
-            for (int it = 0; it < 30; it++)
-            {
-                float m = 0.5f * (lo + hi);
-                if (Gap(m) > 0f) lo = m; else hi = m;
-            }
-            dIn[j]  = 0.5f * (lo + hi);
+            yTop[j] = shape.TopOver(rimY);
+            dIn[j]  = SlantedFaceDrop(profile, grid, shape, vs[j], yTop[j], step);
             longest = Mathf.Max(longest, dIn[j] * Mathf.Sqrt(1f + lean * lean));
         }
 
+        // Down the face: one even run of columns — or, with a screen, three, so two columns stand
+        // at exactly the screen's top and bottom on every row. Off the screen's own rows they are
+        // held inside the face, where they are only more columns.
         int kFace = Mathf.Max(2, Mathf.CeilToInt(longest / step));
+        int kAbove = 0, kAcross = 0, kBelow = 0;
+        var dOpen = new float[nv + 1];
+        var dShut = new float[nv + 1];
+        if (hasScreen)
+        {
+            float slope = Mathf.Sqrt(1f + lean * lean);
+            float aMax = 0f, bMax = 0f, cMax = 0f;
+            for (int j = 0; j <= nv; j++)
+            {
+                const float Hair = 1e-4f;
+                dOpen[j] = Mathf.Clamp(yTop[j] - screen.yTop, Hair, Mathf.Max(Hair, dIn[j] - 2f * Hair));
+                dShut[j] = Mathf.Clamp(yTop[j] - screen.yBot, dOpen[j] + Hair * 0.5f,
+                                       Mathf.Max(dOpen[j] + Hair * 0.5f, dIn[j] - Hair));
+                aMax = Mathf.Max(aMax, dOpen[j]);
+                bMax = Mathf.Max(bMax, dShut[j] - dOpen[j]);
+                cMax = Mathf.Max(cMax, dIn[j] - dShut[j]);
+            }
+            kAbove  = Mathf.Max(1, Mathf.CeilToInt(aMax * slope / step));
+            kAcross = Mathf.Max(1, Mathf.CeilToInt(bMax * slope / step));
+            kBelow  = Mathf.Max(1, Mathf.CeilToInt(cMax * slope / step));
+            kFace   = kAbove + kAcross + kBelow;
+        }
+
+        float FaceDepth(int j, int k)
+        {
+            if (!hasScreen)      return dIn[j] * k / kFace;
+            if (k <= kAbove)     return dOpen[j] * k / kAbove;
+            k -= kAbove;
+            if (k <= kAcross)    return Mathf.Lerp(dOpen[j], dShut[j], (float)k / kAcross);
+            return Mathf.Lerp(dShut[j], dIn[j], (float)(k - kAcross) / kBelow);
+        }
+
         int last  = n + kFace;                                   // the column where it goes in
+        int iOpen = n + kAbove;                                  // the screen's top
+        int iShut = iOpen + kAcross;                             // and its bottom
 
         var upper   = new Vector3[nv + 1, last + 1];
         var meet    = new Vector3[nv + 1, last + 1];
@@ -538,13 +728,13 @@ public static partial class RiverMeshBuilder
                 Vector3 p = Flat(cols[i].u, vs[j]);
                 SideOfRun(grid, p, out float y, out float a);
                 float fl = SectionCut(profile, Mathf.Min(Mathf.Abs(a), halfOuter));
-                upper[j, i]  = new Vector3(p.x, y + shape.height, p.z);
+                upper[j, i]  = new Vector3(p.x, shape.TopOver(y), p.z);
                 meet[j, i]   = new Vector3(p.x, y - fl, p.z);
                 bottom[j, i] = new Vector3(p.x, y - profile.depth, p.z);
             }
             else
             {
-                float   d = dIn[j] * (i - n) / kFace;
+                float   d = FaceDepth(j, i - n);
                 Vector3 p = Flat(uN - lean * d, vs[j]);
                 SideOfRun(grid, p, out float y, out _);
                 upper[j, i]  = new Vector3(p.x, yTop[j] - d, p.z);
@@ -553,7 +743,7 @@ public static partial class RiverMeshBuilder
             }
         }
 
-        b.NextKind = 0f;
+        b.NextKind = kinds.top;
 
         // The top.
         b.NextPart = RimTopPart;
@@ -568,10 +758,34 @@ public static partial class RiverMeshBuilder
         for (int j = 0; j < nv; j++)
         for (int i = n; i < last; i++)
         {
+            // The screen's opening is left open.
+            if (hasScreen && j >= jOpen && j < jShut && i >= iOpen && i < iShut) continue;
+
             Vector3 mid = (upper[j, i] + upper[j + 1, i + 1]) * 0.5f;
-            b.NextKind = Across(mid) < halfInner ? RunPart(FaceInner) : 0f;
+            b.NextKind = Across(mid) < halfInner ? RunPart(FaceInner) : kinds.sides;
             FacingQuad(b, upper[j, i], upper[j + 1, i], upper[j + 1, i + 1], upper[j, i + 1],
                        faceOut);
+        }
+
+        // The opening's header, sill and two sides, running back from the face to the screen.
+        if (hasScreen)
+        {
+            b.NextPart = RimScreenPart;
+            for (int j = jOpen; j < jShut; j++)
+            {
+                b.NextKind = kinds.screen != 0f ? kinds.screen
+                           : Across(upper[j, iOpen]) < halfInner ? RunPart(FaceInner) : 0f;
+                ScreenReveal(b, screen, shape.axis, upper[j, iOpen], upper[j + 1, iOpen], Vector3.down);
+                ScreenReveal(b, screen, shape.axis, upper[j, iShut], upper[j + 1, iShut], Vector3.up);
+            }
+            for (int i = iOpen; i < iShut; i++)
+            {
+                b.NextKind = kinds.screen != 0f ? kinds.screen
+                           : Across(upper[jOpen, i]) < halfInner ? RunPart(FaceInner) : 0f;
+                ScreenReveal(b, screen, shape.axis, upper[jOpen, i], upper[jOpen, i + 1],  shape.along);
+                ScreenReveal(b, screen, shape.axis, upper[jShut, i], upper[jShut, i + 1], -shape.along);
+            }
+            b.NextPart = RimWallPart;
         }
 
         // The two sides, far end to where the face goes in.
@@ -584,7 +798,7 @@ public static partial class RiverMeshBuilder
             if (midA < halfOuter)
             {
                 b.NextPart = RimWallPart;
-                b.NextKind = midA < halfInner ? RunPart(FaceInner) : 0f;
+                b.NextKind = midA < halfInner ? RunPart(FaceInner) : kinds.sides;
                 if (i2 == last) FacingTri(b, meet[j, i], upper[j, i2], upper[j, i], outward);
                 else            FacingQuad(b, meet[j, i], meet[j, i2], upper[j, i2], upper[j, i], outward);
 
@@ -595,7 +809,7 @@ public static partial class RiverMeshBuilder
             else
             {
                 b.NextPart = RimWallPart;
-                b.NextKind = 0f;
+                b.NextKind = kinds.sides;
 
                 var poly = new List<Vector3> { upper[j, i], upper[j, i2] };
                 if (isOuter[i2]) poly.Add(meet[j, i2]);
@@ -613,7 +827,7 @@ public static partial class RiverMeshBuilder
             if (midA < halfOuter)
             {
                 b.NextPart = RimWallPart;
-                b.NextKind = midA < halfInner ? RunPart(FaceInner) : 0f;
+                b.NextKind = midA < halfInner ? RunPart(FaceInner) : kinds.sides;
                 FacingQuad(b, meet[j, 0], meet[j + 1, 0], upper[j + 1, 0], upper[j, 0], shape.axis);
 
                 b.NextPart = RimBuriedPart;
@@ -623,7 +837,7 @@ public static partial class RiverMeshBuilder
             else
             {
                 b.NextPart = RimWallPart;
-                b.NextKind = 0f;
+                b.NextKind = kinds.sides;
                 FacingQuad(b, upper[j, 0], upper[j + 1, 0], bottom[j + 1, 0], bottom[j, 0], shape.axis);
             }
         }
@@ -649,7 +863,7 @@ public static partial class RiverMeshBuilder
     /// underneath is built whole and buries its foot — so it is only ever its own wall and top.
     /// </summary>
     private static void BuildPlinth(MeshBuild b, RiverProfile profile, RunGrid grid,
-                                    RimShape shape, float edge)
+                                    RimShape shape, float edge, RimKinds kinds)
     {
         if (!shape.HasPlinth) return;
 
@@ -678,14 +892,153 @@ public static partial class RiverMeshBuilder
             Vector3 outward = OutwardAt(plinth, mid);
 
             SideOfRun(grid, mid, out _, out float midAcross);
-            b.NextKind = Mathf.Abs(midAcross) < halfInner ? RunPart(FaceInner) : 0f;
+            b.NextKind = Mathf.Abs(midAcross) < halfInner ? RunPart(FaceInner) : kinds.plinthSides;
             FacingQuad(b, foot[k], foot[k2], top[k2], top[k], outward);
         }
 
-        b.NextKind = 0f;
+        b.NextKind = kinds.plinthTop;
         FillFlat(b, grid, plinth, walk, top, edge, shape.height + shape.plinthHeight, Vector3.up);
+        b.NextKind = 0f;
         b.NextPart = 0;
     }
+
+    // ══════════════════════════════════════════════════════════════
+    // SCREEN
+    // ══════════════════════════════════════════════════════════════
+    //
+    //     wall    ____               A square opening in the river-side wall, its screen a
+    //            |    |___ header    flat panel set back inside it, upright and facing
+    //    river   |    |   |          straight out into the river. Sill, header and two
+    //     <--    |    |   | screen   sides run back from the wall to the screen's edges. The
+    //            |    |___|          screen itself is a separate object (the designer places
+    //            |    |   sill       it), so the platform leaves the back of the opening open.
+    //                                In a slanted face the screen leans with the face instead.
+
+    // Widest a screen may be either side of its middle, as a share of the radius.
+    private const float RimScreenMaxShare = 0.8f;
+
+    // How far it stands back from the wall, as a share of its size.
+    private const float RimScreenRecess = 0.25f;
+
+    // How much of the wall between the waterline and the top it may take, keeping a margin
+    // above and below; and the smallest worth building.
+    private const float RimScreenFill    = 0.8f;
+    private const float RimScreenMinSize = 0.004f;
+
+    private struct RimScreenCut
+    {
+        public float   half;          // half its width
+        public float   yBot, yTop;
+        public Vector3 centre;        // the middle of the screen's top edge, flat — y left at zero
+        public float   lean;          // how far it leans out for each unit it drops, with a slanted face
+    }
+
+    /// <summary>
+    /// Where a rim node's screen goes: as wide and as tall as asked, its height held to what fits
+    /// on the wall facing the river between the waterline (or where the wall goes into the run, if
+    /// higher) and the top, and centred in that height. The wall is read at the screen's two edges and its middle.
+    /// </summary>
+    private static bool SolveRimScreen(RiverProfile profile, RunGrid grid, RimShape shape, float edge,
+                                       out RimScreenCut cut)
+    {
+        cut = default;
+        float r = shape.radius;
+        if (shape.screenSize <= 0f || shape.screenHeight <= 0f || r < 1e-5f) return false;
+
+        float halfOuter = profile.OuterWidth * 0.5f;
+        float half      = Mathf.Min(shape.screenSize * 0.5f, r * RimScreenMaxShare);
+        float step      = Mathf.Max(edge, 0.005f) * 0.5f;
+
+        float hi = float.MaxValue, lo = float.MinValue, middleTop = 0f;
+        foreach (float v in new[] { -half, 0f, half })
+        {
+            Vector3 p = shape.slanted
+                ? shape.centre + shape.axis * shape.NearU(r) + shape.along * v
+                : shape.Near - shape.axis * Mathf.Sqrt(r * r - v * v) + shape.along * v;
+            p.y = 0f;
+
+            SideOfRun(grid, p, out float rimY, out float a);
+            float topY = shape.TopOver(rimY);
+            float inY  = shape.slanted
+                ? topY - SlantedFaceDrop(profile, grid, shape, v, topY, step)
+                : rimY - SectionCut(profile, Mathf.Min(Mathf.Abs(a), halfOuter));
+
+            hi = Mathf.Min(hi, topY);
+            lo = Mathf.Max(lo, Mathf.Max(inY, rimY - shape.waterDrop));
+            if (v == 0f) middleTop = topY;
+        }
+
+        float tall = Mathf.Min(shape.screenHeight, (hi - lo) * RimScreenFill);
+        if (2f * half < RimScreenMinSize || tall < RimScreenMinSize) return false;
+
+        float mid = 0.5f * (lo + hi);
+        cut.half  = half;
+        cut.yBot  = mid - tall * 0.5f;
+        cut.yTop  = mid + tall * 0.5f;
+
+        // Set back from where the wall is at the opening's edges — on a slanted face, from its
+        // top edge, and leaning with the face from there, so it is set back as far all the way down.
+        float recess = Mathf.Min(2f * half, tall) * RimScreenRecess;
+        cut.lean     = shape.slanted ? shape.lean : 0f;
+        Vector3 c = shape.slanted
+            ? shape.centre + shape.axis * (shape.NearU(r) - shape.lean * (middleTop - cut.yTop) + recess)
+            : shape.Near - shape.axis * (Mathf.Sqrt(r * r - half * half) - recess);
+        c.y = 0f;
+        cut.centre = c;
+        return true;
+    }
+
+    /// <summary>
+    /// How far a slanted face drops, down one row across it, before it goes into the channel —
+    /// a march finds the first place it does, then halving pins it down.
+    /// </summary>
+    private static float SlantedFaceDrop(RiverProfile profile, RunGrid grid, RimShape shape,
+                                         float v, float topY, float step)
+    {
+        float halfOuter = profile.OuterWidth * 0.5f;
+        float uN        = shape.NearU(shape.radius);
+        float dMax      = shape.topRise + profile.riverDepth + 0.001f;
+
+        float Gap(float d)
+        {
+            Vector3 p = shape.centre + shape.axis * (uN - shape.lean * d) + shape.along * v;
+            p.y = 0f;
+            SideOfRun(grid, p, out float y, out float a);
+            return topY - d - (y - SectionCut(profile, Mathf.Min(Mathf.Abs(a), halfOuter)));
+        }
+
+        float lo = 0f, hi = dMax, dStep = step * 0.5f;
+        for (float d = dStep; d < dMax + dStep; d += dStep)
+        {
+            float dd = Mathf.Min(d, dMax);
+            if (Gap(dd) <= 0f) { hi = dd; break; }
+            lo = dd;
+        }
+        for (int it = 0; it < 30; it++)
+        {
+            float m = 0.5f * (lo + hi);
+            if (Gap(m) > 0f) lo = m; else hi = m;
+        }
+        return 0.5f * (lo + hi);
+    }
+
+    /// <summary>
+    /// One face of an opening's sides: the edge from <paramref name="a"/> to <paramref name="c"/>
+    /// on the wall, run straight back to the screen.
+    /// </summary>
+    private static void ScreenReveal(MeshBuild b, RimScreenCut s, Vector3 axis, Vector3 a,
+                                     Vector3 c, Vector3 facing)
+        => FacingQuad(b, a, c, OntoScreen(s, axis, c), OntoScreen(s, axis, a), facing);
+
+    // A point straight back (or out) onto the screen's plane, at the same height — which on a
+    // leaning screen stands further out the lower it is.
+    private static Vector3 OntoScreen(RimScreenCut s, Vector3 axis, Vector3 p)
+    {
+        float d = (p.x - s.centre.x) * axis.x + (p.z - s.centre.z) * axis.z + s.lean * (s.yTop - p.y);
+        return p - axis * d;
+    }
+
+    private static Vector3 AtHeight(Vector3 p, float y) => new Vector3(p.x, y, p.z);
 
     /// <summary>
     /// The walk round a platform's outline: an even spread, plus every place the outline crosses
@@ -694,7 +1047,8 @@ public static partial class RiverMeshBuilder
     /// </summary>
     private static List<float> PlatformOutline(RunGrid grid, RimShape shape, float edge,
                                                float halfInner, float halfOuter,
-                                               out HashSet<int> outerBreaks)
+                                               out HashSet<int> outerBreaks,
+                                               float[] extra = null)
     {
         const int Probe = 720;
 
@@ -729,6 +1083,15 @@ public static partial class RiverMeshBuilder
 
         var   spread  = SampleOutline(shape, shape.radius, Mathf.Max(edge, 0.005f) * 0.5f, 16);
         float spacing = Perimeter(shape, shape.radius) / Mathf.Max(1, spread.Count);
+
+        // Points the walk must carry exactly (a screen's edges), taking the place of any channel
+        // crossing so close it would only make a sliver.
+        if (extra != null)
+            foreach (float q in extra)
+            {
+                breaks.RemoveAll(brk => !brk.outer && ArcGap(shape, shape.radius, q, brk.q) < spacing * 0.1f);
+                breaks.Add((q, false));
+            }
 
         var all = new List<(float q, bool outerBreak)>();
         foreach (var brk in breaks) all.Add((brk.q, brk.outer));
@@ -1336,18 +1699,35 @@ public static partial class RiverMeshBuilder
     {
         // A slanted face meets the water further out than its top edge stands — the bank follows
         // it round where the water really meets it.
-        if (shape.slanted) shape.nearPush = shape.lean * (shape.height + Mathf.Max(waterLevel, 0f));
+        float midRim = 0f;
+        if (shape.slanted)
+        {
+            SideOfRun(grid, shape.centre, out midRim, out _);
+            shape.nearPush = shape.lean * (shape.TopOver(midRim) - midRim + Mathf.Max(waterLevel, 0f));
+        }
+
+        // A level top stands taller over the lower end of its face where the river falls away, so
+        // the face meets the water further out there than in the middle — and nearer in at the
+        // higher end. Points on the face's end are moved to where it really meets the water.
+        Vector3 OntoLevelFace(Vector3 p, float rimY)
+        {
+            if (!shape.levelTop) return p;
+            float u = (p.x - shape.centre.x) * shape.axis.x + (p.z - shape.centre.z) * shape.axis.z;
+            if (Mathf.Abs(u - shape.NearU(shape.radius)) > 1e-4f) return p;
+            return p - shape.axis * (shape.lean * (midRim - rimY));
+        }
 
         var   hits  = new List<(float s, Vector3 p)>();
-        float reach = shape.radius + shape.halfWidth + shape.nearPush + grid.profile.OuterWidth + edge;
+        float reach = shape.radius + shape.halfWidth + shape.nearPush + grid.profile.OuterWidth +
+                      grid.MaxWiden * 2f + edge;
 
         for (int j = 0; j < grid.Rings - 1; j++)
         {
             if (FlatDistance(grid.centre[j], shape.centre) >
                 reach + Vector3.Distance(grid.centre[j], grid.centre[j + 1])) continue;
 
-            Vector3 a = grid.centre[j]     + grid.right[j]     * x;
-            Vector3 c = grid.centre[j + 1] + grid.right[j + 1] * x;
+            Vector3 a = grid.Line(j,     x);
+            Vector3 c = grid.Line(j + 1, x);
 
             int count = OutlineRoots(a, c, shape, shape.radius, out float t0, out float t1);
             for (int k = 0; k < count; k++)
@@ -1400,7 +1780,7 @@ public static partial class RiverMeshBuilder
             Vector3 q = OnOutline(shape, shape.radius, q0 + span * f);
             SideOfRun(grid, q, out float y, out _);
             q.y = y;
-            pts.Add(q);
+            pts.Add(OntoLevelFace(q, y));
         }
         pts.Add(last.p);
 

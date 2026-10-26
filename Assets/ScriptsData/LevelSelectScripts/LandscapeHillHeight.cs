@@ -32,7 +32,10 @@ public static class LandscapeHillHeight
     /// </summary>
     public const float RiverEdgeUnderRim = 0.02f;
 
-    /// <summary>How far inside a run's outer edge the landscape is cut away.</summary>
+    /// <summary>
+    /// How far inside a run's outer edge the landscape is cut away by default: a path's Cutout
+    /// Gap starts at minus this (see <see cref="LandscapeTool.riverEdgeCutGap"/>).
+    /// </summary>
     public const float RiverEdgeTuck = 0.05f;
 
     /// <summary>The step the slope is measured over for the lighting normal, in metres.</summary>
@@ -53,11 +56,18 @@ public static class LandscapeHillHeight
         public float globalHeight = 1f;
         public float noiseScale   = 0.25f;
 
+        // The painted base height and rocky noise maps, laid over mapArea (the tile area: x/y the
+        // min world X/Z, width/height its extent). Null for none.
+        public LandscapeMaps maps;
+        public Rect          mapArea;
+
         // See LandscapeTool.riverEdgePoints for the layout.
         public IList<Vector4> edgePoints;
         public IList<float>   edgeReach;
         public IList<float>   edgeStrength;
         public IList<float>   edgeShelf;
+        public IList<float>   edgeCutGap;
+        public IList<float>   edgeSmooth;
         public int            edgeCount;
 
         public List<int> nearHills;   // hills that can reach
@@ -73,12 +83,12 @@ public static class LandscapeHillHeight
 
         /// <summary>
         /// The smooth height above <paramref name="baseY"/> (the tile base, in world space — a rim
-        /// is a world height): hills, then drawn to the river rims. No noise — this is what the
+        /// is a world height): the painted height map and the hills on it, then drawn to the river rims. No noise — this is what the
         /// lighting normal is measured on, so the light stays clean.
         /// </summary>
         public float SmoothHeight(Vector2 xz, float baseY)
         {
-            float total = 0f;
+            float total = maps != null ? maps.HeightAt(mapArea, xz) : 0f;
             int   n     = nearHills != null ? nearHills.Count : hillCount;
             for (int k = 0; k < n; k++)
             {
@@ -95,7 +105,7 @@ public static class LandscapeHillHeight
         ///   x  the height it pushes the geometry, in metres
         ///   y  the lean without its grain: the lean (-1 fully down, +1 fully up) is the noise
         ///      value here times this. Kept apart so the grain can be drawn per pixel.
-        ///   z  how much noise there is here at all, 0 where the hills carry none
+        ///   z  how much noise there is here at all, 0 where neither the hills nor the noise map carry any
         /// The lean is the push measured against how far it COULD have pushed here, so it reads the
         /// same on a tall hill and a shallow one.
         /// </summary>
@@ -115,13 +125,26 @@ public static class LandscapeHillHeight
                 amount    += falloff * noise[i];
             }
 
+            // The painted noise map: white is full noise, pushing by its Noise Height.
+            if (maps != null && !maps.noise.IsEmpty)
+            {
+                float painted = maps.NoiseAt(mapArea, xz);
+                if (painted > 0f)
+                {
+                    float lift = painted * maps.noiseHeight;
+                    lifted    += lift;
+                    potential += Mathf.Abs(lift);
+                    amount    += painted;
+                }
+            }
+
             float grain = GradientNoise(xz * noiseScale) * 2f - 1f;
             return new Vector3(grain * lifted, lifted / Mathf.Max(potential, 1e-5f), Mathf.Clamp01(amount));
         }
 
         /// <summary>Metres above <paramref name="baseY"/> the surface stands: smooth height plus the noise, held off near a rim.</summary>
         public float Height(Vector2 xz, float baseY)
-            => SmoothHeight(xz, baseY) + Noise(xz).x * (1f - Lift(xz, out _));
+            => SmoothHeight(xz, baseY) + Noise(xz).x * (1f - Calm(xz));
 
         /// <summary>The lighting normal, from the smooth height's slope.</summary>
         public Vector3 Normal(Vector2 xz, float baseY)
@@ -171,8 +194,36 @@ public static class LandscapeHillHeight
         }
 
         /// <summary>
+        /// How much the rocky noise is calmed here: the lift's own weight, but eased over the
+        /// Influence Distance times (1 + the path's Smooth Factor), so the noise stays quiet
+        /// further out than the ground is lifted. With no Smooth Factor it is exactly the lift.
+        /// </summary>
+        public float Calm(Vector2 xz)
+        {
+            float best = 0f;
+            int   n    = nearLifts != null ? nearLifts.Count : edgeCount;
+            for (int k = 0; k < n; k++)
+            {
+                int   i = nearLifts != null ? nearLifts[k] : k;
+                float r = edgeReach[i];
+                if (r < 0f) continue;
+                r *= 1f + LandscapeTool.RiverEdgeSmoothAt(edgeSmooth, i);
+
+                float shelf   = LandscapeTool.RiverEdgeShelfAt(edgeShelf, i);
+                float outside = Outside(edgePoints[i], EdgeEnd(i), xz, out _) - Mathf.Max(shelf, 0f);
+                float w       = outside <= 0f ? 1f
+                              : r > 0f       ? 1f - HlslSmoothstep(0f, r, outside)
+                              :                0f;
+                w *= LandscapeTool.RiverEdgeStrengthAt(edgeStrength, i);
+                best = Mathf.Max(best, w);
+            }
+            return best;
+        }
+
+        /// <summary>
         /// How far the ground at <paramref name="xz"/> is from being cut: positive where it stays,
-        /// negative inside a run or pool (past the tuck under its rim). Large where none is near.
+        /// negative inside a run or pool and out to its path's Cutout Gap past the outer edge (or,
+        /// for a negative gap, past the tuck under its rim). Large where none is near.
         /// </summary>
         public float Cut(Vector2 xz)
         {
@@ -181,9 +232,10 @@ public static class LandscapeHillHeight
             for (int k = 0; k < n; k++)
             {
                 int i = nearCuts != null ? nearCuts[k] : k;
-                nearest = Mathf.Min(nearest, Outside(edgePoints[i], EdgeEnd(i), xz, out _));
+                nearest = Mathf.Min(nearest, Outside(edgePoints[i], EdgeEnd(i), xz, out _)
+                                             - LandscapeTool.RiverEdgeCutGapAt(edgeCutGap, i));
             }
-            return nearest == float.MaxValue ? nearest : nearest + RiverEdgeTuck;
+            return nearest;
         }
 
         float Falloff(int i, Vector2 xz)
@@ -211,21 +263,27 @@ public static class LandscapeHillHeight
                            float globalHeight, float noiseScale,
                            IList<Vector4> edgePoints, IList<float> edgeReach,
                            IList<float> edgeStrength, float baseY,
-                           IList<float> edgeShelf = null)
+                           IList<float> edgeShelf = null, IList<float> edgeSmooth = null,
+                           LandscapeMaps maps = null, Rect mapArea = default)
         => BuildSurface(hills, globalHeight, noiseScale, edgePoints, edgeReach, edgeStrength,
-                        edgeShelf)
+                        edgeShelf, null, edgeSmooth, maps, mapArea)
                .Height(xz, baseY);
 
     /// <summary>
-    /// The surface the static samplers read, built from the designer's hills and the river edges.
+    /// The surface the static samplers read, built from the designer's hills, the painted maps
+    /// (laid over <paramref name="mapArea"/>, the tile area) and the river edges.
     /// Build once and sample it many times when laying something over a whole area.
     /// </summary>
     public static Surface BuildSurface(IList<LevelSelectDesignerData.LandscapeHillPoint> hills,
                                        float globalHeight, float noiseScale,
                                        IList<Vector4> edgePoints, IList<float> edgeReach,
-                                       IList<float> edgeStrength, IList<float> edgeShelf = null)
+                                       IList<float> edgeStrength, IList<float> edgeShelf = null,
+                                       IList<float> edgeCutGap = null,
+                                       IList<float> edgeSmooth = null,
+                                       LandscapeMaps maps = null, Rect mapArea = default)
     {
-        var surface = new Surface { globalHeight = globalHeight, noiseScale = noiseScale };
+        var surface = new Surface { globalHeight = globalHeight, noiseScale = noiseScale,
+                                    maps = maps != null && !maps.IsEmpty ? maps : null, mapArea = mapArea };
 
         int count = hills != null ? Mathf.Min(hills.Count, MaxHills) : 0;
         for (int i = 0; i < count; i++)
@@ -244,6 +302,8 @@ public static class LandscapeHillHeight
             surface.edgeReach    = edgeReach;
             surface.edgeStrength = edgeStrength;
             surface.edgeShelf    = edgeShelf;
+            surface.edgeCutGap   = edgeCutGap;
+            surface.edgeSmooth   = edgeSmooth;
             surface.edgeCount    = Mathf.Min(Mathf.Min(edgePoints.Count, edgeReach.Count),
                                              LandscapeTool.MaxRiverEdgePoints);
         }

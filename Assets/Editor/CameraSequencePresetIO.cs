@@ -40,11 +40,14 @@ public static class CameraSequencePresetIO
             copy.camera     = null;
             copy.orbitPoint = null;
             copy.endCamera  = null;
+            copy.viewTarget = null;
             var ps = new CameraSequencePreset.PresetShot
             {
                 cameraLink     = LinkId(shot.camera != null ? shot.camera.gameObject : null, assignLinks),
                 orbitPointLink = LinkId(shot.orbitPoint != null ? shot.orbitPoint.gameObject : null, assignLinks),
                 endCameraLink  = LinkId(shot.endCamera != null ? shot.endCamera.gameObject : null, assignLinks),
+                // Linked only, like the characters — never stored, so Load never moves or rebuilds it.
+                viewTargetLink = LinkId(shot.viewTarget != null ? shot.viewTarget.gameObject : null, assignLinks),
                 shot           = copy,
             };
             // Characters are linked only — never stored, so Load never moves or rebuilds them.
@@ -64,8 +67,6 @@ public static class CameraSequencePresetIO
         into.sequenceAudio = sequence.sequenceAudio;
         into.audioFadeOut  = sequence.audioFadeOut;
         into.endBlend      = CameraSequence.DeepCopy(sequence.endBlend);
-        into.overrideFog   = sequence.overrideFog;
-        into.fog           = CameraSequence.DeepCopy(sequence.fog);
         into.playOnce      = sequence.playOnce;
     }
 
@@ -147,7 +148,7 @@ public static class CameraSequencePresetIO
         return list;
     }
 
-    private static string HierarchyPath(Transform t)
+    public static string HierarchyPath(Transform t)
     {
         var parts = new List<string>();
         for (; t != null; t = t.parent) parts.Add(t.name);
@@ -261,7 +262,7 @@ public static class CameraSequencePresetIO
         return go.GetComponents<Component>().FirstOrDefault(c => c != null && c.GetType().Name == typeName) ?? (UnityEngine.Object)go;
     }
 
-    private static Transform FindPath(string path)
+    public static Transform FindPath(string path)
     {
         if (string.IsNullOrEmpty(path)) return null;
         var found = GameObject.Find("/" + path);

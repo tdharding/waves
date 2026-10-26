@@ -15,6 +15,8 @@ MonoBehaviour:
   obstacleRange: 28.2
   repelLimit: 59
   maskLimit: 128
+  heightWindowBelow: 1.11
+  heightWindowAbove: 87.6
   properties:
     spineBend1: -0.099
     spineBend2: 0.36
@@ -41,6 +43,7 @@ MonoBehaviour:
   blobScaleMin: 2.1
   blobScaleMax: 5.8
   fogOpacity: 1
+  screenCircleOcclusion: 1
   maskRadius: 26.7
   maskFeather: 0.75
   windAngle: 257
@@ -67,8 +70,8 @@ MonoBehaviour:
   lampMaskFeather: 0.2
   runsRepel: 1
   naturalRunsRepel: 0
-  runChainSpacing: 3.1
-  runRepelRadius: 2.15
+  runChainSpacing: 2.1
+  runRepelRadius: 0.63
   runRepelStrength: 2.95
   runMaskRadius: 1.18
   runMaskFeather: 0.6
@@ -88,7 +91,7 @@ MonoBehaviour:
   boatMaskFeather: 0.4
   fogMaterial: {fileID: 2100000, guid: 46e2e25193da1f44e8078d278e21e7f9, type: 2}
   overrideLook: 1
-  threshold: 0.178
+  threshold: 0.05
   edgeSoftness: 0.1434
   undulationAmount: 0
   undulationScale: 0.05
@@ -96,12 +99,12 @@ MonoBehaviour:
   lipLighting: 1.92
   lipCurvature: 0.55
   heightScale: 1.07
-  fogColour: {r: 0.4433962, g: 0.4433962, b: 0.4433962, a: 1}
+  fogColour: {r: 0.49056602, g: 0.49019173, b: 0.43271625, a: 1}
   litColour: {r: 1, g: 1, b: 1, a: 1}
-  ambient: 0.74
+  ambient: 0.958
   interiorFill: 1
   transparencyFalloff: 0.29
-  grainAmount: 0.56
+  grainAmount: 0.12
   grainScale: 1.1
   edgeShadowWidth: 0.687
-  edgeShadowStrength: 2.76
+  edgeShadowStrength: 3.12

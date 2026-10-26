@@ -142,6 +142,8 @@ public partial class LevelSelectDesignerWindow
     /// The left panel while River Select is on — just the picked rivers, nothing else.
     private void DrawRiverSelectList()
     {
+        DrawMergeRiversPanel();
+
         EditorGUILayout.Space(6);
         EditorGUILayout.LabelField($"Selected Rivers ({_riverSelectIds.Count})", EditorStyles.boldLabel);
 

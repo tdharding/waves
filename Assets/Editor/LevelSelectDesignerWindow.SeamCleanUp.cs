@@ -55,6 +55,7 @@ public partial class LevelSelectDesignerWindow
         if (wall == null) return null;
         if (_wallSeams.TryGetValue(wallId, out var report)) return report;
 
+        wall.SyncSpotNodes();
         report = new WallMesh.SeamReport();
         var meshes = WallMesh.BuildChunks(WallNodes(wall), wall.closed, wall.thickness, -_data.RunDepth,
                                           StoneShadingForBuild, wall.removedSeams, report, wall.faceGroups,
@@ -70,7 +71,7 @@ public partial class LevelSelectDesignerWindow
         var wall = FindWall(wallId);
         if (wall == null) return;
 
-        var spot = WallMesh.SpotAt(WallNodes(wall), wall.closed, -_data.RunDepth, point, dir);
+        var spot = WallSpotAt(wall, point, dir);
         if (spot == null) return;
 
         Undo.RecordObject(_data, "Remove Seam");
@@ -146,7 +147,7 @@ public partial class LevelSelectDesignerWindow
         var wall = FindWall(wallId);
         if (wall == null) return;
 
-        var spot = WallMesh.SpotAt(WallNodes(wall), wall.closed, -_data.RunDepth, point, normal);
+        var spot = WallSpotAt(wall, point, normal);
         if (spot == null) return;
 
         Undo.RecordObject(_data, "Group Face");
@@ -189,6 +190,15 @@ public partial class LevelSelectDesignerWindow
         MarkDirty();
         RebuildWall(wall);
         Repaint();
+    }
+
+    /// <summary>The spot <paramref name="point"/> (wall frame) is on this wall, tied to its node by the node's id.</summary>
+    private WallSeamSpot WallSpotAt(LevelSelectDesignerData.DesignerWall wall, Vector3 point, Vector3 dir)
+    {
+        wall.SyncSpotNodes();
+        var spot = WallMesh.SpotAt(WallNodes(wall), wall.closed, -_data.RunDepth, point, dir);
+        if (spot != null && spot.node >= 0 && spot.node < wall.nodes.Count) spot.nodeId = wall.nodes[spot.node].nodeId;
+        return spot;
     }
 
     private static string SpotsKey(List<WallSeamSpot> spots) =>

@@ -68,6 +68,12 @@ public class FogFieldManager : MonoBehaviour
     [Tooltip("The most obstacles the mask cuts each frame, nearest first.")]
     [Range(0, FOG_OBSTACLE_SLOTS)] [SerializeField] int maskLimit = FOG_OBSTACLE_SLOTS;
 
+    [Tooltip("How far below the fog plane a repel point may sit and still count.")]
+    [Min(0f)] [SerializeField] float heightWindowBelow = 100f;
+
+    [Tooltip("How far above the fog plane a repel point may sit and still count.")]
+    [Min(0f)] [SerializeField] float heightWindowAbove = 100f;
+
     // HOW MUCH WATER IS SIMULATED, and the only thing that decides it.
     [Header("Cull")]
     [Tooltip("Where masses are BORN, in world units. That is all it does.")]
@@ -83,6 +89,13 @@ public class FogFieldManager : MonoBehaviour
     [Tooltip("Overall opacity of the whole fog sheet. Seeded from the map on level load, live " +
              "from then on.")]
     [Range(0f, 1f)] [SerializeField] float fogOpacity = 1f;
+
+    [Tooltip("Thins the fog in a soft circle round the boat on screen while a sheet stands between " +
+             "the camera and the boat. Seeded from the map on level load, live from then on.")]
+    [SerializeField] bool screenCircleOcclusion = true;
+
+    /// <summary>Whether fog sheets fade in the Screen Circle when they block the view of the boat.</summary>
+    public static bool ScreenCircleOcclusion => _instance != null && _instance.screenCircleOcclusion;
 
     [Header("Boat Mask")]
     [Tooltip("How far from the boat fog is DRAWN, in world units. A fade on the material. It has " +
@@ -307,6 +320,8 @@ public class FogFieldManager : MonoBehaviour
         _instance.obstacleRange = from.obstacleRange;
         _instance.repelLimit    = from.repelLimit;
         _instance.maskLimit     = from.maskLimit;
+        _instance.heightWindowBelow = from.heightWindowBelow;
+        _instance.heightWindowAbove = from.heightWindowAbove;
 
         _instance.windAngle = from.windAngle;
         _instance.windSpeed = from.windSpeed;
@@ -315,6 +330,7 @@ public class FogFieldManager : MonoBehaviour
         _instance.blobScaleMax = from.blobScaleMax;
 
         _instance.fogOpacity  = from.fogOpacity;
+        _instance.screenCircleOcclusion = from.screenCircleOcclusion;
         _instance.maskRadius  = from.maskRadius;
         _instance.maskFeather = from.maskFeather;
 
@@ -444,7 +460,8 @@ public class FogFieldManager : MonoBehaviour
     [Tooltip("Whether the elevated river runs push fog about at all.")]
     [SerializeField] bool runsRepel = true;
 
-    [Tooltip("Whether Landscape Natural River Runs repel too. Off leaves them out of the fog.")]
+    [Tooltip("Whether Landscape Natural River Runs, and the pools on them, repel too. Off leaves " +
+             "them out of the fog.")]
     [SerializeField] bool naturalRunsRepel = true;
 
     [Tooltip("How far apart the circles are strung along a run, in world units. The amount on " +
@@ -1270,12 +1287,53 @@ public class FogFieldManager : MonoBehaviour
         _boatRepel.Strength    = fogMap != null ? Mathf.Max(fogMap.boatRepelStrength, 0f) : 0f;
         _boatRepel.MaskClear   = fogMap != null ? Mathf.Max(fogMap.boatMaskRadius, 0f) : 0f;
         _boatRepel.Feather     = fogMap != null ? Mathf.Max(fogMap.boatMaskFeather, 0f) : 0.2f;
+        // The boat is never height-tested: it is what the fog is drawn around.
+        _hasPlane = false;
         Consider(_boatRepel, limitSq);
 
+        _hasPlane = TryFogPlane(out _plane);
         for (int i = 0; i < _repellers.Count; i++) Consider(_repellers[i], limitSq);
         for (int i = 0; i < _rocks.Count; i++)     Consider(_rocks[i], limitSq);
 
         SortNearestFirst();
+    }
+
+    bool         _hasPlane;
+    FogSheetMesh _plane;
+
+    /// <summary>
+    /// The fog plane the boat is under: the shown sheet whose footprint holds the boat, or failing
+    /// that the nearest shown sheet. With a zone per height, that is the zone the boat is in. No
+    /// sheet at all and there is no plane, so nothing is height-tested.
+    /// </summary>
+    bool TryFogPlane(out FogSheetMesh plane)
+    {
+        plane = null;
+        var sheets = FogSheetMesh.All;
+        float bestSq = float.MaxValue;
+        bool found = false, inside = false;
+
+        for (int i = 0; i < sheets.Count; i++)
+        {
+            var s = sheets[i];
+            if (s == null || !s.Shown) continue;
+
+            Bounds b = s.WorldBounds;
+            bool holds = _boatCentre.x >= b.min.x && _boatCentre.x <= b.max.x &&
+                         _boatCentre.y >= b.min.z && _boatCentre.y <= b.max.z;
+            if (inside && !holds) continue;
+
+            Vector3 p = s.transform.position;
+            float dx = p.x - _boatCentre.x, dz = p.z - _boatCentre.y;
+            float dSq = dx * dx + dz * dz;
+            if (holds && !inside) { inside = true; bestSq = float.MaxValue; }
+            if (dSq >= bestSq) continue;
+
+            bestSq = dSq;
+            plane = s;
+            found = true;
+        }
+        return found;
     }
 
     IFogRepeller[] _nearSorted = new IFogRepeller[64];
@@ -1327,6 +1385,25 @@ public class FogFieldManager : MonoBehaviour
         Vector3 c = r.RepelCentre;
         float dx = c.x - _boatCentre.x, dz = c.z - _boatCentre.y;
         if (dx * dx + dz * dz > limitSq) return;
+
+        // Outside the height window of the fog plane, it neither pushes nor masks. Measured from
+        // the sheet's height right over the point, so a sheet bent by Landscape Influence counts
+        // a repeller up a hill against the fog that has risen with it, not the zone's flat height.
+        // One that stands up from a base to a top counts when any part of that height is inside.
+        if (_hasPlane)
+        {
+            float surface = _plane.SurfaceY(new Vector2(c.x, c.z));
+            if (r is IFogRepellerSpan span)
+            {
+                if (span.RepelTopY - surface < -heightWindowBelow ||
+                    span.RepelBottomY - surface > heightWindowAbove) return;
+            }
+            else
+            {
+                float dy = c.y - surface;
+                if (dy < -heightWindowBelow || dy > heightWindowAbove) return;
+            }
+        }
         _near.Add(r);
     }
 
@@ -1801,6 +1878,8 @@ public class FogFieldManager : MonoBehaviour
     public float   ObstacleRange  => obstacleRange;
     public float   GlobalRepelStrength => settings.RepelStrength;
     public float   GizmoY         => GizmoHeight();
+    public float   HeightWindowBelow => heightWindowBelow;
+    public float   HeightWindowAbove => heightWindowAbove;
 
     public IReadOnlyList<FogBlob> LiveBlobs => _blobs;
     public float   GizmoMaskRadius   => MaskRadius;
@@ -1867,20 +1946,7 @@ public class FogFieldManager : MonoBehaviour
         UnityEditor.Handles.Label(c + new Vector3(cullRadius, 0f, 0f),
             $"cull {cullRadius:0.##}");
 
-        // What every repeller is actually clearing, drawn at the size the simulation uses — rock
-        // radius plus its clear radius plus dot slack. Seeing these against the mask ring is the
-        // fastest way to spot a repeller that clears more ground than the fog can occupy.
-        for (int i = 0; i < _near.Count; i++)
-        {
-            var r = _near[i];
-            if (r == null || !r.RepelActive) continue;
-            Vector3 rc = r.RepelCentre; rc.y = y;
-            float keep = r.RepelRadius + r.RepelClearRadius;
-
-            UnityEditor.Handles.color = Fade(new Color(0.95f, 0.45f, 0.30f, 0.13f));
-            UnityEditor.Handles.DrawSolidDisc(rc, Vector3.up, keep);
-            Ring(rc, keep, new Color(0.95f, 0.45f, 0.30f, 0.55f));
-        }
+        // Repellers are drawn by the Gizmo Manager's Fog button (SceneViewFogGizmos), not here.
 
         // Live masses. Solid, because a mass is an area you are comparing against those rings.
         for (int i = 0; i < _blobs.Count; i++)

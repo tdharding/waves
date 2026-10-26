@@ -65,6 +65,18 @@ void PoolRings(
     float outer = max(w, inner + 1e-4);
     float pulse = 1.0 - smoothstep(inner, outer, centred);
 
+    // Softness past 1 blurs the rings, exactly as it does the river lines: 1 to 5.5 rounds the
+    // window into a smooth swell, 5.5 to 10 flattens that to an even glow, both holding the
+    // ring's average brightness.
+    float blur = saturate((Softness - 1.0) / 9.0);
+    if (blur > 0.0)
+    {
+        float mean  = (inner + outer) * 0.5;
+        float swell = mean + min(mean, 1.0 - mean) * cos(centred * 3.14159265);
+        pulse = blur < 0.5 ? lerp(pulse, swell, blur * 2.0)
+                           : lerp(swell, mean, blur * 2.0 - 1.0);
+    }
+
     Ripples = max(pulse * Strength, 0.0);
 }
 

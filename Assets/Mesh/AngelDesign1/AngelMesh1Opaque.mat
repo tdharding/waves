@@ -46,6 +46,7 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _AddBakedLighting: 1
     - _AddLighting: 1
     - _AddWhiteFade: 1
     - _DoubleSided: 1

@@ -98,7 +98,7 @@ public partial class LevelSelectDesignerWindow
 
         float across = pool != null
             ? (_data.PoolShapeFor(pool).poolRadius + profile.rimWidth * 0.5f) * 2f
-            : profile.innerWidth + profile.rimWidth;
+            : InnerWidthAtNode(profile, nodeId) + profile.rimWidth;
 
         // The node is on the rim top; the water lies WaterSurfaceDrop below it.
         float drop   = _data.WaterSurfaceDrop;

@@ -7,8 +7,15 @@ public enum FogPlaneMode
     Zones,    // a sheet per authored fog zone, each at its own height
 }
 
+/// <summary>The outline of a fog zone's sheet. Circle first, so it is the default.</summary>
+public enum FogZoneShape
+{
+    Circle,
+    Square,
+}
+
 /// <summary>
-/// One level select fog zone: a square fog sheet at its own height, shown while the boat is inside
+/// One level select fog zone: a round or square fog sheet at its own height, shown while the boat is inside
 /// the zone's bounds and faded out and hidden when it leaves. Built by the Level Select Designer's
 /// Fog Zones mode — the numbers here are written by it, not authored on the component.
 ///
@@ -44,6 +51,9 @@ public class FogZone : MonoBehaviour
     [Tooltip("Seconds to fade in on entering the bounds and out on leaving.")]
     [SerializeField] float fadeTime = 1f;
 
+    [Tooltip("The sheet's outline — the edge fade follows it, round a circle or along a square's sides.")]
+    [SerializeField] FogZoneShape shape;
+
     static readonly int FogZoneId = Shader.PropertyToID("_FogZone");
 
     // Found once by name, the way LevelSelectDataController finds it, and re-found only once it
@@ -57,13 +67,14 @@ public class FogZone : MonoBehaviour
     Vector4 _pushed = new Vector4(float.NaN, 0f, 0f, 0f);
 
     public void Configure(MeshRenderer sheetRenderer, BoxCollider zoneBounds,
-                          float size, float fade, float seconds)
+                          float size, float fade, float seconds, FogZoneShape sheetShape)
     {
         sheet     = sheetRenderer;
         bounds    = zoneBounds;
         sheetSize = size;
         edgeFade  = fade;
         fadeTime  = seconds;
+        shape     = sheetShape;
         _pushed   = new Vector4(float.NaN, 0f, 0f, 0f);
     }
 
@@ -98,7 +109,8 @@ public class FogZone : MonoBehaviour
         if (sheet.enabled != visible) sheet.enabled = visible;
         if (!visible) return;
 
-        Push(new Vector4(Mathf.Max(edgeFade, 0f), Mathf.Max(sheetSize, 0.01f), 1f - _shown, 0f));
+        Push(new Vector4(Mathf.Max(edgeFade, 0f), Mathf.Max(sheetSize, 0.01f), 1f - _shown,
+                         shape == FogZoneShape.Circle ? 1f : 0f));
     }
 
     void Push(Vector4 zone)

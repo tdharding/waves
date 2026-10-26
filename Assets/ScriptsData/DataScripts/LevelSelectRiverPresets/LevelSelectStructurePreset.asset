@@ -53,6 +53,11 @@ MonoBehaviour:
       seamStrength: 0.77
       seamExtentPercent: 12.7
       seamsSet: 1
+      decalGroups:
+      - 09a9f890d35c41efa0cb8bba3cd4a887
+      - 0a11898cde5c4bf8951d1165755520d4
+      decalGroupIntensities: []
+      normalDecalGroups: []
       decalAmount: 1
       decalOpacity: 0.659
       decalSpacing: 4.76
@@ -63,7 +68,7 @@ MonoBehaviour:
       decalsSet: 1
     - colour: {r: 0.33962262, g: 0.33962262, b: 0.33962262, a: 1}
       grainSize: 0.59
-      grainStrength: 0.241
+      grainStrength: 0.176
       useGradient: 0
       gradient:
         serializedVersion: 2
@@ -96,10 +101,15 @@ MonoBehaviour:
         m_NumColorKeys: 2
         m_NumAlphaKeys: 2
       gradientDirection: 0
-      seamColour: {r: 0, g: 0, b: 0, a: 1}
-      seamStrength: 0.77
-      seamExtentPercent: 12.7
+      seamColour: {r: 0.14150941, g: 0.14150941, b: 0.14150941, a: 1}
+      seamStrength: 0.7
+      seamExtentPercent: 29.3
       seamsSet: 1
+      decalGroups:
+      - 09a9f890d35c41efa0cb8bba3cd4a887
+      - 0a11898cde5c4bf8951d1165755520d4
+      decalGroupIntensities: []
+      normalDecalGroups: []
       decalAmount: 1
       decalOpacity: 0.659
       decalSpacing: 4.76
@@ -144,9 +154,14 @@ MonoBehaviour:
         m_NumAlphaKeys: 2
       gradientDirection: 0
       seamColour: {r: 0, g: 0, b: 0, a: 1}
-      seamStrength: 0.94
+      seamStrength: 0.67
       seamExtentPercent: 15.4
       seamsSet: 1
+      decalGroups:
+      - 09a9f890d35c41efa0cb8bba3cd4a887
+      - 0a11898cde5c4bf8951d1165755520d4
+      decalGroupIntensities: []
+      normalDecalGroups: []
       decalAmount: 1
       decalOpacity: 0.633
       decalSpacing: 1.03
@@ -155,23 +170,23 @@ MonoBehaviour:
       decalRotate: 1
       decalRotateAmount: 1
       decalsSet: 1
-    - colour: {r: 0.786, g: 0.786, b: 0.786, a: 1}
+    - colour: {r: 0.4433962, g: 0.4282329, b: 0.38274294, a: 1}
       grainSize: 2.31
-      grainStrength: 0.161
-      useGradient: 1
+      grainStrength: 0.084
+      useGradient: 0
       gradient:
         serializedVersion: 2
-        key0: {r: 0.3584906, g: 0.3584906, b: 0.3584906, a: 1}
+        key0: {r: 0.2735849, g: 0.2735849, b: 0.2735849, a: 1}
         key1: {r: 0.3584906, g: 0.3584906, b: 0.3584906, a: 1}
-        key2: {r: 0.786, g: 0.786, b: 0.786, a: 0}
+        key2: {r: 0.6792453, g: 0.6792453, b: 0.6792453, a: 0}
         key3: {r: 0, g: 0, b: 0, a: 0}
         key4: {r: 0, g: 0, b: 0, a: 0}
         key5: {r: 0, g: 0, b: 0, a: 0}
         key6: {r: 0, g: 0, b: 0, a: 0}
         key7: {r: 0, g: 0, b: 0, a: 0}
         ctime0: 34135
-        ctime1: 49131
-        ctime2: 65535
+        ctime1: 44491
+        ctime2: 61227
         ctime3: 0
         ctime4: 0
         ctime5: 0
@@ -190,10 +205,24 @@ MonoBehaviour:
         m_NumColorKeys: 3
         m_NumAlphaKeys: 2
       gradientDirection: 0
-      seamColour: {r: 0.20754719, g: 0.20754719, b: 0.20754719, a: 1}
-      seamStrength: 0.77
-      seamExtentPercent: 3.3
+      seamColour: {r: 0.13207549, g: 0.12524964, b: 0.09282664, a: 1}
+      seamStrength: 0.65
+      seamExtentPercent: 7.7
       seamsSet: 1
+      decalGroups:
+      - 09a9f890d35c41efa0cb8bba3cd4a887
+      - 0a11898cde5c4bf8951d1165755520d4
+      - 88a8dcbc7ebb43a49b34674e09c42444
+      - d80c053fa8594f4e81904beb63d306c2
+      - 3ea6dfc439d4491b923251709f2a1faa
+      decalGroupIntensities:
+      - 2.674
+      - 0.931
+      - 2.082
+      - 1
+      - 1.485
+      normalDecalGroups:
+      - 13d23c659e7f4d32b2a15ecff594bc87
       decalAmount: 0.943
       decalOpacity: 0.406
       decalSpacing: 3.27
@@ -241,6 +270,9 @@ MonoBehaviour:
       seamStrength: 0.77
       seamExtentPercent: 12.7
       seamsSet: 1
+      decalGroups: []
+      decalGroupIntensities: []
+      normalDecalGroups: []
       decalAmount: 1
       decalOpacity: 0.659
       decalSpacing: 4.76
@@ -249,42 +281,354 @@ MonoBehaviour:
       decalRotate: 0
       decalRotateAmount: 0.5
       decalsSet: 1
+    - colour: {r: 0.44313726, g: 0.42745098, b: 0.38431373, a: 1}
+      grainSize: 2.31
+      grainStrength: 0.161
+      useGradient: 0
+      gradient:
+        serializedVersion: 2
+        key0: {r: 0.3584906, g: 0.3584906, b: 0.3584906, a: 1}
+        key1: {r: 0.3584906, g: 0.3584906, b: 0.3584906, a: 1}
+        key2: {r: 0.786, g: 0.786, b: 0.786, a: 0}
+        key3: {r: 0, g: 0, b: 0, a: 0}
+        key4: {r: 0, g: 0, b: 0, a: 0}
+        key5: {r: 0, g: 0, b: 0, a: 0}
+        key6: {r: 0, g: 0, b: 0, a: 0}
+        key7: {r: 0, g: 0, b: 0, a: 0}
+        ctime0: 34135
+        ctime1: 49131
+        ctime2: 65535
+        ctime3: 0
+        ctime4: 0
+        ctime5: 0
+        ctime6: 0
+        ctime7: 0
+        atime0: 0
+        atime1: 65535
+        atime2: 0
+        atime3: 0
+        atime4: 0
+        atime5: 0
+        atime6: 0
+        atime7: 0
+        m_Mode: 0
+        m_ColorSpace: -1
+        m_NumColorKeys: 3
+        m_NumAlphaKeys: 2
+      gradientDirection: 0
+      seamColour: {r: 0.20754719, g: 0.20754719, b: 0.20754719, a: 1}
+      seamStrength: 0.92
+      seamExtentPercent: 5
+      seamsSet: 1
+      decalGroups:
+      - 09a9f890d35c41efa0cb8bba3cd4a887
+      - 88a8dcbc7ebb43a49b34674e09c42444
+      - d80c053fa8594f4e81904beb63d306c2
+      - 3ea6dfc439d4491b923251709f2a1faa
+      decalGroupIntensities:
+      - 1
+      - 1
+      - 1
+      - 1.44
+      normalDecalGroups:
+      - 13d23c659e7f4d32b2a15ecff594bc87
+      decalAmount: 0.943
+      decalOpacity: 0.406
+      decalSpacing: 3.27
+      decalScaleMin: 0.68
+      decalScaleMax: 1.16
+      decalRotate: 0
+      decalRotateAmount: 0.5
+      decalsSet: 1
     waterlineColour: {r: 1, g: 1, b: 1, a: 1}
-    waterlineStrength: 1.1
+    waterlineStrength: 0
     waterlineExtent: 0.06
+    seamMask: {fileID: 2800000, guid: 11cc26714c35a324c997fa8a96d180b8, type: 3}
+    seamMaskScale: 700
+    seamMaskTiles: 296.8
+    seamMaskMapping: 1
+    seamMaskMode: 1
+    seamMaskSoftness: 3
+    seamsAboveLighting: 0
+    seamBlendMode: 1
     decalSheet: {fileID: 2800000, guid: d4684965c7f28464c81e40a4fad0cd3d, type: 2}
-    decalSheetColumns: 2
-    decalSheetRows: 2
-    decalSheetHeld: 3
+    decalSheetColumns: 4
+    decalSheetRows: 3
+    decalSheetHeld: 11
     decalSheetCellPixels: 256
+    decalSheetDrawings:
+    - f35f9477d50bb0e46a1d6860308917fa
+    - 13126bdbbc795fa44a2b46e4bfe44434
+    - 44da48932c91c8d42adfe5a657baeeba
+    - bce834fc9826b3441873d8f8a347f150
+    - 79caea3764071f14e918de24a3b11c74
+    - 99e6b9efd3abdab44a4ef6b8ec25c90b
+    - 60d6960614d9ba448be8d1cb558a636f
+    - 3e5dcb251596a0a46b4ec00817b7b3b2
+    - 42e73ad4851b0744589890e82ed08433
+    - 4dae13367d54bc340a96e9d7c2f714ce
+    - 7ea3fefb03d2b09478ea6023d4c56e9e
+    decalGroups:
+    - name: SmallBits
+      sortOrder: 3
+      amount: 0.943
+      opacity: 0.406
+      spacing: 3.27
+      uniformSpacing: 0
+      blendTiles: 0
+      blendNoiseScale: 0.15
+      blendNoiseSoftness: 0.5
+      scaleMin: 0.68
+      scaleMax: 1.16
+      rotate: 0
+      rotateAmount: 0.5
+      aboveLighting: 0
+      blendMode: 0
+      drawings:
+      - bce834fc9826b3441873d8f8a347f150
+      - 79caea3764071f14e918de24a3b11c74
+      - 99e6b9efd3abdab44a4ef6b8ec25c90b
+      id: 09a9f890d35c41efa0cb8bba3cd4a887
+      seed: 0
+      allDrawings: 0
+    - name: Big bits
+      sortOrder: 4
+      amount: 0.077
+      opacity: 0.858
+      spacing: 10
+      uniformSpacing: 0
+      blendTiles: 0
+      blendNoiseScale: 0.15
+      blendNoiseSoftness: 0.5
+      scaleMin: 15
+      scaleMax: 35.5
+      rotate: 1
+      rotateAmount: 0.98
+      aboveLighting: 0
+      blendMode: 0
+      drawings:
+      - 44da48932c91c8d42adfe5a657baeeba
+      - bce834fc9826b3441873d8f8a347f150
+      id: 0a11898cde5c4bf8951d1165755520d4
+      seed: 1
+      allDrawings: 0
+    - name: TexturalBits
+      sortOrder: 5
+      amount: 0.679
+      opacity: 0.911
+      spacing: 15.71
+      uniformSpacing: 0
+      blendTiles: 0
+      blendNoiseScale: 0.15
+      blendNoiseSoftness: 0.5
+      scaleMin: 29.25
+      scaleMax: 33.09
+      rotate: 1
+      rotateAmount: 0.5
+      aboveLighting: 0
+      blendMode: 0
+      drawings:
+      - f35f9477d50bb0e46a1d6860308917fa
+      - 60d6960614d9ba448be8d1cb558a636f
+      id: 3ea6dfc439d4491b923251709f2a1faa
+      seed: 2
+      allDrawings: 0
+    - name: Grid
+      sortOrder: 0
+      amount: 0.59
+      opacity: 0.755
+      spacing: 9.1
+      uniformSpacing: 1
+      blendTiles: 1
+      blendNoiseScale: 5.73
+      blendNoiseSoftness: 1
+      scaleMin: 15
+      scaleMax: 15
+      rotate: 0
+      rotateAmount: 0.5
+      aboveLighting: 1
+      blendMode: 1
+      drawings:
+      - 3e5dcb251596a0a46b4ec00817b7b3b2
+      - 42e73ad4851b0744589890e82ed08433
+      - 4dae13367d54bc340a96e9d7c2f714ce
+      id: 88a8dcbc7ebb43a49b34674e09c42444
+      seed: 3
+      allDrawings: 0
+    - name: Grid2Effects
+      sortOrder: 1
+      amount: 0.251
+      opacity: 0.219
+      spacing: 9.1
+      uniformSpacing: 1
+      blendTiles: 0
+      blendNoiseScale: 0.15
+      blendNoiseSoftness: 0.5
+      scaleMin: 15
+      scaleMax: 15
+      rotate: 0
+      rotateAmount: 0.5
+      aboveLighting: 0
+      blendMode: 0
+      drawings:
+      - 7ea3fefb03d2b09478ea6023d4c56e9e
+      id: d80c053fa8594f4e81904beb63d306c2
+      seed: 4
+      allDrawings: 0
+    - name: Decal Group 6
+      sortOrder: 0
+      amount: 0.5
+      opacity: 1
+      spacing: 0.15
+      uniformSpacing: 0
+      blendTiles: 0
+      blendNoiseScale: 0.15
+      blendNoiseSoftness: 0.5
+      scaleMin: 0.04
+      scaleMax: 0.09
+      rotate: 0
+      rotateAmount: 0.5
+      aboveLighting: 0
+      blendMode: 0
+      drawings: []
+      id: 7a1d0f2bdfd547d1ac0d1e70bdcacdb9
+      seed: 5
+      allDrawings: 0
+    decalGroupsSet: 1
+    normalDecalSheet: {fileID: 2800000, guid: d5fd30a917e8b5842b83ecfdc851f742, type: 2}
+    normalDecalSheetColumns: 1
+    normalDecalSheetRows: 1
+    normalDecalSheetHeld: 1
+    normalDecalSheetCellPixels: 256
+    normalDecalSheetDrawings:
+    - 2e09405fdc265484081f43429eb0a70a
+    normalDecalGroups:
+    - name: GridNormal
+      strength: 20
+      spacing: 9.1
+      blendTiles: 1
+      blendNoiseScale: 0.15
+      blendNoiseSoftness: 0.5
+      seed: 1
+      drawings:
+      - 2e09405fdc265484081f43429eb0a70a
+      id: 13d23c659e7f4d32b2a15ecff594bc87
+    interiorDarkColour: {r: 0, g: 0, b: 0, a: 1}
+    interiorDarkSoftness: 1
+    interiorBoatLight: 1
+    interiorLampLight: 1
     runOuterFaces: 4
-    runRim: 2
-    runInnerChannel: 3
+    runOuterFacesScale: 1
+    runOuterFacesSeamExtent: 0.41
+    runRim: 4
+    runRimScale: 0.37
+    runRimSeamExtent: 8
+    runInnerChannel: 4
+    runInnerChannelScale: 0.16
+    runInnerChannelSeamExtent: 0.53
     outpostOutsideWalls: 4
     outpostWallTop: 4
     outpostInsideWalls: 4
     outpostFloor: 4
-    structureSides: 0
-    structureWallTop: 0
+    outpostColumnSides: 4
+    outpostColumnTop: 4
+    outpostOpeningSides: 4
+    outpostOpeningFloor: 4
+    outpostSlopeTop: 4
+    outpostSlopeSides: 4
+    outpostSlopeEnd: 4
+    structureSides: 4
+    structureWallTop: 3
     structureInsideWalls: 0
     structureTop: 0
-    walkwayTop: 0
-    walkwayOuterWall: 0
-    walkwayStep: 0
-    walkwayEnds: 0
-    towerOrb: 3
-    towerStem: 3
-    towerBaseSides: 2
-    towerBaseTop: 3
+    structureColumnSides: 4
+    structureColumnTop: 3
+    walkwayTop: 4
+    walkwayOuterWall: 4
+    walkwayStep: 4
+    walkwayEnds: 4
+    bridgeTop: 4
+    bridgeUnderside: 4
+    bridgeRampEnds: 4
+    bridgeSides: 4
+    riverArchTop: 4
+    riverArchOutside: 4
+    riverArchOpening: 4
+    riverArchFaces: 4
+    rimWallTop: 6
+    rimWallRiverFace: 6
+    rimWallOuterFace: 6
+    rimWallEnds: 6
+    poolDoorway: 0
+    riverPortholes: 4
+    rimNodeTop: 4
+    rimNodeSides: 4
+    rimNodeScreenEdges: 4
+    rimNodePlinthTop: 4
+    rimNodePlinthSides: 4
+    towerOrb: 6
+    towerStem: 6
+    towerBaseSides: 6
+    towerBaseTop: 6
+    towerLowerRamp: 6
+    towerUpperRamp: 6
+    towerLowerRampTop: 4
+    towerUpperRampTop: 4
+    towerSecondBaseSides: 4
+    towerSecondBaseTop: 4
+    towerOrbInside: 4
+    towerOrbHoleEdge: 4
+    towerInnerLollipopOrb: 4
+    towerInnerLollipopStem: 4
+    towerInnerLollipopBase: 4
+    turretBaseSides: 2
+    turretBaseTop: 3
+    turretLowerRamp: 2
+    turretUpperRamp: 2
+    turretStem: 3
+    turretHead: 3
+    turretNose: 3
+    poolTowerBaseSides: 4
+    poolTowerBaseTop: 4
+    poolTowerLowerRamp: 4
+    poolTowerRamp: 4
+    poolTowerColumn: 4
+    poolTowerOrb: 4
+    poolTowerTopHub: 4
+    poolTowerSideHub: 4
+    poolTowerTap: 4
+    poolTowerIntake: 4
+    poolTowerBowlOutside: 0
+    poolTowerBowlRim: 0
+    poolTowerBowlInside: 0
+    fishBowlBaseSides: 2
+    fishBowlBaseTop: 3
+    fishBowlRamp: 2
+    fishBowlColumn: 3
+    fishBowlOutside: 0
+    fishBowlRim: 0
+    fishBowlInside: 0
     wallSides: 4
-    wallTop: 5
-    wallEnds: 0
+    wallTop: 4
+    wallEnds: 4
     wallOpenings: 4
     wallColumnSides: 4
-    wallColumnTop: 5
-    wallLipTop: 0
-    wallLipSides: 0
+    wallColumnTop: 4
+    wallLipTop: 4
+    wallLipSides: 4
     wallLipUnderside: 4
+    wallPortholes: 4
+    wallDamageEdge: 0
+    wallColumnLipTop: 4
+    wallColumnLipSides: 4
+    wallColumnLipUnderside: 4
+    wallColumnSleeve: 4
+    pipeOutside: 4
+    pipeInside: 4
+    pipeRings: 4
+    pipeStems: 4
+    pipeHubSleeve: 4
+    pipeHubRing: 4
     arenaInnerFace: 0
     arenaOuterFace: 4
     arenaTop: 5
@@ -298,6 +642,24 @@ MonoBehaviour:
     doorFlapRim: 4
     doorDisc: 4
     doorEdges: 4
+    designationScales:
+    - 1
+    - 1
+    - 0.21
+    - 1
+    - 1
+    - 0.16
+    - 0.26
+    - 0.04
+    - 0.28
+    - 1
+    - 0.07
+    - 1
+    - 0.16
+    - 1
+    - 1
+    - 1
+    - 0.46
     outerColour: {r: 0.05660379, g: 0.05660379, b: 0.05660379, a: 1}
     outerGrainSize: 0.36
     outerGrainStrength: 0.241
@@ -315,3 +677,6 @@ MonoBehaviour:
     decalSpacing: 4.76
     decalScaleMin: 0.68
     decalScaleMax: 7.89
+    partsSeeded: 1
+    towerTiersSeeded: 1
+    fishBowlSeeded: 1

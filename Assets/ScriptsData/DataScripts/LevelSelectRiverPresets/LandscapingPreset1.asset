@@ -13,25 +13,73 @@ MonoBehaviour:
   m_Name: LandscapingPreset1
   m_EditorClassIdentifier: Assembly-CSharp::LevelSelectLandscapePreset
   landscapeShading:
-    colourA: {r: 0.23584908, g: 0.23584908, b: 0.23584908, a: 1}
+    baseColour: {r: 0, g: 0.3207547, b: 0.053266447, a: 1}
+    colourA: {r: 0.14901961, g: 0.30980393, b: 0.17254902, a: 1}
     grainSizeA: 0.31
-    grainStrengthA: 0.304
-    colourB: {r: 0.08176088, g: 0.08176088, b: 0.08176088, a: 1}
-    grainSizeB: 0.45
-    grainStrengthB: 0.281
-    colourC: {r: 0, g: 0, b: 0, a: 1}
+    grainStrengthA: 0.192
+    colourB: {r: 0.14831792, g: 0.31132078, b: 0.17160402, a: 1}
+    grainSizeB: 0.54
+    grainStrengthB: 0.23
+    colourC: {r: 0, g: 0.5377358, b: 0.3581865, a: 1}
     grainSizeC: 0.2
     grainStrengthC: 0.285
-    colourD: {r: 0.45, g: 0.45, b: 0.45, a: 1}
+    colourD: {r: 0.031772878, g: 0.3962264, b: 0.12925969, a: 1}
     grainSizeD: 0.2
     grainStrengthD: 0.3
     holes: 2
     noiseUp: 0
     noiseDown: 1
-    holeDepth: -31.68
-    softness: 0.089
+    holeDepth: 0.5
+    softness: 0.053
     noiseSoftness: 0.2
     spikes: 0
     spikeGrooveSoftness: 0.5
     spikeGrooveDarkness: 0.35
     spikeGrooveResolution: 256
+    decalSheet: {fileID: 2800000, guid: 6de4274286365c041ae50acfb5fe69c7, type: 2}
+    decalSheetColumns: 1
+    decalSheetRows: 1
+    decalSheetHeld: 1
+    decalSheetCellPixels: 256
+    decalSheetDrawings:
+    - 78e80040c4b1b8a498b5e4bf6f14b99f
+    decalGroups:
+    - name: Decal Group 1
+      onLandscape: 1
+      onSpikes: 1
+      onTrees: 1
+      amount: 0.722
+      opacity: 0.572
+      spacing: 6.46
+      tiled: 1
+      blendTiles: 0
+      blendNoiseScale: 0.15
+      blendNoiseSoftness: 0.5
+      scaleMin: 0.04
+      scaleMax: 0.09
+      rotate: 0
+      rotateAmount: 0.5
+      blendMode: 5
+      drawings:
+      - 78e80040c4b1b8a498b5e4bf6f14b99f
+      seed: 1
+    normalDecalSheet: {fileID: 2800000, guid: 87566e6c6b08bbe4e9c32a42362e06cb, type: 2}
+    normalDecalSheetColumns: 1
+    normalDecalSheetRows: 1
+    normalDecalSheetHeld: 1
+    normalDecalSheetCellPixels: 256
+    normalDecalSheetDrawings:
+    - 51c6e6a0661a1754b9a0d70b36ebcf4b
+    normalDecalGroups:
+    - name: Normal Map Group 1
+      onLandscape: 1
+      onSpikes: 0
+      onTrees: 0
+      strength: 28.4
+      spacing: 52
+      blendTiles: 0
+      blendNoiseScale: 0.15
+      blendNoiseSoftness: 0.5
+      seed: 1
+      drawings:
+      - 51c6e6a0661a1754b9a0d70b36ebcf4b

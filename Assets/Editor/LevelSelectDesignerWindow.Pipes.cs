@@ -60,9 +60,170 @@ public partial class LevelSelectDesignerWindow
     private static Vector3 PipeNodeWorldFlat(LevelSelectDesignerData.PipeNode node)
         => new Vector3(node.positionXZ.x, 0f, node.positionXZ.y);
 
+    /// <summary>
+    /// What the pipe's centre line runs through: its nodes, with a lead-in either side of every
+    /// hub that has Lead-ins ticked, so the pipe runs straight through the hub.
+    /// </summary>
+    private List<Vector3> PipeLinePoints(LevelSelectDesignerData.DesignerPipe pipe)
+    {
+        var nodes     = PipeNodePoints(pipe);
+        var leadIns   = new List<int>();
+        var distances = new List<float>();
+        for (int i = 0; i < pipe.nodes.Count; i++)
+        {
+            var n = pipe.nodes[i];
+            if (!n.hub || !n.hubLeadIns) continue;
+            leadIns.Add(i);
+            distances.Add(n.hubLeadInDistance);
+        }
+        return leadIns.Count == 0 ? nodes : PipeMesh.WithLeadIns(nodes, leadIns, distances);
+    }
+
+    // ─────────────────────────────────────────────
+    // HUBS
+    // ─────────────────────────────────────────────
+
+    /// <summary>The pipe and node index of the hub <paramref name="hubId"/>, if it is still a hub.</summary>
+    private bool FindPipeHub(string hubId, out LevelSelectDesignerData.DesignerPipe pipe, out int node)
+    {
+        pipe = null; node = -1;
+        if (string.IsNullOrEmpty(hubId) || _data == null) return false;
+        foreach (var p in _data.pipes)
+        {
+            if (p?.nodes == null) continue;
+            int i = p.nodes.FindIndex(n => n != null && n.hub && n.hubId == hubId);
+            if (i < 0) continue;
+            pipe = p; node = i;
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>The pool whose soul juice tank takes its intake from <paramref name="hubId"/>, or null.</summary>
+    private LevelSelectDesignerData.DesignerPool TankLinkedTo(string hubId)
+        => string.IsNullOrEmpty(hubId) ? null
+         : _data.pools.Find(p => p != null && p.tankHubId == hubId && p.hasTower &&
+                                 p.towerKind == LevelSelectDesignerData.TowerKind.SoulJuiceTank);
+
+    /// <summary>
+    /// A hub in the pipe's own frame (world x and z, y up from the rim top). Its ring stands out
+    /// level and square to the pipe, on the side of the tank linked to it — or on the right-hand
+    /// side looking along the pipe when no tank is linked.
+    /// </summary>
+    private PipeMesh.Hub PipeHubLocal(LevelSelectDesignerData.DesignerPipe pipe, int node)
+    {
+        var nodes = PipeNodePoints(pipe);
+        var n     = pipe.nodes[node];
+        var hub   = new PipeMesh.Hub
+        {
+            centre          = nodes[node],
+            axis            = PipeMesh.AxisAt(nodes, node),
+            sleeveRadius    = n.hubSleeveRadius,
+            sleeveThickness = n.hubSleeveThickness,
+            ringRadius      = n.hubRingRadius,
+            ringThickness   = n.hubRingThickness,
+        };
+
+        // Always level, square to the pipe — so the intake comes up and turns one right angle into
+        // it, the way the tap turns down. It stands out on the linked tank's side; with none, on
+        // the right-hand side looking along the pipe.
+        Vector3 dir = Vector3.Cross(hub.axis, Vector3.up);
+        var pool = TankLinkedTo(n.hubId);
+        if (pool != null && TankTopHubWorld(pool, out Vector3 top))
+        {
+            Vector3 toward = top - (hub.centre + Vector3.up * PipeRimTopY);
+            toward.y = 0f;
+            if (dir.sqrMagnitude < 1e-8f) dir = toward;           // a pipe running straight up
+            else if (Vector3.Dot(dir, toward) < 0f) dir = -dir;
+        }
+        if (dir.sqrMagnitude < 1e-8f) dir = Vector3.forward;
+        if (n.hubFlip) dir = -dir;
+        dir.y = 0f;
+        hub.ringDir = dir.normalized;
+        return hub;
+    }
+
+    /// <summary>A hub as <see cref="PipeHubLocal"/> gives it, moved into the world.</summary>
+    private bool TryPipeHubWorld(LevelSelectDesignerData.DesignerPipe pipe, int node, out PipeMesh.Hub hub)
+    {
+        hub = default;
+        if (pipe == null || node < 0 || node >= pipe.nodes.Count) return false;
+        hub = PipeHubLocal(pipe, node);
+        hub.centre += Vector3.up * PipeRimTopY;
+        return true;
+    }
+
+    /// <summary>
+    /// Where the middle of a soul juice tank's top hub face is in the world: off the tank as
+    /// generated, or off its pool's node when it isn't built yet.
+    /// </summary>
+    private bool TankTopHubWorld(LevelSelectDesignerData.DesignerPool pool, out Vector3 top)
+    {
+        top = default;
+        if (pool?.soulJuiceTank == null) return false;
+        var placed = pool.soulJuiceTank.Scaled(pool.towerScale);
+
+        var tank = FindGeneratedPoolTower(pool);
+        if (tank != null) { top = tank.TransformPoint(placed.TopHubFace); return true; }
+
+        var node = _data.nodes.Find(n => n.id == pool.nodeId);
+        if (node == null) return false;
+        top = node.worldPosition + placed.TopHubFace;
+        return true;
+    }
+
+    /// <summary>
+    /// The Intake Hub dropdown for a soul juice tank: None, then every pipe hub within the Hub
+    /// Reach set under Pipes in Level Select Settings, nearest first. A hub already feeding
+    /// another tank isn't offered. Hands back the hub id picked.
+    /// </summary>
+    private string DrawTankIntakeHubField(LevelSelectDesignerData.DesignerPool pool)
+    {
+        var node = _data.nodes.Find(n => n.id == pool.nodeId);
+        Vector2 at = node != null ? new Vector2(node.worldPosition.x, node.worldPosition.z) : Vector2.zero;
+        float reach = LevelSelectDesignerSettings.PipeHubReach;
+
+        var near = new List<(string id, string label, float dist)>();
+        for (int p = 0; p < _data.pipes.Count; p++)
+        {
+            var pipe = _data.pipes[p];
+            if (pipe?.nodes == null) continue;
+            for (int i = 0; i < pipe.nodes.Count; i++)
+            {
+                var n = pipe.nodes[i];
+                if (n == null || !n.hub || string.IsNullOrEmpty(n.hubId)) continue;
+
+                var other = TankLinkedTo(n.hubId);
+                if (other != null && other != pool) continue;
+
+                float dist = Vector2.Distance(at, n.positionXZ);
+                if (dist > reach && n.hubId != pool.tankHubId) continue;
+                near.Add((n.hubId, $"Pipe {p + 1} · Node {i + 1}  ({dist:F2} m)", dist));
+            }
+        }
+        near.Sort((a, b) => a.dist.CompareTo(b.dist));
+
+        var labels = new List<GUIContent> { new GUIContent("None") };
+        labels.AddRange(near.Select(h => new GUIContent(h.label)));
+        int index = Mathf.Max(0, near.FindIndex(h => h.id == pool.tankHubId) + 1);
+
+
+        index = EditorGUILayout.Popup(
+            new GUIContent("Intake Hub", "The pipe hub the intake runs up to — hubs within Hub Reach (Level " +
+                                         "Select Settings > Pipes), nearest first. A hub feeds one tank only."),
+            index, labels.ToArray());
+        if (near.Count == 0)
+            EditorGUILayout.LabelField($"No free pipe hub within {reach:F1} m.", EditorStyles.miniLabel);
+
+        return index <= 0 ? null : near[index - 1].id;
+    }
+
     // ─────────────────────────────────────────────
     // CANVAS — DRAWING
     // ─────────────────────────────────────────────
+
+    // The pipe itself (band, bore, supports, nodes) at the Pipes settings' Opacity, on top of any mode fade.
+    private static Color PipeFaded(Color c) { c = Faded(c); c.a *= LevelSelectDesignerSettings.PipeOpacity; return c; }
 
     private void DrawPipes()
     {
@@ -80,31 +241,32 @@ public partial class LevelSelectDesignerWindow
             // a darker line down the middle for the hollow.
             if (pipe.nodes.Count >= 2)
             {
-                var line   = PipeMesh.CentreLine(PipeNodePoints(pipe), pipe.pipeThickness);
+                var line   = PipeMesh.CentreLine(PipeLinePoints(pipe), pipe.pipeThickness);
                 var canvas = line.Select(p => (Vector3)WorldToCanvas(p)).ToArray();
                 float width = Mathf.Max(3f, pipe.pipeThickness * _zoom);
 
-                Handles.color = body;
+                Handles.color = PipeFaded(body);
                 DrawSolidLine(width, canvas);
                 float hollow = Mathf.Max(0f, pipe.pipeThickness - pipe.wallThickness * 2f) * _zoom;
                 if (hollow > 1f)
                 {
-                    Handles.color = bore;
+                    Handles.color = PipeFaded(bore);
                     DrawSolidLine(Mathf.Max(1f, hollow), canvas);
                 }
 
                 DrawPipeSupports(pipe, line, selected);
+                DrawPipeHubs(pipe);
             }
 
             // Nodes: solid dots, orange where the node has its own height.
             for (int i = 0; i < pipe.nodes.Count; i++)
             {
                 Vector2 at = WorldToCanvas(PipeNodeWorldFlat(pipe.nodes[i]));
-                Handles.color = LevelSelectDesignerSettings.PipeOutlineColour;
+                Handles.color = PipeFaded(LevelSelectDesignerSettings.PipeOutlineColour);
                 Handles.DrawSolidDisc(at, Vector3.forward, PipeNodeRadius + 1.5f);
-                Handles.color = selected && i == _selectedPipeNode ? LevelSelectDesignerSettings.PipeSelColour
+                Handles.color = PipeFaded(selected && i == _selectedPipeNode ? LevelSelectDesignerSettings.PipeSelColour
                               : pipe.nodes[i].overrideHeight       ? LevelSelectDesignerSettings.PipeOwnHeightColour
-                              : body;
+                              : body);
                 Handles.DrawSolidDisc(at, Vector3.forward, PipeNodeRadius);
             }
         }
@@ -113,9 +275,48 @@ public partial class LevelSelectDesignerWindow
         var drawing = _isDrawingPipe ? SelectedPipe : null;
         if (drawing != null && drawing.nodes.Count > 0 && _canvasRect.Contains(Event.current.mousePosition))
         {
-            Handles.color = LevelSelectDesignerSettings.PipeGhostColour;
+            Handles.color = Faded(LevelSelectDesignerSettings.PipeGhostColour);
             Handles.DrawDottedLine(WorldToCanvas(PipeNodeWorldFlat(drawing.nodes[drawing.nodes.Count - 1])),
                                    Event.current.mousePosition, 5f);
+        }
+    }
+
+    // Each hub as its sleeve seen from above — a bar across the pipe as wide as the sleeve and as
+    // long as it is thick — and each lead-in as a small dot on the pipe.
+    private void DrawPipeHubs(LevelSelectDesignerData.DesignerPipe pipe)
+    {
+        var nodes = PipeNodePoints(pipe);
+        for (int i = 0; i < pipe.nodes.Count; i++)
+        {
+            var n = pipe.nodes[i];
+            if (!n.hub) continue;
+
+            Vector3 axis   = PipeMesh.AxisAt(nodes, i);
+            Vector2 at     = WorldToCanvas(PipeNodeWorldFlat(n));
+            Vector2 along  = WorldToCanvas(PipeNodeWorldFlat(n) + axis) - at;
+            if (along.sqrMagnitude < 1e-8f) along = Vector2.right;
+            along.Normalize();
+            Vector2 across = new Vector2(-along.y, along.x);
+
+            float half  = Mathf.Max(PipeNodeRadius + 3f, n.hubSleeveRadius * _zoom);
+            float thick = Mathf.Max(3f, n.hubSleeveThickness * _zoom);
+            Handles.color = PipeFaded(LevelSelectDesignerSettings.PipeOutlineColour);
+            DrawSolidLine(thick + 2f, at - across * (half + 1f), at + across * (half + 1f));
+            Handles.color = PipeFaded(LevelSelectDesignerSettings.PipeSupportColour);
+            DrawSolidLine(thick, at - across * half, at + across * half);
+
+            if (!n.hubLeadIns) continue;
+            float d = Mathf.Max(0f, n.hubLeadInDistance);
+            Vector3 flat = PipeNodeWorldFlat(n), flatAxis = new Vector3(axis.x, 0f, axis.z);
+            for (int side = -1; side <= 1; side += 2)
+            {
+                if ((side < 0 && i == 0) || (side > 0 && i == pipe.nodes.Count - 1)) continue;
+                Vector2 lead = WorldToCanvas(flat + flatAxis * (d * side));
+                Handles.color = PipeFaded(LevelSelectDesignerSettings.PipeOutlineColour);
+                Handles.DrawSolidDisc(lead, Vector3.forward, PipeNodeRadius * 0.6f + 1.5f);
+                Handles.color = PipeFaded(LevelSelectDesignerSettings.PipeSupportColour);
+                Handles.DrawSolidDisc(lead, Vector3.forward, PipeNodeRadius * 0.6f);
+            }
         }
     }
 
@@ -130,10 +331,10 @@ public partial class LevelSelectDesignerWindow
             float half  = Mathf.Max(8f, (pipe.pipeThickness * 0.5f + pipe.ringOverhang) * _zoom + 3f);
             float thick = Mathf.Max(2.5f, pipe.supportThickness * _zoom);
 
-            Handles.color = LevelSelectDesignerSettings.PipeOutlineColour;
+            Handles.color = PipeFaded(LevelSelectDesignerSettings.PipeOutlineColour);
             DrawSolidLine(thick + 2f, at - across * (half + 1f), at + across * (half + 1f));
-            Handles.color = selected && i == _selectedPipeSupport ? LevelSelectDesignerSettings.PipeSelColour
-                                                                   : LevelSelectDesignerSettings.PipeSupportColour;
+            Handles.color = PipeFaded(selected && i == _selectedPipeSupport ? LevelSelectDesignerSettings.PipeSelColour
+                                                                   : LevelSelectDesignerSettings.PipeSupportColour);
             DrawSolidLine(thick, at - across * half, at + across * half);
         }
     }
@@ -537,6 +738,9 @@ public partial class LevelSelectDesignerWindow
         _selectedPipeNode    = -1;
         _selectedPipeSupport = -1;
         _isDrawingPipe       = false;
+
+        // A tank whose hub went with the pipe loses its intake.
+        RebuildTankIntakes();
     }
 
     // ─────────────────────────────────────────────
@@ -574,6 +778,19 @@ public partial class LevelSelectDesignerWindow
         bool  nodeOverride = false;
         float nodeHeight   = 0f;
         bool  hasNode      = _selectedPipeNode >= 0 && _selectedPipeNode < pipe.nodes.Count;
+        bool  hub = false, hubLeadIns = false, hubFlip = false;
+        float hubLeadInDistance = 0f, sleeveRadius = 0f, sleeveThickness = 0f, ringRadius = 0f, ringThickness = 0f;
+        if (hasNode)
+        {
+            var n = pipe.nodes[_selectedPipeNode];
+            hubLeadIns        = n.hubLeadIns;
+            hubFlip           = n.hubFlip;
+            hubLeadInDistance = n.hubLeadInDistance;
+            sleeveRadius      = n.hubSleeveRadius;
+            sleeveThickness   = n.hubSleeveThickness;
+            ringRadius        = n.hubRingRadius;
+            ringThickness     = n.hubRingThickness;
+        }
         if (hasNode)
         {
             var node = pipe.nodes[_selectedPipeNode];
@@ -586,6 +803,45 @@ public partial class LevelSelectDesignerWindow
                 nodeHeight = EditorGUILayout.FloatField(
                     new GUIContent("Height", "How far the pipe's centre line stands above the water at this node."),
                     nodeOverride ? node.height : pipe.height);
+
+            hub = EditorGUILayout.Toggle(
+                new GUIContent("Hub", "Make this node a hub: a sleeve round the pipe with a ring standing out of it " +
+                                      "at a right angle, which a soul juice tank's intake can be linked into."),
+                node.hub);
+            if (hub)
+            {
+                EditorGUI.indentLevel++;
+                hubLeadIns = EditorGUILayout.Toggle(
+                    new GUIContent("Lead-ins", "Put a lead-in either side of the hub, so the pipe runs straight " +
+                                               "through it and bends at the lead-ins instead."),
+                    node.hubLeadIns);
+                using (new EditorGUI.DisabledScope(!hubLeadIns))
+                    hubLeadInDistance = EditorGUILayout.FloatField(
+                        new GUIContent("Lead-in Distance", "How far each lead-in is from the hub, along the pipe."),
+                        node.hubLeadInDistance);
+                sleeveRadius = EditorGUILayout.FloatField(
+                    new GUIContent("Sleeve Radius", "Radius of the sleeve round the pipe, out to its outside."),
+                    node.hubSleeveRadius);
+                sleeveThickness = EditorGUILayout.FloatField(
+                    new GUIContent("Sleeve Thickness", "How long the sleeve is along the pipe."),
+                    node.hubSleeveThickness);
+                ringRadius = EditorGUILayout.FloatField(
+                    new GUIContent("Ring Radius", "Radius of the ring standing out of the sleeve, the intake goes into."),
+                    node.hubRingRadius);
+                ringThickness = EditorGUILayout.FloatField(
+                    new GUIContent("Ring Thickness", "How far the ring stands out past the sleeve. It stands out " +
+                                                     "level, on the linked tank's side (the right-hand side " +
+                                                     "looking along the pipe with none)."),
+                    node.hubRingThickness);
+                hubFlip = EditorGUILayout.Toggle(
+                    new GUIContent("Flip Side", "Put the ring on the other side of the pipe."), node.hubFlip);
+
+                var linked = TankLinkedTo(node.hubId);
+                EditorGUILayout.LabelField(linked != null ? $"Feeds the soul juice tank on {linked.nodeId}."
+                                                          : "No soul juice tank linked — pick it from a tank's Intake Hub.",
+                                           EditorStyles.wordWrappedMiniLabel);
+                EditorGUI.indentLevel--;
+            }
         }
 
         if (EditorGUI.EndChangeCheck())
@@ -603,10 +859,22 @@ public partial class LevelSelectDesignerWindow
                 if (nodeOverride && !node.overrideHeight) nodeHeight = pipe.height;
                 node.overrideHeight = nodeOverride;
                 if (nodeOverride) node.height = Mathf.Max(0f, nodeHeight);
+
+                node.hub = hub;
+                if (hub && string.IsNullOrEmpty(node.hubId)) node.hubId = Guid.NewGuid().ToString();
+                node.hubLeadIns         = hubLeadIns;
+                node.hubLeadInDistance  = Mathf.Max(0f, hubLeadInDistance);
+                node.hubSleeveRadius    = Mathf.Max(0.001f, sleeveRadius);
+                node.hubSleeveThickness = Mathf.Max(0.001f, sleeveThickness);
+                node.hubRingRadius      = Mathf.Max(0.001f, ringRadius);
+                node.hubRingThickness   = Mathf.Max(0f, ringThickness);
+                node.hubFlip            = hubFlip;
             }
             MarkDirty();
             RebuildAfterEdit(pipe, () => RebuildPipe(pipe));
         }
+
+        if (OcclusionToggle(ref pipe.occlusion, ref pipe.occlusionStyle)) RebuildPipe(pipe);
 
         if (hasNode)
         {
@@ -667,6 +935,8 @@ public partial class LevelSelectDesignerWindow
 
             BuildPipe(pipe, go);
         }
+
+        RebuildTankIntakes();
     }
 
     /// <summary>
@@ -692,7 +962,21 @@ public partial class LevelSelectDesignerWindow
             go.AddComponent<PipeMesh>();
             BuildPipe(pipe, go);
         }
+
+        // A tank's intake reaches this pipe's hub, so it is laid again to meet it.
+        RebuildTankIntakes();
         AssetDatabase.SaveAssets();
+    }
+
+    /// <summary>
+    /// Rebuilds one pipe already in the scene, and nothing else — for when a tank linked to one
+    /// of its hubs moves, and the hub's ring only needs turning to face it.
+    /// </summary>
+    private void BuildPipeIfGenerated(LevelSelectDesignerData.DesignerPipe pipe)
+    {
+        if (pipe == null || pipe.nodes.Count < 2) return;
+        var record = FindObjectsOfType<PipeMesh>().FirstOrDefault(r => r.pipeId == pipe.pipeId);
+        if (record != null) BuildPipe(pipe, record.gameObject);
     }
 
     private void BuildPipe(LevelSelectDesignerData.DesignerPipe pipe, GameObject go)
@@ -707,10 +991,14 @@ public partial class LevelSelectDesignerWindow
         go.transform.rotation   = Quaternion.identity;
         go.transform.localScale = Vector3.one;
 
+        var hubs = new List<PipeMesh.Hub>();
+        for (int i = 0; i < pipe.nodes.Count; i++)
+            if (pipe.nodes[i].hub) hubs.Add(PipeHubLocal(pipe, i));
+
         var mesh = SaveGeneratedMesh(name, PipeMesh.Build(
             PipeNodePoints(pipe), pipe.supports.Select(ToMeshSupport).ToList(),
             pipe.pipeThickness, pipe.wallThickness, pipe.supportThickness, pipe.ringOverhang,
-            -_data.RunDepth));
+            -_data.RunDepth, StoneShadingForBuild, PipeLinePoints(pipe), hubs));
         if (mesh == null) return;
 
         var filter = go.GetComponent<MeshFilter>();
@@ -729,6 +1017,9 @@ public partial class LevelSelectDesignerWindow
         EditorUtility.SetDirty(record);
 
         EnsurePipeColliders(pipe, go);
+
+        // Its rods are found by the camera already — the toggle only says whether it fades.
+        ApplyOcclusion(go, pipe.occlusion, pipe.occlusionStyle, addColliders: false);
     }
 
     private const string PipeColliderName = "PipeCollider";

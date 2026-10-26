@@ -24,14 +24,22 @@ float _AngelGlowSize;       // how far the glow reaches, as a fraction of screen
 float _AngelGlowStrength;   // how bright and full it is before it fades
 float _AngelGlowOpacity;    // master fade; 0 = off, and the feature skips the silhouette too
 
+// Boat glow: the same treatment on the Boat Glow rendering layer, with its own three knobs.
+TEXTURE2D(_BoatGlowMask);
+SAMPLER(sampler_BoatGlowMask);
+float _BoatGlowSize;
+float _BoatGlowStrength;
+float _BoatGlowOpacity;
+
 #define ANGEL_GLOW_TAPS 32
 
 // Blurs the silhouette and keeps only what spills OUTSIDE it, so the light spreads off the edges
 // without washing over the angel. The taps are a spiral turned per pixel, which trades the
 // stepping a fixed pattern would leave for a fine grain.
-float GlowFX_AngelGlow(float2 uv, float2 screenSize)
+float GlowFX_OuterGlow(TEXTURE2D_PARAM(mask, maskSampler), float2 uv, float2 screenSize,
+                       float size, float strength, float opacity)
 {
-    float2 radius = float2(_AngelGlowSize * screenSize.y / screenSize.x, _AngelGlowSize);
+    float2 radius = float2(size * screenSize.y / screenSize.x, size);
     float2 px     = uv * screenSize;
     float  turn   = 6.2831853 * frac(52.9829189 * frac(dot(px, float2(0.06711056, 0.00583715))));
 
@@ -42,12 +50,12 @@ float GlowFX_AngelGlow(float2 uv, float2 screenSize)
         float  a = i * 2.39996323 + turn;
         float  w = 1.0 - r;   // nearer taps count for more, so the glow fades out softly
         float2 o = float2(cos(a), sin(a)) * r * radius;
-        sum     += SAMPLE_TEXTURE2D_LOD(_AngelGlowMask, sampler_AngelGlowMask, uv + o, 0).r * w;
+        sum     += SAMPLE_TEXTURE2D_LOD(mask, maskSampler, uv + o, 0).r * w;
         weights += w;
     }
 
-    float inside = SAMPLE_TEXTURE2D_LOD(_AngelGlowMask, sampler_AngelGlowMask, uv, 0).r;
-    return saturate(sum / weights * _AngelGlowStrength) * (1.0 - inside) * _AngelGlowOpacity;
+    float inside = SAMPLE_TEXTURE2D_LOD(mask, maskSampler, uv, 0).r;
+    return saturate(sum / weights * strength) * (1.0 - inside) * opacity;
 }
 
 // Round point: plain radial falloff, in aspect-corrected UV so it stays circular on screen.
@@ -82,7 +90,12 @@ void GlowFXMask_float(float2 UV, float2 ScreenSize, out float Mask)
 
     // Rides the same brightness lift as the points; max for the same reason as above.
     if (_AngelGlowOpacity > 0.0)
-        Mask = max(Mask, GlowFX_AngelGlow(UV, ScreenSize));
+        Mask = max(Mask, GlowFX_OuterGlow(TEXTURE2D_ARGS(_AngelGlowMask, sampler_AngelGlowMask), UV, ScreenSize,
+                                          _AngelGlowSize, _AngelGlowStrength, _AngelGlowOpacity));
+
+    if (_BoatGlowOpacity > 0.0)
+        Mask = max(Mask, GlowFX_OuterGlow(TEXTURE2D_ARGS(_BoatGlowMask, sampler_BoatGlowMask), UV, ScreenSize,
+                                          _BoatGlowSize, _BoatGlowStrength, _BoatGlowOpacity));
 }
 
 void GlowFXMask_half(half2 UV, half2 ScreenSize, out half Mask)

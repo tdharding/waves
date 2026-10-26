@@ -41,22 +41,4 @@ public class SpikeFogRepeller : MonoBehaviour, IFogRepeller
     }
 
     void OnDisable() => FogFieldManager.Unregister(this);
-
-#if UNITY_EDITOR
-    void OnDrawGizmosSelected()
-    {
-        float r  = radius + FogFieldManager.RockRepelRadius;
-        bool  on = FogFieldManager.AdoptRocks && GetComponent<RockRingSource>() == null;
-
-        UnityEditor.Handles.color = on ? new Color(0.95f, 0.55f, 0.35f, 0.14f)
-                                       : new Color(0.55f, 0.55f, 0.58f, 0.10f);
-        UnityEditor.Handles.DrawSolidDisc(transform.position, Vector3.up, r);
-        UnityEditor.Handles.color = on ? new Color(0.95f, 0.4f, 0.25f, 0.22f)
-                                       : new Color(0.55f, 0.55f, 0.58f, 0.16f);
-        UnityEditor.Handles.DrawSolidDisc(transform.position, Vector3.up, radius);
-
-        UnityEditor.Handles.color = Color.white;
-        UnityEditor.Handles.Label(transform.position, on ? "fog spike" : "fog spike (off)");
-    }
-#endif
 }

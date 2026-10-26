@@ -48,10 +48,13 @@ public partial class LevelSelectDesignerWindow
     // Where the rivers' rim top is, in the world. Walls are built from it, the same as pipes.
     private float WallRimTopY => _data.canvasWorldY;
 
-    /// <summary>A wall's nodes as the builder takes them: world x and z, y the top up from the rim top.</summary>
+    /// <summary>A wall's nodes as the builder takes them: world x and z, y the top up from the rim top.
+    /// Archway and porthole heights are kept up from the baseline (Canvas World Y), so the Drop never
+    /// moves them; the builder takes them up from the wall's base, so the Drop is added back here.</summary>
     private List<WallMesh.Node> WallNodes(LevelSelectDesignerData.DesignerWall wall)
     {
         float water = -_data.WaterSurfaceDrop;
+        float drop  = _data.RunDepth;   // baseline down to the wall's base
         var   list  = new List<WallMesh.Node>(wall.nodes.Count);
         for (int i = 0; i < wall.nodes.Count; i++)
         {
@@ -63,10 +66,20 @@ public partial class LevelSelectDesignerWindow
                 gapToNext    = n.gapToNext,
                 archway      = n.hasArchway,
                 archWidth    = n.archWidth,
-                archHeight   = n.archHeight,
+                archHeight   = drop + n.archHeight,
                 porthole       = n.hasPorthole,
                 portholeRadius = n.portholeRadius,
-                portholeHeight = n.portholeHeight,
+                portholeHeight = drop + n.portholeHeight,
+                destruction        = n.HasDestruction,
+                holeOffset         = n.holeOffset,
+                holeWidth          = n.holeWidth,
+                holeHeight         = n.holeHeight,
+                holeEdgeComplexity = n.holeEdgeComplexity,
+                holeEdgeDepth      = n.holeEdgeDepth,
+                holeEdgeUnevenness = n.holeEdgeUnevenness,
+                holeEdgeRoundness  = n.holeEdgeRoundness,
+                holeCornerCurve      = n.holeCornerCurve,
+                holeCornerComplexity = n.holeCornerComplexity,
                 column       = n.hasColumn,
                 columnRadius = n.columnRadius,
                 columnHeight = n.columnHeight,
@@ -74,6 +87,47 @@ public partial class LevelSelectDesignerWindow
             });
         }
         return list;
+    }
+
+    /// <summary>
+    /// Older data measured archway and porthole heights up from the wall's base, so changing the
+    /// Drop moved them. Turns them to up from the baseline, once, at the Drop the data has now —
+    /// every opening stays exactly where it was. Left unsaved, so Save keeps it.
+    /// </summary>
+    private void ConvertWallOpeningsToBaseline()
+    {
+        if (_data == null || _data.wallOpeningsFromBaseline) return;
+        _data.wallOpeningsFromBaseline = true;
+
+        float drop = _data.RunDepth;
+        bool  any  = false;
+        foreach (var wall in _data.walls)
+        {
+            if (wall == null) continue;
+            foreach (var n in wall.nodes)
+            {
+                n.archHeight     -= drop;
+                n.portholeHeight -= drop;
+                any = true;
+            }
+        }
+
+        if (any)
+        {
+            hasUnsavedChanges = true;
+            _consoleStatusMsg = "Wall archway and porthole heights now measure from the baseline (Canvas World Y) — Save to keep.";
+        }
+    }
+
+    /// <summary>
+    /// Keeps every wall's Seam Clean Up spots on their own nodes as nodes are added and deleted —
+    /// see <see cref="LevelSelectDesignerData.DesignerWall.SyncSpotNodes"/>. Spots from before
+    /// node ids are tied to the node at their place the first time round, before any edit.
+    /// </summary>
+    private void SyncWallSpotNodes()
+    {
+        if (_data == null) return;
+        foreach (var wall in _data.walls) wall?.SyncSpotNodes();
     }
 
     /// <summary>The wall's lip as the builder takes it — null when it has none.</summary>
@@ -106,7 +160,7 @@ public partial class LevelSelectDesignerWindow
                 {
                     var canvas = points.Select(p => (Vector3)WorldToCanvas(p)).ToList();
                     if (loop && canvas.Count > 0) canvas.Add(canvas[0]);
-                    Handles.color = body;
+                    Handles.color = Faded(body);
                     DrawSolidLine(width, canvas.ToArray());
                 }
             }
@@ -121,7 +175,7 @@ public partial class LevelSelectDesignerWindow
                 // A column as a solid disc its own size, in the wall's colour.
                 if (node.hasColumn)
                 {
-                    Handles.color = body;
+                    Handles.color = Faded(body);
                     Handles.DrawSolidDisc(at, Vector3.forward, Mathf.Max(WallNodeRadius + 2f, node.columnRadius * _zoom));
                 }
 
@@ -129,16 +183,32 @@ public partial class LevelSelectDesignerWindow
                 {
                     float baseR = Mathf.Max(TowerBaseRadius(node.towerKind, node.tower, node.turret, node.towerScale),
                                             TowerOrbRadius (node.towerKind, node.tower, node.turret, node.towerScale));
-                    Handles.color = LevelSelectDesignerSettings.WallTowerColour;
+                    Handles.color = Faded(LevelSelectDesignerSettings.WallTowerColour);
                     Handles.DrawSolidDisc(at, Vector3.forward, Mathf.Max(WallNodeRadius + 3f, baseR * _zoom));
                 }
 
-                Handles.color = LevelSelectDesignerSettings.WallOutlineColour;
+                Handles.color = Faded(LevelSelectDesignerSettings.WallOutlineColour);
                 Handles.DrawSolidDisc(at, Vector3.forward, WallNodeRadius + 1.5f);
-                Handles.color = selected && i == _selectedWallNode ? LevelSelectDesignerSettings.WallSelColour
+                Handles.color = Faded(selected && i == _selectedWallNode ? LevelSelectDesignerSettings.WallSelColour
                               : node.overrideHeight               ? LevelSelectDesignerSettings.WallOwnHeightColour
-                              : body;
+                              : body);
                 Handles.DrawSolidDisc(at, Vector3.forward, WallNodeRadius);
+            }
+
+            // The selected wall's node numbers beside its nodes — the same numbers its node list
+            // gives ("Node 3").
+            if (selected)
+            {
+                _nodeNumberStyle ??= new GUIStyle(EditorStyles.miniBoldLabel) { alignment = TextAnchor.MiddleRight };
+                for (int i = 0; i < wall.nodes.Count; i++)
+                {
+                    Vector2 at = WorldToCanvas(WallNodeWorldFlat(wall.nodes[i]));
+                    if (!_canvasRect.Contains(at)) continue;
+                    var text = new GUIContent((i + 1).ToString());
+                    var size = _nodeNumberStyle.CalcSize(text);
+                    DrawShadowedLabel(new Rect(at.x - WallNodeRadius - 4f - size.x, at.y - size.y * 0.5f, size.x, size.y),
+                                      text, _nodeNumberStyle);
+                }
             }
         }
 
@@ -146,7 +216,7 @@ public partial class LevelSelectDesignerWindow
         var drawing = _isDrawingWall ? SelectedWall : null;
         if (drawing != null && drawing.nodes.Count > 0 && _canvasRect.Contains(Event.current.mousePosition))
         {
-            Handles.color = LevelSelectDesignerSettings.WallGhostColour;
+            Handles.color = Faded(LevelSelectDesignerSettings.WallGhostColour);
             Handles.DrawDottedLine(WorldToCanvas(WallNodeWorldFlat(drawing.nodes[drawing.nodes.Count - 1])),
                                    Event.current.mousePosition, 5f);
         }
@@ -389,8 +459,9 @@ public partial class LevelSelectDesignerWindow
             RebuildWall(wall);
         }
 
+        if (OcclusionToggle(ref wall.occlusion, ref wall.occlusionStyle)) RebuildWall(wall);
+
         DrawWallNodeList(wall);
-        DrawSelectedWallNodeProps(wall);
 
         EditorGUILayout.Space(2);
         GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
@@ -489,6 +560,10 @@ public partial class LevelSelectDesignerWindow
         lip.columnRing = Mathf.Max(0f, EditorGUILayout.FloatField(
             new GUIContent("Column Ring", "How far the lip's ring round a column stands out from the column's " +
                                           "side. 0 leaves columns without one."), lip.columnRing));
+        using (new EditorGUI.DisabledScope(lip.columnRing <= 0f))
+            lip.columnSleeve = EditorGUILayout.Toggle(
+                new GUIContent("Sleeve", "Carry each column's ring on down to the wall's base — a round " +
+                                         "sleeve the ring's size round the column below the lip."), lip.columnSleeve);
         EditorGUI.indentLevel--;
         return edited;
     }
@@ -502,70 +577,92 @@ public partial class LevelSelectDesignerWindow
         int count = wall.nodes.Count;
         EditorGUILayout.Space(2);
         EditorGUILayout.LabelField($"Nodes  ({count})", EditorStyles.miniBoldLabel);
-        if (count < 2) return;
-
-        using (new EditorGUILayout.HorizontalScope())
+        if (count >= 2)
         {
-            if (GUILayout.Button(new GUIContent("Straighten All", "Make every stretch of this wall straight."),
-                                 EditorStyles.miniButtonLeft))
-                SetAllWallStretchesCurved(wall, false);
-            if (GUILayout.Button(new GUIContent("Curve All", "Make every stretch of this wall curved."),
-                                 EditorStyles.miniButtonRight))
-                SetAllWallStretchesCurved(wall, true);
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button(new GUIContent("Straighten All", "Make every stretch of this wall straight."),
+                                     EditorStyles.miniButtonLeft))
+                    SetAllWallStretchesCurved(wall, false);
+                if (GUILayout.Button(new GUIContent("Curve All", "Make every stretch of this wall curved."),
+                                     EditorStyles.miniButtonRight))
+                    SetAllWallStretchesCurved(wall, true);
+            }
         }
 
+        // One box per node, as the river nodes have: open a node and everything on it shows inside
+        // its box. Only one is open at a time — the selected node, drawn first under "Selected:".
         int insertAt = -1;
-        for (int i = 0; i < count; i++)
+        foreach (int i in SelectedFirst(count, _selectedWallNode))
         {
             var node = wall.nodes[i];
-            bool isSelected = i == _selectedWallNode;
+            bool isOpen = i == _selectedWallNode;
+
+            if (isOpen) EditorGUILayout.LabelField("Selected:", EditorStyles.miniBoldLabel);
+
+            var prevBg = GUI.backgroundColor;
+            if (isOpen) GUI.backgroundColor = new Color(0.3f, 0.7f, 1f);
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            GUI.backgroundColor = prevBg;
 
             using (new EditorGUILayout.HorizontalScope())
             {
-                GUI.backgroundColor = isSelected ? Color.yellow : Color.white;
-                string label = $"Node {i + 1}" + (node.hasColumn ? "  ▮ column" : "") +
+                string label = $"{(isOpen ? "▼" : "▶")} Node {i + 1}" + (node.hasColumn ? "  ▮ column" : "") +
                                (node.hasTower ? "  ● tower" : "") +
                                (node.hasArchway ? "  ∩ arch" : "") +
                                (node.hasPorthole ? "  ◯ porthole" : "") +
+                               (node.HasDestruction ? "  ◡ destruction" : "") +
                                (node.overrideHeight ? $"  h {node.height:0.##}" : "");
-                if (GUILayout.Button(label, EditorStyles.miniButton))
-                    SelectWall(wall.wallId, i);
-                GUI.backgroundColor = Color.white;
+                if (GUILayout.Button(label, EditorStyles.label))
+                    SelectWall(wall.wallId, isOpen ? -1 : i);
 
-                // Before/After and the stretch controls only on the selected node, to keep the list readable.
-                if (!isSelected) continue;
+                // Before/After only on the open node, to keep the list readable.
+                if (isOpen)
+                {
+                    DrawWallNodeCopyButtons(wall, i);
+                    if (GUILayout.Button(new GUIContent("+ Before", "Add a node between this one and the one before it."),
+                                         EditorStyles.miniButtonLeft, GUILayout.Width(58)))
+                        insertAt = i;
+                    if (GUILayout.Button(new GUIContent("+ After", "Add a node between this one and the one after it."),
+                                         EditorStyles.miniButtonRight, GUILayout.Width(52)))
+                        insertAt = i + 1;
+                }
+            }
 
-                if (GUILayout.Button(new GUIContent("+ Before", "Add a node between this one and the one before it."),
-                                     EditorStyles.miniButtonLeft, GUILayout.Width(58)))
-                    insertAt = i;
-                if (GUILayout.Button(new GUIContent("+ After", "Add a node between this one and the one after it."),
-                                     EditorStyles.miniButtonRight, GUILayout.Width(52)))
-                    insertAt = i + 1;
+            if (isOpen)
+            {
+                EditorGUI.indentLevel++;
+                DrawWallNodeProps(wall, i);
+                EditorGUI.indentLevel--;
             }
 
             // The stretch on to the next node — the last node only has one when the wall is closed.
             bool hasNext = i < count - 1 || wall.closed;
-            if (!hasNext) continue;
-
-            using (new EditorGUILayout.HorizontalScope())
+            if (hasNext)
             {
-                GUILayout.Space(16);
-                EditorGUI.BeginChangeCheck();
-                bool curved = GUILayout.Toggle(node.curvedToNext,
-                    new GUIContent("Curved", "The stretch to the next node bends through its neighbours. " +
-                                             "Off, it runs straight."), EditorStyles.miniButtonLeft);
-                bool gap = GUILayout.Toggle(node.gapToNext,
-                    new GUIContent("Gap", "Leave out the wall between this node and the next."),
-                    EditorStyles.miniButtonRight);
-                if (EditorGUI.EndChangeCheck())
+                using (new EditorGUILayout.HorizontalScope())
                 {
-                    Undo.RecordObject(_data, "Edit Wall Stretch");
-                    node.curvedToNext = curved;
-                    node.gapToNext    = gap;
-                    MarkDirty();
-                    RebuildWall(wall);
+                    GUILayout.Space(16);
+                    EditorGUI.BeginChangeCheck();
+                    bool curved = GUILayout.Toggle(node.curvedToNext,
+                        new GUIContent("Curved", "The stretch to the next node bends through its neighbours. " +
+                                                 "Off, it runs straight."), EditorStyles.miniButtonLeft);
+                    bool gap = GUILayout.Toggle(node.gapToNext,
+                        new GUIContent("Gap", "Leave out the wall between this node and the next."),
+                        EditorStyles.miniButtonRight);
+                    if (EditorGUI.EndChangeCheck())
+                    {
+                        Undo.RecordObject(_data, "Edit Wall Stretch");
+                        node.curvedToNext = curved;
+                        node.gapToNext    = gap;
+                        MarkDirty();
+                        RebuildWall(wall);
+                    }
                 }
             }
+
+            EditorGUILayout.EndVertical();
+            if (isOpen) EditorGUILayout.Space(6);
         }
 
         // Carried out once the list has finished drawing rather than changing it half way down.
@@ -578,6 +675,7 @@ public partial class LevelSelectDesignerWindow
             RebuildWall(wall);
             Repaint();
         }
+        ApplyPendingWallNodePaste();
     }
 
     /// <summary>
@@ -639,14 +737,10 @@ public partial class LevelSelectDesignerWindow
         RebuildWall(wall);
     }
 
-    /// <summary>The selected node's own height, and the lollipop tower standing on it.</summary>
-    private void DrawSelectedWallNodeProps(LevelSelectDesignerData.DesignerWall wall)
+    /// <summary>A node's own height, and what stands on it — drawn inside its box in the node list.</summary>
+    private void DrawWallNodeProps(LevelSelectDesignerData.DesignerWall wall, int index)
     {
-        if (_selectedWallNode < 0 || _selectedWallNode >= wall.nodes.Count) return;
-        var node = wall.nodes[_selectedWallNode];
-
-        EditorGUILayout.Space(4);
-        EditorGUILayout.LabelField($"Node {_selectedWallNode + 1}", EditorStyles.miniBoldLabel);
+        var node = wall.nodes[index];
 
         EditorGUI.BeginChangeCheck();
         bool nodeOverride = EditorGUILayout.Toggle(
@@ -716,7 +810,8 @@ public partial class LevelSelectDesignerWindow
             archWidth = EditorGUILayout.FloatField(
                 new GUIContent("Width", "How wide the archway is, measured along the wall."), node.archWidth);
             archHeight = EditorGUILayout.FloatField(
-                new GUIContent("Height", "How tall the archway is, from the wall's base up to the top of its round."),
+                new GUIContent("Height", "How high the top of the archway's round is, above the baseline (Canvas " +
+                                         "World Y). The opening runs down to the wall's base; the Drop never moves it."),
                 node.archHeight);
             EditorGUI.indentLevel--;
         }
@@ -731,10 +826,67 @@ public partial class LevelSelectDesignerWindow
             portholeRadius = EditorGUILayout.FloatField(
                 new GUIContent("Radius", "The porthole's radius."), node.portholeRadius);
             portholeHeight = EditorGUILayout.FloatField(
-                new GUIContent("Height", "How high the porthole's centre is, from the wall's base. " +
-                                         "Reaching past the base or the top opens the wall there."),
+                new GUIContent("Height", "How high the porthole's centre is, above the baseline (Canvas World Y); " +
+                                         "the Drop never moves it. Reaching past the base or the top opens the wall there."),
                 node.portholeHeight);
             EditorGUI.indentLevel--;
+        }
+
+        // Not offered on a node with a column, a tower or a porthole — its settings are kept, and
+        // the hole comes back once they're gone.
+        bool destruction = node.destruction;
+        float holeOffset = node.holeOffset, holeWidth = node.holeWidth, holeHeight = node.holeHeight;
+        int   holeEdgeComplexity = node.holeEdgeComplexity;
+        float holeEdgeDepth = node.holeEdgeDepth, holeEdgeUnevenness = node.holeEdgeUnevenness,
+              holeEdgeRoundness = node.holeEdgeRoundness, holeCornerCurve = node.holeCornerCurve;
+        int   holeCornerComplexity = node.holeCornerComplexity;
+        if (!hasColumn && !hasTower && !hasPorthole)
+        {
+            destruction = EditorGUILayout.Toggle(
+                new GUIContent("Destruction", "Breaks a hole down into the wall from its top here, through the lip too."),
+                node.destruction);
+            if (destruction)
+            {
+                EditorGUI.indentLevel++;
+                holeOffset = EditorGUILayout.FloatField(
+                    new GUIContent("Hole Offset", "How far along the wall the hole's middle sits from this node — either way."),
+                    node.holeOffset);
+                holeWidth = EditorGUILayout.FloatField(
+                    new GUIContent("Hole Width", "How wide the hole is across its top, measured along the wall, " +
+                                                 "before the edge's rounded shapes."),
+                    node.holeWidth);
+                holeHeight = EditorGUILayout.FloatField(
+                    new GUIContent("Hole Height", "How far the hole reaches down from the wall's very top — the lip's " +
+                                                  "top, when the wall has a lip — before the edge's rounded shapes."),
+                    node.holeHeight);
+                holeEdgeComplexity = EditorGUILayout.IntSlider(
+                    new GUIContent("Hole Edge Complexity", "How many rounded shapes run along the hole's edge. " +
+                                                           "0 = a plain round hole."),
+                    node.holeEdgeComplexity, 0, 16);
+                holeEdgeDepth = EditorGUILayout.Slider(
+                    new GUIContent("Hole Edge Depth", "How far the edge's rounded shapes reach out past the hole, " +
+                                                      "as a share of its size."),
+                    node.holeEdgeDepth, 0f, 1f);
+                holeEdgeUnevenness = EditorGUILayout.Slider(
+                    new GUIContent("Hole Edge Unevenness", "How much the edge's rounded shapes differ from each other " +
+                                                           "in length, width and spacing. 0 = all alike."),
+                    node.holeEdgeUnevenness, 0f, 1f);
+                holeEdgeRoundness = EditorGUILayout.Slider(
+                    new GUIContent("Hole Edge Roundness", "The shape of each rounded shape on the edge: low = broad " +
+                                                          "gentle waves, high = full rounded tips."),
+                    node.holeEdgeRoundness, 0f, 1f);
+                holeCornerCurve = EditorGUILayout.Slider(
+                    new GUIContent("Hole Corner Curve", "How far each top corner of the hole curves away: out along " +
+                                                        "the wall's top by up to Hole Width, down the hole's side by " +
+                                                        "up to Hole Height. 0 = sharp corners."),
+                    node.holeCornerCurve, 0f, 1f);
+                holeCornerComplexity = EditorGUILayout.IntSlider(
+                    new GUIContent("Hole Corner Complexity", "How many rounded shapes are broken into each curved " +
+                                                             "corner — sized by Hole Edge Depth, Unevenness and " +
+                                                             "Roundness. 0 = a smooth curve."),
+                    node.holeCornerComplexity, 0, 16);
+                EditorGUI.indentLevel--;
+            }
         }
 
         if (EditorGUI.EndChangeCheck())
@@ -755,10 +907,21 @@ public partial class LevelSelectDesignerWindow
             node.towerPerch = perch;
             node.hasArchway = hasArchway;
             node.archWidth  = Mathf.Max(0f, archWidth);
-            node.archHeight = Mathf.Max(0f, archHeight);
+            // Below 0 is below the baseline — still on the wall, so not clamped.
+            node.archHeight = archHeight;
             node.hasPorthole    = hasPorthole;
             node.portholeRadius = Mathf.Max(0f, portholeRadius);
-            node.portholeHeight = Mathf.Max(0f, portholeHeight);
+            node.portholeHeight = portholeHeight;
+            node.destruction        = destruction;
+            node.holeOffset         = holeOffset;
+            node.holeWidth          = Mathf.Max(0f, holeWidth);
+            node.holeHeight         = Mathf.Max(0f, holeHeight);
+            node.holeEdgeComplexity = holeEdgeComplexity;
+            node.holeEdgeDepth      = holeEdgeDepth;
+            node.holeEdgeUnevenness = holeEdgeUnevenness;
+            node.holeEdgeRoundness  = holeEdgeRoundness;
+            node.holeCornerCurve      = holeCornerCurve;
+            node.holeCornerComplexity = holeCornerComplexity;
             MarkDirty();
             RebuildAfterTowerEdit(wall, () => RebuildWall(wall));
         }
@@ -830,6 +993,7 @@ public partial class LevelSelectDesignerWindow
         go.transform.rotation   = Quaternion.identity;
         go.transform.localScale = Vector3.one;
 
+        wall.SyncSpotNodes();   // a node added or deleted just now moves the spots after it
         var nodes  = WallNodes(wall);
         var seams  = new WallMesh.SeamReport();
         var meshes = WallMesh.BuildChunks(nodes, wall.closed, wall.thickness, -_data.RunDepth, StoneShadingForBuild,
@@ -878,6 +1042,9 @@ public partial class LevelSelectDesignerWindow
         EditorUtility.SetDirty(record);
 
         RefreshWallTowers(wall, go, nodes);
+
+        // The chunks collide already; its towers are given camera-only colliders when ticked.
+        ApplyOcclusion(go, wall.occlusion, wall.occlusionStyle);
     }
 
     /// <summary>

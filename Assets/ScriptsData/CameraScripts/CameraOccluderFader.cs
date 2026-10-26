@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 /// <summary>
 /// Casts a ray from the camera to the boat and fades out whatever gets in the way.
@@ -11,6 +12,13 @@ using UnityEngine;
 /// global pushed from here.
 ///
 /// The river the boat is floating on never fades — every run and pool carrying its name is left out.
+/// A placed piece carrying an <see cref="OcclusionFade"/> follows that instead, so things standing
+/// on the river can still fade while the boat sails it.
+///
+/// A piece set to Screen Circle (<see cref="OcclusionStyle.ScreenCircle"/>) is flagged the same
+/// way, but only a soft circle round the boat on screen fades — _OccluderCircle is pushed 1 on its
+/// renderers, and the circle's centre (_OccluderCircleCentre, the boat projected onto the screen)
+/// is built per camera in beginCameraRendering, after the camera rig has moved.
 /// </summary>
 public class CameraOccluderFader : MonoBehaviour
 {
@@ -41,12 +49,27 @@ public class CameraOccluderFader : MonoBehaviour
     [Tooltip("How quickly it comes back once it is clear. Higher = snappier.")]
     [SerializeField] private float fadeOutSpeed = 4f;
 
+    [Header("Screen Circle")]
+    [Tooltip("Radius of the faded circle round the boat on pieces set to Screen Circle, as a share " +
+             "of the screen's height. 0.2 = a fifth of the screen's height.")]
+    [Range(0f, 1f)] [SerializeField] private float circleRadius = 0.2f;
+    [Tooltip("How soft the circle's edge is, as a share of the screen's height — the edge fades " +
+             "from solid to faded across this width, inside the radius.")]
+    [Range(0f, 1f)] [SerializeField] private float circleFeather = 0.08f;
+
     [Header("Debug")]
     [Tooltip("Draws the camera-to-boat ray in the scene view — red while something is blocking it.")]
     [SerializeField] private bool drawRay = false;
 
     static readonly int FadeId        = Shader.PropertyToID("_OccluderFade");
     static readonly int FadedAlphaId  = Shader.PropertyToID("_OccluderFadedAlpha");
+    static readonly int CircleId       = Shader.PropertyToID("_OccluderCircle");
+    static readonly int CircleCentreId = Shader.PropertyToID("_OccluderCircleCentre");
+    static readonly int CircleRadiusId = Shader.PropertyToID("_OccluderCircleRadius");
+    static readonly int CircleFeatherId = Shader.PropertyToID("_OccluderCircleFeather");
+
+    // Off every screen, so a circle has nothing to fade while the boat is behind the camera.
+    static readonly Vector4 CircleNowhere = new Vector4(-100f, -100f, 0f, 0f);
 
     readonly RaycastHit[] _hits = new RaycastHit[MaxHits];
 
@@ -55,11 +78,17 @@ public class CameraOccluderFader : MonoBehaviour
     readonly Dictionary<Renderer, float> _fades = new Dictionary<Renderer, float>();
     readonly HashSet<Renderer> _blocking = new HashSet<Renderer>();
 
+    // Renderers of pieces set to Screen Circle — faded only inside the circle round the boat.
+    readonly HashSet<Renderer> _circles = new HashSet<Renderer>();
+
     // Collider → its renderers. Cached because the cast runs every frame.
     readonly Dictionary<Collider, Renderer[]> _rendererCache = new Dictionary<Collider, Renderer[]>();
 
     // Collider → the river it is part of (null for anything that is not a river piece).
     readonly Dictionary<Collider, string> _riverCache = new Dictionary<Collider, string>();
+
+    // Collider → the Occlusion setting of the piece it is part of (null when it has none).
+    readonly Dictionary<Collider, OcclusionFade> _occlusionCache = new Dictionary<Collider, OcclusionFade>();
 
     // The river whose water the boat is on this frame — never faded, it is what the boat sits in.
     string _boatRiver;
@@ -74,15 +103,25 @@ public class CameraOccluderFader : MonoBehaviour
         _block = new MaterialPropertyBlock();
     }
 
+    private void OnEnable()
+    {
+        // The circle's centre is the boat on screen — projected once the camera has moved this
+        // frame, which LateUpdate is too early for.
+        RenderPipelineManager.beginCameraRendering += OnBeginCameraRendering;
+    }
+
     // LateUpdate — the camera rig moves in LateUpdate, so cast after it has settled for this frame.
     private void LateUpdate()
     {
         Shader.SetGlobalFloat(FadedAlphaId, fadedAlpha);
+        Shader.SetGlobalFloat(CircleRadiusId, circleRadius);
+        Shader.SetGlobalFloat(CircleFeatherId, circleFeather);
 
         // Baseline of 0 (solid) for every renderer WITHOUT a property block, so the fade can never
         // bleed onto other objects sharing the material — only the renderers written below, each of
         // which carries its own block, come out faded.
         Shader.SetGlobalFloat(FadeId, 0f);
+        Shader.SetGlobalFloat(CircleId, 0f);
 
         _blocking.Clear();
 
@@ -135,13 +174,25 @@ public class CameraOccluderFader : MonoBehaviour
             Collider col = _hits[i].collider;
             if (col == null) continue;
 
-            if (_boatRiver != null && RiverOf(col) == _boatRiver) continue;
+            // A piece with an Occlusion setting follows it — ticked, it fades even on the boat's
+            // own river; unticked, it never does.
+            OcclusionFade setting = OcclusionOf(col);
+            if (setting != null)
+            {
+                if (!setting.fades) continue;
+            }
+            else if (_boatRiver != null && RiverOf(col) == _boatRiver) continue;
+
+            bool circle = setting != null && setting.style == OcclusionStyle.ScreenCircle;
 
             Renderer[] renderers = GetRenderers(col);
             for (int r = 0; r < renderers.Length; r++)
             {
-                if (renderers[r] != null)
-                    _blocking.Add(renderers[r]);
+                if (renderers[r] == null) continue;
+
+                _blocking.Add(renderers[r]);
+                if (circle) _circles.Add(renderers[r]);
+                else        _circles.Remove(renderers[r]);
             }
         }
 
@@ -192,6 +243,17 @@ public class CameraOccluderFader : MonoBehaviour
         return river;
     }
 
+    /// <summary>The Occlusion setting of the placed piece a collider belongs to — null for anything without one.</summary>
+    private OcclusionFade OcclusionOf(Collider col)
+    {
+        if (_occlusionCache.TryGetValue(col, out OcclusionFade cached))
+            return cached;
+
+        OcclusionFade setting = col.GetComponentInParent<OcclusionFade>(true);
+        _occlusionCache[col] = setting;
+        return setting;
+    }
+
     private Renderer[] GetRenderers(Collider col)
     {
         if (_rendererCache.TryGetValue(col, out Renderer[] cached))
@@ -229,6 +291,7 @@ public class CameraOccluderFader : MonoBehaviour
             if (r == null)
             {
                 _fades.Remove(r);
+                _circles.Remove(r);
                 _tracked.RemoveAt(i);
                 continue;
             }
@@ -239,24 +302,26 @@ public class CameraOccluderFader : MonoBehaviour
             // Fully clear again — write it back to solid and stop tracking it
             if (!blocking && value < 0.002f)
             {
-                Write(r, 0f);
+                Write(r, 0f, false);
                 _fades.Remove(r);
+                _circles.Remove(r);
                 _tracked.RemoveAt(i);
                 continue;
             }
 
             _fades[r] = value;
-            Write(r, value);
+            Write(r, value, _circles.Contains(r));
         }
     }
 
-    private void Write(Renderer r, float fade)
+    private void Write(Renderer r, float fade, bool circle)
     {
         if (_block == null) _block = new MaterialPropertyBlock();
 
         // Read the existing block first so any other per-renderer overrides survive
         r.GetPropertyBlock(_block);
         _block.SetFloat(FadeId, fade);
+        _block.SetFloat(CircleId, circle ? 1f : 0f);
         r.SetPropertyBlock(_block);
     }
 
@@ -266,20 +331,43 @@ public class CameraOccluderFader : MonoBehaviour
         return Mathf.Lerp(from, to, 1f - Mathf.Exp(-speed * Time.deltaTime));
     }
 
+    /// <summary>
+    /// The Screen Circle's centre for the camera about to draw: the boat on that camera's screen,
+    /// 0..1 across it as the shader's Screen Position reads it. Built per camera so every view
+    /// draws its circle round the boat; off every screen while the boat is behind it.
+    /// </summary>
+    private void OnBeginCameraRendering(ScriptableRenderContext context, Camera cam)
+    {
+        if (cam == null) return;
+
+        Vector4 centre = CircleNowhere;
+        if (boatTarget != null)
+        {
+            Vector3 vp = cam.WorldToViewportPoint(boatTarget.position);
+            if (vp.z > 0f) centre = new Vector4(vp.x, vp.y, 0f, 0f);
+        }
+
+        Shader.SetGlobalVector(CircleCentreId, centre);
+    }
+
     // Leave nothing half-faded behind
     private void OnDisable()
     {
+        RenderPipelineManager.beginCameraRendering -= OnBeginCameraRendering;
+
         for (int i = 0; i < _tracked.Count; i++)
         {
             if (_tracked[i] != null)
-                Write(_tracked[i], 0f);
+                Write(_tracked[i], 0f, false);
         }
 
         _tracked.Clear();
         _fades.Clear();
         _blocking.Clear();
+        _circles.Clear();
         _rendererCache.Clear();
         _riverCache.Clear();
+        _occlusionCache.Clear();
         _boatRiver = null;
     }
 }

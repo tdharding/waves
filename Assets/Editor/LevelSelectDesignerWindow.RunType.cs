@@ -33,8 +33,12 @@ public partial class LevelSelectDesignerWindow
     // built alike.
     private static string RunStyleKey(LevelSelectDesignerData.DesignerPath path)
         => IsNaturalRun(path)
-         ? $"Natural|{Mathf.Clamp01(path.rimRounding):F4}|{RunWallsOff(path)}"
+         ? $"Natural|{Mathf.Clamp01(path.rimRounding):F4}|{RunWallsOff(path)}|{RunOuterFlare(path):F4}"
          : "Structural";
+
+    // The flare is the outer corner stretched out and down, so it only exists with the walls on.
+    private static float RunOuterFlare(LevelSelectDesignerData.DesignerPath path)
+        => IsNaturalRun(path) && !RunWallsOff(path) ? Mathf.Max(0f, path.outerFlare) : 0f;
 
     /// <summary>The river's Run Shape, with this path's Run Type stamped on a copy of it.</summary>
     private RiverProfile RunProfileFor(LevelSelectDesignerData.DesignerPath path, string riverName)
@@ -42,11 +46,19 @@ public partial class LevelSelectDesignerWindow
         var profile = _data.ProfileFor(riverName).Clone();
         profile.rimRounding = IsNaturalRun(path) ? Mathf.Clamp01(path.rimRounding) : 0f;
         profile.wallsOff    = RunWallsOff(path);
+        profile.outerFlare  = RunOuterFlare(path);
         return profile;
     }
 
+    // A run's own copy also carries the width at each node of its path, in its own space.
     private RiverProfile RunProfileFor(RiverRunMesh record)
-        => RunProfileFor(PathForRunOrRiver(record), record.riverName);
+    {
+        var path    = PathForRunOrRiver(record);
+        var profile = RunProfileFor(path, record.riverName);
+        StampRunWidths(profile, record);
+        StampRunPortholes(profile, path, record);
+        return profile;
+    }
 
     private LevelSelectDesignerData.DesignerPath PathForRunOrRiver(RiverRunMesh record)
         => PathForRun(record) ?? PathForRiver(record.riverName);
@@ -128,12 +140,24 @@ public partial class LevelSelectDesignerWindow
                     "onto its rim."),
                 walls);
 
-        if (rounding == path.rimRounding && walls == path.outerWalls)
+        // The outer corner stretched out and down past the rim — only while there is a wall.
+        float flare = path.outerFlare;
+        if (!RunWallsOff(path))
+            flare = Mathf.Max(0f, EditorGUILayout.FloatField(
+                new GUIContent("Outer Flare",
+                    "How far, in world units, the outer corner is stretched out past the rim's " +
+                    "outer edge — and how far it drops by the same — before the outer wall goes " +
+                    "on down vertically. 0 is the plain vertical wall. A junction's branch starts " +
+                    "further out to clear it, which takes a Generate."),
+                flare));
+
+        if (rounding == path.rimRounding && walls == path.outerWalls && flare == path.outerFlare)
             return false;
 
         Undo.RecordObject(_data, "Edit Rim Rounding");
         path.rimRounding = rounding;
         path.outerWalls  = walls;
+        path.outerFlare  = flare;
         EditorUtility.SetDirty(_data);
         return true;
     }
@@ -217,10 +241,12 @@ public partial class LevelSelectDesignerWindow
 
         var tool   = FindLandscapeTool();
         var ground = LandscapeHillHeight.BuildSurface(
-            _data.hillPoints,
+            ActiveHillPoints,
             tool != null ? tool.heightMultiplier : 1f,
             tool != null ? tool.noiseScale       : _data.landscapeNoiseScale,
-            null, null, null);
+            null, null, null, null, null, null,
+            tool != null ? tool.maps             : null,
+            tool != null ? tool.mapArea          : default);
 
         var verts = mesh.vertices;
         var uv1   = new List<Vector2>(verts.Length);

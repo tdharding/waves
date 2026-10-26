@@ -1,0 +1,64 @@
+    /// <summary>
+    /// A soul juice tank's base, column and bowl fields. Hands back an edited copy, so the caller
+    /// writes it only inside its own change check.
+    /// </summary>
+    internal static SoulJuiceTank DrawSoulJuiceTankFields(SoulJuiceTank tower)
+    {
+        var edited = (tower ?? new SoulJuiceTank()).Clone();
+        EditorGUI.BeginChangeCheck();
+
+        EditorGUILayout.LabelField("Base", EditorStyles.miniBoldLabel);
+        edited.baseRadius = Mathf.Max(0.001f, EditorGUILayout.FloatField(
+            new GUIContent("Base Radius", "Radius of the round base the column stands on."), edited.baseRadius));
+        edited.baseHeight = Mathf.Max(0f, EditorGUILayout.FloatField(
+            new GUIContent("Base Height", "Height of the round base. 0 = no base, and the column stands on the ground."),
+            edited.baseHeight));
+        edited.rampHeight = Mathf.Max(0f, EditorGUILayout.FloatField(
+            new GUIContent("Ramp Height", "Height of the ramp on top of the base, sloping in from the base radius " +
+                                          "to the base 2 radius. 0 = no ramp."), edited.rampHeight));
+        edited.base2Radius = Mathf.Max(0.001f, EditorGUILayout.FloatField(
+            new GUIContent("Base 2 Radius", "Radius of the second base on top of the ramp — and the radius the ramp slopes in to."),
+            edited.base2Radius));
+        edited.base2Height = Mathf.Max(0f, EditorGUILayout.FloatField(
+            new GUIContent("Base 2 Height", "Height of the second base, on top of the ramp. 0 = no second base."),
+            edited.base2Height));
+
+        EditorGUILayout.LabelField("Column", EditorStyles.miniBoldLabel);
+        edited.columnRadius = Mathf.Max(0.001f, EditorGUILayout.FloatField(
+            new GUIContent("Column Radius", "Radius of the column holding the bowl up."), edited.columnRadius));
+        edited.columnHeight = Mathf.Max(0f, EditorGUILayout.FloatField(
+            new GUIContent("Column Height", "Height of the column, from the top of the base up to where the " +
+                                            "bowl's underside closes onto it."), edited.columnHeight));
+
+        EditorGUILayout.LabelField("Bowl", EditorStyles.miniBoldLabel);
+        edited.bowlRadius = Mathf.Max(0.01f, EditorGUILayout.FloatField(
+            new GUIContent("Bowl Radius", "Radius of the bowl, out to its outer wall."), edited.bowlRadius));
+        edited.rimWidth = Mathf.Max(0.005f, EditorGUILayout.FloatField(
+            new GUIContent("Rim Width", "Width of the flat rim round the top of the bowl."), edited.rimWidth));
+        edited.bandHeight = Mathf.Max(0f, EditorGUILayout.FloatField(
+            new GUIContent("Band Height", "Height of the straight outer wall below the rim, before the underside " +
+                                          "curves in. 0 = the curve starts right at the rim."), edited.bandHeight));
+        edited.undersideDepth = Mathf.Max(0.001f, EditorGUILayout.FloatField(
+            new GUIContent("Underside Depth", "How far the curved underside drops, from the band down to the column."),
+            edited.undersideDepth));
+        edited.basinDepth = Mathf.Max(0.001f, EditorGUILayout.FloatField(
+            new GUIContent("Basin Depth", "How deep the basin inside the rim is at its middle. Kept above the " +
+                                          "underside, so it never breaks through the bottom."), edited.basinDepth));
+        edited.waterDrop = Mathf.Max(0f, EditorGUILayout.FloatField(
+            new GUIContent("Water Drop", "How far below the rim the water in the bowl sits. Less than the " +
+                                         "basin depth, or there is no water."), edited.waterDrop));
+        edited.holeRadius = Mathf.Max(0f, EditorGUILayout.FloatField(
+            new GUIContent("Hole Radius", "Radius of the hole in the middle of the basin, seen once the water " +
+                                          "has drained when the souls are released. 0 = no hole."), edited.holeRadius));
+
+        if (edited.BasinDepth < edited.basinDepth - 0.0001f)
+            EditorGUILayout.LabelField($"Basin held to {edited.BasinDepth:F3} so it stays above the underside.",
+                                       EditorStyles.miniLabel);
+        if (edited.WaterRadius <= 0.0001f)
+            EditorGUILayout.LabelField("Water Drop is as deep as the basin — there is no water for the souls " +
+                                       "to swim in.", EditorStyles.miniLabel);
+
+        if (EditorGUI.EndChangeCheck()) s_towerFieldsEdited = true;
+        return edited;
+    }
+

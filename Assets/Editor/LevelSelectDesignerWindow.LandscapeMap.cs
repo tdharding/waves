@@ -61,7 +61,7 @@ public partial class LevelSelectDesignerWindow
         if (!LevelSelectDesignerSettings.MapOn) return false;
         if (_data.landscapeTilesX <= 0 || _data.landscapeTilesZ <= 0 || _data.landscapeTileSize <= 0) return false;
 
-        bool interacting = _isDraggingHillPoint || GUIUtility.hotControl != 0;
+        bool interacting = _isDraggingHillPoint || _isPaintingLandscapeMap || GUIUtility.hotControl != 0;
         UpdateLandscapeMap(interacting);
         if (_mapTexture == null) return false;
 
@@ -120,7 +120,7 @@ public partial class LevelSelectDesignerWindow
         Add(_mapWorldRect.x); Add(_mapWorldRect.y); Add(_mapWorldRect.width); Add(_mapWorldRect.height);
         Add(SpikeBaselineY); Add(_data.landscapeNoiseScale);
         Add(_mapTool != null ? _mapTool.heightMultiplier : 1f);
-        foreach (var hp in _data.hillPoints)
+        foreach (var hp in ActiveHillPoints)
         {
             if (hp == null) { Add(-9f); continue; }
             Add(hp.positionXZ.x); Add(hp.positionXZ.y); Add(hp.scale);
@@ -135,6 +135,14 @@ public partial class LevelSelectDesignerWindow
             foreach (var r in _mapTool.riverEdgeReach)    Add(r);
             Add(-3f);
             foreach (var s in _mapTool.riverEdgeStrength) Add(s);
+            Add(-4f);
+            foreach (var g in _mapTool.riverEdgeCutGap)   Add(g);
+            Add(-5f);
+            foreach (var m in _mapTool.riverEdgeSmooth)   Add(m);
+            Add(-6f);
+            var area = _mapTool.mapArea;
+            if (_mapTool.maps != null)   // the painted maps, every cell
+                _mapTool.maps.Fingerprint(area, area.xMin, area.xMax, area.yMin, area.yMax, Add);
         }
         return h;
     }
@@ -173,10 +181,15 @@ public partial class LevelSelectDesignerWindow
 
         float globalHeight = _mapTool != null ? _mapTool.heightMultiplier : 1f;
         var surface = LandscapeHillHeight.BuildSurface(
-            _data.hillPoints, globalHeight, _data.landscapeNoiseScale,
+            ActiveHillPoints, globalHeight, _data.landscapeNoiseScale,
             _mapTool != null ? _mapTool.riverEdgePoints   : null,
             _mapTool != null ? _mapTool.riverEdgeReach    : null,
-            _mapTool != null ? _mapTool.riverEdgeStrength : null);
+            _mapTool != null ? _mapTool.riverEdgeStrength : null,
+            null,
+            _mapTool != null ? _mapTool.riverEdgeCutGap   : null,
+            _mapTool != null ? _mapTool.riverEdgeSmooth   : null,
+            _mapTool != null ? _mapTool.maps              : null,
+            _mapTool != null ? _mapTool.mapArea           : default);
         float baseY = SpikeBaselineY;
 
         // Pixel (i, j): i runs screen left to right (world X high to low), j screen bottom to top
@@ -214,7 +227,7 @@ public partial class LevelSelectDesignerWindow
                 }
 
                 float smooth = surface.SmoothHeight(xz, baseY);
-                float rock   = noise || contours ? surface.Noise(xz).x * (1f - surface.Lift(xz, out _)) : 0f;
+                float rock   = noise || contours ? surface.Noise(xz).x * (1f - surface.Calm(xz)) : 0f;
                 float height = noise ? smooth + rock : smooth;
 
                 _mapSmooth[k] = smooth;
@@ -295,7 +308,7 @@ public partial class LevelSelectDesignerWindow
     private float LandscapeMapMiddle(float globalHeight)
     {
         LevelSelectDesignerData.LandscapeHillPoint baseHill = null;
-        foreach (var hp in _data.hillPoints)
+        foreach (var hp in ActiveHillPoints)
             if (hp != null && hp.scale > 50f && (baseHill == null || hp.scale > baseHill.scale))
                 baseHill = hp;
         return baseHill != null ? baseHill.height * globalHeight : 0f;
@@ -328,7 +341,7 @@ public partial class LevelSelectDesignerWindow
 
             if (MapOverlaps(p, q, half + 0.1f, minX, maxX, minZ, maxZ)) _mapNearCuts.Add(i);
 
-            float reach = s.edgeReach[i];
+            float reach = s.edgeReach[i] * (1f + LandscapeTool.RiverEdgeSmoothAt(s.edgeSmooth, i));
             if (reach >= 0f && MapOverlaps(p, q, half + reach + 0.1f, minX, maxX, minZ, maxZ)) _mapNearLifts.Add(i);
         }
 

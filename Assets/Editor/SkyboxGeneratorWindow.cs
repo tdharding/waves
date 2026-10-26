@@ -34,6 +34,7 @@ public class SkyboxGeneratorWindow : EditorWindow
     [SerializeField] private SkyboxPreset working;
 
     private SerializedObject _so;
+    private readonly TunerUnsavedReminder _saveReminder = new TunerUnsavedReminder(nameof(SkyboxGeneratorWindow));
     private Vector2          _scroll;
 
     // ─────────────────────────────────────────────────────────────
@@ -61,12 +62,14 @@ public class SkyboxGeneratorWindow : EditorWindow
 
         _so = new SerializedObject(working);
         Undo.undoRedoPerformed += OnUndoRedo;
+        EditorApplication.update += RemindToSave;
         TakeOver();
     }
 
     private void OnDisable()
     {
         Undo.undoRedoPerformed -= OnUndoRedo;
+        EditorApplication.update -= RemindToSave;
         HandBack();
     }
 
@@ -229,12 +232,13 @@ public class SkyboxGeneratorWindow : EditorWindow
         Repaint();
     }
 
-    private void SaveToPreset()
+    private void SaveToPreset(string reminder = null)
     {
         if (activePreset == null) return;
 
         if (!EditorUtility.DisplayDialog(
                 "Save Sky",
+                reminder +
                 $"Overwrite the sky on '{activePreset.name}' with the current tuner values?\n\n" +
                 TunerSaveChanges.Describe(activePreset, p => p.CopySettingsFrom(working)),
                 "Save", "Cancel"))
@@ -246,6 +250,12 @@ public class SkyboxGeneratorWindow : EditorWindow
 
         Debug.Log($"[SkyboxGeneratorWindow] Saved to {activePreset.name}");
     }
+
+    // Ten minutes of changes the preset hasn't got, and Save asks for itself.
+    private void RemindToSave() => _saveReminder.Tick(
+        () => activePreset != null && working != null &&
+              TunerSaveChanges.List(activePreset, p => p.CopySettingsFrom(working)).Count > 0,
+        SaveToPreset);
 
     private void SaveAsNewPreset()
     {

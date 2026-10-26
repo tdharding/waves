@@ -16,6 +16,9 @@ public class WaveEffectsLiveTuner : EditorWindow
 
     [SerializeField] Material   waveMaterial;
     [SerializeField] WavePreset activePreset;
+    // The preset the values below came from; Save is held until it matches activePreset.
+    [SerializeField] WavePreset loadedPreset;
+    readonly TunerUnsavedReminder saveReminder = new TunerUnsavedReminder(nameof(WaveEffectsLiveTuner));
     // Off by default and on every scene open: while on, the tuner redraws the scene view every tick.
     [SerializeField] bool       applyLive   = false;
     [SerializeField] bool tunerActive = false; 
@@ -207,6 +210,7 @@ public class WaveEffectsLiveTuner : EditorWindow
     {
         serializedWindow = new SerializedObject(this);
         EditorApplication.update += LiveUpdate;
+        EditorApplication.update += RemindToSave;
         EditorSceneManager.sceneOpened += OnSceneOpened;
         RestoreFromPrefs();
         lastUpdateTime = EditorApplication.timeSinceStartup;
@@ -215,6 +219,7 @@ public class WaveEffectsLiveTuner : EditorWindow
     void OnDisable()
     {
         EditorApplication.update -= LiveUpdate;
+        EditorApplication.update -= RemindToSave;
         EditorSceneManager.sceneOpened -= OnSceneOpened;
         StopAllPreviewClips();
         if (testWhirlpoolsEnabled) ClearTestWhirlpools();
@@ -425,6 +430,7 @@ public class WaveEffectsLiveTuner : EditorWindow
         if (newMaterial != waveMaterial) { waveMaterial = newMaterial; SaveToPrefs(); }
         GUILayout.Space(2);
 
+        var tint = TunerLoadedPreset.TintRow(activePreset, loadedPreset);
         using (new EditorGUILayout.HorizontalScope())
         {
             EditorGUILayout.PrefixLabel("Active Preset");
@@ -436,6 +442,7 @@ public class WaveEffectsLiveTuner : EditorWindow
                 // Values are NOT loaded automatically — press Load to apply to the tuner
             }
         }
+        GUI.backgroundColor = tint;
 
         GUILayout.Space(4);
         using (new EditorGUILayout.HorizontalScope())
@@ -443,13 +450,16 @@ public class WaveEffectsLiveTuner : EditorWindow
             using (new EditorGUI.DisabledScope(activePreset == null))
             {
                 if (GUILayout.Button("Load/Preview")) { LoadOrPreview(); }
-                if (GUILayout.Button("Save"))  SaveToActivePreset();
+                using (new EditorGUI.DisabledScope(!TunerLoadedPreset.IsLoaded(activePreset, loadedPreset)))
+                    if (GUILayout.Button("Save"))  SaveToActivePreset();
             }
             if (GUILayout.Button("Save as New")) ExportAsNewPreset();
         }
 
         if (activePreset == null)
             EditorGUILayout.HelpBox("Assign an Active Preset to enable Load and Save.", MessageType.None);
+        else if (!TunerLoadedPreset.IsLoaded(activePreset, loadedPreset))
+            TunerLoadedPreset.DrawNotLoaded(activePreset, loadedPreset, "Load/Preview");
         else if (!tunerActive)
             EditorGUILayout.HelpBox("Tuner inactive — click Load to begin editing. No changes are being applied to the scene.", MessageType.Info);
     }
@@ -1095,6 +1105,7 @@ public class WaveEffectsLiveTuner : EditorWindow
     {
         if (preset == null) return;
 
+        loadedPreset = preset;
         var s = preset.state;
         waveIncreaseFactor    = 1f;
         baseFrequency         = s.Frequency;
@@ -1308,16 +1319,22 @@ public class WaveEffectsLiveTuner : EditorWindow
         sv.FrameSelected();
     }
 
-    void SaveToActivePreset()
+    void SaveToActivePreset(string reminder = null)
     {
         if (activePreset == null)
         {
             Debug.LogWarning("[WaveEffectsLiveTuner] No active preset assigned.");
             return;
         }
+        if (!TunerLoadedPreset.IsLoaded(activePreset, loadedPreset))
+        {
+            Debug.LogWarning($"[WaveEffectsLiveTuner] Values not loaded from {activePreset.name} — press Load/Preview before Save.");
+            return;
+        }
 
         if (!EditorUtility.DisplayDialog(
                 "Save Wave Preset",
+                reminder +
                 $"Overwrite '{activePreset.name}' with the current tuner values?\n\nThis cannot be undone from disk.\n\n" +
                 TunerSaveChanges.Describe(activePreset, WriteTo),
                 "Save", "Cancel"))
@@ -1329,6 +1346,12 @@ public class WaveEffectsLiveTuner : EditorWindow
         AssetDatabase.SaveAssetIfDirty(activePreset);
         Debug.Log($"[WaveEffectsLiveTuner] Saved to {activePreset.name}");
     }
+
+    // Ten minutes of changes the preset hasn't got, and Save asks for itself.
+    void RemindToSave() => saveReminder.Tick(
+        () => TunerLoadedPreset.IsLoaded(activePreset, loadedPreset) &&
+              TunerSaveChanges.List(activePreset, WriteTo).Count > 0,
+        SaveToActivePreset);
 
     void WriteTo(WavePreset preset)
     {
@@ -1359,6 +1382,7 @@ public class WaveEffectsLiveTuner : EditorWindow
         EditorUtility.FocusProjectWindow();
         Selection.activeObject = preset;
         activePreset = preset;
+        loadedPreset = preset;
         Repaint();
 
         Debug.Log($"[WaveEffectsLiveTuner] WavePreset saved to {path}");

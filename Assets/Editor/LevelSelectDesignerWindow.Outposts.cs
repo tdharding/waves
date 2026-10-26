@@ -75,11 +75,11 @@ public partial class LevelSelectDesignerWindow
 
             // Solid fills: the whole block in the wall colour, the floor inside it darker, so the
             // wall reads as the band left showing round the edge.
-            Handles.color = wall;
+            Handles.color = Faded(wall);
             Handles.DrawAAConvexPolygon(outer);
             if (floor != null)
             {
-                Handles.color = inside;
+                Handles.color = Faded(inside);
                 Handles.DrawAAConvexPolygon(floor);
             }
 
@@ -88,7 +88,7 @@ public partial class LevelSelectDesignerWindow
             {
                 var   s   = outpost.OnBank(bank);
                 float orb = TowerOrbRadius(s.towerKind, s.tower, s.turret, s.towerScale);
-                Handles.color = wall;
+                Handles.color = Faded(wall);
                 foreach (var towerAt in towersAt)
                     Handles.DrawSolidDisc(towerAt, Vector3.forward, Mathf.Max(2f, orb * _zoom));
             }
@@ -100,9 +100,9 @@ public partial class LevelSelectDesignerWindow
         {
             if (!TryOutpostPointCanvas(outpost, bank, out Vector2 at)) continue;
             bool selected = outpost.outpostId == _selectedOutpostId;
-            Handles.color = new Color(0.1f, 0.1f, 0.1f, 0.9f);
+            Handles.color = Faded(new Color(0.1f, 0.1f, 0.1f, 0.9f));
             Handles.DrawSolidDisc(at, Vector3.forward, OutpostPointRadius + 1.5f);
-            Handles.color = selected ? Color.white : new Color(1f, 0.6f, 0.15f, 1f);
+            Handles.color = Faded(selected ? Color.white : new Color(1f, 0.6f, 0.15f, 1f));
             Handles.DrawSolidDisc(at, Vector3.forward, OutpostPointRadius);
         }
     }
@@ -339,6 +339,8 @@ public partial class LevelSelectDesignerWindow
             MarkDirty();
             RebuildAfterTowerEdit(outpost, () => RebuildOutpost(outpost));
         }
+
+        if (OcclusionToggle(ref outpost.occlusion, ref outpost.occlusionStyle)) RebuildOutpost(outpost);
 
         // The first time it is on both banks, the Left bank starts as a copy of this one. Also
         // catches an outpost set to Both before the banks had settings of their own — without
@@ -692,6 +694,8 @@ public partial class LevelSelectDesignerWindow
                    TowerTopY(s.towerKind, s.tower, s.turret, s.towerScale));
 
         RefreshOutpostTurrets(s, go, isTurret ? towerBases : null, name);
+
+        ApplyOcclusion(go, outpost.occlusion, outpost.occlusionStyle);
     }
 
     /// <summary>

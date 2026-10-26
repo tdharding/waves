@@ -69,8 +69,8 @@ public static partial class RiverMeshBuilder
         Vector3 along = Vector3.Cross(across, Vector3.up);   // down the run
 
         float hw        = Mathf.Max(bridge.deckWidth, 0.01f) * 0.5f;
-        float halfInner = grid.profile.innerWidth * 0.5f;
-        float halfOuter = grid.profile.OuterWidth * 0.5f;
+        float halfInner = grid.HalfInnerAtArc(s);
+        float halfOuter = halfInner + grid.profile.rimWidth;
         float reach     = halfInner + Mathf.Max(bridge.rampLength, 0.01f);
 
         // Sat on the lower of the rim heights under it, so on a climbing river its floor never
@@ -87,9 +87,10 @@ public static partial class RiverMeshBuilder
                           ? Mathf.Lerp(topY, rimY, (halfOuter - halfInner) / (reach - halfInner))
                           : rimY;
 
-        System.Func<RiverRunShadingSettings, StoneFaceKind> top    = x => x.walkwayTop;
-        System.Func<RiverRunShadingSettings, StoneFaceKind> wall   = x => x.walkwayOuterWall;
-        System.Func<RiverRunShadingSettings, StoneFaceKind> buried = null;
+        System.Func<RiverRunShadingSettings, StoneFaceKind> top     = x => x.bridgeTop;
+        System.Func<RiverRunShadingSettings, StoneFaceKind> under   = x => x.bridgeUnderside;
+        System.Func<RiverRunShadingSettings, StoneFaceKind> rampEnd = x => x.bridgeRampEnds;
+        System.Func<RiverRunShadingSettings, StoneFaceKind> buried  = null;
 
         // The cross-section, anticlockwise looking down the run (x across, y up), so outward
         // from each edge is its right. Each corner carries the part of the face it starts.
@@ -104,15 +105,15 @@ public static partial class RiverMeshBuilder
         {
             loop.Add(new BridgeCorner(-reach,     rimY,   WalkBuriedPart, buried));
         }
-        loop.Add(new BridgeCorner(-halfInner, rimY,   WalkWallPart,   wall));
-        loop.Add(new BridgeCorner(-halfInner, underY, WalkWallPart,   wall));
-        loop.Add(new BridgeCorner( halfInner, underY, WalkWallPart,   wall));
+        loop.Add(new BridgeCorner(-halfInner, rimY,   WalkWallPart,   under));
+        loop.Add(new BridgeCorner(-halfInner, underY, WalkWallPart,   under));
+        loop.Add(new BridgeCorner( halfInner, underY, WalkWallPart,   under));
         loop.Add(new BridgeCorner( halfInner, rimY,   WalkBuriedPart, buried));
         if (pastRim)
         {
             loop.Add(new BridgeCorner(halfOuter, rimY,  WalkBuriedPart, buried));
             loop.Add(new BridgeCorner(halfOuter, baseY, WalkBuriedPart, buried));
-            loop.Add(new BridgeCorner(reach,     baseY, WalkWallPart,   wall));
+            loop.Add(new BridgeCorner(reach,     baseY, WalkWallPart,   rampEnd));
             loop.Add(new BridgeCorner(reach,     rimY,  WalkTopPart,    top));
             loop.Add(new BridgeCorner(halfOuter, rampAtOuter, WalkTopPart, top));
         }
@@ -125,7 +126,7 @@ public static partial class RiverMeshBuilder
         if (pastRim)
         {
             loop.Add(new BridgeCorner(-halfOuter, rampAtOuter, WalkTopPart, top));
-            loop.Add(new BridgeCorner(-reach,     rimY,        WalkWallPart, wall));
+            loop.Add(new BridgeCorner(-reach,     rimY,        WalkWallPart, rampEnd));
         }
 
         Vector3 origin = new Vector3(st.c.x, 0f, st.c.z);
@@ -146,6 +147,8 @@ public static partial class RiverMeshBuilder
 
             b.NextPart = from.part;
             b.NextKind = Kind(from.kind);
+            b.NextLabel = from.kind == null ? null                 // buried in the run
+                        : Mathf.Abs((p.x + q.x) * 0.5f) < halfInner + 1e-4f ? "Deck" : "Ramp";
             FacingQuad(b, At(p, -hw), At(q, -hw), At(q, hw), At(p, hw), outward);
         }
 
@@ -185,16 +188,20 @@ public static partial class RiverMeshBuilder
         }
 
         b.NextPart = WalkWallPart;
-        b.NextKind = Kind(x => x.walkwayEnds);
+        b.NextKind = Kind(x => x.bridgeSides);
         foreach (var piece in pieces)
+        {
+            b.NextLabel = piece == pieces[0] ? "Deck" : "Ramp";
             foreach (float z in new[] { -hw, hw })
             {
                 var poly = new List<Vector3>(piece.Length);
                 foreach (var p in piece) poly.Add(At(p, z));
                 EmitFacingConvex(b, poly, along * Mathf.Sign(z));
             }
+        }
 
         b.NextPart = 0;
         b.NextKind = 0f;
+        b.NextLabel = null;
     }
 }

@@ -16,12 +16,13 @@ using UnityEngine;
 ///
 /// Something can stand on it (<see cref="LevelSelectDesignerData.RimNodeTopper"/>) — on the
 /// river-side circle, on the plinth when it has one:
-/// a lollipop tower, or the vert display point prefab placed off its PrefabBaselineAlignment —
-/// its disc on the top, its forward facing into the river. Both are rebuilt with the piece.
+/// a lollipop tower or a turret. Or, in place of the old vert display point, a Screen: a square
+/// opening cut into the river-side wall by the builder, with a flat glowing quad at its back
+/// facing out into the river. All are rebuilt with the piece.
 ///
-/// A display point can also carry an interaction: stand the boat near it, press the key, and the
-/// poster it names comes up on screen — see DrawInteractBlock, in the Interact part of this
-/// window.
+/// A screen can also carry an interaction: stand the boat near it, press the key, and the poster
+/// it names fades in on the screen itself, the view cutting to the screen's camera when it has one
+/// — see DrawInteractBlock, in the Interact part of this window, and the ScreenCameras part.
 /// </summary>
 public partial class LevelSelectDesignerWindow
 {
@@ -81,6 +82,8 @@ public partial class LevelSelectDesignerWindow
         var profile = RunProfileFor(path, path.riverName);
         var rim     = _data.RimNodeAt(_selectedNodeId);
 
+        if (rim != null && OcclusionToggle(ref rim.occlusion, ref rim.occlusionStyle)) RebuildRimNodesAt(_selectedNodeId);
+
         // None, then the three sides.
         int current = rim == null ? 0 : (int)rim.side + 1;
 
@@ -136,13 +139,13 @@ public partial class LevelSelectDesignerWindow
 
             if (rim.side == LevelSelectDesignerData.RimNodeSide.Both)
             {
-                toppings.Add((-1, DrawRimNodeTopping(rim, -1, "On Top (Left)")));
-                toppings.Add(( 1, DrawRimNodeTopping(rim,  1, "On Top (Right)")));
+                toppings.Add((-1, DrawRimNodeTopping(rim, -1, "On Top (Left)",  "Screen (Left)")));
+                toppings.Add(( 1, DrawRimNodeTopping(rim,  1, "On Top (Right)", "Screen (Right)")));
             }
             else
             {
                 int only = rim.side == LevelSelectDesignerData.RimNodeSide.Left ? -1 : 1;
-                toppings.Add((only, DrawRimNodeTopping(rim, only, "On Top")));
+                toppings.Add((only, DrawRimNodeTopping(rim, only, "On Top", "Screen")));
             }
         }
 
@@ -205,7 +208,7 @@ public partial class LevelSelectDesignerWindow
             if (rim == null || !CanHoldRimNode(rim.nodeId, out _)) continue;
 
             var path    = _data.paths.Find(p => p.nodeIds.Contains(rim.nodeId));
-            var profile = RunProfileFor(path, path.riverName);
+            var profile = ProfileAtNode(RunProfileFor(path, path.riverName), rim.nodeId);
             int at      = path.nodeIds.IndexOf(rim.nodeId);
 
             Vector3 here = _data.NodeWorldPosition(rim.nodeId);
@@ -235,7 +238,7 @@ public partial class LevelSelectDesignerWindow
                 Vector3 near   = centre - axis * halfWidth;   // the circle towards the river
                 Vector3 far    = centre + axis * halfWidth;
 
-                Handles.color = shade;
+                Handles.color = Faded(shade);
 
                 // Slanted: the rectangle over the two circles, seen from above at its top.
                 if (rim.shape == LevelSelectDesignerData.RimNodeShape.Slanted)
@@ -266,7 +269,7 @@ public partial class LevelSelectDesignerWindow
                 // The plinth, on the river-side circle — where whatever stands on it stands.
                 if (plinth > RiverMeshBuilder.RimNodePlinthMinRadius)
                 {
-                    Handles.color = new Color(0.25f, 0.22f, 0.18f, 0.9f);
+                    Handles.color = Faded(new Color(0.25f, 0.22f, 0.18f, 0.9f));
                     Handles.DrawSolidDisc(WorldToCanvas(near), Vector3.forward,
                                           Mathf.Max(1.5f, plinth * _zoom));
                 }
@@ -284,8 +287,7 @@ public partial class LevelSelectDesignerWindow
     /// </summary>
     private void DrawInteractReach(LevelSelectDesignerData.RimNodeTopping topping, Vector3 at)
     {
-        if (topping == null || topping.topper != LevelSelectDesignerData.RimNodeTopper.VertDisplayPoint)
-            return;
+        if (topping == null || !topping.HasScreen) return;
 
         var interact = topping.interact;
         if (interact == null || !interact.enabled || interact.radius <= 0f) return;
@@ -293,10 +295,10 @@ public partial class LevelSelectDesignerWindow
         Vector3 centre = WorldToCanvas(at);
         float   reach  = interact.radius * _zoom;
 
-        Handles.color = new Color(1f, 0.85f, 0.3f, 0.12f);
+        Handles.color = Faded(new Color(1f, 0.85f, 0.3f, 0.12f));
         Handles.DrawSolidDisc(centre, Vector3.forward, reach);
 
-        Handles.color = new Color(1f, 0.85f, 0.3f, 0.9f);
+        Handles.color = Faded(new Color(1f, 0.85f, 0.3f, 0.9f));
         Handles.DrawWireDisc(centre, Vector3.forward, reach);
     }
 
@@ -335,18 +337,25 @@ public partial class LevelSelectDesignerWindow
         var rims = new List<RiverMeshBuilder.RimNode>();
         if (record?.pathNodes == null || _data.rimNodes == null) return rims;
 
-        float lean = RiverMeshBuilder.RimNodeSlantLean(RunProfileFor(record),
-                                                       _data.waterLevel);
+        var runProfile = RunProfileFor(record);
 
         foreach (var node in record.pathNodes)
         {
             var rim = _data.RimNodeAt(node.nodeId);
             if (rim == null || !CanHoldRimNode(node.nodeId, out _)) continue;
 
+            // Leaning as the channel wall beside it does, at the river's width there.
+            float lean = RiverMeshBuilder.RimNodeSlantLean(ProfileAtNode(runProfile, node.nodeId),
+                                                           _data.waterLevel);
+
             foreach (int side in RimSides(rim.side))
             {
+                var topping = rim.ToppingOn(side);
                 rims.Add(new RiverMeshBuilder.RimNode
                 {
+                    screenSize   = topping.HasScreen ? topping.screenSize : 0f,
+                    screenHeight = topping.HasScreen ? topping.ScreenHeight : 0f,
+                    waterDrop    = _data.WaterSurfaceDrop,
                     at           = node.position,
                     side         = side,
                     radius       = rim.radius,
@@ -374,7 +383,23 @@ public partial class LevelSelectDesignerWindow
 
         string name     = $"RiverRimNodes_{record.meshAssetName.Replace("RiverRun_", string.Empty)}";
         var    existing = record.transform.Find(name);
-        var    rims     = RimNodesFor(record);
+        var    sources  = new List<LevelSelectDesignerData.DesignerRimNode>();
+        var    rims     = RimNodesFor(record, sources);
+
+        // Each one ticked for Occlusion is built as a mesh of its own, so it fades on its own;
+        // the rest share the one piece, which carries every rim node's toppers either way.
+        var pieces = new List<(string name, Mesh built, OcclusionStyle style)>();
+        var shared = new List<RiverMeshBuilder.RimNode>();
+        for (int i = 0; i < rims.Count; i++)
+        {
+            if (!sources[i].occlusion) { shared.Add(rims[i]); continue; }
+
+            string label = $"RimNode_{SanitiseAssetName(sources[i].nodeId)}_{(rims[i].side > 0 ? "R" : "L")}";
+            pieces.Add((OcclusionPieceName(name, label), RiverMeshBuilder.BuildRimNodes(
+                profile, centres, forwards, new[] { rims[i] }, MeshEdge, StoneShadingForBuild),
+                sources[i].occlusionStyle));
+        }
+        RefreshOcclusionPieces(record, name + OcclusionPiecePrefix, pieces);
 
         if (rims.Count == 0)
         {
@@ -385,7 +410,7 @@ public partial class LevelSelectDesignerWindow
         }
 
         var mesh = SaveGeneratedMesh(name,
-            RiverMeshBuilder.BuildRimNodes(profile, centres, forwards, rims, MeshEdge));
+            RiverMeshBuilder.BuildRimNodes(profile, centres, forwards, shared, MeshEdge, StoneShadingForBuild));
         if (mesh == null) return;
 
         GameObject go;
@@ -421,24 +446,34 @@ public partial class LevelSelectDesignerWindow
     // ON TOP
     // ─────────────────────────────────────────────
 
+    // Screen is its own toggle now, and Vert Display Point is retired: both are left off the
+    // list, and a saved one of either shows as None here with Screen ticked.
     private static readonly GUIContent[] RimNodeTopperLabels =
     {
-        new GUIContent("None"), new GUIContent("Lollipop Tower"), new GUIContent("Vert Display Point"),
-        new GUIContent("Turret Tower"),
+        new GUIContent("None"), new GUIContent("Lollipop Tower"), new GUIContent("Turret Tower"),
+    };
+    private static readonly int[] RimNodeTopperValues =
+    {
+        (int)LevelSelectDesignerData.RimNodeTopper.None,
+        (int)LevelSelectDesignerData.RimNodeTopper.LollipopTower,
+        (int)LevelSelectDesignerData.RimNodeTopper.TurretTower,
     };
 
     /// <summary>
-    /// The On Top dropdown for one platform (+1 right, -1 left), and the fields for what it
-    /// picks. Hands back an edited copy, written by the caller inside its own change check.
+    /// The On Top dropdown for one platform (+1 right, -1 left) and the fields for what it picks,
+    /// then the Screen toggle and its fields — the two apart, so a platform can have both. Hands
+    /// back an edited copy, written by the caller inside its own change check.
     /// </summary>
     private LevelSelectDesignerData.RimNodeTopping DrawRimNodeTopping(
-        LevelSelectDesignerData.DesignerRimNode rim, int side, string label)
+        LevelSelectDesignerData.DesignerRimNode rim, int side, string label, string screenLabel)
     {
         var edited = rim.ToppingOn(side);
 
-        edited.topper = (LevelSelectDesignerData.RimNodeTopper)EditorGUILayout.Popup(
+        // An old Screen pick moves onto the toggle the first time it is edited.
+        edited.screen = edited.HasScreen;
+        edited.topper = (LevelSelectDesignerData.RimNodeTopper)EditorGUILayout.IntPopup(
             new GUIContent(label, "What stands on this platform, on its plinth when it has one."),
-            (int)edited.topper, RimNodeTopperLabels);
+            (int)edited.OnTop, RimNodeTopperLabels, RimNodeTopperValues);
 
         EditorGUI.indentLevel++;
         if (edited.topper == LevelSelectDesignerData.RimNodeTopper.LollipopTower)
@@ -468,21 +503,61 @@ public partial class LevelSelectDesignerWindow
             edited.towerScale   = DrawLollipopScaleField(edited.towerScale);
             edited.perch        = DrawPerchBlock(edited.perch);
         }
-        else if (edited.topper == LevelSelectDesignerData.RimNodeTopper.VertDisplayPoint)
+        EditorGUI.indentLevel--;
+
+        edited.screen = EditorGUILayout.Toggle(
+            new GUIContent(screenLabel, "A screen set into this platform's river-side wall — " +
+                                        "whatever stands on top as well."),
+            edited.screen);
+
+        EditorGUI.indentLevel++;
+        if (edited.screen)
         {
-            edited.displayHeight = Mathf.Max(0.001f, EditorGUILayout.FloatField(
-                new GUIContent("Display Height", "How tall it stands, from the node floor to " +
-                                                 "the top marker on its prefab."), edited.displayHeight));
+            edited.screenSize = Mathf.Max(0f, EditorGUILayout.FloatField(
+                new GUIContent("Screen Width", "How wide the screen is."), edited.screenSize));
+            edited.screenHeight = Mathf.Max(0f, EditorGUILayout.FloatField(
+                new GUIContent("Screen Height", "How tall the screen is. Held to what fits between " +
+                                                "the waterline and the top."), edited.ScreenHeight));
             edited.interact = DrawInteractBlock(edited.interact);
+            DrawScreenInteractExtras(edited, rim.nodeId, side);
         }
         EditorGUI.indentLevel--;
 
         return edited;
     }
 
-    private const string VertDisplayPointPrefabPath =
-        "Assets/Prefab/LevelSelectPrefabs/LevelSelectVertDisplayPoint.prefab";
     private const string RimNodeToppersChild = "OnTop";
+
+    private const string RimNodeScreenMaterialPath =
+        "Assets/TextureMatShader/LevelSelectMaterials/RimNodeScreenMat.mat";
+
+    /// <summary>
+    /// The one material every rim node screen shares — a plain grey glow, made the first time
+    /// it is asked for. Swap its look in the asset; the artwork goes on it later.
+    /// </summary>
+    private static Material RimNodeScreenMaterial()
+    {
+        var mat = AssetDatabase.LoadAssetAtPath<Material>(RimNodeScreenMaterialPath);
+        if (mat != null) return mat;
+
+        var shader = Shader.Find("Universal Render Pipeline/Lit");
+        if (shader == null)
+        {
+            Debug.LogWarning("[LevelSelectDesigner] URP Lit shader not found — rim node screens " +
+                             "are left without a material.");
+            return null;
+        }
+
+        mat = new Material(shader) { name = "RimNodeScreenMat" };
+        mat.SetColor("_BaseColor", new Color(0.2f, 0.2f, 0.2f, 1f));
+        mat.EnableKeyword("_EMISSION");
+        mat.SetColor("_EmissionColor", new Color(0.8f, 0.8f, 0.8f, 1f));
+        mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+
+        AssetDatabase.CreateAsset(mat, RimNodeScreenMaterialPath);
+        AssetDatabase.SaveAssets();
+        return mat;
+    }
 
     /// <summary>
     /// Stands what each rim node carries in the middle of its top, under an "OnTop" child of the
@@ -497,13 +572,38 @@ public partial class LevelSelectDesignerWindow
         var sources = new List<LevelSelectDesignerData.DesignerRimNode>();
         var rims    = RimNodesFor(record, sources);
         var tops    = RiverMeshBuilder.RimNodeTops(profile, centres, forwards, rims, MeshEdge)
-                          .FindAll(t => sources[t.index].ToppingOn(rims[t.index].side).topper !=
-                                        LevelSelectDesignerData.RimNodeTopper.None);
-        if (tops.Count == 0) return;
+                          .FindAll(t =>
+                          {
+                              var topper = sources[t.index].ToppingOn(rims[t.index].side).OnTop;
+                              return topper != LevelSelectDesignerData.RimNodeTopper.None;
+                          });
+        var screens = RiverMeshBuilder.RimNodeScreens(profile, centres, forwards, rims, MeshEdge);
+        if (tops.Count == 0 && screens.Count == 0) return;
 
         var container = new GameObject(RimNodeToppersChild);
         Undo.RegisterCreatedObjectUndo(container, "Generate Rim Node Toppers");
         container.transform.SetParent(piece.transform, false);
+
+        // Each screen fills the back of the opening the rim node piece leaves for it: a plain
+        // quad, 0–1 across it, facing out into the river — its picture and camera with it.
+        foreach (var screen in screens)
+        {
+            var    rim   = sources[screen.index];
+            int    side  = rims[screen.index].side;
+            string label = $"{SanitiseAssetName(rim.nodeId)}_{(side > 0 ? "R" : "L")}";
+
+            var go = new GameObject($"RimNodeScreen_{label}");
+            Undo.RegisterCreatedObjectUndo(go, "Place Rim Node Screen");
+            go.transform.SetParent(container.transform, false);
+            go.transform.localPosition = screen.centre;
+            go.transform.localRotation = Quaternion.LookRotation(-screen.facing, Vector3.up);
+            go.transform.localScale    = new Vector3(screen.width, screen.height, 1f);
+
+            go.AddComponent<MeshFilter>().sharedMesh = Resources.GetBuiltinResource<Mesh>("Quad.fbx");
+            go.AddComponent<MeshRenderer>().sharedMaterial = RimNodeScreenMaterial();
+
+            ApplyScreenInteract(go, rim.ToppingOn(side), rim.nodeId, side, screen.width, screen.height);
+        }
 
         foreach (var top in tops)
         {
@@ -515,7 +615,7 @@ public partial class LevelSelectDesignerWindow
             toRiver.y = 0f;
             if (toRiver.sqrMagnitude < 1e-8f) toRiver = piece.transform.forward;
 
-            switch (topping.topper)
+            switch (topping.OnTop)
             {
                 case LevelSelectDesignerData.RimNodeTopper.LollipopTower:
                 {
@@ -530,6 +630,7 @@ public partial class LevelSelectDesignerWindow
                     // Her feet go on the top of the orb, which the tower works out from the sizes
                     // this mesh was just built to — resize it and she moves with it.
                     ApplyPerch(go, topping.perch, Vector3.up * tower.TopY);
+                    ApplyOcclusion(go, rim.occlusion, rim.occlusionStyle);
                     break;
                 }
 
@@ -542,15 +643,7 @@ public partial class LevelSelectDesignerWindow
 
                     go.transform.SetPositionAndRotation(at, Quaternion.LookRotation(toRiver, Vector3.up));
                     ApplyPerch(go, topping.perch, Vector3.up * turret.TopY);
-                    break;
-                }
-
-                case LevelSelectDesignerData.RimNodeTopper.VertDisplayPoint:
-                {
-                    var display = PlaceOffAligner(VertDisplayPointPrefabPath, container.transform,
-                                                  $"VertDisplayPoint_{label}", at, toRiver,
-                                                  topping.displayHeight);
-                    ApplyInteract(display, topping.interact);
+                    ApplyOcclusion(go, rim.occlusion, rim.occlusionStyle);
                     break;
                 }
             }

@@ -34,9 +34,24 @@ public class CameraSequenceWindow : EditorWindow
     // put back where it was placed when the preview ends, is stopped, or the window closes.
     private CinemachineCamera   _previewCam;
     private CameraSequence.Shot _previewShot;
-    private Pose                _previewFrom;
+    private Pose                _previewFrom;    // where the camera is placed — put back here
+    private Pose                _previewStartPose;   // where the movement starts: raised to the View Target's height
+    private float               _previewLift;
     private Vector3             _previewCentre;
     private double              _previewStart;
+
+    // Cameras mid-preview in any storyboard, so the View Target follow leaves them alone.
+    private static readonly HashSet<CinemachineCamera> s_Previewing = new HashSet<CinemachineCamera>();
+
+    /// <summary>True while a storyboard is playing a preview on this camera — it isn't where it is placed.</summary>
+    public static bool IsPreviewing(CinemachineCamera cam) => cam != null && s_Previewing.Contains(cam);
+
+    // Set while a shot card is drawn in the Cm View: its Set View Target button.
+    private System.Action _cmViewSetTarget;
+
+    // The Cm View card's Volume foldout: the shot's own profile, drawn by Unity's Volume Profile editor.
+    private const string VolumeOpenKey = "CameraSequenceWindow_VolumeOpen";
+    private Editor _volumeEditor;
 
     // Whether the storyboard (or its cameras) differs from its preset — checked off the update loop.
     private const double DirtyCheckSeconds = 0.5;
@@ -84,6 +99,8 @@ public class CameraSequenceWindow : EditorWindow
         EditorApplication.playModeStateChanged -= OnPlayModeChanged;
 
         StopPreview();
+        if (_volumeEditor != null) DestroyImmediate(_volumeEditor);
+        _volumeEditor = null;
         _previewRig?.Dispose();
         _previewRig = null;
         for (int i = 0; i < _previews.Count; i++)
@@ -260,6 +277,8 @@ public class CameraSequenceWindow : EditorWindow
         p.ApplyTo(_sequence);
         _sequence.preset = p;
         MarkSequenceChanged();
+        // The cameras went back to where they were saved; their View Targets may have moved since.
+        CameraSequenceViewTargets.Forget();
         Debug.Log($"[CameraSequenceWindow] Loaded '{p.name}': {p.shots.Count} shots, {p.storedObjects.Count} linked objects" +
                   (rebuilt > 0 ? $", {rebuilt} built again." : "."));
     }
@@ -402,16 +421,21 @@ public class CameraSequenceWindow : EditorWindow
         _previewCam    = shot.camera;
         _previewShot   = shot;
         _previewFrom   = new Pose(t.position, t.rotation);
-        _previewCentre = CameraSequence.OrbitCentre(shot, _previewFrom);
+        // As in play: the camera first stands at this shot's height over its View Target.
+        _previewLift      = CameraSequence.ViewTargetLift(shot, t.position);
+        _previewStartPose = new Pose(t.position + Vector3.up * _previewLift, t.rotation);
+        _previewCentre    = CameraSequence.OrbitCentre(shot, _previewStartPose, _previewLift);
         _previewStart  = EditorApplication.timeSinceStartup;
+        s_Previewing.Add(shot.camera);
         CinemachineViewWindow.Watch(shot.camera);
-        Debug.Log($"[CameraSequenceWindow] Preview '{shot.camera.name}': {shot.animation} over {shot.animationTime:F1}s {shot.easing}.");
+        Debug.Log($"[CameraSequenceWindow] Preview '{shot.camera.name}': {shot.animation} over {shot.animationTime:F1}s {shot.easing}" +
+                  (Mathf.Abs(_previewLift) > 1e-4f ? $", raised {_previewLift:+0.00;-0.00} to its View Target height." : "."));
     }
 
     private void TickPreview()
     {
         float elapsed = (float)(EditorApplication.timeSinceStartup - _previewStart);
-        var pose = CameraSequence.PoseAt(_previewShot, _previewFrom, _previewCentre, elapsed);
+        var pose = CameraSequence.PoseAt(_previewShot, _previewStartPose, _previewCentre, elapsed, _previewLift);
         _previewCam.transform.SetPositionAndRotation(pose.position, pose.rotation);
         // Keeps the brain updating the camera's state in edit mode, so the Cm View follows it.
         EditorApplication.QueuePlayerLoopUpdate();
@@ -426,6 +450,7 @@ public class CameraSequenceWindow : EditorWindow
             _previewCam.transform.SetPositionAndRotation(_previewFrom.position, _previewFrom.rotation);
             EditorApplication.QueuePlayerLoopUpdate();
             RedrawPreviews();
+            s_Previewing.Remove(_previewCam);
         }
         _previewCam  = null;
         _previewShot = null;
@@ -472,7 +497,6 @@ public class CameraSequenceWindow : EditorWindow
         }
         EditorGUILayout.PropertyField(so.FindProperty("playOnce"), new GUIContent("Play Once",
             "On: plays once per save — never again until New Game. Off: plays every time it is triggered. Saved with the preset."));
-        DrawFog(so);
         DrawPlayOnStart(so);
 
         EditorGUILayout.Space(6);
@@ -498,7 +522,11 @@ public class CameraSequenceWindow : EditorWindow
         }
 
         so.ApplyModifiedProperties();
-        if (Event.current.type == EventType.Layout) AimOrbitCameras();
+        if (Event.current.type == EventType.Layout)
+        {
+            AimOrbitCameras();
+            EnsureShotVolumes();
+        }
     }
 
     // An Orbit shot starts with its camera at Start Degrees round the Orbit Point (at its own distance
@@ -555,31 +583,6 @@ public class CameraSequenceWindow : EditorWindow
     }
 
     // ── Running-time strip ──────────────────────────────────────────────
-    // The whole sequence's fog: the White Fade globals the river runs, landscape and spikes read.
-    private static void DrawFog(SerializedObject so)
-    {
-        var overrideFog = so.FindProperty("overrideFog");
-        EditorGUILayout.PropertyField(overrideFog, new GUIContent("Override Fog",
-            "On: these White Fade numbers replace the world's on the river runs, landscape and spikes while the " +
-            "sequence plays, and the world's come back at the hand back. Off: the world's fog is untouched."));
-
-        var fog = so.FindProperty("fog");
-        using (new EditorGUI.DisabledScope(!overrideFog.boolValue))
-        using (new EditorGUI.IndentLevelScope())
-        {
-            EditorGUILayout.PropertyField(fog.FindPropertyRelative("radius"), new GUIContent("Radius",
-                "Metres from the fog's middle to where the outer ring is fully faded. Where the middle sits is each shot's Fog Centre."));
-            EditorGUILayout.PropertyField(fog.FindPropertyRelative("outerOpacity"), new GUIContent("Outer Opacity",
-                "How far the outer ring pulls towards white. 0 = no fade, 1 = white."));
-            EditorGUILayout.PropertyField(fog.FindPropertyRelative("innerDivision"), new GUIContent("Inner Division",
-                "The inner ring's radius is Radius divided by this."));
-            EditorGUILayout.PropertyField(fog.FindPropertyRelative("innerOpacity"), new GUIContent("Inner Opacity",
-                "How far the inner ring pulls towards white, on top of the outer one."));
-            EditorGUILayout.PropertyField(fog.FindPropertyRelative("gradientBottom"), new GUIContent("Gradient Bottom",
-                "World Y the white gradient rising from the bottom is full at. It eases out by world Y = 1."));
-        }
-    }
-
     private void DrawStrip(SerializedProperty shots)
     {
         float total = 0f;
@@ -673,11 +676,17 @@ public class CameraSequenceWindow : EditorWindow
         shot.FindPropertyRelative("animated").boolValue = false;
         shot.FindPropertyRelative("orbitPoint").objectReferenceValue = null;
         shot.FindPropertyRelative("endCamera").objectReferenceValue = null;
+        shot.FindPropertyRelative("viewTarget").objectReferenceValue = null;
+        shot.FindPropertyRelative("viewTargetPath").stringValue = string.Empty;
         shot.FindPropertyRelative("characterAnimations").ClearArray();
+        // Its own Volume, made fresh from the Level Select profile — never the shot before's.
+        shot.FindPropertyRelative("volumeProfile").objectReferenceValue = null;
     }
 
     // ── One shot card ───────────────────────────────────────────────────
-    private bool DrawShot(SerializedProperty shots, int i, DialogueTiming timing)
+    // inCmView: drawn in the Cm View's panel beside the camera's own view — no reorder/remove buttons
+    // and no thumbnail, and the View Target gets its Set View Target button.
+    private bool DrawShot(SerializedProperty shots, int i, DialogueTiming timing, bool inCmView = false)
     {
         var shot     = shots.GetArrayElementAtIndex(i);
         var camProp  = shot.FindPropertyRelative("camera");
@@ -697,11 +706,14 @@ public class CameraSequenceWindow : EditorWindow
                 EditorGUILayout.LabelField($"Shot {i + 1}  ·  {(cam != null ? cam.name : "no camera")}  ·  {length}",
                                            EditorStyles.boldLabel);
 
-                using (new EditorGUI.DisabledScope(i == 0))
-                    if (GUILayout.Button("▲", GUILayout.Width(24))) { shots.MoveArrayElement(i, i - 1); return false; }
-                using (new EditorGUI.DisabledScope(i == shots.arraySize - 1))
-                    if (GUILayout.Button("▼", GUILayout.Width(24))) { shots.MoveArrayElement(i, i + 1); return false; }
-                if (GUILayout.Button("✕", GUILayout.Width(24))) { shots.DeleteArrayElementAtIndex(i); return false; }
+                if (!inCmView)
+                {
+                    using (new EditorGUI.DisabledScope(i == 0))
+                        if (GUILayout.Button("▲", GUILayout.Width(24))) { shots.MoveArrayElement(i, i - 1); return false; }
+                    using (new EditorGUI.DisabledScope(i == shots.arraySize - 1))
+                        if (GUILayout.Button("▼", GUILayout.Width(24))) { shots.MoveArrayElement(i, i + 1); return false; }
+                    if (GUILayout.Button("✕", GUILayout.Width(24))) { shots.DeleteArrayElementAtIndex(i); return false; }
+                }
             }
 
             using (new EditorGUILayout.HorizontalScope())
@@ -728,14 +740,16 @@ public class CameraSequenceWindow : EditorWindow
                     using (new EditorGUI.DisabledScope(!_sequence.useAudio))
                         EditorGUILayout.PropertyField(shot.FindPropertyRelative("audio"), new GUIContent("Audio",
                             "Optional. Plays when the shot starts and stops when it ends. Not used when the sequence's Audio is off."));
-                    using (new EditorGUI.DisabledScope(!_sequence.overrideFog))
-                        EditorGUILayout.PropertyField(shot.FindPropertyRelative("fogCentre"), new GUIContent("Fog Centre",
-                            "Where the fog's clear middle sits for this shot — set as the shot starts, and held still while the camera " +
-                            "animates. View: the spot the camera looks at. Boat: on the boat. Camera Position: on the water under the " +
-                            "camera. Only used when the sequence's Override Fog is on."));
+                    EditorGUILayout.PropertyField(shot.FindPropertyRelative("fogCentre"), new GUIContent("Fog Centre",
+                        "Where the fog's clear middle sits for this shot — set as the shot starts, and held still while the camera " +
+                        "animates. View: the spot the camera looks at. Boat: on the boat. Camera Position: on the water under the " +
+                        "camera."));
+                    DrawFogDistance(shot);
+                    DrawViewTarget(shot, cam, inCmView);
                     DrawAnimation(shot, i, cam);
+                    if (inCmView) DrawVolume(shot);
                 }
-                DrawPreviews(shot, i, cam);
+                if (!inCmView) DrawPreviews(shot, i, cam);
             }
 
             EditorGUILayout.Space(2);
@@ -827,6 +841,171 @@ public class CameraSequenceWindow : EditorWindow
         EditorGUI.DrawRect(new Rect(card.x, card.yMax - k, card.width, k), c);
         EditorGUI.DrawRect(new Rect(card.x, card.y, k, card.height), c);
         EditorGUI.DrawRect(new Rect(card.xMax - k, card.y, k, card.height), c);
+    }
+
+    // The shot's own fog distance, in place of the world's White Fade Radius. Ticking it starts from the
+    // Radius the world is showing.
+    private static void DrawFogDistance(SerializedProperty shot)
+    {
+        var on       = shot.FindPropertyRelative("overrideFogDistance");
+        var distance = shot.FindPropertyRelative("fogDistance");
+
+        EditorGUI.BeginChangeCheck();
+        EditorGUILayout.PropertyField(on, new GUIContent("Fog Distance Override",
+            "On: for this shot the fog is full at Fog Distance from its centre, instead of the world's White Fade Radius. " +
+            "Shown live in the Cm View."));
+        if (EditorGUI.EndChangeCheck() && on.boolValue && distance.floatValue <= 0f)
+            distance.floatValue = Shader.GetGlobalFloat("_WhiteFadeRadius");
+
+        if (!on.boolValue) return;
+        using (new EditorGUI.IndentLevelScope())
+            EditorGUILayout.PropertyField(distance, new GUIContent("Fog Distance",
+                "Metres from the fog's centre to where it is full, for this shot."));
+    }
+
+    // What the camera keeps its height to. Picked by clicking it in the Cm View; the height is learned from
+    // where the camera stands, and moving the camera up or down changes it.
+    private void DrawViewTarget(SerializedProperty shot, CinemachineCamera cam, bool inCmView)
+    {
+        var target = shot.FindPropertyRelative("viewTarget");
+        EditorGUI.BeginChangeCheck();
+        EditorGUILayout.PropertyField(target, new GUIContent("View Target",
+            "Optional. What the camera keeps its height to: as the shot starts the camera stands its height above it, " +
+            "and its whole movement goes with it. Pick it by clicking it in the Cm View (Set View Target)."));
+        if (EditorGUI.EndChangeCheck()) CameraSequenceViewTargets.LearnHeight(shot);
+
+        if (inCmView && _cmViewSetTarget != null)
+        {
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                GUILayout.Space(EditorGUIUtility.labelWidth);
+                using (new EditorGUI.DisabledScope(cam == null || Application.isPlaying))
+                    if (GUILayout.Button(new GUIContent("Set View Target",
+                            "Then click what the camera should keep its height to, in the view on the left. Esc cancels.")))
+                        _cmViewSetTarget();
+            }
+        }
+
+        if (target.objectReferenceValue != null && cam != null)
+        {
+            using (new EditorGUI.IndentLevelScope())
+                EditorGUILayout.LabelField($"Camera keeps {shot.FindPropertyRelative("viewTargetHeight").floatValue:F2} above it",
+                                           EditorStyles.miniLabel);
+        }
+
+        var focus = shot.FindPropertyRelative("focusViewTarget");
+        using (new EditorGUI.DisabledScope(target.objectReferenceValue == null))
+            EditorGUILayout.PropertyField(focus, new GUIContent("Focus On View Target",
+                "On: as the shot starts its Volume's Depth of Field Focus Distance is set to how far the camera stands " +
+                "from the View Target — once, so it stays put while the camera animates. Off: the Volume's own Focus Distance."));
+    }
+
+    // In the Cm View only: the shot's own Volume, its overrides edited in place — no other shot shares it.
+    private void DrawVolume(SerializedProperty shot)
+    {
+        var profile = shot.FindPropertyRelative("volumeProfile").objectReferenceValue as UnityEngine.Rendering.VolumeProfile;
+
+        EditorGUILayout.Space(2);
+        bool open = SessionState.GetBool(VolumeOpenKey, true);
+        bool now  = EditorGUILayout.Foldout(open, new GUIContent("Volume",
+            "This shot's own post processing — colour, depth of field and the rest. The camera wears it while the shot " +
+            "is on; no other shot shares it."), true);
+        if (now != open) SessionState.SetBool(VolumeOpenKey, now);
+        if (!now) return;
+
+        using (new EditorGUI.IndentLevelScope())
+        {
+            if (profile == null)
+            {
+                EditorGUILayout.LabelField(Application.isPlaying
+                    ? "No Volume of its own yet — the storyboard makes one out of play mode."
+                    : "No camera yet — the shot's Volume is made once it has one.", EditorStyles.miniLabel);
+                return;
+            }
+            using (new EditorGUI.DisabledScope(true))
+                EditorGUILayout.ObjectField(new GUIContent("Profile", "The shot's own copy of the Level Select profile."),
+                                            profile, typeof(UnityEngine.Rendering.VolumeProfile), false);
+        }
+
+        Editor.CreateCachedEditor(profile, null, ref _volumeEditor);
+        _volumeEditor.OnInspectorGUI();
+    }
+
+    // postprocessing/LevelSelectVolumeProfile — what every shot camera's Volume Settings and every shot's own Volume start from.
+    private const string LevelSelectProfileGuid = "9eafecbf7740f374b941e60136993d6f";
+
+    // Each shot's own Volume is kept here.
+    private const string ShotVolumesFolder = CameraSequencePresetIO.Folder + "/ShotVolumes";
+
+    /// <summary>
+    /// Every shot camera has Cinemachine Volume Settings (on the Level Select profile, Focus Tracking off), and every
+    /// shot its own Volume — a copy of the Level Select profile in <see cref="ShotVolumesFolder"/>.
+    /// </summary>
+    private void EnsureShotVolumes()
+    {
+        if (Application.isPlaying) return;
+        string levelSelectPath = AssetDatabase.GUIDToAssetPath(LevelSelectProfileGuid);
+        var levelSelect = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.VolumeProfile>(levelSelectPath);
+        if (levelSelect == null) return;
+
+        for (int i = 0; i < _sequence.shots.Count; i++)
+        {
+            var shot = _sequence.shots[i];
+            if (shot.camera == null) continue;
+
+            if (!shot.camera.TryGetComponent(out CinemachineVolumeSettings settings))
+            {
+                settings = Undo.AddComponent<CinemachineVolumeSettings>(shot.camera.gameObject);
+                settings.Profile       = levelSelect;
+                settings.FocusTracking = CinemachineVolumeSettings.FocusTrackingMode.None;
+                EditorUtility.SetDirty(settings);
+                PrefabUtility.RecordPrefabInstancePropertyModifications(settings);
+                Debug.Log($"[CameraSequenceWindow] Gave '{shot.camera.name}' Cinemachine Volume Settings ({levelSelect.name}).");
+            }
+
+            if (shot.volumeProfile != null) continue;
+            string owner = _sequence.preset != null ? _sequence.preset.name : _sequence.name;
+            string path  = AssetDatabase.GenerateUniqueAssetPath(
+                $"{LevelSelectRiverPresetLibrary.EnsureFolder(ShotVolumesFolder)}/{owner} Shot {i + 1} Volume.asset");
+            if (!AssetDatabase.CopyAsset(levelSelectPath, path))
+            {
+                Debug.LogWarning($"[CameraSequenceWindow] Couldn't copy {levelSelect.name} to {path} for shot {i + 1}.");
+                continue;
+            }
+            Undo.RecordObject(_sequence, "Shot Volume");
+            shot.volumeProfile = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.VolumeProfile>(path);
+            MarkSequenceChanged();
+            Debug.Log($"[CameraSequenceWindow] Shot {i + 1}: its own Volume at {path}.");
+        }
+    }
+
+    /// <summary>
+    /// For the Cm View: draws shot <paramref name="index"/>'s card (as in the storyboard, less the reorder buttons and
+    /// thumbnail) through the open storyboard showing <paramref name="sequence"/>. False when no storyboard shows it.
+    /// </summary>
+    public static bool DrawShotInCmView(CameraSequence sequence, int index, System.Action setViewTarget)
+    {
+        if (sequence == null) return false;
+        var w = Resources.FindObjectsOfTypeAll<CameraSequenceWindow>().FirstOrDefault(x => x._sequence == sequence);
+        if (w == null) return false;
+
+        var so = new SerializedObject(sequence);
+        so.Update();
+        var shots = so.FindProperty("shots");
+        if (index < 0 || index >= shots.arraySize) return false;
+
+        w._characters      = FindObjectsByType<SequenceCharacter>(FindObjectsInactive.Exclude);
+        w._cmViewSetTarget = setViewTarget;
+        try
+        {
+            w.DrawShot(shots, index, DialogueTiming.Read(), true);
+        }
+        finally
+        {
+            w._cmViewSetTarget = null;
+        }
+        so.ApplyModifiedProperties();
+        return true;
     }
 
     private void DrawAnimation(SerializedProperty shot, int i, CinemachineCamera cam)
@@ -1190,7 +1369,7 @@ public class CameraSequenceWindow : EditorWindow
                        shot.FindPropertyRelative("animation").enumValueIndex == (int)CameraSequence.ShotAnimation.Animate2Shot;
         if (!twoShot)
         {
-            DrawPreview(_previews, i, cam, "No camera");
+            DrawPreview(_previews, i, cam, "No camera", true);
             return;
         }
 
@@ -1199,7 +1378,7 @@ public class CameraSequenceWindow : EditorWindow
         {
             using (new EditorGUILayout.HorizontalScope())
             {
-                DrawPreview(_previews, i, cam, "No camera");
+                DrawPreview(_previews, i, cam, "No camera", true);
                 GUILayout.Space(4f);
                 DrawPreview(_endPreviews, i, endCam, "No end camera");
             }
@@ -1213,7 +1392,8 @@ public class CameraSequenceWindow : EditorWindow
     }
 
     // What a camera sees, the shape of the game view.
-    private void DrawPreview(List<RenderTexture> previews, int i, CinemachineCamera cam, string emptyLabel)
+    // shotCamera: the shot's own camera, whose click opens the shot's settings beside it in the Cm View.
+    private void DrawPreview(List<RenderTexture> previews, int i, CinemachineCamera cam, string emptyLabel, bool shotCamera = false)
     {
         float height = PreviewWidth / CinemachinePreviewRig.GameAspect(cam);
         Rect rect = GUILayoutUtility.GetRect(PreviewWidth, height,
@@ -1226,7 +1406,8 @@ public class CameraSequenceWindow : EditorWindow
             var e = Event.current;
             if (e.type == EventType.MouseDown && e.button == 0 && rect.Contains(e.mousePosition))
             {
-                CinemachineViewWindow.Watch(cam);
+                if (shotCamera) CinemachineViewWindow.WatchShot(_sequence, i);
+                else            CinemachineViewWindow.Watch(cam);
                 e.Use();
                 return;
             }
@@ -1247,7 +1428,9 @@ public class CameraSequenceWindow : EditorWindow
         previews[i] = target;
 
         _previewRig ??= new CinemachinePreviewRig();
-        if (_previewRig.Render(cam, target))
+        var shot    = i < _sequence.shots.Count ? _sequence.shots[i] : null;
+        var focusOn = CameraSequenceFogPreview.FocusFor(shot);
+        if (_previewRig.Render(cam, target, null, focusOn, null, shot?.volumeProfile))
             GUI.DrawTexture(rect, target, ScaleMode.StretchToFill, false);
     }
 

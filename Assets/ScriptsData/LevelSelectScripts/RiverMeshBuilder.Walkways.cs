@@ -89,6 +89,7 @@ public static partial class RiverMeshBuilder
         public float   s;
         public Vector3 c;
         public Vector3 r;
+        public float   halfOuter;   // how far out the run's outer edge stands here, lerped the same way
     }
 
     /// <summary>
@@ -99,26 +100,46 @@ public static partial class RiverMeshBuilder
     public static Mesh BuildWalkways(
         RiverProfile profile, IList<Vector3> centres, IList<Vector3> forwards,
         IList<Walkway> walkways, IList<WalkwayFlat> flats, float edge,
-        RiverRunShadingSettings shading = null, IList<Bridge> bridges = null)
+        RiverRunShadingSettings shading = null, IList<Bridge> bridges = null,
+        IList<Archway> archways = null, IList<RimWall> rimWalls = null,
+        RimWallPool poolAtStart = default, RimWallPool poolAtEnd = default)
     {
         var b = new MeshBuild();
-        bool any = (walkways != null && walkways.Count > 0) || (bridges != null && bridges.Count > 0);
+        bool any = (walkways != null && walkways.Count > 0) || (bridges != null && bridges.Count > 0) ||
+                   (archways != null && archways.Count > 0) || (rimWalls != null && rimWalls.Count > 0);
         if (profile == null || centres == null || forwards == null || centres.Count < 2 || !any)
             return b.ToMesh("RiverWalkways");
 
         var grid = new RunGrid(profile, centres, forwards, Mathf.Max(edge, 0.005f));
         if (grid.Rings < 2) return b.ToMesh("RiverWalkways");
 
+        // One mesh, four Designations — each takes its own Scale in the tuner.
+        // The run's portholes bore on through every walkway beside them.
+        var holes = ResolvePortholes(profile, grid, null);
+
+        b.NextDesignation = StoneDesignation.RiverWalkways;
         if (walkways != null)
             foreach (var walkway in walkways)
-                BuildWalkway(b, grid, walkway, flats, shading);
+                BuildWalkway(b, grid, walkway, flats, shading, holes);
 
+        b.NextDesignation = StoneDesignation.RiverBridges;
         if (bridges != null)
             foreach (var bridge in bridges)
                 BuildBridge(b, grid, bridge, shading);
 
+        b.NextDesignation = StoneDesignation.RiverArchways;
+        if (archways != null)
+            foreach (var archway in archways)
+                BuildArchway(b, grid, archway, shading);
+
+        b.NextDesignation = StoneDesignation.RimWalls;
+        if (rimWalls != null)
+            foreach (var wall in rimWalls)
+                BuildRimWall(b, grid, wall, poolAtStart, poolAtEnd, shading);
+
         b.NextKind = 0f;
         b.NextPart = 0;
+        b.NextDesignation = StoneDesignation.None;
 
         // Measured off the run's own rim line, as the run and its rim nodes are.
         b.ShadeSeams(grid.centre, profile.jointGroove);
@@ -126,7 +147,8 @@ public static partial class RiverMeshBuilder
     }
 
     private static void BuildWalkway(MeshBuild b, RunGrid grid, Walkway walkway,
-                                     IList<WalkwayFlat> flats, RiverRunShadingSettings shading)
+                                     IList<WalkwayFlat> flats, RiverRunShadingSettings shading,
+                                     List<RunPorthole> holes)
     {
         int side = walkway.side >= 0 ? 1 : -1;
 
@@ -135,7 +157,6 @@ public static partial class RiverMeshBuilder
         if (s0 > s1) (s0, s1) = (s1, s0);
         if (s1 - s0 < 1e-4f) return;
 
-        float halfOuter = grid.profile.OuterWidth * 0.5f;
         float width     = Mathf.Max(walkway.width, WalkwayMinWidth);
         float height    = Mathf.Max(walkway.height, -(grid.profile.depth - 0.01f));
         bool  second    = walkway.layer == 2;
@@ -177,7 +198,8 @@ public static partial class RiverMeshBuilder
             var outer = new float[stations.Count];
             for (int k = 0; k < stations.Count; k++)
             {
-                inner[k] = halfOuter + inset;
+                float runEdge = stations[k].halfOuter;
+                inner[k] = runEdge + inset;
                 outer[k] = inner[k] + width;
                 if (flatIndex < 0) continue;
 
@@ -185,7 +207,7 @@ public static partial class RiverMeshBuilder
                 if (second)
                 {
                     if (FlatCrossing(stations[k], side, flat, out float tIn, out _, flat.beyond))
-                        inner[k] = Mathf.Max(tIn, halfOuter);
+                        inner[k] = Mathf.Max(tIn, runEdge);
                     if (FlatCrossing(stations[k], side, flat, out float tOut, out _))
                         outer[k] = tOut;
                 }
@@ -196,7 +218,9 @@ public static partial class RiverMeshBuilder
                 outer[k] = Mathf.Max(outer[k], inner[k] + WalkwayMinWidth);
             }
 
-            BuildWalkwayBox(b, stations, inner, outer, side, height, grid.profile.depth, shading);
+            b.NextLabel = second ? "River Walkway 2" : "River Walkway";
+            BuildWalkwayBox(b, stations, inner, outer, side, height, grid.profile.depth, shading, holes);
+            b.NextLabel = null;
         }
     }
 
@@ -206,11 +230,12 @@ public static partial class RiverMeshBuilder
     /// </summary>
     private static void BuildWalkwayBox(MeshBuild b, List<WalkStation> st, float[] innerT,
                                         float[] outerT, int side, float height, float depth,
-                                        RiverRunShadingSettings shading)
+                                        RiverRunShadingSettings shading, List<RunPorthole> holes = null)
     {
         int n = st.Count;
         if (n < 2) return;
 
+        string label = b.NextLabel;   // the buried faces are named nothing, so the name sits on what shows
         bool step = height > WalkwayMinStep;
         bool flush = Mathf.Abs(height) <= WalkwayMinStep;
         float lift = flush ? 0f : height;
@@ -239,30 +264,83 @@ public static partial class RiverMeshBuilder
             outward[k] = d.sqrMagnitude < 1e-8f ? Vector3.right * side : d.normalized;
         }
 
+        // The face against the run (or the walkway inside this one) stands up to the rim when
+        // there is a step above it, else to the top.
+        var iHead = step ? iR : iT;
+        var along = new float[n];
+        for (int k = 0; k < n; k++) along[k] = st[k].s;
+
+        Vector3 Out(int k) => (outward[k] + outward[k + 1]).normalized;
+
         for (int k = 0; k + 1 < n; k++)
         {
-            int     k2  = k + 1;
-            Vector3 out3 = (outward[k] + outward[k2]).normalized;
+            int k2 = k + 1;
 
             b.NextPart = WalkTopPart;
             b.NextKind = Kind(s => s.walkwayTop);
             FacingQuad(b, iT[k], oT[k], oT[k2], iT[k2], Vector3.up);
 
-            b.NextPart = WalkWallPart;
-            b.NextKind = Kind(s => s.walkwayOuterWall);
-            FacingQuad(b, oB[k], oB[k2], oT[k2], oT[k], out3);
-
             if (step)
             {
+                b.NextPart = WalkWallPart;
                 b.NextKind = Kind(s => s.walkwayStep);
-                FacingQuad(b, iR[k], iR[k2], iT[k2], iT[k], -out3);
+                FacingQuad(b, iR[k], iR[k2], iT[k2], iT[k], -Out(k));
             }
 
             b.NextPart = WalkBuriedPart;
             b.NextKind = 0f;
-            FacingQuad(b, iB[k], iB[k2], step ? iR[k2] : iT[k2], step ? iR[k] : iT[k], -out3);
+            b.NextLabel = null;
             FacingQuad(b, iB[k], iB[k2], oB[k2], oB[k], Vector3.down);
+            b.NextLabel = label;
         }
+
+        // A porthole bores on through the box when it lies wholly on both its faces and under its
+        // top — a box ending across the hole, or too low for it, is left whole.
+        var bored    = new List<RunPorthole>();
+        var inLines  = new List<List<Vector3>>();
+        var outLines = new List<List<Vector3>>();
+        if (holes != null)
+            foreach (var hole in holes)
+            {
+                bool under = true;
+                for (int k = 0; k < n && under; k++)
+                {
+                    if (along[k] < hole.sLo - 1e-5f || along[k] > hole.sHi + 1e-5f) continue;
+                    float room = Mathf.Min(iHead[k].y, oT[k].y) - (hole.cy + hole.radius);
+                    under = room > 1e-4f && hole.cy - hole.radius - iB[k].y > 1e-4f;
+                }
+                if (!under) continue;
+
+                var inLine  = WallOutline(hole, along, iB);
+                var outLine = WallOutline(hole, along, oB);
+                if (inLine == null || outLine == null) continue;
+
+                bored.Add(hole);
+                inLines.Add(inLine);
+                outLines.Add(outLine);
+            }
+
+        b.NextPart = WalkWallPart;
+        b.NextKind = Kind(s => s.walkwayOuterWall);
+        BuildHoledWall(b, bored, along, oB, oT, Out);
+
+        b.NextPart = WalkBuriedPart;
+        b.NextKind = 0f;
+        b.NextLabel = null;
+        BuildHoledWall(b, bored, along, iB, iHead, k => -Out(k));
+
+        if (bored.Count > 0)
+        {
+            var keepAs = b.NextDesignation;
+            b.NextPart        = WalkPortholePart;
+            b.NextKind        = PortholeKind(shading);
+            b.NextDesignation = StoneDesignation.RiverPortholes;
+            b.NextLabel       = "Porthole";
+            for (int h = 0; h < bored.Count; h++)
+                BuildPortholeTube(b, bored[h], inLines[h], outLines[h]);
+            b.NextDesignation = keepAs;
+        }
+        b.NextLabel = label;
 
         // The two ends, square across the run. The step's foot is carried as a corner so the end
         // shares its edges with both the step and the face below it.
@@ -318,9 +396,14 @@ public static partial class RiverMeshBuilder
     /// </summary>
     private static WalkStation StationAt(RunGrid grid, float s)
     {
-        int last = grid.Rings - 1;
-        if (s <= grid.arc[0])    return new WalkStation { s = s, c = grid.centre[0],    r = grid.right[0] };
-        if (s >= grid.arc[last]) return new WalkStation { s = s, c = grid.centre[last], r = grid.right[last] };
+        int   last = grid.Rings - 1;
+        float rim  = grid.profile.rimWidth;
+        if (s <= grid.arc[0])
+            return new WalkStation { s = s, c = grid.centre[0], r = grid.right[0],
+                                     halfOuter = grid.HalfInnerAt(0) + rim };
+        if (s >= grid.arc[last])
+            return new WalkStation { s = s, c = grid.centre[last], r = grid.right[last],
+                                     halfOuter = grid.HalfInnerAt(last) + rim };
 
         int j = 0;
         while (j < last - 1 && grid.arc[j + 1] < s) j++;
@@ -332,6 +415,7 @@ public static partial class RiverMeshBuilder
             s = s,
             c = Vector3.Lerp(grid.centre[j], grid.centre[j + 1], t),
             r = Vector3.Lerp(grid.right[j],  grid.right[j + 1],  t),
+            halfOuter = Mathf.Lerp(grid.HalfInnerAt(j), grid.HalfInnerAt(j + 1), t) + rim,
         };
     }
 

@@ -157,30 +157,36 @@ public static class SceneViewNavigation
 
     // The nearest thing drawn at this point of the Scene view — what a click there would select —
     // hit on its own surface. Picking hidden or unpickable objects is off in Unity, and they are
-    // passed over here too.
+    // passed over here too. So are fog sheets: they hover over everything, so the pivot would land
+    // on the fog instead of the ground under it. They don't count against MaxPickTries, since
+    // several zone sheets can stack up at the centre.
     internal static bool TryHitDrawnSurface(Vector2 guiPoint, out Vector3 point)
     {
         point = default;
         Ray ray = HandleUtility.GUIPointToWorldRay(guiPoint);
         PassedOver.Clear();
 
-        for (int i = 0; i < MaxPickTries; i++)
+        int tries = 0;
+        while (tries < MaxPickTries)
         {
             GameObject drawn = PassedOver.Count == 0
                 ? HandleUtility.PickGameObject(guiPoint, false)
                 : HandleUtility.PickGameObject(guiPoint, false, PassedOver.ToArray(), null);
             if (drawn == null)
                 return false;
+            PassedOver.Add(drawn);
+            if (drawn.TryGetComponent(out FogSheetMesh _))
+                continue;
             if (TryHitObject(ray, drawn, out point))
                 return true;
-            PassedOver.Add(drawn);
+            tries++;
         }
         return false;
     }
 
     // The ray against one object: the mesh it draws, or failing that its own colliders (a terrain
     // has no mesh to hit; a shader can draw a shape the mesh doesn't have).
-    static bool TryHitObject(Ray ray, GameObject go, out Vector3 point)
+    internal static bool TryHitObject(Ray ray, GameObject go, out Vector3 point)
     {
         if (go.TryGetComponent(out SkinnedMeshRenderer skinned))
         {

@@ -99,12 +99,29 @@ public static class LevelSelectDesignerSettings
     public static float HillSelDotSize    { get => GetF("HillSelDotSize", 4f);          set => SetF("HillSelDotSize", value); }
     public static Color HillDotColour     { get => GetC("HillDotColour",  Color.white);  set => SetC("HillDotColour",  value); }
 
+    // ── Landscape mode ──
+    // How see-through the river runs, pools and everything built on them draw while in Landscape mode.
+    public static float LandscapeStructureOpacity { get => GetF("LandscapeStructureOpacity", 0.35f); set => SetF("LandscapeStructureOpacity", value); }
+    // Off, Landscape mode leaves out the plain river node dots.
+    public static bool  LandscapeShowRiverNodes   { get => GetB("LandscapeShowRiverNodes", false);   set => SetB("LandscapeShowRiverNodes", value); }
+    // Off, Landscape mode leaves out the spikes.
+    public static bool  LandscapeShowSpikes       { get => GetB("LandscapeShowSpikes", false);       set => SetB("LandscapeShowSpikes", value); }
+    // Off, Landscape mode leaves out the junction diamonds.
+    public static bool  LandscapeShowJunctions    { get => GetB("LandscapeShowJunctions", false);    set => SetB("LandscapeShowJunctions", value); }
+    // Off, Landscape mode leaves out the arenas: their nodes, rings and entrances.
+    public static bool  LandscapeShowArenas       { get => GetB("LandscapeShowArenas", false);       set => SetB("LandscapeShowArenas", value); }
+    // Off, Landscape mode leaves out the soul paths.
+    public static bool  LandscapeShowSoulPaths    { get => GetB("LandscapeShowSoulPaths", false);    set => SetB("LandscapeShowSoulPaths", value); }
+
     // ── Node dots ──
     public static float NodeDotSize       { get => GetF("NodeDotSize", 6f);              set => SetF("NodeDotSize", value); }
     public static Color NodeDotColour     { get => GetC("NodeDotColour", Color.gray);    set => SetC("NodeDotColour", value); }
     public static float NodeSelRingSize   { get => GetF("NodeSelRingSize", 10f);         set => SetF("NodeSelRingSize", value); }
     public static float NodeSelRingWidth  { get => GetF("NodeSelRingWidth", 3f);         set => SetF("NodeSelRingWidth", value); }
     public static Color NodeSelColour     { get => GetC("NodeSelColour", Color.white);   set => SetC("NodeSelColour", value); }
+    // ── Camera ──
+    // Off, the canvas draws no cameras at all: neither the Cinematic node symbols nor the shot cameras.
+    public static bool  ShowCameras       { get => GetB("ShowCameras", true);            set => SetB("ShowCameras", value); }
     public static bool  CameraSymbol      { get => GetB("CameraSymbol", true);           set => SetB("CameraSymbol", value); }
     public static float CameraSymbolSize  { get => GetF("CameraSymbolSize", 12f);        set => SetF("CameraSymbolSize", value); }
     public static Color CameraSymbolColour{ get => GetC("CameraSymbolColour", Color.white); set => SetC("CameraSymbolColour", value); }
@@ -160,6 +177,7 @@ public static class LevelSelectDesignerSettings
 
     // ── Pipes ──
     public static float PipeNodeSize        { get => GetF("PipeNodeSize", 4.5f);          set => SetF("PipeNodeSize", value); }
+    public static float PipeOpacity         { get => GetF("PipeOpacity", 1f);             set => SetF("PipeOpacity", value); }
     public static Color PipeBodyColour      { get => GetC("PipeBodyColour",    new Color(0.55f, 0.72f, 0.78f, 0.9f));  set => SetC("PipeBodyColour",    value); }
     public static Color PipeBoreColour      { get => GetC("PipeBoreColour",    new Color(0.22f, 0.3f,  0.33f, 0.9f));  set => SetC("PipeBoreColour",    value); }
     public static Color PipeSelBodyColour   { get => GetC("PipeSelBodyColour", new Color(0.92f, 0.92f, 0.92f, 0.95f)); set => SetC("PipeSelBodyColour", value); }
@@ -169,6 +187,7 @@ public static class LevelSelectDesignerSettings
     public static Color PipeOwnHeightColour { get => GetC("PipeOwnHeightColour", new Color(1f, 0.6f, 0.15f, 1f));      set => SetC("PipeOwnHeightColour", value); }
     public static Color PipeOutlineColour   { get => GetC("PipeOutlineColour", new Color(0.1f, 0.1f, 0.1f, 0.9f));     set => SetC("PipeOutlineColour", value); }
     public static Color PipeGhostColour     { get => GetC("PipeGhostColour",   new Color(1f, 1f, 1f, 0.3f));           set => SetC("PipeGhostColour",   value); }
+    public static float PipeHubReach        { get => GetF("PipeHubReach", 3f);            set => SetF("PipeHubReach", value); }
 
     // ── Walls ──
     public static float WallNodeSize        { get => GetF("WallNodeSize", 4.5f);          set => SetF("WallNodeSize", value); }
@@ -179,6 +198,27 @@ public static class LevelSelectDesignerSettings
     public static Color WallOwnHeightColour { get => GetC("WallOwnHeightColour", new Color(1f, 0.6f, 0.15f, 1f));      set => SetC("WallOwnHeightColour", value); }
     public static Color WallOutlineColour   { get => GetC("WallOutlineColour", new Color(0.1f, 0.1f, 0.1f, 0.9f));     set => SetC("WallOutlineColour", value); }
     public static Color WallGhostColour     { get => GetC("WallGhostColour",   new Color(1f, 1f, 1f, 0.3f));           set => SetC("WallGhostColour",   value); }
+
+    // ── Fog Zones ──
+    public static Color FogZoneFillColour    { get => GetC("FogZoneFillColour",    new Color(1f, 1f, 1f, 0.20f)); set => SetC("FogZoneFillColour",    value); }
+    public static Color FogZoneSelFillColour { get => GetC("FogZoneSelFillColour", new Color(1f, 1f, 1f, 0.35f)); set => SetC("FogZoneSelFillColour", value); }
+    public static float FogTriggerWidth      { get => GetF("FogTriggerWidth", 2f);                                set => SetF("FogTriggerWidth", value); }
+    public static Color FogTriggerColour     { get => GetC("FogTriggerColour",     new Color(1f, 1f, 1f, 0.50f)); set => SetC("FogTriggerColour",     value); }
+    public static Color FogTriggerSelColour  { get => GetC("FogTriggerSelColour",  new Color(1f, 1f, 1f, 0.90f)); set => SetC("FogTriggerSelColour",  value); }
+    public static Color FogSceneMeshColour   { get => GetC("FogSceneMeshColour",   new Color(1f, 1f, 1f, 0.35f)); set => SetC("FogSceneMeshColour",   value); }
+    public static Color FogSceneMeshSelColour{ get => GetC("FogSceneMeshSelColour",new Color(1f, 1f, 1f, 0.80f)); set => SetC("FogSceneMeshSelColour",value); }
+    public static float FogZoneHandleSize     { get => GetF("FogZoneHandleSize", 6f);                              set => SetF("FogZoneHandleSize", value); }
+    public static float FogZoneHandleSelSize  { get => GetF("FogZoneHandleSelSize", 8f);                           set => SetF("FogZoneHandleSelSize", value); }
+    public static Color FogZoneHandleColour   { get => GetC("FogZoneHandleColour",    new Color(0.7f, 0.7f, 0.7f, 1f)); set => SetC("FogZoneHandleColour",    value); }
+    public static Color FogZoneHandleSelColour{ get => GetC("FogZoneHandleSelColour", Color.white);                set => SetC("FogZoneHandleSelColour", value); }
+
+    // ── Fog Repellers ──
+    public static bool  ShowFogRepelRadius      { get => GetB("ShowFogRepelRadius", true);                                   set => SetB("ShowFogRepelRadius", value); }
+    public static Color FogRepelFillColour      { get => GetC("FogRepelFillColour",      new Color(1f, 1f, 1f, 0.08f)); set => SetC("FogRepelFillColour",      value); }
+    public static Color FogRepelSelFillColour   { get => GetC("FogRepelSelFillColour",   new Color(1f, 1f, 1f, 0.16f)); set => SetC("FogRepelSelFillColour",   value); }
+    public static float FogRepelEdgeWidth       { get => GetF("FogRepelEdgeWidth", 2f);                                      set => SetF("FogRepelEdgeWidth", value); }
+    public static Color FogRepelEdgeColour      { get => GetC("FogRepelEdgeColour",      new Color(1f, 1f, 1f, 0.35f)); set => SetC("FogRepelEdgeColour",      value); }
+    public static Color FogRepelSelEdgeColour   { get => GetC("FogRepelSelEdgeColour",   new Color(1f, 1f, 1f, 0.70f)); set => SetC("FogRepelSelEdgeColour",   value); }
 
     // ── Gizmo visibility ──
     public static bool  ShowPerchRadius   { get => GetB("ShowPerchRadius", true);        set => SetB("ShowPerchRadius", value); }
@@ -207,6 +247,7 @@ public static class LevelSelectDesignerSettings
     static void Changed()
     {
         foreach (var w in Resources.FindObjectsOfTypeAll<LevelSelectDesignerWindow>()) w.Repaint();
+        SceneView.RepaintAll();
     }
 }
 
@@ -222,9 +263,9 @@ public class LevelSelectDesignerSettingsWindow : EditorWindow
 
     static readonly string[] Sections =
     {
-        "Canvas Height Map", "Contours", "Hill Points", "Node Dots", "Junctions",
+        "Landscape", "Node Dots", "Junctions",
         "Rivers", "Arenas", "Soul Routes", "Gizmo Visibility",
-        "Pipes", "Walls", "Navigation", "Editing",
+        "Pipes", "Walls", "Navigation", "Editing", "Fog", "Camera",
     };
 
     const string SectionPref = "LSD_Settings_Section";
@@ -252,23 +293,42 @@ public class LevelSelectDesignerSettingsWindow : EditorWindow
 
         switch (picked)
         {
-            case 0: DrawHeightMap();  break;
-            case 1: DrawContours();  break;
-            case 2: DrawHillPoints(); break;
-            case 3: DrawNodeDots();   break;
-            case 4: DrawJunctions();  break;
-            case 5: DrawRivers();     break;
-            case 6: DrawArenas();     break;
-            case 7: DrawSoulRoutes(); break;
-            case 8: DrawGizmos();     break;
-            case 9: DrawPipes();      break;
-            case 10: DrawWalls();      break;
-            case 11: DrawNavigation(); break;
-            case 12: DrawEditing();    break;
+            case 0: DrawLandscape();  break;
+            case 1: DrawNodeDots();   break;
+            case 2: DrawJunctions();  break;
+            case 3: DrawRivers();     break;
+            case 4: DrawArenas();     break;
+            case 5: DrawSoulRoutes(); break;
+            case 6: DrawGizmos();     break;
+            case 7: DrawPipes();      break;
+            case 8: DrawWalls();      break;
+            case 9: DrawNavigation(); break;
+            case 10: DrawEditing();   break;
+            case 11: DrawFog();       break;
+            case 12: DrawCamera();    break;
         }
 
         EditorGUILayout.EndScrollView();
         EditorGUIUtility.labelWidth = prevLW;
+    }
+
+    // Everything the landscape shows on the canvas, one header per group.
+    static void DrawLandscape()
+    {
+        Header("Canvas Height Map", first: true);
+        DrawHeightMap();
+        Header("Contours");
+        DrawContours();
+        Header("Hill Points");
+        DrawHillPoints();
+        Header("Landscape Mode");
+        DrawRiverStructures();
+    }
+
+    static void Header(string title, bool first = false)
+    {
+        if (!first) EditorGUILayout.Space(12);
+        EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
     }
 
     static void DrawHeightMap()
@@ -374,25 +434,7 @@ public class LevelSelectDesignerSettingsWindow : EditorWindow
         Colour("Selected Colour", LevelSelectDesignerSettings.NodeSelColour, v => LevelSelectDesignerSettings.NodeSelColour = v);
 
         EditorGUILayout.Space(6);
-        Toggle("Camera Symbol", "A little camera above each node with Cinematic on (a camera sequence plays there).",
-               LevelSelectDesignerSettings.CameraSymbol, v => LevelSelectDesignerSettings.CameraSymbol = v);
-        using (new EditorGUI.DisabledScope(!LevelSelectDesignerSettings.CameraSymbol))
-        {
-            Slider("Camera Symbol Size (px)", LevelSelectDesignerSettings.CameraSymbolSize, 4f, 40f, v => LevelSelectDesignerSettings.CameraSymbolSize = v);
-            Colour("Camera Symbol Colour", LevelSelectDesignerSettings.CameraSymbolColour, v => LevelSelectDesignerSettings.CameraSymbolColour = v);
-        }
-
-        EditorGUILayout.Space(6);
-        Toggle("Shot Cameras", "A camera where each camera sequence preset's shot camera stands. Click one in Select mode to clamp it.",
-               LevelSelectDesignerSettings.ShotCameras, v => LevelSelectDesignerSettings.ShotCameras = v);
-        using (new EditorGUI.DisabledScope(!LevelSelectDesignerSettings.ShotCameras))
-        {
-            Slider("Shot Camera Size (px)", LevelSelectDesignerSettings.ShotCameraSize, 4f, 40f, v => LevelSelectDesignerSettings.ShotCameraSize = v);
-            Colour("Shot Camera Colour", LevelSelectDesignerSettings.ShotCameraColour, v => LevelSelectDesignerSettings.ShotCameraColour = v);
-        }
-
-        EditorGUILayout.Space(6);
-        Colour(new GUIContent("Playtest Boat Colour", "The second boat on the map, standing where Play From Playtest Position starts the boat (Setup > Playtest)."),
+        Colour(new GUIContent("Playtest Boat Colour", "The second boat on the map, standing where Play From Playtest Position starts the boat (placed with the ⊙ beside it, under PLAYTEST)."),
                LevelSelectDesignerSettings.PlaytestBoatColour, v => LevelSelectDesignerSettings.PlaytestBoatColour = v);
     }
 
@@ -501,6 +543,33 @@ public class LevelSelectDesignerSettingsWindow : EditorWindow
         }
     }
 
+    static void DrawCamera()
+    {
+        Toggle("Show Cameras", "Off, the canvas draws no cameras: neither the Cinematic node symbols nor the shot cameras.",
+               LevelSelectDesignerSettings.ShowCameras, v => LevelSelectDesignerSettings.ShowCameras = v);
+
+        EditorGUILayout.Space(6);
+        using (new EditorGUI.DisabledScope(!LevelSelectDesignerSettings.ShowCameras))
+        {
+            Toggle("Camera Symbol", "A little camera above each node with Cinematic on (a camera sequence plays there).",
+                   LevelSelectDesignerSettings.CameraSymbol, v => LevelSelectDesignerSettings.CameraSymbol = v);
+            using (new EditorGUI.DisabledScope(!LevelSelectDesignerSettings.CameraSymbol))
+            {
+                Slider("Camera Symbol Size (px)", LevelSelectDesignerSettings.CameraSymbolSize, 4f, 40f, v => LevelSelectDesignerSettings.CameraSymbolSize = v);
+                Colour("Camera Symbol Colour", LevelSelectDesignerSettings.CameraSymbolColour, v => LevelSelectDesignerSettings.CameraSymbolColour = v);
+            }
+
+            EditorGUILayout.Space(6);
+            Toggle("Shot Cameras", "A camera where each camera sequence preset's shot camera stands. Click one in Select mode to clamp it.",
+                   LevelSelectDesignerSettings.ShotCameras, v => LevelSelectDesignerSettings.ShotCameras = v);
+            using (new EditorGUI.DisabledScope(!LevelSelectDesignerSettings.ShotCameras))
+            {
+                Slider("Shot Camera Size (px)", LevelSelectDesignerSettings.ShotCameraSize, 4f, 40f, v => LevelSelectDesignerSettings.ShotCameraSize = v);
+                Colour("Shot Camera Colour", LevelSelectDesignerSettings.ShotCameraColour, v => LevelSelectDesignerSettings.ShotCameraColour = v);
+            }
+        }
+    }
+
     static void DrawGizmos()
     {
         Toggle("Perch Radius", "The washed disc round each perch — markers, spikes and structures.",
@@ -509,6 +578,10 @@ public class LevelSelectDesignerSettingsWindow : EditorWindow
 
     static void DrawPipes()
     {
+        Slider(new GUIContent("Opacity", "How solid the pipes draw on the map: body, bore, supports and nodes. 1 = fully solid."),
+               LevelSelectDesignerSettings.PipeOpacity, 0f, 1f, v => LevelSelectDesignerSettings.PipeOpacity = v);
+
+        EditorGUILayout.Space(6);
         Colour("Body Colour",          LevelSelectDesignerSettings.PipeBodyColour,    v => LevelSelectDesignerSettings.PipeBodyColour    = v);
         Colour(new GUIContent("Bore Colour", "The darker line down the middle for the hollow."),
                LevelSelectDesignerSettings.PipeBoreColour, v => LevelSelectDesignerSettings.PipeBoreColour = v);
@@ -531,6 +604,14 @@ public class LevelSelectDesignerSettingsWindow : EditorWindow
         EditorGUILayout.Space(6);
         Colour(new GUIContent("Drawing Line Colour", "The dotted line out to the cursor while a pipe is being laid."),
                LevelSelectDesignerSettings.PipeGhostColour, v => LevelSelectDesignerSettings.PipeGhostColour = v);
+
+        EditorGUILayout.Space(6);
+        EditorGUI.BeginChangeCheck();
+        float reach = EditorGUILayout.FloatField(
+            new GUIContent("Hub Reach (m)", "How far from a soul juice tank a pipe hub can be and still be " +
+                                            "offered in the tank's Intake Hub list."),
+            LevelSelectDesignerSettings.PipeHubReach);
+        if (EditorGUI.EndChangeCheck()) LevelSelectDesignerSettings.PipeHubReach = Mathf.Max(0f, reach);
     }
 
     static void DrawWalls()
@@ -553,6 +634,72 @@ public class LevelSelectDesignerSettingsWindow : EditorWindow
                LevelSelectDesignerSettings.WallGhostColour, v => LevelSelectDesignerSettings.WallGhostColour = v);
     }
 
+    // Fog on the canvas: the zones, then the repellers' radii.
+    static void DrawFog()
+    {
+        Header("Zones", first: true);
+        DrawFogZones();
+        Header("Repellers");
+        DrawFogRepellers();
+    }
+
+    static void DrawFogRepellers()
+    {
+        Toggle("Show Radius", "The disc fog is held off from round each structure with Fog Repeller ticked.",
+               LevelSelectDesignerSettings.ShowFogRepelRadius, v => LevelSelectDesignerSettings.ShowFogRepelRadius = v);
+
+        using (new EditorGUI.DisabledScope(!LevelSelectDesignerSettings.ShowFogRepelRadius))
+        {
+            Colour(new GUIContent("Fill Colour", "The radius, filled. Alpha sets how solid it draws."),
+                   LevelSelectDesignerSettings.FogRepelFillColour, v => LevelSelectDesignerSettings.FogRepelFillColour = v);
+            Colour("Selected Fill Colour",
+                   LevelSelectDesignerSettings.FogRepelSelFillColour, v => LevelSelectDesignerSettings.FogRepelSelFillColour = v);
+
+            EditorGUILayout.Space(6);
+            Slider(new GUIContent("Edge Width (px)", "The line round the radius. 0 = no line."),
+                   LevelSelectDesignerSettings.FogRepelEdgeWidth, 0f, 20f, v => LevelSelectDesignerSettings.FogRepelEdgeWidth = v);
+            Colour("Edge Colour",
+                   LevelSelectDesignerSettings.FogRepelEdgeColour, v => LevelSelectDesignerSettings.FogRepelEdgeColour = v);
+            Colour("Selected Edge Colour",
+                   LevelSelectDesignerSettings.FogRepelSelEdgeColour, v => LevelSelectDesignerSettings.FogRepelSelEdgeColour = v);
+        }
+    }
+
+    static void DrawFogZones()
+    {
+        Colour(new GUIContent("Zone Fill Colour", "The fog sheet, filled. Alpha sets how solid it draws."),
+               LevelSelectDesignerSettings.FogZoneFillColour, v => LevelSelectDesignerSettings.FogZoneFillColour = v);
+        Colour("Selected Zone Fill Colour",
+               LevelSelectDesignerSettings.FogZoneSelFillColour, v => LevelSelectDesignerSettings.FogZoneSelFillColour = v);
+
+        EditorGUILayout.Space(6);
+        Slider(new GUIContent("Handle Size (px)", "The dot on each sheet's centre that picks up the whole zone."),
+               LevelSelectDesignerSettings.FogZoneHandleSize, 1f, 20f, v => LevelSelectDesignerSettings.FogZoneHandleSize = v);
+        Slider("Selected Handle Size (px)",
+               LevelSelectDesignerSettings.FogZoneHandleSelSize, 1f, 20f, v => LevelSelectDesignerSettings.FogZoneHandleSelSize = v);
+        Colour("Handle Colour",
+               LevelSelectDesignerSettings.FogZoneHandleColour, v => LevelSelectDesignerSettings.FogZoneHandleColour = v);
+        Colour("Selected Handle Colour",
+               LevelSelectDesignerSettings.FogZoneHandleSelColour, v => LevelSelectDesignerSettings.FogZoneHandleSelColour = v);
+
+        EditorGUILayout.Space(6);
+        Slider(new GUIContent("Trigger Line Width (px)", "The trigger bounds, drawn as an outline only."),
+               LevelSelectDesignerSettings.FogTriggerWidth, 1f, 20f, v => LevelSelectDesignerSettings.FogTriggerWidth = v);
+        Colour("Trigger Line Colour",
+               LevelSelectDesignerSettings.FogTriggerColour, v => LevelSelectDesignerSettings.FogTriggerColour = v);
+        Colour("Selected Trigger Line Colour",
+               LevelSelectDesignerSettings.FogTriggerSelColour, v => LevelSelectDesignerSettings.FogTriggerSelColour = v);
+
+        EditorGUILayout.Space(6);
+        EditorGUILayout.LabelField("Scene view: the trigger box shows on the selected zone only, " +
+                                   "in the line width and Selected Trigger Line Colour above.",
+                                   EditorStyles.wordWrappedMiniLabel);
+        Colour(new GUIContent("Scene Mesh Colour", "Each sheet's mesh, drawn as a wireframe in the Scene view while in Fog Zones mode."),
+               LevelSelectDesignerSettings.FogSceneMeshColour, v => LevelSelectDesignerSettings.FogSceneMeshColour = v);
+        Colour("Selected Scene Mesh Colour",
+               LevelSelectDesignerSettings.FogSceneMeshSelColour, v => LevelSelectDesignerSettings.FogSceneMeshSelColour = v);
+    }
+
     static void DrawNavigation()
     {
         Toggle("Invert Pan Horizontal", "Space + drag and middle-mouse drag, left/right: " +
@@ -573,6 +720,26 @@ public class LevelSelectDesignerSettingsWindow : EditorWindow
                 "0 = rebuild on every step. Toggles, dropdowns and buttons always rebuild at once."),
             LevelSelectDesignerSettings.RebuildDelay);
         if (EditorGUI.EndChangeCheck()) LevelSelectDesignerSettings.RebuildDelay = delay;
+    }
+
+    static void DrawRiverStructures()
+    {
+        Slider(new GUIContent("River Structure Opacity",
+                   "While in Landscape mode: how solid the river runs, pools, pool towers, walkways, bridges, " +
+                   "archways, outposts, pipes, walls and rim nodes draw, so the ground shows through them. " +
+                   "1 = as in every other mode."),
+               LevelSelectDesignerSettings.LandscapeStructureOpacity, 0f, 1f,
+               v => LevelSelectDesignerSettings.LandscapeStructureOpacity = v);
+        Toggle("River Nodes", "While in Landscape mode: shows the river node dots.",
+               LevelSelectDesignerSettings.LandscapeShowRiverNodes, v => LevelSelectDesignerSettings.LandscapeShowRiverNodes = v);
+        Toggle("Junctions", "While in Landscape mode: shows the junction diamonds.",
+               LevelSelectDesignerSettings.LandscapeShowJunctions, v => LevelSelectDesignerSettings.LandscapeShowJunctions = v);
+        Toggle("Arenas", "While in Landscape mode: shows the arenas — their nodes, rings and entrances.",
+               LevelSelectDesignerSettings.LandscapeShowArenas, v => LevelSelectDesignerSettings.LandscapeShowArenas = v);
+        Toggle("Soul Paths", "While in Landscape mode: shows the soul paths.",
+               LevelSelectDesignerSettings.LandscapeShowSoulPaths, v => LevelSelectDesignerSettings.LandscapeShowSoulPaths = v);
+        Toggle("Spikes", "While in Landscape mode: shows the spikes.",
+               LevelSelectDesignerSettings.LandscapeShowSpikes, v => LevelSelectDesignerSettings.LandscapeShowSpikes = v);
     }
 
     static void Toggle(string label, string tip, bool value, System.Action<bool> set)

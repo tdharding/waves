@@ -1,0 +1,70 @@
+    private const string SoulJuiceTankBowlChild  = "Bowl";
+    private const string SoulJuiceTankWaterChild = "Water";
+
+    /// <summary>
+    /// Builds a soul juice tank under <paramref name="parent"/>, base at its origin: the body
+    /// (base tiers and column) on the root, a "Bowl" child carrying the bowl, and a "Water" child
+    /// of the bowl at the bowl's water surface. The water is a pool's own water, built by the same
+    /// builder as a bowl with no island and no rivers, so it looks and moves like the rest and the
+    /// souls stamped on it draw the way they do on the river. It sits the tower's own Water Drop
+    /// below the bowl's rim — the world's Water Level is far deeper than any bowl.
+    ///
+    /// <paramref name="reuse"/>, when given, is one built before — its pieces are refilled. Meshes
+    /// are saved as <paramref name="name"/>, name_Bowl and name_Water. The caller places the root.
+    /// </summary>
+    private GameObject PlaceSoulJuiceTank(Transform parent, string name, string poolNodeId, SoulJuiceTank placed,
+                                           RiverProfile profile, GameObject reuse = null)
+    {
+        var bodyMesh = SaveGeneratedMesh(name,           placed.BuildBody(StoneShadingForBuild));
+        var bowlMesh = SaveGeneratedMesh(name + "_Bowl", placed.BuildBowl(_data.WaterSurfaceDrop, StoneShadingForBuild));
+
+        // Fine enough to go round even a small bowl; the pool water's own grid is laid off this.
+        float drop  = Mathf.Max(0f, placed.waterDrop);
+        float inner = placed.InnerRadius;
+        float edge  = Mathf.Min(MeshEdge, 2f * Mathf.PI * inner / 32f);
+        var waterMesh = SaveGeneratedMesh(name + "_Water",
+            RiverMeshBuilder.BuildPoolWater(profile, drop, inner, 0f, edge, null, placed.BasinDepth));
+
+        if (bodyMesh == null || bowlMesh == null || waterMesh == null) return null;
+
+        GameObject go = reuse;
+        if (go == null)
+        {
+            go = new GameObject(name);
+            Undo.RegisterCreatedObjectUndo(go, "Generate Soul Juice Tank");
+            go.transform.SetParent(parent, false);
+        }
+        SetTurretPiece(go, bodyMesh, _data.riverMaterial);
+
+        // The bowl mesh is built in the tower's own space, so it sits at the root's origin.
+        Transform bowl = TurretChild(go.transform, SoulJuiceTankBowlChild);
+        bowl.localPosition = Vector3.zero;
+        bowl.localRotation = Quaternion.identity;
+        bowl.localScale    = Vector3.one;
+        SetTurretPiece(bowl.gameObject, bowlMesh, _data.riverMaterial);
+
+        // The pool water builder works down from a rim at y = 0, so the water's origin is the rim.
+        Transform water = TurretChild(bowl, SoulJuiceTankWaterChild);
+        water.localPosition = Vector3.up * placed.RimTopY;
+        water.localRotation = Quaternion.identity;
+        water.localScale    = Vector3.one;
+        SetTurretPiece(water.gameObject, waterMesh, _data.waterMaterial);
+        SetWaterSorting(water.gameObject, PoolWaterSortingLayer, 0);
+
+        // Where the souls waiting in this tower swim, for the runtime to read.
+        var marker = go.GetComponent<SoulJuiceTankBowl>();
+        if (marker == null) marker = Undo.AddComponent<SoulJuiceTankBowl>(go);
+        marker.poolNodeId  = poolNodeId;
+        marker.water       = water;
+        marker.waterRadius = placed.WaterRadius;
+        marker.innerRadius = placed.InnerRadius;
+        marker.basinDepth  = placed.BasinDepth;
+        marker.waterDrop   = drop;
+        marker.emptyDrop   = Mathf.Max(drop, placed.EmptyDrop);
+        EditorUtility.SetDirty(marker);
+
+        // Deliberately not made sampleable: the boat reads the water under it by raycast, and a
+        // bowl held up over the island must never be taken for the river.
+        return go;
+    }
+

@@ -32,6 +32,19 @@ public class RiverSoulZoneSettings
              "way from the centre line; near 1 is a hard edge.")]
     [Range(0f, 1f)] public float fadeStart = 0.6f;
 
+    [Tooltip("How far the drawn band's middle swings to either side of the route's line, in " +
+             "metres — an even wavy line down the river. 0 = straight.")]
+    [Min(0f)] public float meanderWidth = 0f;
+
+    [Tooltip("How many metres along the route from one swing of the drawn band's wave to the same " +
+             "point on the next.")]
+    [Min(0.1f)] public float meanderLength = 4f;
+
+    [Tooltip("How far either side of a turn, in metres along the route, the drawn band's line is " +
+             "eased round it — the bigger, the wider and smoother the curve at a junction or bend. " +
+             "0 = the route's own sharp corners.")]
+    [Min(0f)] public float cornerSmoothing = 0f;
+
     [Tooltip("Width of one grain cell in world units — the same gradient-noise grain the river " +
              "stone uses. 0 = no grain, a plain band of the Base Colour.")]
     [Min(0f)] public float grainSize = 0.1f;
@@ -43,8 +56,8 @@ public class RiverSoulZoneSettings
     [Tooltip("World units per second the grain flows down the route.")]
     public float scrollSpeed = 0.3f;
 
-    [Header("Souls Pool Tower Release")]
-    [Tooltip("World units per second the water in a souls pool tower's bowl drains down once E is " +
+    [Header("Soul Juice Tank Release")]
+    [Tooltip("World units per second the water in a soul juice tank's bowl drains down once E is " +
              "pressed. When it is gone the pool round the tower fills.")]
     [Min(0.001f)] public float drainSpeed = 0.05f;
 
@@ -56,6 +69,20 @@ public class RiverSoulZoneSettings
     [Tooltip("World units per second the zone grows across the pool round the tower, out to its " +
              "Pool Fill Radius. Then the souls set off along their routes.")]
     [Min(0.01f)] public float fillSpeed = 1f;
+
+    [Header("Soul Path Glow")]
+    [Tooltip("How brightly a soul route's band lights the walls, rims, banks, hills and fog " +
+             "around it, once the band has drawn out past them. 0 leaves the glow out. Live — no " +
+             "need to bake again.")]
+    [Range(0f, 10f)] public float glowStrength = 1f;
+
+    [Tooltip("How far the soul route's glow reaches from the band, in metres. Baked — press Bake " +
+             "Soul Path Glow after changing it.")]
+    [Range(0.5f, 20f)] public float glowReach = 3f;
+
+    [Tooltip("How many metres the glow takes to come up behind the band's front as it draws out " +
+             "along its route. 0 comes up at once. Live.")]
+    [Min(0f)] public float glowRevealSoftness = 2f;
 
     // ─────────────────────────────────────────────────────────────
     // PUSHING
@@ -79,6 +106,9 @@ public class RiverSoulZoneSettings
     private static readonly int GrainSizeId     = Shader.PropertyToID("_TravelSoulZoneGrainSize");
     private static readonly int GrainStrengthId = Shader.PropertyToID("_TravelSoulZoneGrainStrength");
     private static readonly int ScrollSpeedId = Shader.PropertyToID("_TravelSoulZoneScrollSpeed");
+    private static readonly int MeanderId     = Shader.PropertyToID("_TravelSoulZoneMeander");
+    private static readonly int GlowStrengthId = Shader.PropertyToID("_SoulGlowStrength");
+    private static readonly int GlowSoftnessId = Shader.PropertyToID("_SoulGlowSoftness");
 
     /// <summary>The numbers in force: the tuner's while it drives, this world's otherwise.</summary>
     public static RiverSoulZoneSettings Resolve(RiverSoulZoneSettings settings) => Live ?? settings ?? None;
@@ -99,6 +129,10 @@ public class RiverSoulZoneSettings
         Shader.SetGlobalFloat(GrainSizeId,     grainSize);
         Shader.SetGlobalFloat(GrainStrengthId, grainStrength);
         Shader.SetGlobalFloat(ScrollSpeedId, scrollSpeed);
+        Shader.SetGlobalVector(MeanderId, new Vector4(Mathf.Max(meanderWidth, 0f),
+                                                      Mathf.Max(meanderLength, 0.1f), 0f, 0f));
+        Shader.SetGlobalFloat(GlowStrengthId, glowStrength);
+        Shader.SetGlobalFloat(GlowSoftnessId, glowRevealSoftness);
     }
 
     /// <summary>Field-by-field copy, so the tuner can load a preset without holding on to it.</summary>
@@ -111,11 +145,17 @@ public class RiverSoulZoneSettings
         brightness  = other.brightness;
         baseColour  = other.baseColour;
         fadeStart   = other.fadeStart;
+        meanderWidth  = other.meanderWidth;
+        meanderLength = other.meanderLength;
+        cornerSmoothing = other.cornerSmoothing;
         grainSize     = other.grainSize;
         grainStrength = other.grainStrength;
         scrollSpeed = other.scrollSpeed;
         drainSpeed  = other.drainSpeed;
         fillSpeed   = other.fillSpeed;
         poolFillRadius = other.poolFillRadius;
+        glowStrength       = other.glowStrength;
+        glowReach          = other.glowReach;
+        glowRevealSoftness = other.glowRevealSoftness;
     }
 }

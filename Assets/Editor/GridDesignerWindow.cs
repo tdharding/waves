@@ -2573,8 +2573,7 @@ public class GridDesignerWindow : EditorWindow
 
         EditorGUI.BeginChangeCheck();
         bool on = EditorGUILayout.Toggle("Fog Enabled", loadedData.fogEnabled);
-        var newMap = (FogMap)EditorGUILayout.ObjectField(
-            "Fog Map", loadedData.fogMap, typeof(FogMap), false);
+        var newMap = FogMapPicker.Popup("Fog Map", loadedData.fogMap);
         if (EditorGUI.EndChangeCheck())
         {
             Undo.RecordObject(loadedData, "Set Fog");

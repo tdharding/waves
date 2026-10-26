@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2b36669c5c2c074e98951dc757d05dd, type: 3}
+  m_Name: DamageWallLollyPopPreset1
+  m_EditorClassIdentifier: Assembly-CSharp::LollipopTowerPreset
+  tower:
+    stemRadius: 1.4
+    stemHeight: 4
+    orbRadius: 3
+    baseRadius: 1.4
+    baseHeight: 0
+    lowerRampHeight: 1.76
+    lowerRampRadius: 2.93
+    rampHeight: 0
+    base2Radius: 1
+    base2Height: 0
+    destruction: 1
+    holeAround: 74
+    holeUpDown: 20
+    holeSize: 35
+    holeEdgeComplexity: 7
+    holeEdgeDepth: 0.334
+    holeEdgeUnevenness: 0.928
+    holeEdgeRoundness: 1
+    holeEdgeThickness: 0.4

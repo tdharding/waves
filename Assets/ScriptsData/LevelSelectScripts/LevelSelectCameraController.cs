@@ -18,7 +18,9 @@ public class LevelSelectCameraController : MonoBehaviour
     public float followHeight = 3f;
     [Tooltip("Raises (or lowers) the point on the boat the camera follows and looks at, in " +
              "world units. The distance and height are measured from this point, so the whole " +
-             "shot lifts with it and the boat sits lower in the frame.")]
+             "shot lifts with it and the boat sits lower in the frame. Taken at zoom 1 and " +
+             "scaled with the scroll zoom, so the boat holds its place in the frame zooming in " +
+             "and out.")]
     public float followTargetVerticalOffset = 0f;
     [Tooltip("The resting zoom. 1 is the shot exactly as the distance and height describe it; " +
              "the scroll wheel moves out from here, held in by the distance limits below.")]
@@ -148,6 +150,9 @@ public class LevelSelectCameraController : MonoBehaviour
     private float _rise;               // the downhill rise in, in world units, eased
     private float _riseVelocity;
 
+    private float _offsetZoom = 1f;    // the scroll zoom the follow offset is scaled by, eased
+    private float _offsetZoomVelocity;
+
     private bool           _isOrbiting;
     private CursorLockMode _cursorLockBeforeOrbit;
     private bool           _cursorVisibleBeforeOrbit;
@@ -177,7 +182,28 @@ public class LevelSelectCameraController : MonoBehaviour
 
     /// <summary>The follow offset with the low-angle zoom's share of its own offset in.</summary>
     private float CurrentFollowOffset =>
-        Mathf.Lerp(followTargetVerticalOffset, lowAngleZoomFollowOffset, _lowAngleZoomIn);
+        Mathf.Lerp(ZoomedFollowOffset, lowAngleZoomFollowOffset, _lowAngleZoomIn);
+
+    /// <summary>The follow offset scaled with the scroll zoom: as entered at zoom 1, shrinking as
+    /// the camera comes in and growing as it goes out, so the boat holds its place in the frame.</summary>
+    private float ZoomedFollowOffset => followTargetVerticalOffset * _offsetZoom;
+
+    /// <summary>The scroll zoom as the distance limits leave it — what the offset is scaled by.</summary>
+    private float HeldZoom => TargetDistance / RestDistance;
+
+    /// <summary>Eases the offset's zoom after the scroll wheel on the follow's own time, so the point
+    /// looked at moves with the camera drawing in rather than ahead of it.</summary>
+    private void EaseOffsetZoom()
+    {
+        if (followCatchUpTime <= 0f)
+        {
+            _offsetZoom         = HeldZoom;
+            _offsetZoomVelocity = 0f;
+            return;
+        }
+
+        _offsetZoom = Mathf.SmoothDamp(_offsetZoom, HeldZoom, ref _offsetZoomVelocity, followCatchUpTime);
+    }
 
     private bool IsAnchored =>boatControl != null && boatControl.CanLookAround;
 
@@ -195,6 +221,7 @@ public class LevelSelectCameraController : MonoBehaviour
     {
         _zoom            = Mathf.Max(defaultZoom, 0.01f);
         _currentDistance = TargetDistance;
+        _offsetZoom      = HeldZoom;
 
         ApplyDefaultLens();
 
@@ -236,11 +263,10 @@ public class LevelSelectCameraController : MonoBehaviour
         {
             ApplyDefaultLens();
 
-            _orbitPivot.position = FollowPoint(_boatTarget.position);
-
             // The camera starts in its resting shot behind the boat. Any opening shot is a
             // camera sequence's, which hands back to this.
             SnapToFollowPose();
+            _orbitPivot.position = FollowPoint(_boatTarget.position);
             ApplyCameraState();
             Debug.Log($"[CameraController] SetFollowTarget: final cam position={cam.transform.position}, rotation={cam.transform.eulerAngles}");
         }
@@ -258,8 +284,8 @@ public class LevelSelectCameraController : MonoBehaviour
     {
         if (_boatTarget != null && _orbitPivot != null)
         {
-            _orbitPivot.position = FollowPoint(_boatTarget.position);
             SnapToFollowPose();
+            _orbitPivot.position = FollowPoint(_boatTarget.position);
             ApplyCameraState();
         }
         IsControlEnabled = true;
@@ -273,6 +299,8 @@ public class LevelSelectCameraController : MonoBehaviour
         _pitch           = Mathf.Clamp(FollowPitch, pitchMin, pitchMax);
         _currentDistance = FollowDistance;
         _lowAngleZoomIn  = 0f;
+        _offsetZoom      = HeldZoom;
+        _offsetZoomVelocity = 0f;
         _leanYaw = _leanPitch = _leanWeight = 0f;
         _yawVelocity = _pitchVelocity = _distanceVelocity = 0f;
         _leanYawVelocity = _leanPitchVelocity = _leanWeightVelocity = 0f;
@@ -464,6 +492,8 @@ public class LevelSelectCameraController : MonoBehaviour
     {
         if (cam == null || _orbitPivot == null || _boatTarget == null) return;
 
+        EaseOffsetZoom();
+
         // Always keep pivot on the boat
         _orbitPivot.position = FollowPoint(_boatTarget.position);
 
@@ -473,6 +503,8 @@ public class LevelSelectCameraController : MonoBehaviour
             // behind the boat, so whatever hands back blends into a settled shot.
             SnapToFollowPose();
             ApplyCameraState();
+            ReleaseInfluenceFog();
+            SnapCut();
             return;
         }
 
@@ -528,7 +560,368 @@ public class LevelSelectCameraController : MonoBehaviour
         _orbitPivot.position = FollowPoint(_boatTarget.position);
 
         ApplyCameraState();
+        ApplyCameraInfluence();
     }
+
+    /// <summary>
+    /// A node's Camera Influence the boat is in (<see cref="LevelSelectCameraInfluence"/>), laid over
+    /// the shot just placed. Influence draws the camera towards the node's camera by its amounts,
+    /// keeping the distance from the boat; Cut puts the view on the node's camera — outright, or
+    /// moving there over its Transition Time. Anchored with Q, the shot is the ordinary one — a cut
+    /// away, and a cut back in on setting off.
+    /// </summary>
+    private void ApplyCameraInfluence()
+    {
+        // A screen whose picture is up has the view outright — see LevelSelectScreenCamera.
+        var   screen    = LevelSelectScreenCamera.Live;
+        float weight    = 0f;
+        var   influence = IsAnchored || screen != null
+            ? null : LevelSelectCameraInfluence.Strongest(_boatTarget.position, out weight);
+        var   pulling   = influence != null && influence.mode == LevelSelectCameraInfluence.Mode.Influence ? influence : null;
+        var   cutting   = influence != null && influence.mode == LevelSelectCameraInfluence.Mode.Cut       ? influence : null;
+
+        // The lens the camera rests at is whatever it held while nothing was pulling it, and it
+        // goes straight back to that once nothing is.
+        if (!_lensInfluenced) _restFov = cam.Lens.FieldOfView;
+
+        // The follow shot, drawn by an Influence box if the boat is in one.
+        if (pulling != null) InfluenceShot(pulling, weight);
+        Vector3    shotPos = cam.transform.position;
+        Quaternion shotRot = cam.transform.rotation;
+        float      shotFov = pulling != null ? Mathf.Lerp(_restFov, pulling.FieldOfView, weight * pulling.lens) : _restFov;
+
+        // Q and a screen's picture take the view straight off a Cut camera, and give it straight back.
+        if (IsAnchored || screen != null) SnapCut();
+        else                              StepCut(cutting);
+        float cutShare = Mathf.SmoothStep(0f, 1f, _cutT);
+
+        float lensFov = shotFov;
+        if (screen != null)
+        {
+            cam.transform.SetPositionAndRotation(screen.transform.position, screen.transform.rotation);
+            lensFov = screen.FieldOfView;
+        }
+        else if (_cutFrom != null || _cutTo != null)
+        {
+            CutPose(_cutFrom, shotPos, shotRot, out Vector3 fromPos, out Quaternion fromRot);
+            CutPose(_cutTo,   shotPos, shotRot, out Vector3 toPos,   out Quaternion toRot);
+            cam.transform.SetPositionAndRotation(Vector3.Lerp(fromPos, toPos, cutShare),
+                                                 Quaternion.Slerp(fromRot, toRot, cutShare));
+            lensFov = Mathf.Lerp(_cutFrom != null ? _cutFrom.FieldOfView : shotFov,
+                                 _cutTo   != null ? _cutTo.FieldOfView   : shotFov, cutShare);
+        }
+
+        DebugCamInfluence(influence, weight);
+
+        if (screen != null || _cutFrom != null || _cutTo != null || (pulling != null && weight * pulling.lens > 0f))
+        {
+            cam.Lens.FieldOfView = lensFov;
+            _lensInfluenced      = true;
+        }
+        else if (_lensInfluenced)
+        {
+            cam.Lens.FieldOfView = _restFov;
+            _lensInfluenced      = false;
+        }
+
+        // A screen is small and stood close to, so its camera's near clip is taken too, and the
+        // camera's own put back the moment the view leaves it.
+        if (screen != null)
+        {
+            if (!_nearHeld) _restNear = cam.Lens.NearClipPlane;
+            cam.Lens.NearClipPlane = screen.NearClipPlane;
+            _nearHeld = true;
+        }
+        else if (_nearHeld)
+        {
+            cam.Lens.NearClipPlane = _restNear;
+            _nearHeld = false;
+        }
+
+        // The influence's own fog distance, coming in with the pull, or with the move to a Cut camera
+        // (all at once for a straight cut).
+        float pushed  = WhiteFadeSettings.PushedRadius;
+        float shotFog = pulling != null && pulling.overrideFogDistance
+            ? Mathf.Lerp(pushed, pulling.fogDistance, weight) : pushed;
+        if ((pulling  != null && pulling.overrideFogDistance)  ||
+            (_cutFrom != null && _cutFrom.overrideFogDistance) ||
+            (_cutTo   != null && _cutTo.overrideFogDistance))
+        {
+            _fogWritten = Mathf.Lerp(CutFog(_cutFrom, shotFog, pushed), CutFog(_cutTo, shotFog, pushed), cutShare);
+            WhiteFadeSettings.RadiusOverride = _fogWritten;
+            _fogHeld = true;
+        }
+        else ReleaseInfluenceFog();
+
+        // The depth of field focuses on the screen too, or on the influence's View Target, and goes back
+        // to its own focus (the boat) after.
+        if (_volume == null) _volume = cam.GetComponent<CinemachineVolumeSettings>();
+        if (_volume == null) return;
+        Transform focusOn    = null;
+        float     focusShare = 1f;
+        if (screen != null) focusOn = screen.FocusTarget;
+        else if (_cutTo   != null && _cutTo.FocusTarget   != null) { focusOn = _cutTo.FocusTarget;   focusShare = cutShare; }
+        else if (_cutFrom != null && _cutFrom.FocusTarget != null) { focusOn = _cutFrom.FocusTarget; focusShare = 1f - cutShare; }
+        else if (pulling  != null) { focusOn = pulling.FocusTarget; focusShare = weight; }
+
+        if (focusOn != null)
+        {
+            if (!_focusHeld)
+            {
+                _restFocus       = _volume.FocusTracking;
+                _restFocusTarget = _volume.FocusTarget;
+                _restFocusOffset = _volume.FocusOffset;
+            }
+            _volume.FocusTracking = CinemachineVolumeSettings.FocusTrackingMode.CustomTarget;
+            _volume.FocusTarget   = focusOn;
+            // Part way in, the focus distance sits between its own and the target's: the offset makes up
+            // the difference from the target's distance, which is what Custom Target measures.
+            float toTarget = Vector3.Distance(cam.transform.position, focusOn.position);
+            _volume.FocusOffset = focusShare >= 1f
+                ? _restFocusOffset
+                : Mathf.Lerp(RestFocusDistance(), toTarget + _restFocusOffset, focusShare) - toTarget;
+            _focusHeld = true;
+        }
+        else if (_focusHeld)
+        {
+            _volume.FocusTracking = _restFocus;
+            _volume.FocusTarget   = _restFocusTarget;
+            _volume.FocusOffset   = _restFocusOffset;
+            _focusHeld = false;
+        }
+    }
+
+    // The focus distance the camera's own Focus Tracking gives, measured the way CinemachineVolumeSettings
+    // measures it.
+    private float RestFocusDistance()
+    {
+        Vector3 at = cam.transform.position;
+        switch (_restFocus)
+        {
+            case CinemachineVolumeSettings.FocusTrackingMode.LookAtTarget:
+                return _restFocusOffset + (at - cam.State.ReferenceLookAt).magnitude;
+            case CinemachineVolumeSettings.FocusTrackingMode.FollowTarget:
+                return _restFocusOffset + (cam.Follow != null ? (at - cam.Follow.position).magnitude : 0f);
+            case CinemachineVolumeSettings.FocusTrackingMode.CustomTarget:
+                return _restFocusOffset + (_restFocusTarget != null ? (at - _restFocusTarget.position).magnitude : 0f);
+            case CinemachineVolumeSettings.FocusTrackingMode.Camera:
+                return _restFocusOffset;
+            default:   // None: the profile's own Focus Distance
+                return _volume.Profile != null &&
+                       _volume.Profile.TryGet(out UnityEngine.Rendering.Universal.DepthOfField dof)
+                    ? dof.focusDistance.value : _restFocusOffset;
+        }
+    }
+
+    // The Cut camera the view is on or moving to (null: the follow shot), the one it is moving from,
+    // and how far along that move it is (1: there). Each move takes the Transition Time of the camera
+    // being moved to, or of the one being left for the follow shot; a Cut blend is all at once.
+    private LevelSelectCameraInfluence _cutFrom;
+    private LevelSelectCameraInfluence _cutTo;
+    private float                      _cutT    = 1f;
+    private bool                       _cutSnap = true;   // the next change is a straight cut
+
+    private void StepCut(LevelSelectCameraInfluence cut)
+    {
+        if (cut != _cutTo)
+        {
+            // Back to where it was moving from: turn round part way rather than start over.
+            _cutT    = cut == _cutFrom ? 1f - _cutT : 0f;
+            _cutFrom = _cutTo;
+            _cutTo   = cut;
+        }
+
+        var by = _cutTo != null ? _cutTo : _cutFrom;
+        if (_cutSnap || by == null || by.blend == LevelSelectCameraInfluence.Blend.Cut || by.transitionTime <= 0f)
+            _cutT = 1f;
+        else
+            _cutT = Mathf.MoveTowards(_cutT, 1f, Time.deltaTime / by.transitionTime);
+
+        if (_cutT >= 1f) _cutFrom = null;
+        _cutSnap = false;
+    }
+
+    // Off any Cut camera at once, and straight onto one after.
+    private void SnapCut()
+    {
+        _cutFrom = _cutTo = null;
+        _cutT    = 1f;
+        _cutSnap = true;
+    }
+
+    // Where a Cut camera puts the view: on the camera, fixed or turned to the boat. Null: the follow shot.
+    // The boat is taken from the boat itself, not the orbit pivot: the pivot is a child of this camera,
+    // so it is carried off the boat as soon as the camera is placed.
+    private void CutPose(LevelSelectCameraInfluence cut, Vector3 shotPos, Quaternion shotRot,
+                         out Vector3 position, out Quaternion rotation)
+    {
+        if (cut == null) { position = shotPos; rotation = shotRot; return; }
+        position = cut.transform.position;
+        Vector3 toBoat = FollowPoint(_boatTarget.position) - position;
+        rotation = cut.lookAt == LevelSelectCameraInfluence.LookAt.FollowBoat && toBoat.sqrMagnitude > 1e-8f
+            ? Quaternion.LookRotation(toBoat, Vector3.up)
+            : cut.transform.rotation;
+    }
+
+    // The fog distance on a Cut camera: its own if it overrides, else the world's. Null: the follow shot's.
+    private static float CutFog(LevelSelectCameraInfluence cut, float shotFog, float pushed)
+        => cut == null ? shotFog : cut.overrideFogDistance ? cut.fogDistance : pushed;
+
+    // Lets go of the influence's fog distance - unless something else (a camera sequence's shot) has
+    // set its own since.
+    private void ReleaseInfluenceFog()
+    {
+        if (!_fogHeld) return;
+        if (WhiteFadeSettings.RadiusOverride == _fogWritten) WhiteFadeSettings.RadiusOverride = null;
+        _fogHeld = false;
+    }
+
+    // ── DEBUG (camera influence) — remove once the cause is confirmed ──
+    private LevelSelectCameraInfluence _dbgInfluence;
+    private Vector3    _dbgCamPos;
+    private Quaternion _dbgCamRot;
+    private bool       _dbgHasLast;
+    private float      _dbgNext;
+    private float      _dbgAcrossNext;
+    private int        _dbgAlongSign;
+
+    private void DebugCamInfluence(LevelSelectCameraInfluence influence, float weight)
+    {
+        Vector3    pos = cam.transform.position;
+        Quaternion rot = cam.transform.rotation;
+
+        if (influence != _dbgInfluence)
+        {
+            var box = influence != null ? influence : _dbgInfluence;
+            Vector3 local = box != null ? Quaternion.Inverse(box.boxRotation) * (_boatTarget.position - box.boxCentre) : Vector3.zero;
+            Debug.Log($"[CamInfluenceDebug] SWITCH {(_dbgInfluence != null ? _dbgInfluence.name : "none")} -> " +
+                      $"{(influence != null ? influence.name : "none")} weight={weight:F2} frame={Time.frameCount} " +
+                      $"boatLocalInBox={local} halfSize={(box != null ? box.boxSize * 0.5f : Vector3.zero)} " +
+                      $"boatPos={_boatTarget.position} anchored={IsAnchored}");
+            _dbgInfluence = influence;
+            _dbgAlongSign = 0;
+        }
+
+        if (influence != null && _dbgHasLast)
+        {
+            float moved   = Vector3.Distance(pos, _dbgCamPos);
+            float turned  = Quaternion.Angle(rot, _dbgCamRot);
+            float dt      = Mathf.Max(Time.deltaTime, 1e-4f);
+            bool  jump    = turned / dt > 90f || moved / dt > 30f;
+            if (jump || Time.time >= _dbgNext)
+            {
+                _dbgNext = Time.time + 0.5f;
+                Vector3 toBoat = FollowPoint(_boatTarget.position) - pos;
+                float offCentre = Vector3.Angle(rot * Vector3.forward, toBoat);
+                Debug.Log($"[CamInfluenceDebug] {(jump ? "JUMP" : "tick")} '{influence.name}' mode={influence.mode} look={influence.lookAt} " +
+                          $"weight={weight:F2} frame={Time.frameCount} dt={dt:F4} moved={moved:F3} turned={turned:F2}deg " +
+                          $"boatOffCentre={offCentre:F2}deg camPos={pos} camEuler={rot.eulerAngles} pivot={FollowPoint(_boatTarget.position)} " +
+                          $"distToBoat={toBoat.magnitude:F2}");
+            }
+        }
+
+        _dbgCamPos  = pos;
+        _dbgCamRot  = rot;
+        _dbgHasLast = true;
+    }
+
+    private CinemachineVolumeSettings                   _volume;
+    private bool                                        _focusHeld;
+    private CinemachineVolumeSettings.FocusTrackingMode _restFocus;
+    private Transform                                   _restFocusTarget;
+    private float                                       _restFocusOffset;
+    private bool                                        _fogHeld;
+    private float                                       _fogWritten;
+
+    private bool  _lensInfluenced;
+    private float _restFov;
+    private bool  _nearHeld;
+    private float _restNear;
+
+    /// <summary>
+    /// Influence: the camera moves towards the node camera's distance from the follow point, then
+    /// swings round the follow point at that distance — up or down towards the node camera's
+    /// height, and across the river towards its side — then turns towards its facing. Each by its own amount, all scaled by how far into the box the
+    /// boat is. The glance the follow put on the camera's head is kept.
+    /// </summary>
+    private void InfluenceShot(LevelSelectCameraInfluence influence, float weight)
+    {
+        Vector3 pivot  = FollowPoint(_boatTarget.position);
+        Vector3 offset = cam.transform.position - pivot;
+        float   d      = offset.magnitude;
+        if (d < 0.0001f) return;
+
+        Vector3    dir  = offset / d;
+        // Whatever the follow turned the head by on top of looking at the follow point.
+        Quaternion head = Quaternion.Inverse(Quaternion.LookRotation(-dir, Vector3.up)) * cam.transform.rotation;
+
+        Vector3 flat = new Vector3(dir.x, 0f, dir.z);
+        flat = flat.sqrMagnitude > 1e-8f ? flat.normalized : -_boatTarget.forward;
+        float   y      = dir.y;
+        Vector3 target = influence.transform.position;
+
+        // Distance: from the follow point, towards the node camera's — first, so Height and Across
+        // are worked out at the distance the camera ends up at.
+        float distanceShare = weight * influence.distance;
+        if (distanceShare > 0f)
+            d = Mathf.Max(Mathf.Lerp(d, Vector3.Distance(target, pivot), distanceShare), 0.0001f);
+
+        // Height: the camera's height above the follow point at this distance, towards the node camera's.
+        float heightShare = weight * influence.height;
+        if (heightShare > 0f)
+            y = Mathf.Lerp(y, Mathf.Clamp((target.y - pivot.y) / d, -1f, 1f), heightShare);
+        y = Mathf.Clamp(y, -MaxInfluenceRise, MaxInfluenceRise);
+
+        // Across: the camera's place across the river at this distance, towards the node camera's.
+        // Which end of the river it stands at (behind or ahead of the boat) is kept.
+        float acrossShare = weight * influence.across;
+        float flatRadius  = d * Mathf.Sqrt(1f - y * y);
+        if (acrossShare > 0f && flatRadius > 0.0001f)
+        {
+            Vector3 acrossAxis = influence.AcrossAxis;
+            acrossAxis.y = 0f;
+            if (acrossAxis.sqrMagnitude > 1e-8f)
+            {
+                acrossAxis.Normalize();
+                Vector3 alongAxis = Vector3.Cross(acrossAxis, Vector3.up);
+
+                float side   = Vector3.Dot(flat, acrossAxis);
+                float along  = Vector3.Dot(flat, alongAxis);
+                float wanted = Mathf.Clamp(Vector3.Dot(target - pivot, acrossAxis) / flatRadius, -1f, 1f);
+                float sideBefore = side, alongBefore = along;
+                side  = Mathf.Lerp(side, wanted, acrossShare);
+                along = (along >= 0f ? 1f : -1f) * Mathf.Sqrt(Mathf.Max(0f, 1f - side * side));
+                flat  = acrossAxis * side + alongAxis * along;
+
+                bool alongFlipped = _dbgAlongSign != 0 && (along >= 0f ? 1 : -1) != _dbgAlongSign;
+                _dbgAlongSign = along >= 0f ? 1 : -1;
+                if (alongFlipped || Time.time >= _dbgAcrossNext)
+                {
+                    _dbgAcrossNext = Time.time + 0.5f;
+                    Debug.Log($"[CamInfluenceDebug] ACROSS{(alongFlipped ? " ALONG-FLIPPED" : "")} '{influence.name}' share={acrossShare:F2} " +
+                              $"sideBefore={sideBefore:F2} alongBefore={alongBefore:F2} wanted={wanted:F2} side={side:F2} along={along:F2} " +
+                              $"flatRadius={flatRadius:F2} y={y:F2} d={d:F2} targetAcross={Vector3.Dot(target - pivot, acrossAxis):F2} " +
+                              $"boatYaw={_boatTarget.eulerAngles.y:F1} acrossAxis={acrossAxis}");
+                }
+            }
+        }
+
+        dir = flat * Mathf.Sqrt(1f - y * y) + Vector3.up * y;
+
+        Quaternion rotation = Quaternion.LookRotation(-dir, Vector3.up) * head;
+
+        // Aim: towards the node camera's own facing.
+        float aimShare = weight * influence.aim;
+        if (aimShare > 0f)
+            rotation = Quaternion.Slerp(rotation, influence.transform.rotation, aimShare);
+
+        cam.transform.position = pivot + dir * d;
+        cam.transform.rotation = rotation;
+    }
+
+    /// <summary>How near straight above or below the follow point the Height pull may take the
+    /// camera, as a share of its distance — short of overhead, where the facing turns over.</summary>
+    private const float MaxInfluenceRise = 0.98f;
 
     // How far in the low-angle zoom should be for the current pitch while turning about the boat:
     // 0 at the scroll zoom, 1 all the way in. Measured as a level from the boat, like the floor:
@@ -536,7 +929,7 @@ public class LevelSelectCameraController : MonoBehaviour
     // 0; below it the zoom goes in, reaching 1 at the height floor.
     private float LowAngleZoomIn()
     {
-        float height = followTargetVerticalOffset + TargetDistance * Mathf.Sin(_pitch * Mathf.Deg2Rad);
+        float height = ZoomedFollowOffset + TargetDistance * Mathf.Sin(_pitch * Mathf.Deg2Rad);
 
         if (height >= lowAngleZoomStartHeight)
             return 0f;
@@ -628,6 +1021,7 @@ public class LevelSelectCameraController : MonoBehaviour
     private void OnDisable()
     {
         ReleaseCursor();
+        ReleaseInfluenceFog();
     }
 
 #if UNITY_EDITOR
@@ -673,7 +1067,8 @@ public class LevelSelectCameraController : MonoBehaviour
             pivot = target.position;
         }
 
-        pivot = FollowPoint(pivot);
+        // The offset scaled with the zoom being shown, as it is in play.
+        pivot += Vector3.up * (followTargetVerticalOffset * d / RestDistance);
 
         Undo.RecordObject(cam.transform, undoName);
 

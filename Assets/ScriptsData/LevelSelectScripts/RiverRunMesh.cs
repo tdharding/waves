@@ -12,6 +12,7 @@ using UnityEngine.Splines;
 /// Level Select Designer can rebuild the mesh from it whenever a river's shape changes,
 /// without a full regenerate.
 /// </summary>
+[ExecuteAlways]
 public class RiverRunMesh : MonoBehaviour
 {
     [Serializable]
@@ -67,6 +68,13 @@ public class RiverRunMesh : MonoBehaviour
 
     [Tooltip("Name of the generated water mesh asset, when this river is water filled.")]
     public string waterMeshAssetName;
+
+    [Tooltip("Whether this run's water wears its own Water Colour rather than the Level Select " +
+             "River Tuner's. Stamped by the designer from the path's Water Colour Override.")]
+    public bool waterColourOverride;
+
+    [Tooltip("This run's water colour, while Water Colour Override is on.")]
+    public Color waterColour = new Color(0.836478f, 0.836478f, 0.836478f, 1f);
 
     [Tooltip("How far back past the start of this run its water reaches, so a branch's water " +
              "carries across the mouth to meet the water of the river it joins.")]
@@ -145,6 +153,44 @@ public class RiverRunMesh : MonoBehaviour
 
     [Tooltip("Name of the generated river walkway mesh asset, when this run carries any.")]
     public string walkwaysMeshAssetName;
+
+    private static readonly int WaterColourId = Shader.PropertyToID("_RiverWaterColour");
+
+    // A property block is not saved with the scene, so it goes back on every time the run loads.
+    private void OnEnable() => ApplyWaterColour();
+
+    // Undo puts the stamped colour back without the designer hearing of it.
+    private void OnValidate() => ApplyWaterColour();
+
+    /// <summary>
+    /// Puts this run's Water Colour on its water, over the River Tuner's global one — or takes it
+    /// off again, so the water goes back to the global, when the override is off.
+    /// </summary>
+    public void ApplyWaterColour()
+        => ApplyWaterColour(transform, waterMeshAssetName, waterColourOverride, waterColour);
+
+    /// <summary>
+    /// Puts a Water Colour on the water child named <paramref name="waterName"/>, or takes it off
+    /// when <paramref name="on"/> is false. Shared with <see cref="RiverPoolMesh"/>.
+    /// </summary>
+    public static void ApplyWaterColour(Transform owner, string waterName, bool on, Color colour)
+    {
+        if (string.IsNullOrEmpty(waterName)) return;
+        var water    = owner.Find(waterName);
+        var renderer = water != null ? water.GetComponent<MeshRenderer>() : null;
+        if (renderer == null) return;
+
+        if (!on)
+        {
+            if (renderer.HasPropertyBlock()) renderer.SetPropertyBlock(null);
+            return;
+        }
+
+        var block = new MaterialPropertyBlock();
+        renderer.GetPropertyBlock(block);
+        block.SetColor(WaterColourId, colour);
+        renderer.SetPropertyBlock(block);
+    }
 
     /// <summary>
     /// Rebuilds the curve the run was swept along.

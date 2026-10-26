@@ -5,7 +5,7 @@ using Unity.Cinemachine;
 
 /// <summary>
 /// Everything a camera sequence is, saved as an asset: every shot with its length, blend, dialogue,
-/// audio and animation, plus the sequence's audio, end blend, fog and Play Once.
+/// audio and animation, plus the sequence's audio, end blend and Play Once.
 ///
 /// Shot cameras and orbit points stay in the scene. The preset links to them by the ID on their
 /// <see cref="CameraSequenceLink"/>, and keeps a full copy of each one (every component on it) so the
@@ -26,10 +26,13 @@ public class CameraSequencePreset : ScriptableObject
         public string orbitPointLink;
         [Tooltip("Link ID of the shot's Animate 2 Shot end camera in the scene. Empty when it has none.")]
         public string endCameraLink;
+        [Tooltip("Link ID of the shot's View Target in the scene. Empty when it has none. Linked only — never stored or " +
+                 "rebuilt; it belongs to the scene, like the characters.")]
+        public string viewTargetLink;
         [Tooltip("Link IDs of the characters in the shot's Character Animations, in the same order. Characters are " +
                  "only linked — never stored or rebuilt; they belong to the scene, not the sequence.")]
         public List<string> characterLinks = new List<string>();
-        [Tooltip("The shot's settings. Its Camera, Orbit Point, End Camera and characters are always empty here — they come from the links.")]
+        [Tooltip("The shot's settings. Its Camera, Orbit Point, End Camera, View Target and characters are always empty here — they come from the links.")]
         public CameraSequence.Shot shot = new CameraSequence.Shot();
     }
 
@@ -77,9 +80,6 @@ public class CameraSequencePreset : ScriptableObject
     public CinemachineBlendDefinition endBlend =
         new CinemachineBlendDefinition(CinemachineBlendDefinition.Styles.EaseInOut, 2f);
 
-    public bool overrideFog;
-    public WhiteFadeSettings fog = new WhiteFadeSettings();
-
     [Tooltip("On: plays once per save — after that it never plays again until New Game. Off: plays every time it is triggered.")]
     public bool playOnce = true;
 
@@ -103,6 +103,11 @@ public class CameraSequencePreset : ScriptableObject
             shot.camera     = camLink   != null ? camLink.GetComponent<CinemachineCamera>() : null;
             shot.orbitPoint = pointLink != null ? pointLink.transform : null;
             shot.endCamera  = endLink   != null ? endLink.GetComponent<CinemachineCamera>() : null;
+            var targetLink  = CameraSequenceLink.Find(ps.viewTargetLink);
+            shot.viewTarget = targetLink != null ? targetLink.transform : null;
+            if (!string.IsNullOrEmpty(ps.viewTargetLink) && shot.viewTarget == null)
+                Debug.LogWarning($"[CameraSequencePreset] '{name}': a shot's View Target (link {ps.viewTargetLink}) is not in the scene — " +
+                                 "the camera keeps the height it is placed at.");
             for (int c = 0; c < shot.characterAnimations.Count; c++)
             {
                 string id = c < ps.characterLinks.Count ? ps.characterLinks[c] : null;
@@ -120,8 +125,6 @@ public class CameraSequencePreset : ScriptableObject
         sequence.sequenceAudio = sequenceAudio;
         sequence.audioFadeOut  = audioFadeOut;
         sequence.endBlend      = CameraSequence.DeepCopy(endBlend);
-        sequence.overrideFog   = overrideFog;
-        sequence.fog           = CameraSequence.DeepCopy(fog);
         sequence.playOnce      = playOnce;
     }
 }

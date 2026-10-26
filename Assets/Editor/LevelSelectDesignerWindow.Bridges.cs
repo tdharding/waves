@@ -19,21 +19,7 @@ public partial class LevelSelectDesignerWindow
     // ADDING
     // ─────────────────────────────────────────────
 
-    /// <summary>The Add Bridge / Remove Bridge button for a node, in a row of node buttons.</summary>
-    private void DrawBridgeButton(LevelSelectDesignerData.DesignerPath path, string nodeId)
-    {
-        bool has = _data.BridgeAt(nodeId) != null;
-        bool can = CanHoldWalkway(nodeId, out string why);
-
-        bool prev = GUI.enabled;
-        GUI.enabled = prev && (has || can);
-        string tip = can || has ? "A flat bridge across the river here, with a ramp at each end."
-                                : why?.Replace("Walkways", "Bridges");
-        if (GUILayout.Button(new GUIContent(has ? "Remove Bridge" : "Add Bridge", tip)))
-            ToggleBridgeAt(path, nodeId);
-        GUI.enabled = prev;
-    }
-
+    // Add Bridge / Remove Bridge is in a node's Add ▾ menu (NodeAddMenu.cs).
     private void ToggleBridgeAt(LevelSelectDesignerData.DesignerPath path, string nodeId)
     {
         Undo.RecordObject(_data, "Toggle Bridge");
@@ -93,11 +79,16 @@ public partial class LevelSelectDesignerWindow
             new GUIContent("Offset Along", "Moves the bridge along the river from its node — the " +
                                            "way the path was drawn when positive, back when negative."),
             bridge.offsetAlong);
+        bool occlusion = bridge.occlusion;
+        var  occlusionStyle = bridge.occlusionStyle;
+        OcclusionField(ref occlusion, ref occlusionStyle);
         if (!EditorGUI.EndChangeCheck()) return;
 
         Undo.RecordObject(_data, "Edit Bridge");
         sizes?.ApplyTo(bridge);
         bridge.offsetAlong = offsetAlong;
+        bridge.occlusion   = occlusion;
+        bridge.occlusionStyle = occlusionStyle;
 
         MarkDirty();
         RebuildAfterTowerEdit("Bridge:" + pathId, () => RebuildWalkwaysOnPath(pathId, false));
@@ -195,7 +186,7 @@ public partial class LevelSelectDesignerWindow
             Vector3 at      = _data.NodeWorldPosition(bridge.nodeId) + along * bridge.offsetAlong;
 
             float hw    = Mathf.Max(bridge.deckWidth, 0.01f) * 0.5f;
-            float inner = profile.innerWidth * 0.5f;
+            float inner = InnerWidthAtNode(profile, bridge.nodeId) * 0.5f;
             float reach = inner + Mathf.Max(bridge.rampLength, 0.01f);
 
             void Band(float from, float to)
@@ -210,12 +201,12 @@ public partial class LevelSelectDesignerWindow
             bool selected = bridge.nodeId == _selectedNodeId;
 
             // The deck lighter than its ramps, so where the slope starts reads at a glance.
-            Handles.color = selected ? new Color(0.98f, 0.98f, 0.95f, 0.9f)
-                                     : new Color(0.85f, 0.85f, 0.82f, 0.8f);
+            Handles.color = Faded(selected ? new Color(0.98f, 0.98f, 0.95f, 0.9f)
+                                     : new Color(0.85f, 0.85f, 0.82f, 0.8f));
             Band(-inner, inner);
 
-            Handles.color = selected ? new Color(0.8f, 0.8f, 0.77f, 0.85f)
-                                     : new Color(0.62f, 0.62f, 0.6f, 0.75f);
+            Handles.color = Faded(selected ? new Color(0.8f, 0.8f, 0.77f, 0.85f)
+                                     : new Color(0.62f, 0.62f, 0.6f, 0.75f));
             Band(-reach, -inner);
             Band(inner, reach);
         }
@@ -225,8 +216,13 @@ public partial class LevelSelectDesignerWindow
     // BUILDING
     // ─────────────────────────────────────────────
 
-    /// <summary>The bridges across a run, as the builder takes them — in the run's own space.</summary>
-    private List<RiverMeshBuilder.Bridge> BridgesFor(RiverRunMesh record)
+    /// <summary>
+    /// The bridges across a run, as the builder takes them — in the run's own space. With
+    /// <paramref name="occluded"/>, one entry per bridge: a name for each ticked for Occlusion,
+    /// null for the rest.
+    /// </summary>
+    private List<RiverMeshBuilder.Bridge> BridgesFor(RiverRunMesh record, List<string> occluded = null,
+        List<OcclusionStyle> occludedStyles = null)
     {
         var bridges = new List<RiverMeshBuilder.Bridge>();
         if (record?.pathNodes == null || record.pathNodes.Count < 2 || _data.bridges == null ||
@@ -247,6 +243,8 @@ public partial class LevelSelectDesignerWindow
                 rampLength    = bridge.rampLength,
                 offsetAlong   = bridge.offsetAlong,
             });
+            occluded?.Add(bridge.occlusion ? $"Bridge_{SanitiseAssetName(node.nodeId)}" : null);
+            occludedStyles?.Add(bridge.occlusionStyle);
         }
         return bridges;
     }

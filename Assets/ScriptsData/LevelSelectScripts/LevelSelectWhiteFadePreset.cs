@@ -11,4 +11,7 @@ using UnityEngine;
 public class LevelSelectWhiteFadePreset : ScriptableObject
 {
     public WhiteFadeSettings whiteFade = new WhiteFadeSettings();
+
+    // What the fade goes to: a ramp up the screen with a scrolling grain.
+    public WhiteFadeScreenPicture screenPicture = new WhiteFadeScreenPicture();
 }

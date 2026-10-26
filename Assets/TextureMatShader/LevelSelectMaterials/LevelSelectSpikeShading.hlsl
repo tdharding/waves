@@ -26,25 +26,36 @@ float4 _LandscapeSpikeGroove;
 // WorldPos : world position, for the grain and the light.
 // UV2      : UV channel 2, where ProceduralSpikeMesh bakes where its grooves are.
 // Colour   : the spike, in its variant, grained, lit and grooved.
-void LevelSelectSpikeShading_float(float3 Normal, float3 WorldPos, float4 UV2, out float3 Colour)
+// BentNormal : Normal bent by the Spikes designation's normal map decal groups — the one the
+//            light is worked out from, handed out for the River Glow.
+void LevelSelectSpikeShading_float(float3 Normal, float3 WorldPos, float4 UV2,
+                                   out float3 Colour, out float3 BentNormal)
 {
     float3 n = normalize(Normal);
 
     float3 stone = LandscapeVariant(_LandscapeSpikeVariant, WorldPos, n);
+
+    // The Spikes designation's decal groups, on the stone and under the light and the grooves.
+    stone = LandscapeDecalsOnGround(stone, WorldPos, n, _LandscapeDecalDesignations.y);
+
+    // Its normal map groups bend the light only, as on the hills.
+    BentNormal = LandscapeNormalDecalsOnGround(WorldPos, n, _LandscapeNormalDecalDesignations.y);
 
     float shade, groove;
     SpikeSpiralShade_float(UV2, _LandscapeSpikeGroove.x, _LandscapeSpikeGroove.y,
                            _LandscapeSpikeGroove.z, shade, groove);
 
     // Groove shade last, so the light cannot lift it back out.
-    Colour = stone * LandscapeLight(n, WorldPos) * shade;
+    Colour = stone * LandscapeLight(BentNormal, WorldPos) * shade;
 }
 
-void LevelSelectSpikeShading_half(half3 Normal, half3 WorldPos, half4 UV2, out half3 Colour)
+void LevelSelectSpikeShading_half(half3 Normal, half3 WorldPos, half4 UV2,
+                                  out half3 Colour, out half3 BentNormal)
 {
-    float3 colour;
-    LevelSelectSpikeShading_float(Normal, WorldPos, UV2, colour);
-    Colour = colour;
+    float3 colour, bent;
+    LevelSelectSpikeShading_float(Normal, WorldPos, UV2, colour, bent);
+    Colour     = colour;
+    BentNormal = bent;
 }
 
 #endif

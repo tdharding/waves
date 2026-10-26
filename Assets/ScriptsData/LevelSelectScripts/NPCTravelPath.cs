@@ -10,7 +10,7 @@ using UnityEngine;
 /// </summary>
 public class NPCTravelPath : ScriptableObject
 {
-    public enum PathWalk { Loop, BackAndForth }
+    public enum PathWalk { Loop, BackAndForth, Static }
 
     /// <summary>How long it stands at one path point before moving on, and which way it faces there.</summary>
     [System.Serializable]
@@ -36,7 +36,8 @@ public class NPCTravelPath : ScriptableObject
     public List<Vector3> points = new();
 
     [Tooltip("Loop: after the last point it heads back to the first. Back and Forth: it turns round " +
-             "at each end and walks the points the other way.")]
+             "at each end and walks the points the other way. Static: it stands on the first point, " +
+             "facing its Rot when set, and never moves or starts an animation.")]
     public PathWalk walk = PathWalk.Loop;
 
     [Tooltip("The ground between each point and the next — the last leg runs back to the first — " +

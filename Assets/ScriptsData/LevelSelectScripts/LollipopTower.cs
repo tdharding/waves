@@ -56,6 +56,44 @@ public class LollipopTower
     [Tooltip("Height of the second base, on top of the ramp. 0 = no second base.")]
     [Min(0f)] public float base2Height = 0f;
 
+    [Tooltip("Breaks a hole into the orb. The orb becomes a hollow shell, seen inside through the hole.")]
+    public bool destruction = false;
+
+    [Tooltip("Where the hole sits round the orb, in degrees.")]
+    public float holeAround = 0f;
+
+    [Tooltip("How far the hole sits above (+) or below (−) the orb's middle, in degrees. 90 = right on top.")]
+    [Range(-90f, 90f)] public float holeUpDown = 20f;
+
+    [Tooltip("How big the hole is: degrees from its middle out to its edge, before the edge's rounded shapes.")]
+    [Range(1f, 150f)] public float holeSize = 35f;
+
+    [Tooltip("How many rounded shapes run round the hole's edge. 0 = a plain round hole.")]
+    [Range(0, 16)] public int holeEdgeComplexity = 5;
+
+    [Tooltip("How far the edge's rounded shapes reach out past the hole, as a share of Hole Size.")]
+    [Range(0f, 1f)] public float holeEdgeDepth = 0.35f;
+
+    [Tooltip("How much the edge's rounded shapes differ from each other in length, width and spacing. 0 = all alike.")]
+    [Range(0f, 1f)] public float holeEdgeUnevenness = 0.6f;
+
+    [Tooltip("The shape of each rounded shape on the edge: low = broad gentle waves, high = full rounded tips.")]
+    [Range(0f, 1f)] public float holeEdgeRoundness = 0.5f;
+
+    [Tooltip("How thick the orb's shell is — the band you see round the hole's edge.")]
+    [Min(0.001f)] public float holeEdgeThickness = 0.015f;
+
+    [Tooltip("Stands a small lollipop inside the broken orb, on the lowest point of its floor — only with Destruction on.")]
+    public bool innerLollipop = false;
+
+    [Tooltip("The lollipop tower preset the inner lollipop is built from — linked, so editing it changes " +
+             "every inner lollipop using it. Always built whole: its own Destruction and Inner Lollipop are ignored.")]
+    public LollipopTowerPreset innerLollipopPreset;
+
+    [Tooltip("How tall the inner lollipop stands, as a share of the space inside the orb above where it stands. " +
+             "1 = its orb touches the top of the hollow.")]
+    [Range(0.05f, 1f)] public float innerLollipopSize = 0.6f;
+
     /// <summary>
     /// The very top of the orb, measured up from the tower's base. The angel lands here, so it is
     /// worked out the same way the mesh is built: the tiers stacked bottom up, then the stem, then
@@ -105,6 +143,7 @@ public class LollipopTower
         copy.rampHeight  *= s;
         copy.base2Radius *= s;
         copy.base2Height *= s;
+        copy.holeEdgeThickness *= s;
         return copy;
     }
 
@@ -114,8 +153,10 @@ public class LollipopTower
     /// <summary>
     /// The tower on its own, base at the origin, carrying the river run stone shading. Each part
     /// takes the stone colour <paramref name="shading"/> gives it; null leaves them worked out.
+    /// <paramref name="rimTopY"/> is the rivers' rim top above the base — 0 for a tower standing
+    /// on a rim, the water's depth for one standing on the water.
     /// </summary>
-    public Mesh Build(RiverRunShadingSettings shading = null)
+    public Mesh Build(RiverRunShadingSettings shading = null, float rimTopY = 0f)
     {
         var verts = new List<Vector3>();
         var norms = new List<Vector3>();
@@ -134,7 +175,8 @@ public class LollipopTower
         mesh.RecalculateBounds();
 
         // River run stone shading, read off its base, with each part's colour as the settings say.
-        return RiverMeshBuilder.ShadeAsStone(mesh, 0f, 0f, kinds, parts);
+        return RiverMeshBuilder.ShadeAsStone(mesh, rimTopY, 0f, kinds, parts,
+                                             designation: RiverRunShadingSettings.TowerAs(shading));
     }
 
     /// <summary>
@@ -148,15 +190,24 @@ public class LollipopTower
     /// </summary>
     public void Append(List<Vector3> verts, List<Vector3> norms, List<Vector2> uvs, List<int> tris,
                        Vector3 basePos, List<float> kinds = null, RiverRunShadingSettings shading = null,
-                       List<int> parts = null, bool withOrb = true)
+                       List<int> parts = null, bool withOrb = true,
+                       string upperRampLabel = "Upper Ramp", string stemLabel = "Stem",
+                       string tierLabel = null, string orbLabel = "Orb")
     {
         var sideKind = shading != null ? shading.towerBaseSides : StoneFaceKind.Auto;
         var capKind  = shading != null ? shading.towerBaseTop   : StoneFaceKind.Auto;
         var stemKind = shading != null ? shading.towerStem : StoneFaceKind.Auto;
         var orbKind  = shading != null ? shading.towerOrb  : StoneFaceKind.Auto;
+        var lowerRampKind = shading != null ? shading.towerLowerRamp : StoneFaceKind.Auto;
+        var upperRampKind = shading != null ? shading.towerUpperRamp : StoneFaceKind.Auto;
+        var lowerRampTopKind = shading != null ? shading.towerLowerRampTop    : StoneFaceKind.Auto;
+        var upperRampTopKind = shading != null ? shading.towerUpperRampTop    : StoneFaceKind.Auto;
+        var base2SideKind    = shading != null ? shading.towerSecondBaseSides : StoneFaceKind.Auto;
+        var base2CapKind     = shading != null ? shading.towerSecondBaseTop   : StoneFaceKind.Auto;
 
         StoneFaces.Tag(kinds, tris, StoneFaceKind.Auto);
         StoneFaces.Part(parts, tris, 0);
+        PartLabels.Mark(null, verts, tris);
 
         float r = Mathf.Max(0.001f, stemRadius);
         float h = Mathf.Max(0f, stemHeight);
@@ -178,16 +229,16 @@ public class LollipopTower
 
         if (lh > 0f)
             AppendRing(verts, norms, uvs, tris, kinds, parts, 4, ref basePos, lr, br, lh,
-                       bh <= 0f && baseCapped, sideKind, capKind);
+                       bh <= 0f && baseCapped, lowerRampKind, lowerRampTopKind, tierLabel ?? "Lower Ramp");
         if (bh > 0f)
             AppendRing(verts, norms, uvs, tris, kinds, parts, 1, ref basePos, br, br, bh,
-                       baseCapped, sideKind, capKind);
+                       baseCapped, sideKind, capKind, tierLabel ?? "Base");
         if (rh > 0f)
             AppendRing(verts, norms, uvs, tris, kinds, parts, 2, ref basePos, br, b2r, rh,
-                       b2h <= 0f, sideKind, capKind);
+                       b2h <= 0f, upperRampKind, upperRampTopKind, tierLabel ?? upperRampLabel);
         if (b2h > 0f)
             AppendRing(verts, norms, uvs, tris, kinds, parts, 3, ref basePos, b2r, b2r, b2h,
-                       true, sideKind, capKind);
+                       true, base2SideKind, base2CapKind, tierLabel ?? "Base 2");
 
         // ── Stem: smooth sides, one column doubled at the seam so u runs round unbroken ──
         if (h > 0f)
@@ -226,6 +277,7 @@ public class LollipopTower
 
             StoneFaces.Tag(kinds, tris, stemKind);
             StoneFaces.Part(parts, tris, 0);
+            PartLabels.Mark(stemLabel, verts, tris);
         }
 
         // ── Orb: seated so the stem's top edge lies on its surface. A turret builds its own,
@@ -233,10 +285,219 @@ public class LollipopTower
         if (!withOrb) return;
 
         Vector3 orbCentre = basePos + Vector3.up * (h + Mathf.Sqrt(Mathf.Max(0f, R * R - r * r)));
-        AppendOrb(verts, norms, uvs, tris, orbCentre, R);
+        if (!destruction)
+        {
+            AppendOrb(verts, norms, uvs, tris, orbCentre, R);
 
+            StoneFaces.Tag(kinds, tris, orbKind);
+            StoneFaces.Part(parts, tris, 0);
+            PartLabels.Mark(orbLabel, verts, tris);
+            return;
+        }
+
+        var insideKind = shading != null ? shading.towerOrbInside   : StoneFaceKind.D;
+        var edgeKind   = shading != null ? shading.towerOrbHoleEdge : StoneFaceKind.D;
+        AppendBrokenOrb(verts, norms, uvs, tris, kinds, parts, orbCentre, R, orbKind, insideKind, edgeKind);
+
+        if (innerLollipop)
+            AppendInnerLollipop(verts, norms, uvs, tris, kinds, parts, shading, orbCentre, R);
+    }
+
+    /// <summary>
+    /// The small lollipop standing inside the broken orb: <see cref="innerLollipopPreset"/>, built
+    /// whole (its own Destruction and Inner Lollipop ignored, so nothing nests again), scaled to
+    /// Inner Lollipop Size of the hollow's height above where it stands. It stands on the lowest
+    /// point of the hollow, raised just enough that the rim of its foot sits on the curved floor
+    /// all the way round.
+    /// </summary>
+    void AppendInnerLollipop(List<Vector3> verts, List<Vector3> norms, List<Vector2> uvs, List<int> tris,
+                             List<float> kinds, List<int> parts, RiverRunShadingSettings shading,
+                             Vector3 centre, float R)
+    {
+        if (innerLollipopPreset == null || innerLollipopPreset.tower == null) return;
+
+        var inner = innerLollipopPreset.Build();
+        inner.destruction   = false;
+        inner.innerLollipop = false;
+
+        float Ri     = R - Mathf.Clamp(holeEdgeThickness, 0.001f, R * 0.9f);
+        float height = Mathf.Max(0.001f, inner.TopY);
+        float foot   = Mathf.Max(0.001f, inner.FootRadius);
+        float size   = Mathf.Clamp(innerLollipopSize, 0.05f, 1f);
+
+        // The wider it stands, the higher its foot's rim meets the floor, and the less room above
+        // it — so the scale and the lift are settled together.
+        float scale = size * 2f * Ri / height, lift = 0f;
+        for (int i = 0; i < 8; i++)
+        {
+            float f = Mathf.Min(foot * scale, Ri);
+            lift  = Ri - Mathf.Sqrt(Mathf.Max(0f, Ri * Ri - f * f));
+            scale = size * (2f * Ri - lift) / height;
+        }
+
+        Vector3 basePos = centre + Vector3.up * (lift - Ri);
+        inner.Scaled(scale).Append(verts, norms, uvs, tris, basePos, kinds,
+                                   RiverRunShadingSettings.ForInnerLollipop(shading), parts,
+                                   stemLabel: "Inner Lollipop Stem", tierLabel: "Inner Lollipop Base",
+                                   orbLabel: "Inner Lollipop Orb");
+    }
+
+    const int HoleColumns = 64;   // round the hole's edge
+    const int HoleRings   = 10;   // from the hole's edge to the far side of the orb
+
+    /// <summary>
+    /// The orb with Destruction on: a hollow shell of radius <paramref name="R"/>, its inside
+    /// Hole Edge Thickness in, with one hole broken through it. The shell is laid out round the
+    /// hole — rings from the hole's edge across to the far side — so its first ring IS the edge,
+    /// rounded shapes and all, with nothing cut. The edge band joins the outside to the inside
+    /// straight in towards the centre.
+    /// </summary>
+    void AppendBrokenOrb(List<Vector3> verts, List<Vector3> norms, List<Vector2> uvs, List<int> tris,
+                         List<float> kinds, List<int> parts, Vector3 centre, float R,
+                         StoneFaceKind orbKind, StoneFaceKind insideKind, StoneFaceKind edgeKind)
+    {
+        float Ri = R - Mathf.Clamp(holeEdgeThickness, 0.001f, R * 0.9f);
+
+        // The hole's middle, and two directions across it to measure round its edge from.
+        float   yaw   = holeAround * Mathf.Deg2Rad;
+        float   pitch = Mathf.Clamp(holeUpDown, -90f, 90f) * Mathf.Deg2Rad;
+        Vector3 d     = new Vector3(Mathf.Cos(pitch) * Mathf.Cos(yaw), Mathf.Sin(pitch),
+                                    Mathf.Cos(pitch) * Mathf.Sin(yaw));
+        Vector3 e1    = Vector3.Cross(d, Vector3.up);
+        e1 = e1.sqrMagnitude > 1e-8f ? e1.normalized : Vector3.right;
+        Vector3 e2    = Vector3.Cross(d, e1);
+
+        // The edge: degrees from the hole's middle out to its edge, all the way round.
+        var edge = HoleEdgeAngles(HoleColumns);
+
+        Vector3 Dir(float theta, float phi)
+            => Mathf.Cos(theta) * d + Mathf.Sin(theta) * (Mathf.Cos(phi) * e1 + Mathf.Sin(phi) * e2);
+
+        // ── Outside, then inside: the same rings, the inside facing in ──
+        AppendShell(R, 1f);
         StoneFaces.Tag(kinds, tris, orbKind);
         StoneFaces.Part(parts, tris, 0);
+        PartLabels.Mark("Orb", verts, tris);
+
+        AppendShell(Ri, -1f);
+        StoneFaces.Tag(kinds, tris, insideKind);
+        StoneFaces.Part(parts, tris, 0);
+        PartLabels.Mark("Orb Inside", verts, tris);
+
+        // ── Edge band: outside edge to inside edge, facing into the hole ──
+        int start = verts.Count;
+        for (int k = 0; k <= HoleColumns; k++)
+        {
+            int     kk    = k % HoleColumns;
+            float   phi   = kk * Mathf.PI * 2f / HoleColumns;
+            float   theta = edge[kk];
+            Vector3 n     = Dir(theta, phi);
+
+            float   phiA = (kk + HoleColumns - 1) % HoleColumns * Mathf.PI * 2f / HoleColumns;
+            float   phiB = (kk + 1) % HoleColumns * Mathf.PI * 2f / HoleColumns;
+            Vector3 along = Dir(edge[(kk + 1) % HoleColumns], phiB) - Dir(edge[(kk + HoleColumns - 1) % HoleColumns], phiA);
+            Vector3 face  = Vector3.Cross(n, along).normalized;
+            Vector3 outward = -Mathf.Sin(theta) * d + Mathf.Cos(theta) * (Mathf.Cos(phi) * e1 + Mathf.Sin(phi) * e2);
+            if (Vector3.Dot(face, outward) > 0f) face = -face;   // into the hole, not into the shell
+
+            float u = phi * R;
+            verts.Add(centre + n * R);  norms.Add(face); uvs.Add(new Vector2(u, R));
+            verts.Add(centre + n * Ri); norms.Add(face); uvs.Add(new Vector2(u, Ri));
+        }
+        for (int k = 0; k < HoleColumns; k++)
+        {
+            int o0 = start + k * 2, i0 = o0 + 1, o1 = o0 + 2, i1 = o0 + 3;
+            AddTri(tris, verts, norms, o0, i0, i1);
+            AddTri(tris, verts, norms, o0, i1, o1);
+        }
+        StoneFaces.Tag(kinds, tris, edgeKind);
+        StoneFaces.Part(parts, tris, 0);
+        PartLabels.Mark("Orb Hole Edge", verts, tris);
+
+        // One shell at radius `radius`, its normals out (+1) or in (−1). Ring 0 lies on the hole's
+        // edge, the last ring closes to a point on the far side.
+        void AppendShell(float radius, float facing)
+        {
+            int shellStart = verts.Count;
+            int cols       = HoleColumns + 1;
+            for (int ring = 0; ring <= HoleRings; ring++)
+            {
+                float s = (float)ring / HoleRings;
+                for (int k = 0; k <= HoleColumns; k++)
+                {
+                    float   phi   = k * Mathf.PI * 2f / HoleColumns;
+                    float   from  = edge[k % HoleColumns];
+                    float   theta = from + (Mathf.PI - from) * s;
+                    Vector3 n     = Dir(theta, phi);
+
+                    verts.Add(centre + n * radius);
+                    norms.Add(n * facing);
+                    uvs.Add(new Vector2(phi * radius, theta * radius));
+                }
+            }
+            for (int ring = 0; ring < HoleRings; ring++)
+            {
+                for (int k = 0; k < HoleColumns; k++)
+                {
+                    int a = shellStart + ring * cols + k, b = a + 1;
+                    int c = a + cols,                     e = c + 1;
+                    AddTri(tris, verts, norms, a, b, c);
+                    if (ring < HoleRings - 1) AddTri(tris, verts, norms, b, e, c);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// The hole's edge, in radians from its middle, at <paramref name="columns"/> even steps round
+    /// it: Hole Size plus Hole Edge Complexity rounded shapes reaching out past it by up to Hole
+    /// Edge Depth of Hole Size. Each shape is a smooth hump, flat where it meets the next, so the
+    /// edge never comes to a point. Hole Edge Unevenness varies their length, width and spacing —
+    /// the same way every time for the same settings.
+    /// </summary>
+    public float[] HoleEdgeAngles(int columns)
+    {
+        float size = Mathf.Clamp(holeSize, 1f, 150f) * Mathf.Deg2Rad;
+        float most = 170f * Mathf.Deg2Rad;
+        int   count  = Mathf.Max(0, holeEdgeComplexity);
+        float uneven = Mathf.Clamp01(holeEdgeUnevenness);
+        float power  = Mathf.Lerp(2f, 5f, Mathf.Clamp01(holeEdgeRoundness));
+        float depth  = Mathf.Clamp01(holeEdgeDepth);
+
+        var middles = new float[count];
+        var halves  = new float[count];
+        var lengths = new float[count];
+        float spacing = count > 0 ? Mathf.PI * 2f / count : 0f;
+        for (int i = 0; i < count; i++)
+        {
+            middles[i] = (i + (Hash(i, 1) - 0.5f) * 0.5f * uneven) * spacing;
+            halves[i]  = 0.5f * spacing * (1f + uneven * (Hash(i, 2) * 0.9f - 0.45f));
+            lengths[i] = 1f - uneven * 0.75f * Hash(i, 3);
+        }
+
+        var angles = new float[columns];
+        for (int k = 0; k < columns; k++)
+        {
+            float phi  = k * Mathf.PI * 2f / columns;
+            float reach = 0f;
+            for (int i = 0; i < count; i++)
+            {
+                float gap = Mathf.Abs(Mathf.DeltaAngle(phi * Mathf.Rad2Deg, middles[i] * Mathf.Rad2Deg)) * Mathf.Deg2Rad;
+                float t   = gap / halves[i];
+                if (t >= 1f) continue;
+                float hump = 1f - Mathf.Pow(t, power);
+                reach += lengths[i] * hump * hump;
+            }
+            angles[k] = Mathf.Min(most, size * (1f + depth * reach));
+        }
+        return angles;
+    }
+
+    // A fixed number in [0, 1) for shape `i` — the same every build.
+    static float Hash(int i, int salt)
+    {
+        float x = Mathf.Sin(i * 12.9898f + salt * 78.233f) * 43758.5453f;
+        return x - Mathf.Floor(x);
     }
 
     /// <summary>
@@ -281,7 +542,7 @@ public class LollipopTower
     // Moves basePos up to its top. Every face of it, cap included, is tagged as tier `part`.
     static void AppendRing(List<Vector3> verts, List<Vector3> norms, List<Vector2> uvs, List<int> tris,
                            List<float> kinds, List<int> parts, int part, ref Vector3 basePos, float bottomR, float topR, float height,
-                           bool cap, StoneFaceKind sideKind, StoneFaceKind capKind)
+                           bool cap, StoneFaceKind sideKind, StoneFaceKind capKind, string label)
     {
         float slant = Mathf.Sqrt(height * height + (bottomR - topR) * (bottomR - topR));
         float midR  = (bottomR + topR) * 0.5f;
@@ -305,6 +566,7 @@ public class LollipopTower
         }
         StoneFaces.Tag(kinds, tris, sideKind);
         StoneFaces.Part(parts, tris, part);
+        PartLabels.Mark(label, verts, tris);
 
         basePos += Vector3.up * height;
         if (!cap) return;
@@ -322,6 +584,7 @@ public class LollipopTower
 
         StoneFaces.Tag(kinds, tris, capKind);
         StoneFaces.Part(parts, tris, part);
+        PartLabels.Mark(label, verts, tris);
     }
 
     // One triangle, wound so its face points the way its vertices' normals do — Unity's front

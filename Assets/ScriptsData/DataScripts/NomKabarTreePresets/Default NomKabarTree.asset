@@ -1,0 +1,68 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 760fa4f003c6e3d48b7b2d2b32066fe9, type: 3}
+  m_Name: Default NomKabarTree
+  m_EditorClassIdentifier: Assembly-CSharp::NomKabarTreePreset
+  tree:
+    baseFootRadius: 0.5
+    baseHeight: 0.25
+    baseShoulder: 0.843
+    stemRadius: 0.08
+    stemHeight: 0.6
+    hubRadius: 0.17
+    hubSquash: 0.936
+    baseJoin: 0.2
+    stemJoin: 0.03
+    hubJoin: 0.05
+    endJoin: 0.03
+    armCount: 3
+    arms:
+    - angle: 28
+      radius: 0.04
+      reach: 0.5
+      rise: 0.5
+      bend: 80
+      bendArea: 0.6
+      endLean: 10
+      endScale: 3.5
+    - angle: 120
+      radius: 0.04
+      reach: 0.5
+      rise: 0.4
+      bend: 80
+      bendArea: 0.6
+      endLean: 10
+      endScale: 2.5
+    - angle: 248
+      radius: 0.04
+      reach: 0.5
+      rise: 0.7
+      bend: 80
+      bendArea: 0.482
+      endLean: 4
+      endScale: 3
+    - angle: 60
+      radius: 0.04
+      reach: 0.35
+      rise: 0.5
+      bend: 80
+      bendArea: 0.6
+      endLean: 10
+      endScale: 2.5
+    - angle: 180
+      radius: 0.04
+      reach: 0.35
+      rise: 0.5
+      bend: 80
+      bendArea: 0.6
+      endLean: 10
+      endScale: 2.5

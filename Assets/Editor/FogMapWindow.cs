@@ -71,22 +71,16 @@ public class FogMapWindow : EditorWindow
     {
         _lastTick = EditorApplication.timeSinceStartup;
         EditorApplication.update += OnEditorTick;
-        SceneView.duringSceneGui += OnSceneGUI;
     }
 
     void OnDisable()
     {
         EditorApplication.update -= OnEditorTick;
-        SceneView.duringSceneGui -= OnSceneGUI;
     }
 
     void OnEditorTick()
     {
         if (_animate && _map != null && _map.windSpeed > 0.0001f) Repaint();
-
-        // The Scene view does not redraw on its own while the game runs, so live gizmos would
-        // freeze on whatever frame it last happened to draw.
-        if (AnyGizmo && Application.isPlaying) SceneView.RepaintAll();
     }
 
     /// <summary>
@@ -202,8 +196,7 @@ public class FogMapWindow : EditorWindow
     {
         EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
 
-        var picked = (FogMap)EditorGUILayout.ObjectField(
-            _map, typeof(FogMap), false, GUILayout.Width(220));
+        var picked = FogMapPicker.ToolbarPopup(_map, GUILayout.Width(220));
         if (picked != _map)
         {
             if (ConfirmDiscard()) { _map = picked; _so = null; _selected = -1; TakeSnapshot(); }
@@ -441,13 +434,6 @@ public class FogMapWindow : EditorWindow
     bool _openBlob, _openDistribution, _openWind, _openBoatMask, _openFogScale,
          _openSimulation, _openRepellers, _openLook, _openGizmos;
 
-    // Gizmos section toggles, each a separate layer drawn in the Scene view.
-    bool _gizmoMasses, _gizmoBoatMask, _gizmoSpawnCull, _gizmoPaintedArea, _gizmoWind,
-         _gizmoRange, _gizmoRepellers, _gizmoLabels;
-
-    bool AnyGizmo => _gizmoMasses || _gizmoBoatMask || _gizmoSpawnCull || _gizmoPaintedArea ||
-                     _gizmoWind || _gizmoRange || _gizmoRepellers;
-
     static GUIStyle _sectionStyle;
 
     bool Section(ref bool open, string title)
@@ -525,6 +511,7 @@ public class FogMapWindow : EditorWindow
         if (Section(ref _openBoatMask, "Boat Mask"))
         {
             Field("fogOpacity", "Overall Opacity");
+            Field("screenCircleOcclusion", "Screen Circle Occlusion");
             Field("maskRadius");
             Field("maskFeather");
 
@@ -604,6 +591,17 @@ public class FogMapWindow : EditorWindow
                 "Obstacle Range is how far from the boat an obstacle's centre may be and still count. " +
                 "Of those, the nearest Repel Limit push fog (CPU) and the nearest Mask Limit cut the " +
                 "clear edge (GPU). Nearest is measured to each obstacle's edge.", MessageType.None);
+
+            EditorGUILayout.Space(4);
+            EditorGUILayout.LabelField("Height Window", EditorStyles.miniBoldLabel);
+            Field("heightWindowBelow", "Below Fog Plane");
+            Field("heightWindowAbove", "Above Fog Plane");
+            EditorGUILayout.HelpBox(
+                "A repel point only counts when its height is within this window of the fog plane the " +
+                "boat is under (the zone's sheet, in Zones mode), measured from that sheet's height right " +
+                "over the point, so it follows Landscape Influence. Outside it, it neither pushes fog nor " +
+                "cuts the mask. A freestanding structure's column is tested base to top: it counts when any " +
+                "part of its height is within the window. The boat always counts.", MessageType.None);
             if (Application.isPlaying)
                 EditorGUILayout.LabelField(" ",
                     $"in range {FogFieldManager.NearRepellerCount}  ·  pushing {FogFieldManager.PushingCount}" +
@@ -778,19 +776,9 @@ public class FogMapWindow : EditorWindow
 
         if (Section(ref _openGizmos, "Gizmos"))
         {
-            EditorGUI.BeginChangeCheck();
-            _gizmoMasses      = EditorGUILayout.Toggle("Masses", _gizmoMasses);
-            _gizmoBoatMask    = EditorGUILayout.Toggle("Boat Mask", _gizmoBoatMask);
-            _gizmoSpawnCull   = EditorGUILayout.Toggle("Spawn & Cull", _gizmoSpawnCull);
-            _gizmoPaintedArea = EditorGUILayout.Toggle("Painted Area", _gizmoPaintedArea);
-            _gizmoWind        = EditorGUILayout.Toggle("Wind", _gizmoWind);
-            _gizmoRange       = EditorGUILayout.Toggle("Obstacle Range", _gizmoRange);
-            _gizmoRepellers   = EditorGUILayout.Toggle("Repellers", _gizmoRepellers);
-            _gizmoLabels      = EditorGUILayout.Toggle("Labels", _gizmoLabels);
-            if (EditorGUI.EndChangeCheck()) SceneView.RepaintAll();
-
             EditorGUILayout.HelpBox(
-                "Drawn in the Scene view while this window is open, off the running fog field.\n" +
+                "Fog gizmos are shown from the Gizmo Manager: its Fog button, and the ▾ beside it " +
+                "for which layers.\n" +
                 "Masses: cream, solid while painting, hollow grey when alive but faded out.\n" +
                 "Boat Mask: blue — where fog stops drawing, and the fainter ring where the fade begins.\n" +
                 "Spawn & Cull: green where masses are born, orange where they are dropped.\n" +
@@ -814,180 +802,6 @@ public class FogMapWindow : EditorWindow
 
         EditorGUILayout.EndScrollView();
         EditorGUILayout.EndVertical();
-    }
-
-    // ────────────────────────────────────────────────────────────────────────
-    // Gizmos section: drawn in the Scene view, read straight off the running fog field.
-    readonly System.Collections.Generic.HashSet<IFogRepeller> _gzNear    = new System.Collections.Generic.HashSet<IFogRepeller>();
-    readonly System.Collections.Generic.HashSet<IFogRepeller> _gzPushing = new System.Collections.Generic.HashSet<IFogRepeller>();
-    readonly System.Collections.Generic.HashSet<IFogRepeller> _gzMasked  = new System.Collections.Generic.HashSet<IFogRepeller>();
-
-    static readonly Color GzPush  = new Color(0.95f, 0.45f, 0.30f);
-    static readonly Color GzMask  = new Color(0.35f, 0.72f, 1f);
-    static readonly Color GzRange = new Color(0.75f, 0.75f, 0.78f);
-    static readonly Color GzCull  = new Color(0.95f, 0.55f, 0.35f);
-    static readonly Color GzSpawn = new Color(0.55f, 0.90f, 0.55f);
-    static readonly Color GzMass  = new Color(1f, 0.95f, 0.75f);
-    static readonly Color GzArea  = new Color(0.65f, 0.75f, 0.9f);
-    static readonly Color GzWind  = new Color(0.7f, 0.9f, 1f);
-
-    void OnSceneGUI(SceneView view)
-    {
-        if (!AnyGizmo || Event.current.type != EventType.Repaint) return;
-
-        var mgr = FogFieldManager.Instance;
-        if (mgr == null) return;
-
-        // Same opacity pref as the fog's own gizmos, so the Gizmo Manager slider thins these too.
-        float opacity = Mathf.Clamp01(EditorPrefs.GetFloat("FogTools.GizmoManager.Opacity", 1f));
-        float y = mgr.GizmoY;
-        Vector2 b2 = mgr.BoatCentreXZ;
-        Vector3 boat = new Vector3(b2.x, y, b2.y);
-
-        using (new Handles.DrawingScope())
-        {
-            if (_gizmoPaintedArea)
-            {
-                float cov = mgr.GizmoCoverage, h = cov * 0.5f;
-                Vector3 fc = new Vector3(mgr.FieldCentre.x, y, mgr.FieldCentre.y);
-                Color fill = GzArea; fill.a = 0.04f * opacity;
-                Color edge = GzArea; edge.a = 0.30f * opacity;
-                Handles.DrawSolidRectangleWithOutline(new[]
-                {
-                    fc + new Vector3(-h, 0f, -h), fc + new Vector3(-h, 0f,  h),
-                    fc + new Vector3( h, 0f,  h), fc + new Vector3( h, 0f, -h),
-                }, fill, edge);
-                if (_gizmoLabels)
-                    GizmoLabel(fc + new Vector3(-h, 0f, h),
-                        $"painted area {cov:0.#} u  @ {cov / Mathf.Max(mgr.GizmoFieldPx, 1):0.####} u/texel", opacity);
-            }
-
-            if (_gizmoSpawnCull)
-            {
-                DrawGizmoRing(boat, mgr.GizmoSpawnRadius, GzSpawn, 0.75f * opacity);
-                DrawGizmoRing(boat, mgr.CullRadius,       GzCull,  0.75f * opacity);
-                if (_gizmoLabels)
-                {
-                    GizmoLabel(boat + new Vector3(0f, 0f, mgr.GizmoSpawnRadius), $"spawn {mgr.GizmoSpawnRadius:0.##}", opacity);
-                    GizmoLabel(boat + new Vector3(mgr.CullRadius, 0f, 0f),       $"cull {mgr.CullRadius:0.##}", opacity);
-                }
-            }
-
-            if (_gizmoBoatMask)
-            {
-                float mask = mgr.GizmoMaskRadius;
-                DrawGizmoRing(boat, mask, GzMask, 0.95f * opacity);
-                // (1 - feather), matching FogMask.hlsl — where the fade begins.
-                DrawGizmoRing(boat, mask * (1f - mgr.LodFeather), GzMask, 0.45f * opacity);
-                if (_gizmoLabels)
-                    GizmoLabel(boat + new Vector3(-mask, 0f, 0f), $"mask {mask:0.##}", opacity);
-            }
-
-            if (_gizmoRange)
-            {
-                DrawGizmoRing(boat, mgr.ObstacleRange, GzRange, 0.5f * opacity);
-                if (_gizmoLabels)
-                    GizmoLabel(boat + new Vector3(0f, 0f, -mgr.ObstacleRange),
-                               $"obstacle range {mgr.ObstacleRange:0.##}", opacity);
-            }
-
-            if (_gizmoMasses)
-            {
-                var blobs = mgr.LiveBlobs;
-                for (int i = 0; i < blobs.Count; i++)
-                {
-                    var blob = blobs[i];
-                    if (blob == null || !blob.Alive) continue;
-
-                    // Hollow when faded: alive, drifting, holding a slot, painting nothing.
-                    bool painting = blob.LodFade > 0.001f;
-                    Vector3 bc = new Vector3(blob.Centre.x, y, blob.Centre.y);
-                    float rad = Mathf.Max(blob.ReachRadius, 0.1f);
-                    if (painting)
-                    {
-                        Color fill = GzMass; fill.a = (0.10f + 0.25f * blob.LodFade) * opacity;
-                        Handles.color = fill;
-                        Handles.DrawSolidDisc(bc, Vector3.up, rad);
-                    }
-                    DrawGizmoRing(bc, rad, painting ? GzMass : GzRange, (painting ? 0.7f : 0.5f) * opacity);
-                }
-            }
-
-            if (_gizmoWind)
-            {
-                float speed = mgr.GizmoWindSpeed;
-                if (speed > 0.0001f)
-                {
-                    Vector2 w = mgr.WindVector;
-                    Vector3 dir = new Vector3(w.x, 0f, w.y).normalized;
-                    float len = Mathf.Max(mgr.GizmoMaskRadius, HandleUtility.GetHandleSize(boat));
-                    Color c = GzWind; c.a = 0.8f * opacity;
-                    Handles.color = c;
-                    Handles.DrawLine(boat, boat + dir * len, 2f);
-                    Handles.ConeHandleCap(0, boat + dir * len, Quaternion.LookRotation(dir),
-                                          HandleUtility.GetHandleSize(boat) * 0.15f, EventType.Repaint);
-                    if (_gizmoLabels)
-                        GizmoLabel(boat + dir * len, $"wind {mgr.GizmoWindAngle:0}°  {speed:0.##} u/s", opacity);
-                }
-            }
-
-            if (_gizmoRepellers)
-            {
-                _gzNear.Clear(); _gzPushing.Clear(); _gzMasked.Clear();
-                foreach (var r in mgr.NearRepellers)    _gzNear.Add(r);
-                foreach (var r in mgr.PushingRepellers) _gzPushing.Add(r);
-                foreach (var r in mgr.MaskedRepellers)  _gzMasked.Add(r);
-
-                DrawRepellerGizmo(mgr.BoatRepeller, y, opacity);
-                foreach (var r in FogFieldManager.RegisteredRepellers) DrawRepellerGizmo(r, y, opacity);
-                foreach (var r in mgr.AdoptedRocks)                   DrawRepellerGizmo(r, y, opacity);
-            }
-        }
-    }
-
-    static GUIStyle _gizmoLabelStyle;
-
-    static void GizmoLabel(Vector3 at, string text, float opacity)
-    {
-        _gizmoLabelStyle ??= new GUIStyle(EditorStyles.miniLabel);
-        _gizmoLabelStyle.normal.textColor = new Color(1f, 1f, 1f, Mathf.Max(opacity, 0.2f));
-        Handles.Label(at, text, _gizmoLabelStyle);
-    }
-
-    void DrawRepellerGizmo(IFogRepeller r, float y, float opacity)
-    {
-        // A destroyed component still sits in the list until it unregisters.
-        if (r == null || (r is Object o && o == null)) return;
-
-        Vector3 c = r.RepelCentre; c.y = y;
-        bool active  = r.RepelActive;
-        bool inRange = active && _gzNear.Contains(r);
-        bool pushing = _gzPushing.Contains(r);
-        bool masked  = _gzMasked.Contains(r);
-
-        float push = r.RepelRadius + r.RepelClearRadius;
-        float mask = r.RepelRadius + r.MaskClearRadius;
-
-        if (pushing && push > 0.001f)
-        {
-            Handles.color = new Color(GzPush.r, GzPush.g, GzPush.b, 0.12f * opacity);
-            Handles.DrawSolidDisc(c, Vector3.up, push);
-        }
-        DrawGizmoRing(c, push, GzPush, (pushing ? 0.9f : 0.25f) * opacity);
-        DrawGizmoRing(c, mask, GzMask, (masked  ? 0.9f : 0.25f) * opacity);
-
-        Color dot = inRange ? Color.white : GzRange;
-        dot.a = (inRange ? 0.95f : 0.5f) * opacity;
-        Handles.color = dot;
-        Handles.DrawSolidDisc(c, Vector3.up, HandleUtility.GetHandleSize(c) * 0.04f);
-    }
-
-    static void DrawGizmoRing(Vector3 centre, float radius, Color colour, float alpha)
-    {
-        if (radius <= 0.001f) return;
-        colour.a = alpha;
-        Handles.color = colour;
-        Handles.DrawWireDisc(centre, Vector3.up, radius, 2f);
     }
 
     // ────────────────────────────────────────────────────────────────────────

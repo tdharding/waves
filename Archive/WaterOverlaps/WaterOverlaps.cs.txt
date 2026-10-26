@@ -1,0 +1,382 @@
+// ARCHIVED 2026-10-25 — verbatim slices of the water overlaps as they stood before removal.
+// Not compiled (outside Assets/). See README.md.
+
+// ═══ LevelSelectDesignerData.cs ═══
+    // ─────────────────────────────────────────────
+    // WHERE TWO WATERS MEET
+    //
+    // Every water surface in the world is generated to BUTT onto its neighbours — a branch's
+    // ribbon stops on the edge of the river it leaves, a pool's ring stops on the line each of
+    // its rivers ends on. Nothing overlaps, so nothing z-fights.
+    //
+    // What butting cannot do is carry a pattern across the join. Each surface has its own frame,
+    // and where two frames meet on a line the lines drawn in them meet on that line too. An
+    // overlap lets the one on top run PAST the join and fade out over its neighbour instead,
+    // which is what hides it.
+    //
+    // These are geometry, not look: they change the mesh, so they need a Rebuild Runs. Leave
+    // them at 0 and every surface butts exactly as it did before.
+    // ─────────────────────────────────────────────
+
+    [Tooltip("How far a pool's water carries on OUT into each river that meets it, over that " +
+             "river's own water, before fading out. 0 butts it onto the line the river's water " +
+             "ends on as before. Geometry — needs a Rebuild Runs.")]
+    [Min(0f)] public float     waterPoolOverlap = 0f;
+
+// ═══ LevelSelectDesignerWindow.cs — Aesthetics UI ═══
+
+        // Geometry, not globals — which is the whole reason this is here and not in the tuner
+        // alongside everything else the water is drawn with.
+        EditorGUILayout.LabelField("Where Two Waters Meet", EditorStyles.boldLabel);
+
+        EditorGUI.BeginChangeCheck();
+        float poolOverlap = EditorGUILayout.FloatField(
+            new GUIContent("Water Pool Overlap",
+                           "How far a pool's water carries on out into each river that meets " +
+                           "it, over that river's own water, fading out as it goes. 0 butts it " +
+                           "onto the line the river's water ends on as before."),
+            _data.waterPoolOverlap);
+        if (EditorGUI.EndChangeCheck())
+        {
+            Undo.RecordObject(_data, "Set Water Overlap");
+            _data.waterPoolOverlap = Mathf.Max(0f, poolOverlap);
+            MarkDirty();
+        }
+
+        EditorGUILayout.LabelField(
+            "Changes the generated mesh — press Rebuild Runs to see it. How much of " +
+            "the lap the alpha gradient covers is River Fade To Pool Distance, in the River Tuner.",
+            EditorStyles.wordWrappedMiniLabel);
+
+// ═══ LevelSelectDesignerWindow.cs — junction water lead-in (branch water to the main centreline) ═══
+            // Its water carries the whole way in to this river's centreline, where the two
+            // channels are already the same depth and one surface runs into the other.
+            _junctionWaterLeadIn[junc.nodeId] = collar;
+
+    /// <summary>
+    /// How far back past the start of a run its water reaches. Only a branch has any: its run
+    /// was trimmed to butt onto the side wall of the river it leaves, and its water has to
+    /// carry on past that wall, over the mouth, to the edge of that river's channel.
+    /// </summary>
+    private float WaterLeadInFor(LevelSelectDesignerData.DesignerPath path)
+    {
+        if (path == null || path.nodeIds.Count == 0) return 0f;
+
+        // A river running out of a pool only has that pool's rim to cross; its trim carried no
+        // designer offset, so its water makes up none either.
+        if (_poolWaterReach.TryGetValue(path.nodeIds[0], out float poolReach)) return poolReach;
+
+        if (!_junctionWaterLeadIn.TryGetValue(path.nodeIds[0], out float leadIn)) return 0f;
+
+        // The run was cut back by the collar, so the water makes that up and carries on to
+        // the centreline of the river it leaves.
+        return Mathf.Max(0f, leadIn);
+    }
+
+// ═══ LevelSelectDesignerWindow.cs — LevelWaterIntoPool hold ═══
+        // The lap reaches Water Pool Overlap back from where the river's water ends, and the lead
+        // across the rim is its own length back from there; whichever is further is held.
+        float hold = Mathf.Max(Mathf.Max(0f, _data.waterPoolOverlap), lead);
+        if (hold <= 0.0001f) return;
+
+// ═══ LevelSelectDesignerWindow.cs — RefreshPoolWater call ═══
+        // arrives, on the very line that river's own water ends on, so the two meet without a
+        // crescent of the pool's circle left open between them.
+        var mesh = SaveGeneratedMesh(waterName,
+            RiverMeshBuilder.BuildPoolWater(profile, _data.waterLevel,
+                                           record.poolRadius, record.islandRadius, MeshEdge,
+                                           ToPoolMouths(record.mouths, PoolForRecord(record)), record.floorDepth,
+                                           Mathf.Max(0f, _data.waterPoolOverlap)));
+
+// ═══ RiverMeshBuilder.cs — RiverJoin (branch water lying over the river it leaves) ═══
+    /// <summary>
+    /// The river a branch leaves, as its water sees it: a straight line across the junction.
+    ///
+    /// A branch's water runs back across the mouth to that river's centreline and lies over it,
+    /// drawn on top. Where it does, its lines should belong to THAT river's banks — held along
+    /// them, gone from its middle — rather than carrying the branch's own banks straight out
+    /// across it. So every corner near the junction carries, on UV3, how far it lies from each of
+    /// that river's waterlines, which the shader turns into that river's Reach and eases the
+    /// branch's own over to.
+    ///
+    /// The river is taken as straight across the junction: its tangent there. Both distances are
+    /// straight lines, so they interpolate exactly across a face.
+    /// </summary>
+    // DEBUG (branch mouth fade at pools) — read by the designer straight after BuildWater.
+    public static int   DebugJoinQuads;
+    public static float DebugJoinAlong, DebugJoinMaxIn, DebugWaterLength;
+
+    public struct RiverJoin
+    {
+        /// <summary>A point on that river's centreline, in the water's own space.</summary>
+        public Vector3 point;
+
+        /// <summary>Flat unit direction across that river, facing out toward the branch.</summary>
+        public Vector3 across;
+
+        /// <summary>Half the width of that river's water.</summary>
+        public float shore;
+
+        /// <summary>How far out past its near waterline, into the branch, the banks are still
+        /// carried. That river's outer width: past it the branch is its own water.</summary>
+        public float extent;
+
+        private float Out(Vector3 corner)
+        {
+            Vector3 d = corner - point;
+            d.y = 0f;
+            return Vector3.Dot(d, across);
+        }
+
+        public bool Near(Vector3 corner) => Out(corner) <= shore + extent;
+
+        /// <summary>
+        /// UV3 for one corner: .x metres to that river's NEAR waterline (the branch's side),
+        /// positive inside its water and negative out in the branch; .y metres to its far
+        /// waterline; .z 1, carrying.
+        /// </summary>
+        public Vector4 BankAt(Vector3 corner)
+        {
+            float off = Out(corner);
+            return new Vector4(shore - off, shore + off, 1f, 0f);
+        }
+    }
+
+// ═══ RiverMeshBuilder.cs — BuildPoolWater ═══
+    public static Mesh BuildPoolWater(
+        RiverProfile profile, float waterLevel,
+        float poolRadius, float islandRadius, float edge,
+        IList<PoolMouth> mouths = null, float floorDepth = 0f, float overlap = 0f)
+    {
+        var b = new MeshBuild();
+        if (profile == null) return b.ToMesh("RiverPoolWater");
+
+        poolRadius   = Mathf.Max(poolRadius, 0.01f);
+        islandRadius = Mathf.Clamp(islandRadius, 0f, poolRadius - 0.01f);
+        edge         = Mathf.Max(edge, 0.005f);
+        overlap      = Mathf.Max(overlap, 0f);
+        if (floorDepth <= 0f) floorDepth = profile.riverDepth;
+
+        // Every river that meets this pool, each carrying the two lines its strip runs between:
+        // where the river's own water really ends, and how far past that the pool's water is
+        // drawn over it before fading out.
+        bool island = islandRadius > 0f;
+
+        // Where the bowl comes up through the water, out at the wall and in at the island, and
+        // the circles the sheet is BUILT to. Those are the channel's own edges on a flat rim; a
+        // rounded bank can hold the waterline out on its corner, and the sheet is then carried
+        // on under it, as a run's ribbon is (see WaterRibbonHalfWidth).
+        PoolWaterEdges(profile, poolRadius, islandRadius, floorDepth, waterLevel,
+                       out float outerShore, out float innerShore,
+                       out float waterRadius, out float waterInner);
+
+        var flats = WaterFlats(profile, poolRadius, islandRadius, floorDepth, waterLevel,
+                               mouths, edge, overlap);
+
+        var angles = PoolWaterAngles(waterRadius, flats, edge);
+        if (angles.Count < 3) return b.ToMesh("RiverPoolWater");
+
+        float y = -waterLevel;
+
+        // A pool's rings are drawn in world space from the pool's own centre. What its surface
+        // carries is the SAME on every vertex — the two waterline radii, for Pool Reach, the
+        // circle its strips set off from, for Pool Mouth Fade, and the lap's length, for the fade
+        // distance — so nothing can change along a face edge.
+        System.Func<Vector3, bool, Vector4> edges = (flat, open)
+            => new Vector4(outerShore, innerShore, waterRadius, overlap);
+
+        int n = angles.Count;
+
+        // The pool's own circle: the outline the sheet inside is filled to, and the line every
+        // strip sets off from. Held flat, with the water's own height put on at the last moment,
+        // because everything read off a corner is read off where it lies rather than how deep.
+        var rim = new Vector3[n];
+        for (int j = 0; j < n; j++) rim[j] = PoolDirection(angles[j]) * waterRadius;
+
+        // Which river, if any, owns the cell between one heading and the next. A cell belongs to
+        // whichever river's water crosses it, and the two headings a cell lies between were put
+        // on the list by those very crossings — so a cell is never half in and half out, and a
+        // strip starts and stops on a clean radial edge.
+        var owner = WaterOwners(angles, flats, waterRadius);
+
+        // ── The sheet inside the circle ──────────────────────────────────────
+        // It carries UV3 too, so Pool Mouth Reach Overlap can start a river's reach inside the circle:
+        // each corner takes the river it faces. See SheetBank.
+        b.BankAt = corner => SheetBank(corner, flats, waterLevel, edge);
+        if (island) PoolWaterRings(b, angles, waterRadius, waterInner, edge, y, edges);
+        else        PoolWaterGrid (b, rim, GridTurn(angles, RiverHeadings(flats, waterRadius)),
+                                  y, edges);
+
+        // ── The strips running out into the rivers ───────────────────────────
+        for (int j = 0; j < n; j++)
+        {
+            if (owner[j] < 0) continue;
+
+            int  k = (j + 1) % n;
+            var  f = flats[owner[j]];
+
+            Vector3 o1 = CarryDownRiver(rim[j], f, f.distance);
+            Vector3 o2 = CarryDownRiver(rim[k], f, f.distance);
+
+            Vector4 eo1 = edges(o1, true);
+            Vector4 eo2 = edges(o2, true);
+
+            Vector4 fo1 = PoolFlowData(o1, 1f);
+            Vector4 fo2 = PoolFlowData(o2, 1f);
+
+            // UV3: the river this strip runs down — metres to its waterline either side, read off
+            // the corner's offset across it, against the same shore the river's own water measures
+            // from. Straight lines across a flat face, so it interpolates exactly. Only the strip
+            // and its lap carry it; the sheet inside the circle has none.
+            float riverShore = WaterHalfWidth(f.section, waterLevel);
+            float centreline = Vector3.Dot(f.end, f.across);
+            b.BankAt = corner =>
+            {
+                float off = Vector3.Dot(corner, f.across) - centreline;
+                return new Vector4(riverShore + off, riverShore - off, 1f, 0f);
+            };
+
+            // The two rim corners a strip sets off from are open water as well: there is no wall
+            // across a mouth for the ripples to end on, so they carry on out into the river.
+            b.Quad(rim[j] + Vector3.up * y, o1 + Vector3.up * y,
+                   o2     + Vector3.up * y, rim[k] + Vector3.up * y,
+                   edges(rim[j], true), eo1, eo2, edges(rim[k], true),
+                   PoolFlowData(rim[j], 1f), fo1, fo2, PoolFlowData(rim[k], 1f));
+
+            // The lap: the same water carried on up the river, over the river's own, running out
+            // to nothing at the far lip. With no overlap authored the two lines are one line and
+            // this face is collapsed, which the builder drops.
+            if (f.lipDistance <= f.distance + 0.0001f) continue;
+
+            Vector3 l1 = CarryDownRiver(rim[j], f, f.lipDistance);
+            Vector3 l2 = CarryDownRiver(rim[k], f, f.lipDistance);
+
+            b.Quad(o1 + Vector3.up * y, l1 + Vector3.up * y,
+                   l2 + Vector3.up * y, o2 + Vector3.up * y,
+                   eo1, edges(l1, true), edges(l2, true), eo2,
+                   fo1, PoolFlowData(l1, 0f), PoolFlowData(l2, 0f), fo2);
+        }
+
+        b.BankAt = null;
+
+        return b.ToMesh("RiverPoolWater");
+    }
+
+// ═══ RiverMeshBuilder.cs — WaterFlats ═══
+    /// <summary>
+    /// The straight line each arriving river's water ends on, in the pool's own space: the way
+    /// the run heads back out, how far out along it that line lies, and how far across it the
+    /// water really runs.
+    ///
+    /// Worked out from the very numbers the run's water was carried on by — its last ring,
+    /// carried in by <see cref="PoolWaterReach"/>, spanning the arriving river's inner width —
+    /// so the line this ends on and the line that ends on are one line.
+    /// </summary>
+    private static List<WaterFlat> WaterFlats(
+        RiverProfile profile, float poolRadius, float islandRadius, float floorDepth,
+        float waterLevel, IList<PoolMouth> mouths, float edge, float overlap = 0f)
+    {
+        var flats = new List<WaterFlat>();
+        if (mouths == null) return flats;
+
+        // The reach is measured back INWARD from where the arriving run stopped. The overlap then
+        // carries the pool's water on up the river from there, over the river's own — so it is
+        // the same line moved further out, and both are held on one record rather than the whole
+        // list being worked out twice. Two lists could not be told apart river by river anyway:
+        // the guard below can drop a river from one and keep it in the other.
+        float reach = Mathf.Max(0f, PoolWaterReach(profile, poolRadius, islandRadius, floorDepth,
+                                                   waterLevel, edge));
+
+        foreach (var m in mouths)
+        {
+            Vector3 dir = m.direction;
+            dir.y = 0f;
+            if (dir.sqrMagnitude < 1e-8f) continue;
+            dir.Normalize();
+
+            Vector3 centre = m.centre;
+            centre.y = 0f;
+
+            Vector3 end = centre - dir * reach;
+            float   d   = Vector3.Dot(end, dir);
+
+            // A river reaching in past the pool's own middle has no line left to hold — leave
+            // that one round rather than turning the water inside out.
+            if (d <= 0.01f) continue;
+
+            var section = m.profile != null ? m.profile : profile;
+
+            flats.Add(new WaterFlat
+            {
+                dir         = dir,
+                across      = Vector3.Cross(Vector3.up, dir).normalized,
+                end         = end,
+                distance    = d,
+                lipDistance = d + Mathf.Max(overlap, 0f),
+                halfWidth   = WaterRibbonHalfWidth(section, waterLevel),
+                section     = section,
+            });
+        }
+
+        return flats;
+    }
+
+    /// <summary>
+
+// ═══ RiverMeshBuilder.cs — WaterFlat.lipDistance ═══
+        /// <summary>The same line carried on up the river by the overlap — how far the pool's
+        /// water is drawn OVER the river's own before it fades out. Equal to
+        /// <see cref="distance"/> when nothing is lapped.</summary>
+        public float   lipDistance;
+
+// ═══ RiverEdgeRippleSettings.cs ═══
+    [Header("River fade to pool")]
+
+    [Tooltip("How far back from the far lip of a pool's lap the alpha fades, in metres. Held to " +
+             "the lap's own length — Water Pool Overlap in the designer — so it can never outrun " +
+             "the lap. Retunes without a Rebuild Runs.")]
+    [FormerlySerializedAs("lapFadeDistance")]
+    [Min(0f)] public float riverFadeToPoolDistance = 0.25f;
+
+    [Tooltip("The falloff of that fade over its distance. 1 is an even ramp. Above 1 the water " +
+             "stays faint further in from the lip and comes in late and hard; below 1 it comes " +
+             "in quickly and eases the rest of the way.")]
+    [Min(0.01f)] public float riverFadeToPoolIntensity = 1f;
+    private static readonly int RiverFadeToPoolDistanceId  = Shader.PropertyToID("_RiverEdgeRippleRiverFadeToPoolDistance");
+    private static readonly int RiverFadeToPoolIntensityId = Shader.PropertyToID("_RiverEdgeRippleRiverFadeToPoolIntensity");
+        Shader.SetGlobalFloat(RiverFadeToPoolDistanceId,  riverFadeToPoolDistance);
+        Shader.SetGlobalFloat(RiverFadeToPoolIntensityId, riverFadeToPoolIntensity);
+        riverFadeToPoolDistance  = other.riverFadeToPoolDistance;
+        riverFadeToPoolIntensity = other.riverFadeToPoolIntensity;
+
+// ═══ RiverEdgeRipples.hlsl — the lap fade ═══
+float _RiverEdgeRippleRiverFadeToPoolDistance;  // metres back from a pool lap's lip the alpha fades over
+float _RiverEdgeRippleRiverFadeToPoolIntensity; // falloff of that fade: 1 even, higher later and harder
+    // ── The overlap ──────────────────────────────────────────────────────────
+    // Where two waters are built to lie over one another — a pool reaching out into its rivers —
+    // the one on top is generated with a weight running 1 down to 0 across the lap. It goes out as the alpha and nowhere else.
+    // Unframed water has no lap and stays at 1. The fade runs River Fade To Pool Distance metres
+    // back from the lip, held to the lap's own length so it can never outrun the lap it is drawn on
+    // and leave a step where the gradient stops short of the water's body. River Fade To Pool
+    // Intensity bends that ramp: 1 even, higher comes in later and harder, lower sooner.
+    float lapLength = framed ? EdgeData.w : 0.0;
+    if (lapLength > 0.0001)
+    {
+        float fromLip = saturate(FlowData.z) * lapLength;
+        Fade = saturate(fromLip / clamp(_RiverEdgeRippleRiverFadeToPoolDistance, 0.0001, lapLength));
+        Fade = pow(Fade, max(_RiverEdgeRippleRiverFadeToPoolIntensity, 0.01));
+    }
+
+// ═══ LevelSelectRiverTuner.cs — help box ═══
+        // The one thing in the effect that is NOT a global. Where two waters lap over each other
+        // is geometry, so it is authored on the world and needs a rebuild — saying so here is
+        // what stops it being hunted for among the sliders above.
+        EditorGUILayout.LabelField("Where Two Waters Meet", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            "How far a pool's water laps over each river that meets it is GEOMETRY — Water " +
+            "Pool Overlap in the Level Select Designer's Aesthetics section, applied by " +
+            "Rebuild Runs. " +
+            "How far back from the lip the alpha gradient runs is River Fade To Pool Distance above, in " +
+            "metres — never longer than the lap that was built. Which water draws on top is " +
+            "each water's Sorting Group.",
+            MessageType.None);

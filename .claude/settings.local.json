@@ -55,7 +55,10 @@
       "PowerShell(git fetch origin)",
       "Bash(cd C:/Users/tomdh/Waves *)",
       "Bash(python __TRACKED_VAR__/gen_bands.py)",
-      "Bash(python fog_3d.py)"
+      "Bash(python fog_3d.py)",
+      "Read(//c/Users/tomdh/.claude/projects/C--Users-tomdh-Waves/memory/**)",
+      "Bash(sed -i 's#^- \\\\[Level Select Walls\\\\]\\(project_level_select_walls.md\\).*#&\\\\n- [Grid Designer bake plan]\\(project_grid_designer_bake_plan.md\\) — LevelSpawner to be retired; grid will bake like Level Select \\(fresh session\\). One-mesh walls = new grid wall TYPE#' MEMORY.md)",
+      "Bash(sed -i 's#One-mesh walls = new grid wall TYPE#PWalls \\(one-mesh grid wall type\\) ON HOLD until then#' MEMORY.md)"
     ]
   }
 }

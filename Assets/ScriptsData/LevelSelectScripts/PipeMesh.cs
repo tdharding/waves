@@ -37,6 +37,63 @@ public class PipeMesh : MonoBehaviour
         public float along;
     }
 
+    /// <summary>Round the hub's ring, and round a soul juice tank's hubs, tap and intake.</summary>
+    public const int HubSides = 12;
+
+    /// <summary>
+    /// A hub on the pipe, in the pipe's frame: a sleeve round the pipe at <see cref="centre"/>, and
+    /// a ring standing out of it at a right angle along <see cref="ringDir"/>, which a soul juice
+    /// tank's intake goes into.
+    /// </summary>
+    public struct Hub
+    {
+        public Vector3 centre;
+        public Vector3 axis;      // the way the pipe runs through the hub
+        public Vector3 ringDir;   // the way the ring stands out, square to the axis
+        public float   sleeveRadius;
+        public float   sleeveThickness;
+        public float   ringRadius;
+        public float   ringThickness;
+
+        /// <summary>The middle of the ring's flat face.</summary>
+        public Vector3 RingFace => centre + ringDir * (Mathf.Max(0.001f, sleeveRadius) + Mathf.Max(0f, ringThickness));
+    }
+
+    /// <summary>
+    /// The way the pipe runs through node <paramref name="i"/>: from the node before it to the
+    /// node after it, or along the one leg at an end.
+    /// </summary>
+    public static Vector3 AxisAt(IList<Vector3> nodes, int i)
+    {
+        if (nodes == null || nodes.Count < 2) return Vector3.right;
+        Vector3 a = nodes[Mathf.Max(0, i - 1)], b = nodes[Mathf.Min(nodes.Count - 1, i + 1)];
+        Vector3 d = b - a;
+        return d.sqrMagnitude > 1e-10f ? d.normalized : Vector3.right;
+    }
+
+    /// <summary>
+    /// The nodes with a lead-in put either side of each node in <paramref name="leadIns"/>, by
+    /// <paramref name="distances"/>, along <see cref="AxisAt"/> — so the pipe runs straight
+    /// through those nodes and bends at the lead-ins instead. An end node gets only the one on
+    /// the pipe's side.
+    /// </summary>
+    public static List<Vector3> WithLeadIns(IList<Vector3> nodes, IList<int> leadIns, IList<float> distances)
+    {
+        var line = new List<Vector3>(nodes.Count + 2 * (leadIns?.Count ?? 0));
+        for (int i = 0; i < nodes.Count; i++)
+        {
+            int at = leadIns != null ? leadIns.IndexOf(i) : -1;
+            if (at < 0) { line.Add(nodes[i]); continue; }
+
+            Vector3 axis = AxisAt(nodes, i);
+            float   d    = Mathf.Max(0f, distances[at]);
+            if (i > 0)               line.Add(nodes[i] - axis * d);
+            line.Add(nodes[i]);
+            if (i < nodes.Count - 1) line.Add(nodes[i] + axis * d);
+        }
+        return line;
+    }
+
     /// <summary>
     /// The centre line of a pipe through <paramref name="nodes"/>, rounded at every node between
     /// its two ends. Each bend is cut into <see cref="BendSteps"/> pieces. Its radius is
@@ -121,25 +178,62 @@ public class PipeMesh : MonoBehaviour
     /// and the stem. The bend radius follows the pipe's thickness.
     ///
     /// Comes out carrying the river run stone shading — see <see cref="RiverMeshBuilder.ShadeAsStone"/>.
+    ///
+    /// <paramref name="lineNodes"/>, when given, is what the centre line is drawn through instead
+    /// of the nodes — the nodes with each hub's lead-ins put in. Supports still stand on the
+    /// nodes' own legs. <paramref name="hubs"/> are built on the pipe as they come.
     /// </summary>
     public static Mesh Build(IList<Vector3> nodes, IList<Support> supports,
                              float pipeThickness, float wallThickness,
-                             float supportThickness, float ringOverhang, float bottomY)
+                             float supportThickness, float ringOverhang, float bottomY,
+                             RiverRunShadingSettings shading = null,
+                             IList<Vector3> lineNodes = null, IList<Hub> hubs = null)
     {
         var verts = new List<Vector3>();
         var norms = new List<Vector3>();
         var tris  = new List<int>();
         var parts = new List<int>();
 
+        // The stone each part takes, as the Run Shading Tuner's Pipes section says.
+        var kinds = new List<float>();
+        StoneFaceKind Choice(System.Func<RiverRunShadingSettings, StoneFaceKind> pick) =>
+            shading != null ? pick(shading) : StoneFaceKind.Auto;
+
         float outer = Mathf.Max(0.005f, pipeThickness * 0.5f);
         float inner = outer - Mathf.Max(0f, wallThickness);
         float stemR = Mathf.Max(0.0025f, supportThickness * 0.5f);
 
-        var line = CentreLine(nodes, outer * 2f);
+        var line = CentreLine(lineNodes ?? nodes, outer * 2f);
         if (line.Count >= 2)
         {
-            AppendTube(verts, norms, tris, line, outer, inner);
+            AppendTube(verts, norms, tris, line, outer, inner,
+                       kinds, Choice(s => s.pipeOutside), Choice(s => s.pipeInside));
             StoneFaces.Part(parts, tris, 0);
+            PartLabels.Mark("Pipe", verts, tris);
+
+            if (hubs != null)
+            {
+                foreach (var hub in hubs)
+                {
+                    Vector3 axis = hub.axis.sqrMagnitude > 1e-8f ? hub.axis.normalized : Vector3.right;
+                    float   sr   = Mathf.Max(0.001f, hub.sleeveRadius);
+
+                    AppendRing(verts, norms, tris, hub.centre, axis, outer, sr, Mathf.Max(0.0005f, hub.sleeveThickness * 0.5f));
+                    StoneFaces.Tag(kinds, tris, Choice(s => s.pipeHubSleeve));
+                    StoneFaces.Part(parts, tris, 3);
+                    PartLabels.Mark("Hub Sleeve", verts, tris);
+
+                    // Out of the sleeve at a right angle, from just under the sleeve's surface at
+                    // the ring's edge, so no gap shows round its foot.
+                    float rr   = Mathf.Max(0.001f, hub.ringRadius);
+                    float foot = Mathf.Sqrt(Mathf.Max(0f, sr * sr - rr * rr)) * 0.95f;
+                    var   ring = new List<Vector3> { hub.centre + hub.ringDir * foot, hub.RingFace };
+                    AppendTube(verts, norms, tris, ring, rr, 0f,
+                               kinds, Choice(s => s.pipeHubRing), Choice(s => s.pipeHubRing), HubSides);
+                    StoneFaces.Part(parts, tris, 4);
+                    PartLabels.Mark("Hub Ring", verts, tris);
+                }
+            }
 
             if (supports != null)
             {
@@ -150,7 +244,9 @@ public class PipeMesh : MonoBehaviour
                     if (ringOverhang > 0.0001f)
                     {
                         AppendRing(verts, norms, tris, at, along, outer, outer + ringOverhang, stemR);
+                        StoneFaces.Tag(kinds, tris, Choice(s => s.pipeRings));
                         StoneFaces.Part(parts, tris, 1);
+                        PartLabels.Mark("Ring", verts, tris);
                     }
 
                     // Up to the underside of the pipe; the ring covers the join. A pipe on a slope
@@ -160,7 +256,9 @@ public class PipeMesh : MonoBehaviour
                     if (top > bottomY)
                     {
                         AppendStem(verts, norms, tris, new Vector3(at.x, bottomY, at.z), top - bottomY, stemR);
+                        StoneFaces.Tag(kinds, tris, Choice(s => s.pipeStems));
                         StoneFaces.Part(parts, tris, 2);
+                        PartLabels.Mark("Support", verts, tris);
                     }
                 }
             }
@@ -174,7 +272,8 @@ public class PipeMesh : MonoBehaviour
         mesh.RecalculateBounds();
 
         // River run stone shading, the waterline placed off the rim top at y = 0.
-        return RiverMeshBuilder.ShadeAsStone(mesh, 0f, 0f, null, parts);
+        return RiverMeshBuilder.ShadeAsStone(mesh, 0f, 0f, kinds, parts,
+                                             designation: StoneDesignation.Pipes);
     }
 
     /// <summary>
@@ -240,8 +339,10 @@ public class PipeMesh : MonoBehaviour
     }
 
     // ── The pipe: an outside, an inside, and a flat ring closing each open end ──
-    static void AppendTube(List<Vector3> verts, List<Vector3> norms, List<int> tris,
-                           List<Vector3> line, float outer, float inner)
+    internal static void AppendTube(List<Vector3> verts, List<Vector3> norms, List<int> tris,
+                           List<Vector3> line, float outer, float inner,
+                           List<float> kinds, StoneFaceKind outsideKind, StoneFaceKind insideKind,
+                           int sides = PipeSides)
     {
         int count = line.Count;
 
@@ -267,38 +368,54 @@ public class PipeMesh : MonoBehaviour
 
         bool hollow = inner > 0.001f;
 
+        // The outside all the way along, then the inside, so each can take its own stone.
         for (int i = 0; i < count - 1; i++)
         {
-            for (int k = 0; k < PipeSides; k++)
+            for (int k = 0; k < sides; k++)
             {
-                Vector3 n0a = Around(tangents[i],     ups[i],     k),     n0b = Around(tangents[i],     ups[i],     k + 1);
-                Vector3 n1a = Around(tangents[i + 1], ups[i + 1], k),     n1b = Around(tangents[i + 1], ups[i + 1], k + 1);
+                Vector3 n0a = Around(tangents[i],     ups[i],     k, sides), n0b = Around(tangents[i],     ups[i],     k + 1, sides);
+                Vector3 n1a = Around(tangents[i + 1], ups[i + 1], k, sides), n1b = Around(tangents[i + 1], ups[i + 1], k + 1, sides);
 
                 Quad(verts, norms, tris,
                      line[i] + n0a * outer, line[i] + n0b * outer,
                      line[i + 1] + n1b * outer, line[i + 1] + n1a * outer,
                      n0a, n0b, n1b, n1a);
+            }
+        }
+        StoneFaces.Tag(kinds, tris, outsideKind);
 
-                if (hollow)
+        if (hollow)
+        {
+            for (int i = 0; i < count - 1; i++)
+            {
+                for (int k = 0; k < sides; k++)
+                {
+                    Vector3 n0a = Around(tangents[i],     ups[i],     k, sides), n0b = Around(tangents[i],     ups[i],     k + 1, sides);
+                    Vector3 n1a = Around(tangents[i + 1], ups[i + 1], k, sides), n1b = Around(tangents[i + 1], ups[i + 1], k + 1, sides);
+
                     Quad(verts, norms, tris,
                          line[i] + n0a * inner, line[i] + n0b * inner,
                          line[i + 1] + n1b * inner, line[i + 1] + n1a * inner,
                          -n0a, -n0b, -n1b, -n1a);
+                }
             }
+            StoneFaces.Tag(kinds, tris, insideKind);
         }
 
-        EndFace(verts, norms, tris, line[0],         -tangents[0],         tangents[0],         ups[0],         outer, inner);
-        EndFace(verts, norms, tris, line[count - 1],  tangents[count - 1], tangents[count - 1], ups[count - 1], outer, inner);
+        // The flat ends take the outside's stone.
+        EndFace(verts, norms, tris, line[0],         -tangents[0],         tangents[0],         ups[0],         outer, inner, sides);
+        EndFace(verts, norms, tris, line[count - 1],  tangents[count - 1], tangents[count - 1], ups[count - 1], outer, inner, sides);
+        StoneFaces.Tag(kinds, tris, outsideKind);
     }
 
     // The flat end of the pipe: a ring between the outside and inside, or a disc when solid.
     static void EndFace(List<Vector3> verts, List<Vector3> norms, List<int> tris,
                         Vector3 centre, Vector3 facing, Vector3 tangent, Vector3 up,
-                        float outer, float inner)
+                        float outer, float inner, int sides)
     {
-        for (int k = 0; k < PipeSides; k++)
+        for (int k = 0; k < sides; k++)
         {
-            Vector3 a = Around(tangent, up, k), b = Around(tangent, up, k + 1);
+            Vector3 a = Around(tangent, up, k, sides), b = Around(tangent, up, k + 1, sides);
             if (inner > 0.001f)
                 Quad(verts, norms, tris,
                      centre + a * inner, centre + b * inner, centre + b * outer, centre + a * outer,
@@ -362,9 +479,9 @@ public class PipeMesh : MonoBehaviour
     // The direction out from the centre to corner k of the pipe's cross-section. The corners
     // start at straight up, so no flat of a level pipe faces straight up — a dead-flat face
     // would read to the stone shading as a rim and draw a seam down the pipe.
-    static Vector3 Around(Vector3 tangent, Vector3 up, int k)
+    static Vector3 Around(Vector3 tangent, Vector3 up, int k, int sides = PipeSides)
     {
-        float   a    = k * Mathf.PI * 2f / PipeSides;
+        float   a    = k * Mathf.PI * 2f / sides;
         Vector3 side = Vector3.Cross(tangent, up);
         return up * Mathf.Cos(a) + side * Mathf.Sin(a);
     }

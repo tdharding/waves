@@ -373,6 +373,9 @@ public partial class LevelSelectDesignerWindow
                 Handles.DrawSolidDisc(centre, Vector3.forward, s.perch.perchRadius * _zoom);
             }
 
+            // Fog Zones mode draws these itself, over the zone sheets.
+            if (_mode != DesignerMode.FogZone) DrawStructureFogRepel(s, centre, selected);
+
             float inset = StructureWallInset(s);
             Handles.color = body;
             if (IsRound(s)) Handles.DrawSolidDisc(centre, Vector3.forward, Mathf.Max(3f, s.radius * _zoom));
@@ -416,6 +419,39 @@ public partial class LevelSelectDesignerWindow
 
             Handles.color = new Color(0.12f, 0.12f, 0.12f, 1f);
             Handles.DrawSolidDisc(centre, Vector3.forward, 2.5f);
+        }
+    }
+
+    /// <summary>Every structure's fog repel circle on its own — Fog Zones mode draws these over the sheets.</summary>
+    private void DrawStructureFogRepelCircles()
+    {
+        if (Event.current.type != EventType.Repaint) return;
+        if (_data?.structures == null) return;
+
+        foreach (var s in _data.structures)
+        {
+            if (s == null) continue;
+            DrawStructureFogRepel(s, WorldToCanvas(new Vector3(s.positionXZ.x, 0f, s.positionXZ.y)),
+                                  s.structureId == _selectedStructureId);
+        }
+    }
+
+    // The radius fog is held off from — Fog Repeller's own size or its Override Radius.
+    private void DrawStructureFogRepel(LevelSelectDesignerData.DesignerStructure s, Vector2 centre, bool selected)
+    {
+        if (!s.fogRepel || !LevelSelectDesignerSettings.ShowFogRepelRadius) return;
+
+        float r = StructureFogRadius(s) * _zoom;
+        Handles.color = selected ? LevelSelectDesignerSettings.FogRepelSelFillColour
+                                 : LevelSelectDesignerSettings.FogRepelFillColour;
+        Handles.DrawSolidDisc(centre, Vector3.forward, r);
+
+        float edge = LevelSelectDesignerSettings.FogRepelEdgeWidth;
+        if (edge > 0f)
+        {
+            Handles.color = selected ? LevelSelectDesignerSettings.FogRepelSelEdgeColour
+                                     : LevelSelectDesignerSettings.FogRepelEdgeColour;
+            DrawThickCircle(centre, r, edge);
         }
     }
 
@@ -587,9 +623,91 @@ public partial class LevelSelectDesignerWindow
             RebuildAfterTowerEdit(s, () => RebuildStructure(s));
         }
 
+        if (OcclusionToggle(ref s.occlusion, ref s.occlusionStyle)) RebuildStructure(s);
+
+        DrawStructureFogRepelFields(s);
+
         if (s.top == LevelSelectDesignerData.StructureTop.Outpost)
             DrawStructureOutpostFields(s);
     }
+
+    /// <summary>
+    /// Fog Repeller, and its Override Radius. Not overridden, the radius field shows (greyed) the
+    /// structure's own size, which is what it pushes from. Only the repeller is redone — no rebuild.
+    /// </summary>
+    private void DrawStructureFogRepelFields(LevelSelectDesignerData.DesignerStructure s)
+    {
+        EditorGUI.BeginChangeCheck();
+
+        bool repel = EditorGUILayout.Toggle(
+            new GUIContent("Fog Repeller", "Pushes fog away from it, as a spike does — the FogMap's Rock numbers."),
+            s.fogRepel);
+
+        bool  over   = s.fogRepelOverride;
+        float radius = s.fogRepelRadius;
+        if (repel)
+        {
+            EditorGUI.indentLevel++;
+            over = EditorGUILayout.Toggle(
+                new GUIContent("Override Radius", "Push from the radius below instead of the structure's own size."),
+                s.fogRepelOverride);
+
+            // Ticking it starts from the size it was pushing from.
+            if (over && !s.fogRepelOverride) radius = StructureReach(s);
+
+            using (new EditorGUI.DisabledScope(!over))
+                radius = EditorGUILayout.FloatField(
+                    new GUIContent("Radius", "The radius fog is held off from, around its centre."),
+                    over ? radius : StructureReach(s));
+            EditorGUI.indentLevel--;
+        }
+
+        if (!EditorGUI.EndChangeCheck()) return;
+
+        Undo.RecordObject(_data, "Edit Structure Fog Repeller");
+        s.fogRepel         = repel;
+        s.fogRepelOverride = over;
+        if (over) s.fogRepelRadius = Mathf.Max(0f, radius);
+        MarkDirty();
+
+        var go = FindStructureObject(s.structureId);
+        if (go != null) ApplyStructureFogRepel(s, go);
+    }
+
+    /// <summary>Puts the fog repeller on the structure's object, or takes it off when unticked.</summary>
+    private static void ApplyStructureFogRepel(LevelSelectDesignerData.DesignerStructure s, GameObject go)
+    {
+        var fog = go.GetComponent<StructureFogRepeller>();
+        if (!s.fogRepel)
+        {
+            if (fog != null) Undo.DestroyObjectImmediate(fog);
+            return;
+        }
+
+        if (fog == null) fog = Undo.AddComponent<StructureFogRepeller>(go);
+        Undo.RecordObject(fog, "Edit Structure Fog Repeller");
+        fog.Configure(StructureFogRadius(s), StructureLocalCentre(s), StructureFogTop(s, go));
+        EditorUtility.SetDirty(fog);
+    }
+
+    /// <summary>
+    /// How far its top stands above the ground under its centre: its own mesh (floor, wall,
+    /// columns and a merged lollipop), or a turret on top, whichever reaches higher.
+    /// </summary>
+    private static float StructureFogTop(LevelSelectDesignerData.DesignerStructure s, GameObject go)
+    {
+        float top = s.height;
+        var filter = go.GetComponent<MeshFilter>();
+        if (filter != null && filter.sharedMesh != null) top = Mathf.Max(top, filter.sharedMesh.bounds.max.y);
+
+        float towerTop = StructureTowerTopY(s);
+        foreach (var b in StructureTowerBases(s)) top = Mathf.Max(top, b.y + towerTop);
+        return top;
+    }
+
+    /// <summary>The radius it holds fog off from: the Override Radius when ticked, else its own size.</summary>
+    private static float StructureFogRadius(LevelSelectDesignerData.DesignerStructure s)
+        => s.fogRepelOverride ? s.fogRepelRadius : StructureReach(s);
 
     /// <summary>
     /// The outpost top's preset and its tower's Placement Scale. Everything else is set in the
@@ -720,6 +838,10 @@ public partial class LevelSelectDesignerWindow
             ? bases[0] + Vector3.up * StructureTowerTopY(s)
             : StructureLocalCentre(s) + Vector3.up * s.height;
         ApplyPerch(go, s.perch, tip);
+
+        ApplyOcclusion(go, s.occlusion, s.occlusionStyle);
+
+        ApplyStructureFogRepel(s, go);
     }
 
     /// <summary>Stands it where it belongs — its centre on the landscape under it, turned.</summary>

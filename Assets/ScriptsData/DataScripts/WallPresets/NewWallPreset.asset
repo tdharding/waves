@@ -18,5 +18,6 @@ MonoBehaviour:
     hasLip: 1
     lip:
       height: 3
-      thickness: 4.44
+      thickness: 5.48
       columnRing: 2.22
+      columnSleeve: 1

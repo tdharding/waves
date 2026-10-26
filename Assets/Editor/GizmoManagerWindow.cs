@@ -256,6 +256,21 @@ public class GizmoManagerWindow : EditorWindow
             "cameras only — the Game view and play mode keep it."),
             EditorStyles.toolbarButton, GUILayout.Width(72));
         if (newWhiteFade != SceneViewWhiteFade.Shown) SceneViewWhiteFade.Shown = newWhiteFade;
+        bool newFog = GUILayout.Toggle(SceneViewFogGizmos.Shown, new GUIContent("Fog",
+            "Show the fog's gizmos in the Scene view — every fog repeller, and whichever other " +
+            "layers are ticked in the ▾ beside this."),
+            EditorStyles.toolbarButton, GUILayout.Width(36));
+        if (newFog != SceneViewFogGizmos.Shown) SceneViewFogGizmos.Shown = newFog;
+        Rect fogMenuRect = GUILayoutUtility.GetRect(new GUIContent("▾"), EditorStyles.toolbarDropDown,
+                                                    GUILayout.Width(18));
+        if (GUI.Button(fogMenuRect, new GUIContent("", "Which fog gizmos the Fog button shows."),
+                       EditorStyles.toolbarDropDown))
+            SceneViewFogGizmos.ShowLayerMenu(fogMenuRect);
+        bool newDesignerOverlay = GUILayout.Toggle(LevelSelectDesignerOverlay.Shown, new GUIContent("Designer Overlay",
+            "Select a piece the Level Select Designer generated to see the name of each of its bits " +
+            "written on it. A piece generated before this existed shows nothing until it is generated again."),
+            EditorStyles.toolbarButton, GUILayout.Width(104));
+        if (newDesignerOverlay != LevelSelectDesignerOverlay.Shown) LevelSelectDesignerOverlay.Shown = newDesignerOverlay;
         if (GUILayout.Button("Refresh", EditorStyles.toolbarButton, GUILayout.Width(55))) Refresh();
         EditorGUILayout.EndHorizontal();
 
@@ -441,7 +456,7 @@ public class GizmoManagerWindow : EditorWindow
 
 /// <summary>
 /// The Gizmo Manager's White Fade toggle. Off, every Scene view camera renders with the White Fade
-/// switched off — both rings at no opacity and the bottom gradient pushed out of the world — and
+/// switched off — the fade at no opacity and the bottom gradient pushed out of the world — and
 /// the real numbers go straight back after it, so the Game view, play mode and builds never see
 /// the difference. Nothing is written to the preset or the scene; the choice lives in EditorPrefs.
 /// </summary>
@@ -450,8 +465,7 @@ static class SceneViewWhiteFade
 {
     const string ShownKey = "FogTools.GizmoManager.SceneViewWhiteFade";
 
-    static readonly int OuterOpacityId   = Shader.PropertyToID("_WhiteFadeOuterOpacity");
-    static readonly int InnerOpacityId   = Shader.PropertyToID("_WhiteFadeInnerOpacity");
+    static readonly int OpacityId        = Shader.PropertyToID("_WhiteFadeOpacity");
     static readonly int GradientBottomId = Shader.PropertyToID("_WhiteFadeGradientBottom");
 
     // A Gradient Bottom far above the gradient's top at Y = 1 turns the smoothstep round, so the
@@ -459,7 +473,7 @@ static class SceneViewWhiteFade
     const float NoGradientBottom = 1e6f;
 
     static bool  _swapped;
-    static float _savedOuter, _savedInner, _savedBottom;
+    static float _savedOpacity, _savedBottom;
 
     static SceneViewWhiteFade()
     {
@@ -481,21 +495,18 @@ static class SceneViewWhiteFade
     {
         if (_swapped || cam.cameraType != CameraType.SceneView || Shown) return;
 
-        _savedOuter  = Shader.GetGlobalFloat(OuterOpacityId);
-        _savedInner  = Shader.GetGlobalFloat(InnerOpacityId);
-        _savedBottom = Shader.GetGlobalFloat(GradientBottomId);
+        _savedOpacity = Shader.GetGlobalFloat(OpacityId);
+        _savedBottom  = Shader.GetGlobalFloat(GradientBottomId);
         _swapped = true;
 
-        Shader.SetGlobalFloat(OuterOpacityId,   0f);
-        Shader.SetGlobalFloat(InnerOpacityId,   0f);
+        Shader.SetGlobalFloat(OpacityId,        0f);
         Shader.SetGlobalFloat(GradientBottomId, NoGradientBottom);
     }
 
     static void PutBack(ScriptableRenderContext context, Camera cam)
     {
         if (!_swapped) return;
-        Shader.SetGlobalFloat(OuterOpacityId,   _savedOuter);
-        Shader.SetGlobalFloat(InnerOpacityId,   _savedInner);
+        Shader.SetGlobalFloat(OpacityId,        _savedOpacity);
         Shader.SetGlobalFloat(GradientBottomId, _savedBottom);
         _swapped = false;
     }

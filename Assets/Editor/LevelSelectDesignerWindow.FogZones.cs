@@ -14,8 +14,8 @@ using UnityEngine;
 /// is where its sheet is, how high, how soft its edge is, and the box that switches it — see
 /// <see cref="FogZone"/> for the runtime side.
 ///
-/// On the canvas a zone is two squares: the sheet (the stronger fill) and its bounds (the fainter
-/// one). Click inside a sheet to carry the whole zone, sheet and bounds together; click inside
+/// On the canvas a zone is two squares: the sheet (a fill) and its bounds (a line); in the Scene
+/// view, while in Fog Zones mode, the sheet's mesh as a wireframe and the bounds' box. Click inside a sheet to carry the whole zone, sheet and bounds together; click inside
 /// bounds but outside the sheet to carry only the bounds.
 /// </summary>
 public partial class LevelSelectDesignerWindow
@@ -45,6 +45,13 @@ public partial class LevelSelectDesignerWindow
             return;
         }
 
+        if (e.type == EventType.KeyDown && e.keyCode == KeyCode.D && SelectedFogZone != null)
+        {
+            DuplicateSelectedFogZone();
+            e.Use();
+            return;
+        }
+
         if (HandleFogZoneDrag(e)) return;
 
         if (e.type != EventType.MouseDown || e.button != 0) return;
@@ -56,8 +63,9 @@ public partial class LevelSelectDesignerWindow
     }
 
     /// <summary>
-    /// Picks the zone under the mouse and starts carrying it: the smallest sheet containing the
-    /// point carries the whole zone; failing that, the smallest bounds carries only the bounds.
+    /// Picks the zone under the mouse and starts carrying it: a handle under the mouse carries
+    /// its whole zone, ahead of anything else; then the smallest sheet containing the point
+    /// carries the whole zone; failing that, the smallest bounds carries only the bounds.
     /// </summary>
     private bool TryPickFogZone(Event e)
     {
@@ -65,8 +73,14 @@ public partial class LevelSelectDesignerWindow
 
         Vector2 p = CanvasToWorld2D(e.mousePosition);
 
-        var sheetHit = _data.fogZones
-            .Where(z => z != null && SquareContains(z.centreXZ, new Vector2(z.size, z.size), p))
+        var handleHit = _data.fogZones
+            .Where(z => z != null && Vector2.Distance(FogZoneHandleCanvas(z), e.mousePosition) <=
+                                     FogZoneHandleRadius(z) + 2f)
+            .OrderBy(z => Vector2.Distance(FogZoneHandleCanvas(z), e.mousePosition))
+            .FirstOrDefault();
+
+        var sheetHit = handleHit ?? _data.fogZones
+            .Where(z => z != null && SheetContains(z, p))
             .OrderBy(z => z.size)
             .FirstOrDefault();
 
@@ -84,11 +98,21 @@ public partial class LevelSelectDesignerWindow
         _isDraggingFogZone     = true;
         e.Use();
         Repaint();
+        SceneView.RepaintAll();
         return true;
     }
 
-    private static bool SquareContains(Vector2 centre, Vector2 size, Vector2 p) =>
-        Mathf.Abs(p.x - centre.x) <= size.x * 0.5f && Mathf.Abs(p.y - centre.y) <= size.y * 0.5f;
+    private static bool SheetContains(LevelSelectDesignerData.DesignerFogZone zone, Vector2 p) =>
+        zone.shape == FogZoneShape.Circle
+            ? Vector2.Distance(zone.centreXZ, p) <= zone.size * 0.5f
+            : SquareContains(zone.centreXZ, new Vector2(zone.size, zone.size), p, zone.rotation);
+
+    private static bool SquareContains(Vector2 centre, Vector2 size, Vector2 p, float rotation = 0f)
+    {
+        // Into the square's own unturned frame.
+        Vector3 o = Quaternion.Euler(0f, -rotation, 0f) * new Vector3(p.x - centre.x, 0f, p.y - centre.y);
+        return Mathf.Abs(o.x) <= size.x * 0.5f && Mathf.Abs(o.z) <= size.y * 0.5f;
+    }
 
     /// <summary>Moves the carried zone (or its bounds) and lets it go. True when it took the event.</summary>
     private bool HandleFogZoneDrag(Event e)
@@ -152,6 +176,29 @@ public partial class LevelSelectDesignerWindow
         Repaint();
     }
 
+    /// <summary>Copies the selected zone, sheet and bounds, set one sheet-width beside it, and selects the copy.</summary>
+    private void DuplicateSelectedFogZone()
+    {
+        var selected = SelectedFogZone;
+        if (selected == null) return;
+
+        Undo.RecordObject(_data, "Duplicate Fog Zone");
+
+        var     dupe  = selected.Clone();
+        Vector2 shift = new Vector2(selected.size, 0f);
+        dupe.zoneId          = System.Guid.NewGuid().ToString();
+        dupe.centreXZ       += shift;
+        dupe.boundsCentreXZ += shift;
+
+        _data.fogZones.Insert(_data.fogZones.IndexOf(selected) + 1, dupe);
+        _selectedFogZoneId = dupe.zoneId;
+        _isDraggingFogZone = false;
+        MarkDirty();
+        RebuildFogZone(dupe);
+        Repaint();
+        SceneView.RepaintAll();
+    }
+
     private void DeleteFogZone(LevelSelectDesignerData.DesignerFogZone zone)
     {
         if (zone == null) return;
@@ -172,44 +219,180 @@ public partial class LevelSelectDesignerWindow
     // ─────────────────────────────────────────────
 
     /// <summary>
-    /// Each zone's bounds as a faint fill and its sheet as a stronger one, the selected zone
-    /// brighter. Drawn only in Fog Zones mode.
+    /// Each zone's sheet as a fill and its trigger bounds as a line, the selected zone in its
+    /// own colours; both styled in Level Select Settings > Fog Zones. Drawn only in Fog Zones mode.
     /// </summary>
     private void DrawFogZones()
     {
         if (Event.current.type != EventType.Repaint) return;
-        if (_data?.fogZones == null || _data.fogZones.Count == 0) return;
         if (_mode != DesignerMode.FogZone) return;
+
+        // The structures' repel circles go over the sheets, so the zones don't wash them out.
+        if (_data?.fogZones == null || _data.fogZones.Count == 0)
+        {
+            DrawStructureFogRepelCircles();
+            return;
+        }
 
         foreach (var zone in _data.fogZones)
         {
             if (zone == null) continue;
             bool selected = zone.zoneId == _selectedFogZoneId;
 
-            DrawCanvasSquare(zone.boundsCentreXZ, zone.boundsSizeXZ,
-                             new Color(0.55f, 0.75f, 1f, selected ? 0.10f : 0.05f),
-                             new Color(0.55f, 0.75f, 1f, selected ? 0.70f : 0.35f));
+            Color fill = selected ? LevelSelectDesignerSettings.FogZoneSelFillColour : LevelSelectDesignerSettings.FogZoneFillColour;
+            if (zone.shape == FogZoneShape.Circle)
+            {
+                Handles.color = fill;
+                Handles.DrawSolidDisc(FogZoneHandleCanvas(zone), Vector3.forward, zone.size * 0.5f * _zoom);
+            }
+            else
+            {
+                Handles.DrawSolidRectangleWithOutline(
+                    CanvasSquareCorners(zone.centreXZ, new Vector2(zone.size, zone.size), zone.rotation),
+                    fill, Color.clear);
+            }
 
-            DrawCanvasSquare(zone.centreXZ, new Vector2(zone.size, zone.size),
-                             new Color(0.85f, 0.9f, 1f, selected ? 0.35f : 0.20f),
-                             new Color(0.85f, 0.9f, 1f, selected ? 0.90f : 0.50f));
+            var trigger = CanvasSquareCorners(zone.boundsCentreXZ, zone.boundsSizeXZ);
+            Handles.color = selected ? LevelSelectDesignerSettings.FogTriggerSelColour : LevelSelectDesignerSettings.FogTriggerColour;
+            Handles.DrawAAPolyLine(LevelSelectDesignerSettings.FogTriggerWidth,
+                                   trigger[0], trigger[1], trigger[2], trigger[3], trigger[0]);
+            Handles.color = Color.white;
+        }
 
-            Vector2 label = WorldToCanvas(new Vector3(zone.centreXZ.x, 0f, zone.centreXZ.y));
-            Handles.Label(label, FogZoneLabel(zone), EditorStyles.miniLabel);
+        DrawStructureFogRepelCircles();
+
+        // Handles last, over every sheet and bounds, so an overlapped zone can still be grabbed.
+        foreach (var zone in _data.fogZones)
+        {
+            if (zone == null) continue;
+            bool    selected = zone.zoneId == _selectedFogZoneId;
+            Vector2 at       = FogZoneHandleCanvas(zone);
+            float   radius   = FogZoneHandleRadius(zone);
+
+            Handles.color = selected ? LevelSelectDesignerSettings.FogZoneHandleSelColour
+                                     : LevelSelectDesignerSettings.FogZoneHandleColour;
+            Handles.DrawSolidDisc(at, Vector3.forward, radius);
+            Handles.color = Color.white;
+
+            Handles.Label(at + new Vector2(radius + 3f, -7f), FogZoneLabel(zone), EditorStyles.miniLabel);
         }
     }
 
-    private void DrawCanvasSquare(Vector2 centre, Vector2 size, Color fill, Color outline)
+    // The handle sits on the sheet's centre, a fixed size on screen whatever the zoom.
+    private Vector2 FogZoneHandleCanvas(LevelSelectDesignerData.DesignerFogZone zone) =>
+        WorldToCanvas(new Vector3(zone.centreXZ.x, 0f, zone.centreXZ.y));
+
+    private float FogZoneHandleRadius(LevelSelectDesignerData.DesignerFogZone zone) =>
+        zone.zoneId == _selectedFogZoneId ? LevelSelectDesignerSettings.FogZoneHandleSelSize
+                                          : LevelSelectDesignerSettings.FogZoneHandleSize;
+
+    private Vector3[] CanvasSquareCorners(Vector2 centre, Vector2 size, float rotation = 0f)
     {
-        Vector2 h = size * 0.5f;
-        var corners = new Vector3[]
+        Vector2 h    = size * 0.5f;
+        var     turn = Quaternion.Euler(0f, rotation, 0f);
+        var     c    = new Vector3(centre.x, 0f, centre.y);
+        return new Vector3[]
         {
-            WorldToCanvas(new Vector3(centre.x - h.x, 0f, centre.y - h.y)),
-            WorldToCanvas(new Vector3(centre.x - h.x, 0f, centre.y + h.y)),
-            WorldToCanvas(new Vector3(centre.x + h.x, 0f, centre.y + h.y)),
-            WorldToCanvas(new Vector3(centre.x + h.x, 0f, centre.y - h.y)),
+            WorldToCanvas(c + turn * new Vector3(-h.x, 0f, -h.y)),
+            WorldToCanvas(c + turn * new Vector3(-h.x, 0f,  h.y)),
+            WorldToCanvas(c + turn * new Vector3( h.x, 0f,  h.y)),
+            WorldToCanvas(c + turn * new Vector3( h.x, 0f, -h.y)),
         };
-        Handles.DrawSolidRectangleWithOutline(corners, fill, outline);
+    }
+
+    // ─────────────────────────────────────────────
+    // SCENE VIEW
+    // ─────────────────────────────────────────────
+
+    // Each sheet mesh's edges as index pairs, worked out once per mesh rather than every repaint;
+    // the triangle count tells a re-baked mesh from the one the edges came from.
+    private readonly System.Collections.Generic.Dictionary<Mesh, (int tris, int[] edges)> _fogSheetEdges =
+        new System.Collections.Generic.Dictionary<Mesh, (int, int[])>();
+
+    private void FogZoneSceneEnable()  => SceneView.duringSceneGui += DrawFogZonesInScene;
+    private void FogZoneSceneDisable() => SceneView.duringSceneGui -= DrawFogZonesInScene;
+
+    /// <summary>
+    /// While in Fog Zones mode, every zone's sheet mesh as a wireframe in the Scene view, the
+    /// selected zone's in its own colour and with its trigger box as lines. Styled in Level Select
+    /// Settings > Fog Zones.
+    /// </summary>
+    private void DrawFogZonesInScene(SceneView view)
+    {
+        if (Event.current.type != EventType.Repaint) return;
+        if (_mode != DesignerMode.FogZone || _data?.fogZones == null) return;
+
+        var prevMatrix = Handles.matrix;
+        var prevColour = Handles.color;
+
+        foreach (var zone in _data.fogZones)
+        {
+            if (zone == null) continue;
+            var root = FindFogZoneObject(zone.zoneId);
+            if (root == null) continue;
+            bool selected = zone.zoneId == _selectedFogZoneId;
+
+            var sheet = root.transform.Find("Sheet");
+            var filter = sheet != null ? sheet.GetComponent<MeshFilter>() : null;
+            var mesh = filter != null ? filter.sharedMesh : null;
+            if (mesh != null)
+            {
+                Handles.matrix = sheet.localToWorldMatrix;
+                Handles.color  = selected ? LevelSelectDesignerSettings.FogSceneMeshSelColour
+                                          : LevelSelectDesignerSettings.FogSceneMeshColour;
+                Handles.DrawLines(mesh.vertices, FogSheetEdges(mesh));
+            }
+
+            // The bounds' box only for the selected zone.
+            var box = selected ? root.GetComponent<BoxCollider>() : null;
+            if (box != null)
+            {
+                Handles.matrix = root.transform.localToWorldMatrix;
+                Handles.color  = LevelSelectDesignerSettings.FogTriggerSelColour;
+                DrawWireBox(box.center, box.size, LevelSelectDesignerSettings.FogTriggerWidth);
+            }
+        }
+
+        Handles.matrix = prevMatrix;
+        Handles.color  = prevColour;
+    }
+
+    private int[] FogSheetEdges(Mesh mesh)
+    {
+        int[] tris = mesh.triangles;
+        if (_fogSheetEdges.TryGetValue(mesh, out var held) && held.tris == tris.Length) return held.edges;
+
+        // Each shared edge once, however many triangles it borders.
+        var seen  = new System.Collections.Generic.HashSet<long>();
+        var edges = new System.Collections.Generic.List<int>(tris.Length * 2);
+        for (int t = 0; t < tris.Length; t += 3)
+            for (int k = 0; k < 3; k++)
+            {
+                int a = tris[t + k], b = tris[t + (k + 1) % 3];
+                long key = a < b ? ((long)a << 32) | (uint)b : ((long)b << 32) | (uint)a;
+                if (!seen.Add(key)) continue;
+                edges.Add(a);
+                edges.Add(b);
+            }
+
+        var result = edges.ToArray();
+        _fogSheetEdges[mesh] = (tris.Length, result);
+        return result;
+    }
+
+    private static void DrawWireBox(Vector3 centre, Vector3 size, float thickness)
+    {
+        Vector3 h = size * 0.5f;
+        Vector3 C(float x, float y, float z) => centre + new Vector3(h.x * x, h.y * y, h.z * z);
+        Vector3[] lo = { C(-1, -1, -1), C(-1, -1, 1), C(1, -1, 1), C(1, -1, -1) };
+        Vector3[] hi = { C(-1,  1, -1), C(-1,  1, 1), C(1,  1, 1), C(1,  1, -1) };
+        for (int i = 0; i < 4; i++)
+        {
+            int j = (i + 1) % 4;
+            Handles.DrawLine(lo[i], lo[j], thickness);
+            Handles.DrawLine(hi[i], hi[j], thickness);
+            Handles.DrawLine(lo[i], hi[i], thickness);
+        }
     }
 
     private string FogZoneLabel(LevelSelectDesignerData.DesignerFogZone zone) =>
@@ -224,10 +407,11 @@ public partial class LevelSelectDesignerWindow
     {
         EditorGUILayout.Space(4);
         EditorGUILayout.LabelField("Fog Zones", EditorStyles.boldLabel);
-        EditorGUILayout.LabelField("Click the canvas to drop one. The strong square is the fog " +
-                                   "sheet, the faint one its bounds — the boat inside the bounds " +
-                                   "shows the sheet. Drag a sheet to carry the whole zone, drag " +
-                                   "bounds outside the sheet to move only the bounds. Every sheet " +
+        EditorGUILayout.LabelField("Click the canvas to drop one. The filled shape is the fog " +
+                                   "sheet, the outlined square its bounds — the boat inside the bounds " +
+                                   "shows the sheet. Drag a sheet's centre handle (or the sheet) to " +
+                                   "carry the whole zone, drag bounds outside the sheet to move only " +
+                                   "the bounds. D duplicates the selected zone. Every sheet " +
                                    "shows the same fog; the Fog Map and Fade Time are in Setup > Fog.",
                                    EditorStyles.wordWrappedMiniLabel);
 
@@ -261,6 +445,7 @@ public partial class LevelSelectDesignerWindow
                 {
                     _selectedFogZoneId = open ? null : zone.zoneId;
                     Repaint();
+                    SceneView.RepaintAll();
                 }
                 if (GUILayout.Button("×", EditorStyles.miniButton, GUILayout.Width(22f)))
                     toDelete = zone;
@@ -284,21 +469,47 @@ public partial class LevelSelectDesignerWindow
 
     private void DrawFogZoneFields(LevelSelectDesignerData.DesignerFogZone zone)
     {
+        EditorGUILayout.LabelField("Sheet", EditorStyles.miniBoldLabel);
+
+        // A dropdown, so it rebuilds at once rather than after the Rebuild Delay.
+        EditorGUI.BeginChangeCheck();
+        var shape = (FogZoneShape)EditorGUILayout.EnumPopup(
+            new GUIContent("Shape", "The fog sheet's outline: a circle or a square."), zone.shape);
+        if (EditorGUI.EndChangeCheck())
+        {
+            Undo.RecordObject(_data, "Fog Zone Shape");
+            zone.shape = shape;
+            MarkDirty();
+            RebuildFogZone(zone);
+            Repaint();
+            SceneView.RepaintAll();
+        }
+
+        bool round = zone.shape == FogZoneShape.Circle;
+
         EditorGUI.BeginChangeCheck();
 
-        EditorGUILayout.LabelField("Sheet", EditorStyles.miniBoldLabel);
         Vector2 centre = EditorGUILayout.Vector2Field(
             new GUIContent("Centre", "Centre of the fog sheet on the map, world X and Z."), zone.centreXZ);
         float size = Mathf.Max(0.1f, EditorGUILayout.FloatField(
-            new GUIContent("Size", "Width of the square fog sheet, in world units."), zone.size));
+            new GUIContent("Size", round ? "Diameter of the round fog sheet, in world units."
+                                         : "Width of the square fog sheet, in world units."), zone.size));
+        // A circle looks the same at any turn, so only a square shows it.
+        float rotation = !round ? EditorGUILayout.Slider(
+            new GUIContent("Rotation", "How far the sheet is turned round its centre, in degrees. " +
+                                       "The bounds stay square to the map."),
+            zone.rotation, -180f, 180f) : zone.rotation;
         float height = EditorGUILayout.FloatField(
             new GUIContent("Height", "How far this sheet hovers above the landscape surface."), zone.height);
         float edgeFade = Mathf.Max(0f, EditorGUILayout.FloatField(
             new GUIContent("Edge Fade", "How far in from the sheet's edge the fog fades to nothing, " +
                                         "in world units. 0 = a hard edge."), zone.edgeFade));
         int subdivisions = EditorGUILayout.IntSlider(
-            new GUIContent("Subdivisions", "How many squares this sheet is divided into along a side. " +
-                                           "Only matters once Landscape Influence is above 0."),
+            new GUIContent(round ? "Rings" : "Subdivisions",
+                           round ? "How many rings this sheet is divided into from its centre out to " +
+                                   "its rim. Only matters once Landscape Influence is above 0."
+                                 : "How many squares this sheet is divided into along a side. " +
+                                   "Only matters once Landscape Influence is above 0."),
             zone.subdivisions, 1, 64);
         float landscapeInfluence = EditorGUILayout.Slider(
             new GUIContent("Landscape Influence", "How much this sheet follows the landscape under it. " +
@@ -323,6 +534,7 @@ public partial class LevelSelectDesignerWindow
             Undo.RecordObject(_data, "Edit Fog Zone");
             zone.centreXZ       = centre;
             zone.size           = size;
+            zone.rotation       = rotation;
             zone.height         = height;
             zone.edgeFade       = edgeFade;
             zone.subdivisions       = subdivisions;
@@ -501,6 +713,7 @@ public partial class LevelSelectDesignerWindow
         so.FindProperty("matchWavePlaneCentre").boolValue = false;
         so.FindProperty("waterlineY").floatValue          = surfaceY;
         so.FindProperty("heightOffset").floatValue        = zone.height;
+        so.FindProperty("circular").boolValue             = zone.shape == FogZoneShape.Circle;
         so.FindProperty("bakedMesh").objectReferenceValue = BakeFogZoneSheetMesh(zone, surfaceY);
         so.ApplyModifiedProperties();
         sheet.Generate();
@@ -510,14 +723,15 @@ public partial class LevelSelectDesignerWindow
         var fz = root.GetComponent<FogZone>();
         if (fz == null) fz = Undo.AddComponent<FogZone>(root);
         Undo.RecordObject(fz, "Configure Fog Zone");
-        fz.Configure(mr, box, zone.size, zone.edgeFade, _data.fogZoneFadeTime);
+        fz.Configure(mr, box, zone.size, zone.edgeFade, _data.fogZoneFadeTime, zone.shape);
         EditorUtility.SetDirty(fz);
     }
 
     /// <summary>
     /// The zone's sheet, shaped by the zone's own settings and saved to Generated: a grid of
-    /// Subdivisions squares bent by Landscape Influence to follow the ground's rise and fall from
-    /// the zone's centre, then given Smoothing passes.
+    /// Subdivisions squares (a square sheet) or that many rings out from the centre (a round one),
+    /// bent by Landscape Influence to follow the ground's rise and fall from the zone's centre,
+    /// then given Smoothing passes.
     ///
     /// The ground is the smooth landscape height — hills and the river lift, not the rocky noise,
     /// which sampled this coarsely would only come out as random spikes.
@@ -526,7 +740,9 @@ public partial class LevelSelectDesignerWindow
     {
         int     subs    = Mathf.Clamp(zone.subdivisions, 1, 64);
         int     rows    = subs + 1;
-        var     heights = new float[rows * rows];
+        bool    round   = zone.shape == FogZoneShape.Circle;
+        int     segs    = FogSheetMesh.CircleSegments(subs);
+        var     heights = new float[round ? 1 + subs * segs : rows * rows];
         float   pull    = Mathf.Clamp01(zone.landscapeInfluence);
 
         if (pull > 0f)
@@ -538,14 +754,17 @@ public partial class LevelSelectDesignerWindow
             float globalHeight = tool != null ? tool.heightMultiplier : 1f;
 
             // Points marked Omit from Fog are left out, so the sheet doesn't rise or dip over them.
-            var hills = _data.hillPoints.FindAll(hp => !hp.omitFromFog);
+            var hills = ActiveHillPoints.FindAll(hp => !hp.omitFromFog);
 
             var ground = LandscapeHillHeight.BuildSurface(
                 hills, globalHeight, _data.landscapeNoiseScale,
                 tool != null ? tool.riverEdgePoints   : null,
                 tool != null ? tool.riverEdgeReach    : null,
                 tool != null ? tool.riverEdgeStrength : null,
-                tool != null ? tool.riverEdgeShelf    : null);
+                tool != null ? tool.riverEdgeShelf    : null,
+                null, null,
+                tool != null ? tool.maps              : null,
+                tool != null ? tool.mapArea           : default);
 
             // Measured from the ground at the zone's centre, not from the landscape base: the
             // sheet stays at its Height where it was put and only bends with the ground round
@@ -553,20 +772,39 @@ public partial class LevelSelectDesignerWindow
             // rise to a river rim) lifted the whole sheet off with it.
             float centreGround = ground.SmoothHeight(zone.centreXZ, surfaceY);
 
-            // Same grid, same order as FogSheetMesh.BuildMesh lays its points.
-            float step = zone.size / subs;
-            float half = zone.size * 0.5f;
-            for (int y = 0; y < rows; y++)
-            for (int x = 0; x < rows; x++)
+            if (round)
             {
-                var xz = zone.centreXZ + new Vector2(x * step - half, y * step - half);
-                heights[y * rows + x] = pull * (ground.SmoothHeight(xz, surfaceY) - centreGround);
-            }
+                // Same rings, same order as FogSheetMesh.BuildCircleMesh lays its points.
+                for (int k = 0; k <= subs; k++)
+                for (int s = 0; s < (k == 0 ? 1 : segs); s++)
+                {
+                    var xz = zone.centreXZ + FogSheetMesh.CirclePoint(k, s, subs, zone.size);
+                    heights[k == 0 ? 0 : 1 + (k - 1) * segs + s] =
+                        pull * (ground.SmoothHeight(xz, surfaceY) - centreGround);
+                }
 
-            SmoothFogSheetHeights(heights, rows, Mathf.Max(0, zone.smoothing));
+                SmoothRoundFogSheetHeights(heights, subs, segs, Mathf.Max(0, zone.smoothing));
+            }
+            else
+            {
+                // Same grid, same order and same turn as FogSheetMesh.BuildMesh lays its points.
+                float step = zone.size / subs;
+                float half = zone.size * 0.5f;
+                var   turn = Quaternion.Euler(0f, zone.rotation, 0f);
+                for (int y = 0; y < rows; y++)
+                for (int x = 0; x < rows; x++)
+                {
+                    Vector3 o  = turn * new Vector3(x * step - half, 0f, y * step - half);
+                    var     xz = zone.centreXZ + new Vector2(o.x, o.z);
+                    heights[y * rows + x] = pull * (ground.SmoothHeight(xz, surfaceY) - centreGround);
+                }
+
+                SmoothFogSheetHeights(heights, rows, Mathf.Max(0, zone.smoothing));
+            }
         }
 
-        var mesh = FogSheetMesh.BuildMesh(subs, zone.size, heights);
+        var mesh = round ? FogSheetMesh.BuildCircleMesh(subs, zone.size, heights)
+                         : FogSheetMesh.BuildMesh(subs, zone.size, heights, zone.rotation);
         return SaveGeneratedMesh($"FogZoneSheet_{SanitiseAssetName(zone.zoneId)}", mesh);
     }
 
@@ -591,6 +829,36 @@ public partial class LevelSelectDesignerWindow
 
                 float h = heights[y * rows + x];
                 next[y * rows + x] = n > 0 ? h + 0.5f * (sum / n - h) : h;
+            }
+            System.Array.Copy(next, heights, heights.Length);
+        }
+    }
+
+    /// <summary>
+    /// The same mesh smoothing on a round sheet: a point's neighbours are the points either side
+    /// round its ring and the ones in and out along its spoke. The centre's are the whole first
+    /// ring; the rim has no ring outside it.
+    /// </summary>
+    private static void SmoothRoundFogSheetHeights(float[] heights, int rings, int segs, int passes)
+    {
+        int Index(int k, int s) => k == 0 ? 0 : 1 + (k - 1) * segs + (s + segs) % segs;
+
+        var next = new float[heights.Length];
+        for (int pass = 0; pass < passes; pass++)
+        {
+            float ring1 = 0f;
+            for (int s = 0; s < segs; s++) ring1 += heights[Index(1, s)];
+            next[0] = heights[0] + 0.5f * (ring1 / segs - heights[0]);
+
+            for (int k = 1; k <= rings; k++)
+            for (int s = 0; s < segs; s++)
+            {
+                float sum = heights[Index(k, s - 1)] + heights[Index(k, s + 1)] + heights[Index(k - 1, s)];
+                int   n   = 3;
+                if (k < rings) { sum += heights[Index(k + 1, s)]; n++; }
+
+                float h = heights[Index(k, s)];
+                next[Index(k, s)] = h + 0.5f * (sum / n - h);
             }
             System.Array.Copy(next, heights, heights.Length);
         }

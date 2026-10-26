@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 140aa0c3959c1b74db7cd20e86d2e141, type: 3}
+  m_Name: LevelSelectWorld2_Characters
+  m_EditorClassIdentifier: Assembly-CSharp::NPCCharacterRegistry
+  characters:
+  - id: a074e994650c488fb15fa5f552978aed
+    name: ObserverManNPC
+    prefab: {fileID: 4520437846662488807, guid: 539b8b6504d2e1a4d97ecaf2daff3be2, type: 3}
+  - id: 8cd22e0c356049e0b1b0920cbde4a963
+    name: bob
+    prefab: {fileID: 4520437846662488807, guid: 539b8b6504d2e1a4d97ecaf2daff3be2, type: 3}

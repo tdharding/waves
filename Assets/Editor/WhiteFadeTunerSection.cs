@@ -25,9 +25,9 @@ public static class WhiteFadeTunerSection
         if (!open) return;
 
         EditorGUILayout.LabelField(
-            "Everything washed towards white out from the boat, in two rings — the outer out to " +
-            "Radius, the inner out to Radius / Inner Division — and a white gradient rising from " +
-            "below Gradient Bottom to world Y = 1. One set of numbers for the river " +
+            "Everything washed towards the Screen Picture out from the boat, full by Radius — " +
+            "Fade Sharpness sets how soft its edge is — and a gradient rising from below " +
+            "Gradient Bottom to world Y = 1. One set of numbers for the river " +
             "runs, the landscape and the spikes: this foldout in the Run Shading Tuner and the " +
             "Landscape Tuner edits the same preset, the one the Level Select Designer holds. " +
             "Edits land on it straight away — there is nothing to save.",
@@ -61,21 +61,37 @@ public static class WhiteFadeTunerSection
 
         EditorGUI.BeginChangeCheck();
 
-        var settings = so.FindProperty("whiteFade");
-        var end      = settings.GetEndProperty();
-        var field    = settings.Copy();
-        field.NextVisible(true);
-        while (!SerializedProperty.EqualContents(field, end))
-        {
-            EditorGUILayout.PropertyField(field, true);
-            if (!field.NextVisible(false)) break;
-        }
+        DrawChildren(so.FindProperty("whiteFade"));
+
+        EditorGUILayout.Space(4);
+        EditorGUILayout.LabelField("Screen Picture", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField(
+            "What the fade goes to: the ramp read from the bottom of the screen (left) to the " +
+            "top (right), colour what it fades to and alpha how strongly, with white added by a " +
+            "grain that scrolls sideways. All white with no grain is the old plain white fade.",
+            EditorStyles.wordWrappedMiniLabel);
+        DrawChildren(so.FindProperty("screenPicture"));
 
         if (EditorGUI.EndChangeCheck())
         {
             so.ApplyModifiedProperties();
             WhiteFadeSettings.Push(preset.whiteFade);
+            WhiteFadeScreenPicture.Push(preset.screenPicture);
             SceneView.RepaintAll();
+        }
+    }
+
+    private static void DrawChildren(SerializedProperty settings)
+    {
+        if (settings == null) return;
+
+        var end   = settings.GetEndProperty();
+        var field = settings.Copy();
+        field.NextVisible(true);
+        while (!SerializedProperty.EqualContents(field, end))
+        {
+            EditorGUILayout.PropertyField(field, true);
+            if (!field.NextVisible(false)) break;
         }
     }
 

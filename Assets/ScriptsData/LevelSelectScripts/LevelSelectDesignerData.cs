@@ -82,6 +82,39 @@ public class LevelSelectDesignerData : ScriptableObject
         // shifts them by the difference.
         public bool    cinematicPinCameras;
         public Vector3 cinematicPinnedAt;
+        // Camera Influence: a camera set by hand at this node (CameraInfluence_<id> under
+        // CAMERAINFLUENCES) and a box across the river here. In the box the follow camera is drawn
+        // towards it (Influence) or the view cuts to it (Cut); the boat stays the player's. The
+        // camera is pinned: cameraInfluencePinnedAt is where the node stood when it last moved.
+        public bool                              cameraInfluence;
+        public LevelSelectCameraInfluence.Mode   cameraInfluenceMode   = LevelSelectCameraInfluence.Mode.Influence;
+        [Min(0f)] public float                   cameraInfluenceLength = 4f;
+        // How tall the box stands, up from its bottom below the water. 0 = the river's own (the Audio box's).
+        [Min(0f)] public float                   cameraInfluenceBoxHeight;
+        // How wide the box is across the river, centred on it. 0 = the river's own (the Audio box's).
+        [Min(0f)] public float                   cameraInfluenceBoxWidth;
+        // How far the whole box is lowered, keeping its height.
+        [Min(0f)] public float                   cameraInfluenceBoxDrop;
+        // How far the whole box is moved across the river (+ = right, looking down it) and along it
+        // (+ = down it), keeping its size.
+        public float                             cameraInfluenceBoxOffsetAcross;
+        public float                             cameraInfluenceBoxOffsetAlong;
+        [Min(0f)] public float                   cameraInfluenceFade   = 1f;
+        [Range(0f, 1f)] public float             cameraInfluenceHeight = 1f;
+        [Range(0f, 1f)] public float             cameraInfluenceAcross;
+        [Range(0f, 1f)] public float             cameraInfluenceAim;
+        [Range(0f, 1f)] public float             cameraInfluenceLens;
+        [Range(0f, 1f)] public float             cameraInfluenceDistance;
+        public LevelSelectCameraInfluence.LookAt cameraInfluenceLookAt = LevelSelectCameraInfluence.LookAt.FollowBoat;
+        // Cut: straight to the camera and back (Cut), or moving there and back over Transition Time.
+        public LevelSelectCameraInfluence.Blend  cameraInfluenceBlend  = LevelSelectCameraInfluence.Blend.Cut;
+        [Min(0f)] public float                   cameraInfluenceTransitionTime = 1f;
+        // In the box: the fog full at this distance instead of the world's White Fade Radius, and the
+        // depth of field focused on the camera's View Target (a scene object, kept on the camera itself).
+        public bool                              cameraInfluenceOverrideFog;
+        [Min(0f)] public float                   cameraInfluenceFogDistance;
+        public bool                              cameraInfluenceFocusOnViewTarget;
+        public Vector3                           cameraInfluencePinnedAt;
     }
 
     public enum CinematicStart { SailInto, PressKey }
@@ -140,6 +173,19 @@ public class LevelSelectDesignerData : ScriptableObject
                  "halfway, 0 leaves the hills as they are.")]
         [Range(0f, 1f)] public float influenceStrength = 1f;
 
+        [Tooltip("Moves the influenced landscape up (positive) or down (negative) from the height " +
+                 "it is drawn to, in metres.")]
+        public float influenceVerticalOffset;
+
+        [Tooltip("Calms the hills' rocky noise further out round the influenced area: it is eased " +
+                 "away over the Influence Distance times (1 + this). 0 calms it only as far as " +
+                 "the landscape is lifted.")]
+        [Min(0f)] public float influenceSmoothFactor;
+
+        [Tooltip("How far out past the run's outer edge the landscape is cut away, leaving a gap " +
+                 "round it. Negative tucks the landscape in under the rim instead.")]
+        public float cutoutGap = -LandscapeHillHeight.RiverEdgeTuck;
+
         [Tooltip("Nodes on this path where the influence is cancelled: the stretch of run nearest " +
                  "each one is cut only, never lifted.")]
         public List<string> influenceCancelledNodes = new();
@@ -157,6 +203,19 @@ public class LevelSelectDesignerData : ScriptableObject
                  "the landscape runs straight onto its rim. Needs Landscape Influence and " +
                  "Landscape to Outer Rim on.")]
         public bool outerWalls = true;
+
+        [Tooltip("Landscape Natural River Run only, with Outer Walls on. How far, in world units, " +
+                 "the outer corner is stretched out past the rim's outer edge — and how far it " +
+                 "drops by the same — before the outer wall goes on down vertically. 0 is the " +
+                 "plain vertical wall.")]
+        [Min(0f)] public float outerFlare;
+
+        [Tooltip("Gives this path's water its own colour in place of the Level Select River " +
+                 "Tuner's Water Colour. The lines, grain and depth still go on over it.")]
+        public bool waterColourOverride;
+
+        [Tooltip("This path's water colour, while Water Colour Override is on.")]
+        public Color waterColour = new Color(0.836478f, 0.836478f, 0.836478f, 1f);
     }
 
     [Serializable]
@@ -289,6 +348,20 @@ public class LevelSelectDesignerData : ScriptableObject
                  "arena boundary, and is what the ring display and entrance nodes follow.")]
         public ArenaWallProfile wallProfile = new ArenaWallProfile();
 
+        [Tooltip("Stand a lollipop tower in the middle of the arena, its base on the water.")]
+        public bool hasCentreTower;
+
+        [Tooltip("The lollipop tower in the middle of the arena — stem and orb sizes.")]
+        public LollipopTower centreTower = new LollipopTower();
+
+        [Tooltip("The tower preset this arena's centre tower is built from — edit it with Edit in the " +
+                 "designer, and this tower changes with it.")]
+        public LollipopTowerPreset centreTowerPreset;
+
+        [Tooltip("Scales the whole centre tower where it stands here. Kept with this arena, not " +
+                 "saved into the tower preset.")]
+        [Min(0.001f)] public float centreTowerScale = 1f;
+
         [Tooltip("Tick to give the river arriving at this arena's primary entrance its own " +
                  "overlap. Left off, it follows River Overlap in Procedural Generation.")]
         public bool overrideRunOverlap;
@@ -376,6 +449,23 @@ public class LevelSelectDesignerData : ScriptableObject
                  "island — never in an open pool.")]
         public bool hasTower;
 
+        [Tooltip("Fades the island tower when it stands between the camera and the boat — even on the river " +
+                 "the boat is sailing. Gives it a collider only the camera's ray finds.")]
+        public bool occlusion;
+        [Tooltip("How it fades with Occlusion on: Whole Object fades all of it, Screen Circle only a " +
+                 "soft circle round the boat on screen.")]
+        public OcclusionStyle occlusionStyle;
+
+        [Tooltip("A wall standing up off the pool's rim, open where each river comes in.")]
+        public PoolRimWall rimWall = new PoolRimWall();
+
+        [Tooltip("Fill this pool with soul juice and the souls below, circling in its water.")]
+        public bool soulFishArea;
+
+        [Tooltip("The souls circling in this pool when it is a Soul Fish Area — claimed here, so no level or " +
+                 "route can take them too.")]
+        public List<SoulData> soulFishAreaSouls = new List<SoulData>();
+
         [Tooltip("The tower in the middle of the island — stem and orb sizes.")]
         public LollipopTower tower = new LollipopTower { stemRadius = 0.05f, stemHeight = 0.8f, orbRadius = 0.25f,
                                                      baseRadius = 0.12f, baseHeight = 0.08f };
@@ -406,18 +496,42 @@ public class LevelSelectDesignerData : ScriptableObject
         [Tooltip("Whether the angel lands on top of the tower on this island.")]
         public DesignerPerch towerPerch = new DesignerPerch();
 
-        [Tooltip("The souls pool tower in the middle of the island, when Kind is Souls Pool — " +
-                 "where a soul route's souls begin.")]
-        public SoulsPoolTower soulsPool = new SoulsPoolTower();
+        [Tooltip("The soul juice tank in the middle of the island, when Kind is Soul Juice Tank — " +
+                 "where a soul route begins.")]
+        [FormerlySerializedAs("soulsPool")]
+        public SoulJuiceTank soulJuiceTank = new SoulJuiceTank();
 
-        [Tooltip("The souls pool tower preset this pool's tower is built from — edit it with Edit in the designer, " +
+        [Tooltip("The soul juice tank preset this pool's tower is built from — edit it with Edit in the designer, " +
                  "and this pool's tower changes with it.")]
-        public SoulsPoolTowerPreset soulsPoolPreset;
+        [FormerlySerializedAs("soulsPoolPreset")]
+        public SoulJuiceTankPreset soulJuiceTankPreset;
 
-        [Tooltip("Pressing E at the souls pool tower also plays a camera sequence, as the souls are let out.")]
+        [Tooltip("The hub on a pipe this pool's soul juice tank takes its intake from — a pipe node " +
+                 "ticked Hub, by its hub id. Empty = no intake.")]
+        public string tankHubId;
+
+        [Tooltip("The soul fish bowl in the middle of the island, when Kind is Soul Fish Bowl.")]
+        public SoulFishBowl soulFishBowl = new SoulFishBowl();
+
+        [Tooltip("The soul fish bowl preset this pool's bowl is built from — edit it with Edit in the designer, " +
+                 "and this pool's bowl changes with it.")]
+        public SoulFishBowlPreset soulFishBowlPreset;
+
+        [Tooltip("The NomKabarTree in the middle of the island, when Kind is NomKabar Tree — natural pools only. " +
+                 "Left without arms until it is first picked, when it takes the Default NomKabarTree.")]
+        public NomKabarTree nomKabarTree = new NomKabarTree();
+
+        [Tooltip("The NomKabarTree preset this pool's tree is built from — edit it with Edit in the designer, " +
+                 "and this pool's tree changes with it.")]
+        public NomKabarTreePreset nomKabarTreePreset;
+
+        [Tooltip("How far the NomKabarTree is turned about its stem, in degrees. Kept with this placement.")]
+        public float nomKabarTreeTurn;
+
+        [Tooltip("Pressing E at the soul juice tank also plays a camera sequence, as the souls are let out.")]
         public bool towerCinematic;
 
-        [Tooltip("The camera sequence the souls pool tower plays when its souls are let out.")]
+        [Tooltip("The camera sequence the soul juice tank plays when its souls are let out.")]
         public CameraSequencePreset towerCinematicPreset;
 
         // Same as a node's Pin Cameras: the preset's cameras move with this pool. towerCinematicPinnedAt
@@ -433,25 +547,25 @@ public class LevelSelectDesignerData : ScriptableObject
     public const float PoolTowerMinIsland = 0f;
 
     /// <summary>
-    /// The pool on <paramref name="nodeId"/> when it really stands a souls pool tower — ticked,
+    /// The pool on <paramref name="nodeId"/> when it really stands a soul juice tank — ticked,
     /// of that kind, and on an island wide enough for it to be built. Null otherwise. The one
     /// answer the designer and the runtime both ask, so a route can't start from a tower the
     /// scene never built.
     /// </summary>
-    public DesignerPool SoulsTowerPoolAt(string nodeId)
+    public DesignerPool SoulJuiceTankPoolAt(string nodeId)
     {
         if (string.IsNullOrEmpty(nodeId)) return null;
 
         var pool = pools.Find(p => p != null && p.nodeId == nodeId);
-        if (pool == null || !pool.hasTower || pool.towerKind != TowerKind.SoulsPool || pool.soulsPool == null)
+        if (pool == null || !pool.hasTower || pool.towerKind != TowerKind.SoulJuiceTank || pool.soulJuiceTank == null)
             return null;
 
         return PoolShapeFor(pool).islandRadius > PoolTowerMinIsland ? pool : null;
     }
 
-    /// <summary>True when the route begins at a souls pool tower — the only place a route may start.</summary>
-    public bool RouteStartsAtSoulsTower(SoulRoute route)
-        => route != null && SoulsTowerPoolAt(route.originNodeId) != null;
+    /// <summary>True when the route begins at a soul juice tank — the only place a route may start.</summary>
+    public bool RouteStartsAtSoulJuiceTank(SoulRoute route)
+        => route != null && SoulJuiceTankPoolAt(route.originNodeId) != null;
 
     // Both stands a block on each bank, each with its own settings (see DesignerOutpost.bothLeft).
     public enum OutpostSide { Left, Right, Both }
@@ -480,6 +594,13 @@ public class LevelSelectDesignerData : ScriptableObject
         public string outpostId;
         public string pathId;
         public float  pathT;
+
+        [Tooltip("Fades its blocks and towers when it stands between the camera and the boat — even on the river " +
+                 "the boat is sailing. Gives it a collider only the camera's ray finds.")]
+        public bool occlusion;
+        [Tooltip("How it fades with Occlusion on: Whole Object fades all of it, Screen Circle only a " +
+                 "soft circle round the boat on screen.")]
+        public OcclusionStyle occlusionStyle;
 
         [Tooltip("Which bank it stands on, looking down the path the way it was drawn — or Both, " +
                  "a block on each bank with its own settings.")]
@@ -677,6 +798,20 @@ public class LevelSelectDesignerData : ScriptableObject
         [Tooltip("Somewhere the angel can land — the top of the tower, or the structure's top.")]
         public DesignerPerch perch = new DesignerPerch();
 
+        [Tooltip("Fades the structure and its top when it stands between the camera and the boat — even on the river " +
+                 "the boat is sailing. Gives it a collider only the camera's ray finds.")]
+        public bool occlusion;
+        [Tooltip("How it fades with Occlusion on: Whole Object fades all of it, Screen Circle only a " +
+                 "soft circle round the boat on screen.")]
+        public OcclusionStyle occlusionStyle;
+
+        [Tooltip("Pushes fog away from it, with the FogMap's Rock numbers.")]
+        public bool fogRepel;
+        [Tooltip("Uses Fog Repel Radius instead of the structure's own size.")]
+        public bool fogRepelOverride;
+        [Tooltip("The radius fog is held off from, when Override Radius is ticked.")]
+        [Min(0f)] public float fogRepelRadius = 0.5f;
+
         [Tooltip("The outpost on top, when Top is Outpost — walls, columns and tower.")]
         public DesignerOutpost outpost = new DesignerOutpost();
 
@@ -820,12 +955,58 @@ public class LevelSelectDesignerData : ScriptableObject
         [Tooltip("Size multiplier on the whole preset. 1 = the preset's own size.")]
         [Min(0.01f)] public float scale = 1f;
 
+        [Tooltip("Fades this rock when it stands between the camera and the boat — even on the river " +
+                 "the boat is sailing. Gives it a collider only the camera's ray finds.")]
+        public bool occlusion;
+        [Tooltip("How it fades with Occlusion on: Whole Object fades all of it, Screen Circle only a " +
+                 "soft circle round the boat on screen.")]
+        public OcclusionStyle occlusionStyle;
+
         [Tooltip("Somewhere the angel can land — on the tip of this rock.")]
         public DesignerPerch perch = new DesignerPerch();
 
         public DesignerSpike Clone()
         {
             var copy = (DesignerSpike)MemberwiseClone();
+            copy.perch = perch?.Clone();
+            return copy;
+        }
+    }
+
+    /// <summary>
+    /// A NomKabarTree standing in the landscape — a natural feature, placed like a spike: its base
+    /// on the landscape surface under its centre, riding the hills as they are edited, in the
+    /// landscape's own material. Starts as a copy of the Default NomKabarTree.
+    /// </summary>
+    [Serializable]
+    public class DesignerNomKabarTree
+    {
+        public string treeId;
+
+        [Tooltip("Where it stands on the map.")]
+        public Vector2 positionXZ;
+
+        [Tooltip("How far the whole tree is turned about its stem, in degrees.")]
+        public float turn;
+
+        [Tooltip("Scales the whole tree where it stands here. Kept with this placement, not saved " +
+                 "into the tree preset.")]
+        [Min(0.001f)] public float scale = 1f;
+
+        [Tooltip("The tree's base, stem, hub and arms.")]
+        public NomKabarTree tree = new NomKabarTree();
+
+        [Tooltip("The NomKabarTree preset this tree is built from — edit it with Edit in the designer, " +
+                 "and this tree changes with it. Empty keeps the tree's own settings.")]
+        public NomKabarTreePreset treePreset;
+
+        [Tooltip("The angel lands on top of its highest TreeNodeEnd.")]
+        public DesignerPerch perch = new DesignerPerch();
+
+        public DesignerNomKabarTree Clone()
+        {
+            var copy = (DesignerNomKabarTree)MemberwiseClone();
+            copy.tree  = tree?.Clone();
             copy.perch = perch?.Clone();
             return copy;
         }
@@ -844,8 +1025,15 @@ public class LevelSelectDesignerData : ScriptableObject
         [Tooltip("Centre of the fog sheet on the map, world X and Z.")]
         public Vector2 centreXZ;
 
-        [Tooltip("Width of the square fog sheet, in world units.")]
+        [Tooltip("The fog sheet's outline: a circle (the default) or a square.")]
+        public FogZoneShape shape = FogZoneShape.Circle;
+
+        [Tooltip("Width of the fog sheet, in world units — a circle's diameter, a square's side.")]
         [Min(0.1f)] public float size = 10f;
+
+        [Tooltip("How far a square fog sheet is turned round its centre, in degrees (as a Y rotation). " +
+                 "The bounds stay square to the map.")]
+        public float rotation;
 
         [Tooltip("How far this sheet hovers above the landscape surface.")]
         public float height = 2f;
@@ -892,6 +1080,13 @@ public class LevelSelectDesignerData : ScriptableObject
         [Tooltip("Whether this node carries a walkway. Kept when off, so its settings come back.")]
         public bool enabled = true;
 
+        [Tooltip("Fades the stretch starting here when it stands between the camera and the boat — even on the river " +
+                 "the boat is sailing. Gives it a collider only the camera's ray finds.")]
+        public bool occlusion;
+        [Tooltip("How it fades with Occlusion on: Whole Object fades all of it, Screen Circle only a " +
+                 "soft circle round the boat on screen.")]
+        public OcclusionStyle occlusionStyle;
+
         [Tooltip("Which bank it runs along, looking down the path the way it was drawn — or both.")]
         public WalkwaySide side = WalkwaySide.Both;
 
@@ -901,6 +1096,10 @@ public class LevelSelectDesignerData : ScriptableObject
         [Tooltip("How far its top stands above the rim — below it when negative, 0 for flush.")]
         public float height = 0f;
 
+        [Tooltip("On the last node of the river with this walkway ticked: carries it on past that " +
+                 "node to wherever the run stops at the end of the river.")]
+        public bool toEnd;
+
         /// <summary>Whether it is on and runs along this side (+1 right, -1 left).</summary>
         public bool Covers(int bank) =>
             enabled && (side == WalkwaySide.Both || (bank > 0) == (side == WalkwaySide.Right));
@@ -908,7 +1107,150 @@ public class LevelSelectDesignerData : ScriptableObject
         /// <summary>Whether a stretch starting here is built the same as one starting at <paramref name="other"/>.</summary>
         public bool SameBuild(DesignerWalkway other) =>
             other != null && Mathf.Approximately(width, other.width) &&
-            Mathf.Approximately(height, other.height);
+            Mathf.Approximately(height, other.height) && occlusion == other.occlusion &&
+            occlusionStyle == other.occlusionStyle;
+    }
+
+    /// <summary>
+    /// A rim wall set on a node: a wall standing up off the run's rim, from this node to the next
+    /// node of the river that also has one, on the same side. Fills the whole rim by default;
+    /// thinner, it stands in the middle of the rim. A stretch is built from the settings of the
+    /// node it starts at.
+    /// </summary>
+    [Serializable]
+    public class DesignerRimWall
+    {
+        public string nodeId;
+
+        [Tooltip("Whether this node carries a rim wall. Kept when off, so its settings come back.")]
+        public bool enabled = true;
+
+        [Tooltip("Fades the stretch starting here when it stands between the camera and the boat — even on the river " +
+                 "the boat is sailing. Gives it a collider only the camera's ray finds.")]
+        public bool occlusion;
+        [Tooltip("How it fades with Occlusion on: Whole Object fades all of it, Screen Circle only a " +
+                 "soft circle round the boat on screen.")]
+        public OcclusionStyle occlusionStyle;
+
+        [Tooltip("Which rim it stands on, looking down the path the way it was drawn — or both.")]
+        public WalkwaySide side = WalkwaySide.Both;
+
+        [Tooltip("How far its top stands above the rim.")]
+        [Min(0.01f)] public float height = 2f;
+
+        [Tooltip("How much of the rim's width it takes, in the middle of the rim — 1 is the whole rim.")]
+        [Range(0.05f, 1f)] public float thickness = 1f;
+
+        [Tooltip("On the last node of the river with a rim wall ticked: carries it on past that " +
+                 "node to wherever the run stops at the end of the river.")]
+        public bool toEnd;
+
+        /// <summary>Whether it is on and stands on this side (+1 right, -1 left).</summary>
+        public bool Covers(int bank) =>
+            enabled && (side == WalkwaySide.Both || (bank > 0) == (side == WalkwaySide.Right));
+
+        /// <summary>Whether a stretch starting here is built the same as one starting at <paramref name="other"/>.</summary>
+        public bool SameBuild(DesignerRimWall other) =>
+            other != null && Mathf.Approximately(height, other.height) &&
+            Mathf.Approximately(thickness, other.thickness) && occlusion == other.occlusion &&
+            occlusionStyle == other.occlusionStyle;
+    }
+
+    /// <summary>
+    /// A pool's rim wall: a wall standing up off the pool's rim all the way round, open where
+    /// each river comes in.
+    /// </summary>
+    [Serializable]
+    public class PoolRimWall
+    {
+        [Tooltip("Stand a wall on the pool's rim, all the way round, open where each river comes in.")]
+        public bool enabled;
+
+        [Tooltip("Fades the pool's rim wall when it stands between the camera and the boat — even on the river " +
+                 "the boat is sailing. Gives it a collider only the camera's ray finds.")]
+        public bool occlusion;
+        [Tooltip("How it fades with Occlusion on: Whole Object fades all of it, Screen Circle only a " +
+                 "soft circle round the boat on screen.")]
+        public OcclusionStyle occlusionStyle;
+
+        [Tooltip("How far its top stands above the rim.")]
+        [Min(0.01f)] public float height = 2f;
+
+        [Tooltip("How much of the rim's width it takes, in the middle of the rim — 1 is the whole rim.")]
+        [Range(0.05f, 1f)] public float thickness = 1f;
+
+        [Tooltip("The river mouths closed by a doorway — the wall carried across the mouth with a " +
+                 "keyhole cut through it — each named by the node that river comes in from.")]
+        public List<string> doorways = new();
+
+        [Tooltip("Radius of the round head at the top of each doorway's keyhole.")]
+        [Min(0.001f)] public float doorHeadRadius = 0.3f;
+
+        [Tooltip("Height of the doorway's body, up from the rim top: its sides run in from the " +
+                 "river's width at the foot to the neck here, then curve up into the head.")]
+        [Min(0f)] public float doorBodyHeight = 0.35f;
+
+        [Tooltip("Width across the doorway's neck, where the body meets the head.")]
+        [Min(0.001f)] public float doorNeckWidth = 0.25f;
+
+        [Tooltip("Width across the doorway's shoulders, at the top of the body. Wider than the neck, " +
+                 "the side runs up from the foot to this width and curves round and in to the neck. " +
+                 "0 leaves the body's sides running straight in to the neck.")]
+        [Min(0f)] public float doorShoulderWidth = 0f;
+
+        [Tooltip("How round the shoulders are: 0 a flat shoulder meeting the side at a corner, 1 a " +
+                 "full curve from the side round to the neck.")]
+        [Range(0f, 1f)] public float doorShoulderRoundness = 1f;
+
+        [Tooltip("Height of the top of the doorway's head above the rim top. Taller than the wall " +
+                 "cuts through its top.")]
+        [Min(0.001f)] public float doorHeight = 0.9f;
+
+        /// <summary>Whether the mouth the river comes in by from <paramref name="neighbourId"/> has a doorway.</summary>
+        public bool HasDoorway(string neighbourId) =>
+            doorways != null && !string.IsNullOrEmpty(neighbourId) && doorways.Contains(neighbourId);
+    }
+
+    /// <summary>
+    /// A river width override set on a node: the river's channel is this wide there, its rims
+    /// keeping their own width either side, so the outer edge moves with it. The width eases from
+    /// the nodes either side — their own override, or the river's usual width — to this one.
+    /// </summary>
+    [Serializable]
+    public class DesignerRiverWidth
+    {
+        public string nodeId;
+
+        [Tooltip("Whether the override is on. Kept when off, so its width comes back.")]
+        public bool enabled = true;
+
+        [Tooltip("Width of the channel opening across the top of the run at this node — the " +
+                 "river's Inner Width, here only.")]
+        [Min(0.001f)] public float innerWidth = 0.42f;
+    }
+
+    /// <summary>
+    /// A porthole set on a river node: a round hole bored straight across the run under its
+    /// channel, square to the river, through both outer walls and any walkways beside them.
+    /// </summary>
+    [Serializable]
+    public class DesignerRiverPorthole
+    {
+        public string nodeId;
+
+        [Tooltip("Whether the porthole is on. Kept when off, so its settings come back.")]
+        public bool enabled = true;
+
+        [Tooltip("The porthole's radius. Kept small enough to fit under the channel.")]
+        [Min(0f)] public float radius = 1f;
+
+        [Tooltip("How high the porthole's centre is above the run's underside. Kept so the hole " +
+                 "stays under the channel floor.")]
+        public float height = 1f;
+
+        [Tooltip("Moves the porthole along the river from its node — the way the path was drawn " +
+                 "when positive, back when negative.")]
+        public float offsetAlong = 0f;
     }
 
     /// <summary>
@@ -938,9 +1280,61 @@ public class LevelSelectDesignerData : ScriptableObject
                  "when positive, back when negative.")]
         public float offsetAlong = 0f;
 
+        [Tooltip("Fades the deck and ramps when it stands between the camera and the boat — even on the river " +
+                 "the boat is sailing. Gives it a collider only the camera's ray finds.")]
+        public bool occlusion;
+        [Tooltip("How it fades with Occlusion on: Whole Object fades all of it, Screen Circle only a " +
+                 "soft circle round the boat on screen.")]
+        public OcclusionStyle occlusionStyle;
+
         [Tooltip("The preset this bridge's deck and ramp sizes come from — they change with it. " +
                  "None: the sizes are this bridge's own.")]
         public BridgePreset bridgePreset;
+    }
+
+    /// <summary>
+    /// An archway set on a node: a pillar on the rim either side of the river, joined over the
+    /// water by a round arch, the boat passing under it. Can stand on a river's first or last node
+    /// as well as the nodes a rim node can — so it belongs to one river (<see cref="pathId"/>),
+    /// since an end node can be shared by several.
+    /// </summary>
+    [Serializable]
+    public class DesignerArchway
+    {
+        public string nodeId;
+
+        [Tooltip("The river it stands across.")]
+        public string pathId;
+
+        [Tooltip("Fades the archway when it stands between the camera and the boat — even on the river " +
+                 "the boat is sailing. Gives it a collider only the camera's ray finds.")]
+        public bool occlusion;
+        [Tooltip("How it fades with Occlusion on: Whole Object fades all of it, Screen Circle only a " +
+                 "soft circle round the boat on screen.")]
+        public OcclusionStyle occlusionStyle;
+
+        [Tooltip("How high the top of the opening is above the rim.")]
+        [Min(0.01f)] public float archHeight = 0.3f;
+
+        [Tooltip("How deep the archway is, along the river.")]
+        [Min(0.005f)] public float thickness = 0.06f;
+
+        [Tooltip("How far each pillar reaches out from the channel's edge, over the rim.")]
+        [Min(0.005f)] public float pillarWidth = 0.06f;
+
+        [Tooltip("How much stone stands above the top of the opening.")]
+        [Min(0.005f)] public float archDepth = 0.05f;
+
+        [Tooltip("Moves the archway along the river from its node — the way the path was drawn " +
+                 "when positive, back when negative.")]
+        public float offsetAlong = 0f;
+
+        [Tooltip("Rounds off the archway's two top outer corners.")]
+        public bool curvedCorners = false;
+
+        [Tooltip("How far round each curved corner reaches — kept within the stone beside and " +
+                 "above the opening.")]
+        [Min(0f)] public float cornerRadius = 0.04f;
     }
 
     public enum RimNodeSide { Left, Right, Both }
@@ -966,6 +1360,13 @@ public class LevelSelectDesignerData : ScriptableObject
     public class DesignerRimNode
     {
         public string nodeId;
+
+        [Tooltip("Fades the platform and what stands on it when it stands between the camera and the boat — even on the river " +
+                 "the boat is sailing. Gives it a collider only the camera's ray finds.")]
+        public bool occlusion;
+        [Tooltip("How it fades with Occlusion on: Whole Object fades all of it, Screen Circle only a " +
+                 "soft circle round the boat on screen.")]
+        public OcclusionStyle occlusionStyle;
 
         [Tooltip("Which bank it stands on, looking down the path the way it was drawn — or both.")]
         public RimNodeSide side = RimNodeSide.Right;
@@ -1020,8 +1421,24 @@ public class LevelSelectDesignerData : ScriptableObject
                  "on its prefab, when Topper is Vert Display Point.")]
         [Min(0.001f)] public float displayHeight = 0.15f;
 
-        [Tooltip("What the display point does when the boat comes near it, when Topper is " +
-                 "Vert Display Point.")]
+        [Tooltip("A screen set into the river-side wall — its own switch, so a tower can stand " +
+                 "on top as well.")]
+        public bool screen;
+
+        [Tooltip("Width of the screen set into the river-side wall, when Screen is ticked.")]
+        [Min(0f)] public float screenSize = 0.06f;
+
+        [Tooltip("Height of the screen, held to what fits between the waterline and the top. " +
+                 "Below zero reads as the width — screens made before they had a height were square.")]
+        public float screenHeight = -1f;
+
+        [Tooltip("How long the screen's picture takes to fade in once the key is pressed.")]
+        [Min(0f)] public float screenFadeTime = 0.5f;
+
+        [Tooltip("Whether the screen has a camera the view cuts to while its picture is up.")]
+        public bool screenCamera;
+
+        [Tooltip("What the screen does when the boat comes near it, when Screen is ticked.")]
         public DesignerInteract interact = new DesignerInteract();
 
         [Tooltip("What stands on the Left platform when Side is Both. The Topper, Tower and " +
@@ -1046,6 +1463,11 @@ public class LevelSelectDesignerData : ScriptableObject
                 turretPreset  = turretPreset,
                 towerScale    = towerScale,
                 displayHeight = displayHeight,
+                screen        = screen,
+                screenSize    = screenSize,
+                screenHeight  = screenHeight,
+                screenFadeTime = screenFadeTime,
+                screenCamera  = screenCamera,
                 interact      = interact?.Clone(),
             };
         }
@@ -1065,18 +1487,29 @@ public class LevelSelectDesignerData : ScriptableObject
             turretPreset  = topping.turretPreset;
             towerScale    = topping.towerScale;
             displayHeight = topping.displayHeight;
+            screen        = topping.screen;
+            screenSize    = topping.screenSize;
+            screenHeight  = topping.screenHeight;
+            screenFadeTime = topping.screenFadeTime;
+            screenCamera  = topping.screenCamera;
             interact      = topping.interact?.Clone();
         }
     }
 
-    /// <summary>What can stand on top of a rim node.</summary>
-    public enum RimNodeTopper { None, LollipopTower, VertDisplayPoint, TurretTower }
+    /// <summary>
+    /// What can stand on top of a rim node. Screen and VertDisplayPoint are retired from here: the
+    /// screen is its own switch now (<see cref="RimNodeTopping.screen"/>), so a tower can stand on
+    /// top of a platform with a screen in its wall. A saved one of either reads as the switch on
+    /// and nothing on top. They stay so old data still loads.
+    /// </summary>
+    public enum RimNodeTopper { None, LollipopTower, VertDisplayPoint, TurretTower, Screen }
 
     /// <summary>
-    /// Which tower stands where a tower can: a lollipop, or a turret that turns. SoulsPool is for
-    /// pool islands only — the other places offer just the first two.
+    /// Which tower stands where a tower can: a lollipop, or a turret that turns. SoulJuiceTank and
+    /// SoulFishBowl are for pool islands only, and NomKabarTree for the islands of natural pools —
+    /// the other places offer just the first two.
     /// </summary>
-    public enum TowerKind { Lollipop, Turret, SoulsPool }
+    public enum TowerKind { Lollipop, Turret, SoulJuiceTank, NomKabarTree, SoulFishBowl }
 
     /// <summary>What stands on one rim node platform, and its sizes.</summary>
     [Serializable]
@@ -1107,11 +1540,43 @@ public class LevelSelectDesignerData : ScriptableObject
                  "on its prefab, when Topper is Vert Display Point.")]
         [Min(0.001f)] public float displayHeight = 0.15f;
 
+        [Tooltip("A screen set into the river-side wall — its own switch, so a tower can stand " +
+                 "on top as well.")]
+        public bool screen;
+
+        [Tooltip("Width of the screen set into the river-side wall, when Screen is ticked.")]
+        [Min(0f)] public float screenSize = 0.06f;
+
+        [Tooltip("Height of the screen, held to what fits between the waterline and the top. " +
+                 "Below zero reads as the width — screens made before they had a height were square.")]
+        public float screenHeight = -1f;
+
+        [Tooltip("How long the screen's picture takes to fade in once the key is pressed.")]
+        [Min(0f)] public float screenFadeTime = 0.5f;
+
+        [Tooltip("Whether the screen has a camera the view cuts to while its picture is up.")]
+        public bool screenCamera;
+
         [Tooltip("What it does when the boat comes near it.")]
         public DesignerInteract interact = new DesignerInteract();
 
         [Tooltip("Whether the angel lands on top of the tower standing here.")]
         public DesignerPerch perch = new DesignerPerch();
+
+        /// <summary>The screen's height — its width, for a screen saved before it had one.</summary>
+        public float ScreenHeight => screenHeight < 0f ? screenSize : screenHeight;
+
+        /// <summary>
+        /// Whether a screen is set into the wall — ticked, or saved back when Screen (or the
+        /// vert display point before it) was picked in the On Top list.
+        /// </summary>
+        public bool HasScreen => screen || topper == RimNodeTopper.Screen ||
+                                 topper == RimNodeTopper.VertDisplayPoint;
+
+        /// <summary>What stands on top — nothing for an old Screen pick, which is the wall's.</summary>
+        public RimNodeTopper OnTop => topper == RimNodeTopper.Screen ||
+                                      topper == RimNodeTopper.VertDisplayPoint
+                                    ? RimNodeTopper.None : topper;
 
         public RimNodeTopping Clone()
         {
@@ -1136,6 +1601,35 @@ public class LevelSelectDesignerData : ScriptableObject
         [Tooltip("How far the pipe's centre line stands above the water here, when Override " +
                  "Height is on.")]
         [Min(0f)] public float height = 0.5f;
+
+        [Tooltip("Tick to make this node a hub: a sleeve round the pipe with a ring standing out of " +
+                 "it at a right angle, which a soul juice tank's intake can be linked into.")]
+        public bool hub;
+
+        [Tooltip("Which hub this is for good, whatever its place in the list — what a soul juice " +
+                 "tank links to. Given when Hub is first ticked.")]
+        public string hubId;
+
+        [Tooltip("Tick to put a lead-in either side of the hub, so the pipe runs straight through it.")]
+        public bool hubLeadIns;
+
+        [Tooltip("How far each lead-in is from the hub, along the pipe.")]
+        [Min(0f)] public float hubLeadInDistance = 0.3f;
+
+        [Tooltip("Radius of the sleeve round the pipe, out to its outside.")]
+        [Min(0.001f)] public float hubSleeveRadius = 0.13f;
+
+        [Tooltip("Thickness of the sleeve — how long it is along the pipe.")]
+        [Min(0.001f)] public float hubSleeveThickness = 0.14f;
+
+        [Tooltip("Radius of the ring standing out of the sleeve, the intake goes into.")]
+        [Min(0.001f)] public float hubRingRadius = 0.06f;
+
+        [Tooltip("Thickness of the ring — how far it stands out past the sleeve.")]
+        [Min(0f)] public float hubRingThickness = 0.05f;
+
+        [Tooltip("Tick to put the ring on the other side of the pipe.")]
+        public bool hubFlip;
     }
 
     /// <summary>A support on a pipe: which leg it is on (node i to node i + 1), and how far along it.</summary>
@@ -1174,6 +1668,13 @@ public class LevelSelectDesignerData : ScriptableObject
         [Tooltip("How far each ring stands out beyond the pipe.")]
         [Min(0f)] public float ringOverhang = 0.02f;
 
+        [Tooltip("Fades it when it stands between the camera and the boat. Its colliders are " +
+                 "kept either way — unticked, the camera just looks past it.")]
+        public bool occlusion = true;
+        [Tooltip("How it fades with Occlusion on: Whole Object fades all of it, Screen Circle only a " +
+                 "soft circle round the boat on screen.")]
+        public OcclusionStyle occlusionStyle;
+
         public float HeightAt(int node) =>
             nodes[node].overrideHeight ? nodes[node].height : height;
     }
@@ -1185,6 +1686,10 @@ public class LevelSelectDesignerData : ScriptableObject
     [Serializable]
     public class WallNode
     {
+        // Which node this is for good, whatever its place in the list — what the Seam Clean Up
+        // Tool's spots remember it by. Given out by DesignerWall.SyncSpotNodes.
+        [HideInInspector] public string nodeId;
+
         public Vector2 positionXZ;
 
         [Tooltip("Tick to give this node its own height. Left off, it takes the wall's height.")]
@@ -1244,8 +1749,9 @@ public class LevelSelectDesignerData : ScriptableObject
         [Tooltip("How wide the archway is, measured along the wall.")]
         [Min(0f)] public float archWidth = 0.1f;
 
-        [Tooltip("How tall the archway is, from the wall's base up to the top of its round.")]
-        [Min(0f)] public float archHeight = 0.2f;
+        [Tooltip("How high the top of the archway's round is, above the baseline (Canvas World Y). " +
+                 "The opening runs down to the wall's base; the Drop never moves it.")]
+        public float archHeight = 0.2f;
 
         [Tooltip("Bore a round hole straight across the wall here, centred on this node.")]
         public bool hasPorthole;
@@ -1253,8 +1759,49 @@ public class LevelSelectDesignerData : ScriptableObject
         [Tooltip("The porthole's radius.")]
         [Min(0f)] public float portholeRadius = 0.08f;
 
-        [Tooltip("How high the porthole's centre is, from the wall's base.")]
-        [Min(0f)] public float portholeHeight = 0.2f;
+        [Tooltip("How high the porthole's centre is, above the baseline (Canvas World Y); the Drop " +
+                 "never moves it.")]
+        public float portholeHeight = 0.2f;
+
+        [Tooltip("Breaks a hole down into the wall from its top here, through the lip too. Not on a " +
+                 "node with a column, a tower or a porthole.")]
+        public bool destruction;
+
+        [Tooltip("How far along the wall the hole's middle sits from this node — either way.")]
+        public float holeOffset;
+
+        [Tooltip("How wide the hole is across its top, measured along the wall, before the edge's " +
+                 "rounded shapes.")]
+        [Min(0f)] public float holeWidth = 0.15f;
+
+        [Tooltip("How far the hole reaches down from the wall's very top — the lip's top, when the " +
+                 "wall has a lip — before the edge's rounded shapes.")]
+        [Min(0f)] public float holeHeight = 0.12f;
+
+        [Tooltip("How many rounded shapes run along the hole's edge. 0 = a plain round hole.")]
+        [Range(0, 16)] public int holeEdgeComplexity = 5;
+
+        [Tooltip("How far the edge's rounded shapes reach out past the hole, as a share of its size.")]
+        [Range(0f, 1f)] public float holeEdgeDepth = 0.35f;
+
+        [Tooltip("How much the edge's rounded shapes differ from each other in length, width and " +
+                 "spacing. 0 = all alike.")]
+        [Range(0f, 1f)] public float holeEdgeUnevenness = 0.6f;
+
+        [Tooltip("The shape of each rounded shape on the edge: low = broad gentle waves, high = full " +
+                 "rounded tips.")]
+        [Range(0f, 1f)] public float holeEdgeRoundness = 0.5f;
+
+        [Tooltip("How far each top corner of the hole curves away: out along the wall's top by up to " +
+                 "Hole Width, down the hole's side by up to Hole Height. 0 = sharp corners.")]
+        [Range(0f, 1f)] public float holeCornerCurve;
+
+        [Tooltip("How many rounded shapes are broken into each curved corner — sized by Hole Edge Depth, " +
+                 "Unevenness and Roundness. 0 = a smooth curve.")]
+        [Range(0, 16)] public int holeCornerComplexity;
+
+        /// <summary>Whether this node's hole is built: Destruction on, and nothing on the node it can't share with.</summary>
+        public bool HasDestruction => destruction && !hasColumn && !hasTower && !hasPorthole;
     }
 
     /// <summary>
@@ -1270,6 +1817,13 @@ public class LevelSelectDesignerData : ScriptableObject
 
         [Tooltip("Join the last node back to the first.")]
         public bool closed;
+
+        [Tooltip("Fades it when it stands between the camera and the boat. Its colliders are " +
+                 "kept either way — unticked, the camera just looks past it.")]
+        public bool occlusion = true;
+        [Tooltip("How it fades with Occlusion on: Whole Object fades all of it, Screen Circle only a " +
+                 "soft circle round the boat on screen.")]
+        public OcclusionStyle occlusionStyle;
 
         [Tooltip("How far the wall's top stands above the water, at every node that doesn't " +
                  "override it.")]
@@ -1300,6 +1854,53 @@ public class LevelSelectDesignerData : ScriptableObject
 
         public float HeightAt(int node) =>
             nodes[node].overrideHeight ? nodes[node].height : height;
+
+        /// <summary>
+        /// Gives every node its permanent id — one carrying another's, a copy, gets a fresh one —
+        /// and points every removed seam and face group spot at the place its node has now, so
+        /// adding or deleting nodes never moves a spot onto another node. A spot from before ids
+        /// takes the id of the node at its place; a spot whose node is gone points nowhere and
+        /// shows as Not Found. Hands back whether anything changed.
+        /// </summary>
+        public bool SyncSpotNodes()
+        {
+            bool changed = false;
+            var  placeOf = new Dictionary<string, int>();
+            for (int i = 0; i < nodes.Count; i++)
+            {
+                var node = nodes[i];
+                if (node == null) continue;
+                if (string.IsNullOrEmpty(node.nodeId) || placeOf.ContainsKey(node.nodeId))
+                {
+                    node.nodeId = Guid.NewGuid().ToString();
+                    changed = true;
+                }
+                placeOf.Add(node.nodeId, i);
+            }
+
+            void Sync(List<WallSeamSpot> spots)
+            {
+                if (spots == null) return;
+                foreach (var spot in spots)
+                {
+                    if (spot == null) continue;
+                    if (string.IsNullOrEmpty(spot.nodeId))
+                    {
+                        if (spot.node < 0 || spot.node >= nodes.Count || nodes[spot.node] == null) continue;
+                        spot.nodeId = nodes[spot.node].nodeId;
+                        changed = true;
+                    }
+                    int place = placeOf.TryGetValue(spot.nodeId, out int at) ? at : -1;
+                    if (spot.node == place) continue;
+                    spot.node = place;
+                    changed = true;
+                }
+            }
+
+            Sync(removedSeams);
+            if (faceGroups != null) foreach (var group in faceGroups) Sync(group?.surfaces);
+            return changed;
+        }
     }
 
     public List<LandscapeHillPoint> hillPoints = new();
@@ -1318,9 +1919,20 @@ public class LevelSelectDesignerData : ScriptableObject
     [Tooltip("River Walkway 2 — a second walkway set on nodes, built the same way, out past " +
              "the first walkway where one runs beside it.")]
     public List<DesignerWalkway>  walkways2 = new();
+    [Tooltip("Rim walls set on nodes — a wall up off the run's rim to the next node with one.")]
+    public List<DesignerRimWall>  rimWalls  = new();
     public List<DesignerBridge>   bridges   = new();
+    public List<DesignerArchway>  archways  = new();
+    [Tooltip("River width overrides set on nodes — the channel's width at that node.")]
+    public List<DesignerRiverWidth> riverWidths = new();
+    [Tooltip("River portholes set on nodes — a round hole bored across the run under its channel.")]
+    public List<DesignerRiverPorthole> riverPortholes = new();
     public List<DesignerPipe>     pipes     = new();
     public List<DesignerWall>     walls     = new();
+
+    [Tooltip("Set once wall archway and porthole heights are measured up from the baseline (Canvas " +
+             "World Y). Older data measured them up from the wall's base; the designer converts it on open.")]
+    [HideInInspector] public bool wallOpeningsFromBaseline;
 
     [Tooltip("Perches standing on nothing generated — dropped where you like, for the angel to " +
              "land on whatever has no perch block of its own.")]
@@ -1331,6 +1943,10 @@ public class LevelSelectDesignerData : ScriptableObject
 
     [Tooltip("What the spikes are drawn with — LevelSelectSpikeMat, shaded by the landscape tuner.")]
     public Material spikeMaterial;
+
+    [Tooltip("NomKabarTrees standing in the landscape, on its surface — natural features in the " +
+             "landscape's material.")]
+    public List<DesignerNomKabarTree> nomKabarTrees = new();
 
     [Tooltip("Freestanding structures — a block or round column dropped anywhere on the landscape, " +
              "with a lollipop, a turret or an outpost on top.")]
@@ -1377,26 +1993,14 @@ public class LevelSelectDesignerData : ScriptableObject
              "the run's full inner width, so its edges bury themselves in the channel wall.")]
     [Min(0f)] public float     waterLevel  = 0f;
 
-    // ─────────────────────────────────────────────
-    // WHERE TWO WATERS MEET
-    //
     // Every water surface in the world is generated to BUTT onto its neighbours — a branch's
-    // ribbon stops on the edge of the river it leaves, a pool's ring stops on the line each of
+    // ribbon stops on the edge of the river it leaves, a pool's sheet stops on the line each of
     // its rivers ends on. Nothing overlaps, so nothing z-fights.
-    //
-    // What butting cannot do is carry a pattern across the join. Each surface has its own frame,
-    // and where two frames meet on a line the lines drawn in them meet on that line too. An
-    // overlap lets the one on top run PAST the join and fade out over its neighbour instead,
-    // which is what hides it.
-    //
-    // These are geometry, not look: they change the mesh, so they need a Rebuild Runs. Leave
-    // them at 0 and every surface butts exactly as it did before.
-    // ─────────────────────────────────────────────
 
-    [Tooltip("How far a pool's water carries on OUT into each river that meets it, over that " +
-             "river's own water, before fading out. 0 butts it onto the line the river's water " +
-             "ends on as before. Geometry — needs a Rebuild Runs.")]
-    [Min(0f)] public float     waterPoolOverlap = 0f;
+    // Where those butting waters open into one another, for the lines drawn on them — written by
+    // the designer's Generate and Rebuild Runs, never by hand. See RiverWaterMouth.
+    [HideInInspector]
+    public List<RiverWaterMouth> waterMouths = new();
 
     [Tooltip("How far every generated piece carries on below the water surface — runs, pools " +
              "and arena walls alike, so they all end at the same height and the world reads as " +
@@ -1470,6 +2074,14 @@ public class LevelSelectDesignerData : ScriptableObject
     [Tooltip("How fine the rocky noise on hills is — its frequency across the world. Only hills " +
              "with a Rocky Noise amount show it.")]
     public float landscapeNoiseScale = 0.25f;
+
+    [Tooltip("Off: every hill point is left out of the ground (kept in the list, so it can come " +
+             "back). Spikes, fog zones and the canvas map all read the ground without them.")]
+    public bool hillPointsOn = true;
+
+    [Tooltip("The painted base height map and rocky noise map this world's landscape wears. " +
+             "Painted in Landscape ▾ > Landscape Maps.")]
+    public LandscapeMapsPreset landscapeMapsPreset;
 
     /// <summary>
     /// How wide the tile family is, corner to corner on its longer side. Tiles are laid from
@@ -1628,10 +2240,13 @@ public class LevelSelectDesignerData : ScriptableObject
         // decided inside each Push rather than here so both routes stay one route into the
         // globals.
         RiverEdgeRippleSettings.Push(waterPreset     != null ? waterPreset.edgeRipples    : null);
+        RiverWaterMouth.Push(waterMouths);
         RiverSoulZoneSettings.Push(waterPreset       != null ? waterPreset.soulZone       : null);
+        RiverDepthSettings.Push(waterPreset          != null ? waterPreset.depth          : null);
         RiverRunShadingSettings.Push(structurePreset != null ? structurePreset.runShading : null);
         LandscapeShadingSettings.Push(landscapePreset != null ? landscapePreset.landscapeShading : null);
         WhiteFadeSettings.Push(whiteFadePreset != null ? whiteFadePreset.whiteFade : null);
+        WhiteFadeScreenPicture.Push(whiteFadePreset != null ? whiteFadePreset.screenPicture : null);
 
         // The one light the runs, the hills and the spikes are turned against — the scene's
         // LevelSelectLight object, its position and strength both.
@@ -1770,9 +2385,9 @@ public float canvasOriginX      = 0f;
                  "one slot per soul, filled by Auto-Assign or by hand.")]
         public List<SoulData> souls = new List<SoulData>();
 
-        [Tooltip("The points the fish take, in order. Between two points that share a river path " +
-                 "the route follows that path's own nodes, so it hugs the river rather than " +
-                 "cutting across it — and it stops at a junction until the next point is chosen.")]
+        [Tooltip("The waypoints the fish take, in order. Between two waypoints the route follows " +
+                 "the shortest way along the rivers — through junctions, pools and river joins — " +
+                 "so it hugs the river rather than cutting across it.")]
         public List<SoulRoutePoint> points = new List<SoulRoutePoint>();
     }
 
@@ -1780,89 +2395,170 @@ public float canvasOriginX      = 0f;
 
     /// <summary>
     /// The node ids a soul route passes through, in travel order: the origin pool, then every
-    /// authored point with the river's own nodes filled in between consecutive points that share
-    /// a path. This is the ONE definition of a route's shape — the designer draws it and the
-    /// runtime swims it, so the two cannot disagree. Callers turn ids into positions themselves.
+    /// authored waypoint with the rivers' own nodes filled in between — the shortest way along the
+    /// rivers from each waypoint to the next. This is the ONE definition of a route's shape — the
+    /// designer draws it and the runtime swims it, so the two cannot disagree. Callers turn ids
+    /// into positions themselves.
     /// </summary>
-    public List<string> BuildSoulRouteNodeIds(SoulRoute route)
+    public List<string> BuildSoulRouteNodeIds(SoulRoute route) => BuildSoulRouteNodeIds(route, null);
+
+    /// <summary>
+    /// As above, also filling <paramref name="pointIdIndex"/> with where each authored point sits
+    /// in the returned ids (a point with no node takes the id before it), so a caller never has to
+    /// re-walk the fill to find its waypoints.
+    /// </summary>
+    public List<string> BuildSoulRouteNodeIds(SoulRoute route, List<int> pointIdIndex)
     {
         var ids = new List<string>();
+        pointIdIndex?.Clear();
         if (route == null) return ids;
 
+        var    graph    = new RiverGraph(this);
+        string previous = null;
+
         if (!string.IsNullOrEmpty(route.originNodeId))
+        {
             ids.Add(route.originNodeId);
+            previous = route.originNodeId;
+        }
 
         for (int i = 0; i < route.points.Count; i++)
         {
             string nodeId = route.points[i].nodeId;
-            if (string.IsNullOrEmpty(nodeId)) continue;
-
-            if (i > 0)
+            if (string.IsNullOrEmpty(nodeId))
             {
-                var between = NodesBetween(route.points[i - 1].nodeId, nodeId);
+                pointIdIndex?.Add(Mathf.Max(ids.Count - 1, 0));
+                continue;
+            }
+
+            if (previous != null)
+            {
+                var between = graph.NodesBetween(previous, nodeId);
                 if (between != null) ids.AddRange(between);
             }
 
+            pointIdIndex?.Add(ids.Count);
             ids.Add(nodeId);
+            previous = nodeId;
         }
 
         return ids;
     }
 
     /// <summary>
-    /// The river's own nodes strictly between two nodes, in order from <paramref name="a"/> —
-    /// along the path carrying both, or on through river joins when a split put them on
-    /// different rivers. Null when no river links them.
+    /// The rivers' own nodes strictly between two nodes, in order from <paramref name="a"/> — the
+    /// shortest way along the rivers, on through junctions, pools and river joins. Null when no
+    /// river links them.
     /// </summary>
-    public List<string> NodesBetween(string a, string b)
+    public List<string> NodesBetween(string a, string b) => new RiverGraph(this).NodesBetween(a, b);
+
+    /// <summary>
+    /// Every river as one network: a link between each pair of neighbouring nodes on a path. Rivers
+    /// meet where they share a node — a junction, a pool, a river join — so no extra links are
+    /// needed. Built once per route walk; links are weighed by distance on the ground.
+    /// </summary>
+    private class RiverGraph
     {
-        if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b)) return null;
+        private readonly Dictionary<string, List<string>> _links  = new Dictionary<string, List<string>>();
+        private readonly Dictionary<string, Vector3>      _pos    = new Dictionary<string, Vector3>();
+        private readonly HashSet<string>                  _arenas = new HashSet<string>();
 
-        var path = FindPathContaining(a, b);
-        if (path != null) return NodesStrictlyBetween(path, a, b);
-
-        return NodesAcrossJoins(a, b, new HashSet<string>());
-    }
-
-    private List<string> NodesAcrossJoins(string a, string b, HashSet<string> used)
-    {
-        if (riverJoins == null) return null;
-
-        foreach (var join in riverJoins)
+        public RiverGraph(LevelSelectDesignerData data)
         {
-            string j = join?.nodeId;
-            if (string.IsNullOrEmpty(j) || j == a || j == b || used.Contains(j)) continue;
+            foreach (var node in data.nodes)
+                if (node != null && !string.IsNullOrEmpty(node.id)) _pos[node.id] = node.worldPosition;
 
-            var first = FindPathContaining(a, j);
-            if (first == null) continue;
+            foreach (var arena in data.arenas)
+                if (arena != null && !string.IsNullOrEmpty(arena.nodeId)) _arenas.Add(arena.nodeId);
 
-            used.Add(j);
-            var next = FindPathContaining(j, b);
-            var rest = next != null && next != first
-                     ? NodesStrictlyBetween(next, j, b)
-                     : NodesAcrossJoins(j, b, used);
-            used.Remove(j);
-            if (rest == null) continue;
+            foreach (var path in data.paths)
+            {
+                if (path?.nodeIds == null) continue;
+                for (int i = 1; i < path.nodeIds.Count; i++)
+                {
+                    Link(path.nodeIds[i - 1], path.nodeIds[i]);
+                    Link(path.nodeIds[i], path.nodeIds[i - 1]);
+                }
+            }
 
-            var list = NodesStrictlyBetween(first, a, j);
-            list.Add(j);
-            list.AddRange(rest);
+            // A level's other doors start rivers of their own, which never touch the arena's node.
+            // The souls cross the level, so the arena links straight to each of those doors and to
+            // the first node out of it — the steps a route authored node by node already takes.
+            foreach (var arena in data.arenas)
+            {
+                if (arena?.secondaryEntrances == null || string.IsNullOrEmpty(arena.nodeId)) continue;
+                foreach (var entrance in arena.secondaryEntrances)
+                {
+                    if (entrance == null || string.IsNullOrEmpty(entrance.nodeId)) continue;
+
+                    var outs = _links.TryGetValue(entrance.nodeId, out var list) ? list.ToArray() : new string[0];
+                    Link(arena.nodeId, entrance.nodeId);
+                    Link(entrance.nodeId, arena.nodeId);
+                    foreach (string n in outs)
+                    {
+                        Link(arena.nodeId, n);
+                        Link(n, arena.nodeId);
+                    }
+                }
+            }
+        }
+
+        private void Link(string from, string to)
+        {
+            if (string.IsNullOrEmpty(from) || string.IsNullOrEmpty(to) || from == to) return;
+            if (!_links.TryGetValue(from, out var list)) _links[from] = list = new List<string>();
+            if (!list.Contains(to)) list.Add(to);
+        }
+
+        private float Distance(string a, string b)
+        {
+            _pos.TryGetValue(a, out var pa);
+            _pos.TryGetValue(b, out var pb);
+            return Vector2.Distance(new Vector2(pa.x, pa.z), new Vector2(pb.x, pb.z));
+        }
+
+        /// <summary>
+        /// Shortest way along the rivers. An arena is never passed THROUGH on the way — souls
+        /// entering a level is a waypoint's job, not the fill's.
+        /// </summary>
+        public List<string> NodesBetween(string a, string b)
+        {
+            if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b)) return null;
+            if (a == b) return new List<string>();
+
+            var dist     = new Dictionary<string, float> { [a] = 0f };
+            var cameFrom = new Dictionary<string, string>();
+            var frontier = new SortedSet<(float d, int seq, string id)>();
+            int seq      = 0;
+            frontier.Add((0f, seq++, a));
+
+            while (frontier.Count > 0)
+            {
+                var here = frontier.Min;
+                frontier.Remove(here);
+                if (here.id == b) break;
+                if (here.d > dist[here.id]) continue;
+                if (here.id != a && _arenas.Contains(here.id)) continue;
+                if (!_links.TryGetValue(here.id, out var next)) continue;
+
+                foreach (string n in next)
+                {
+                    float d = here.d + Distance(here.id, n);
+                    if (dist.TryGetValue(n, out float best) && best <= d) continue;
+                    dist[n]     = d;
+                    cameFrom[n] = here.id;
+                    frontier.Add((d, seq++, n));
+                }
+            }
+
+            if (!cameFrom.ContainsKey(b)) return null;
+
+            var list = new List<string>();
+            for (string n = cameFrom[b]; n != a; n = cameFrom[n])
+                list.Add(n);
+            list.Reverse();
             return list;
         }
-        return null;
-    }
-
-    private static List<string> NodesStrictlyBetween(DesignerPath path, string a, string b)
-    {
-        var list = new List<string>();
-        int from = path.nodeIds.IndexOf(a);
-        int to   = path.nodeIds.IndexOf(b);
-        if (from < 0 || to < 0 || from == to) return list;
-
-        int step = to > from ? 1 : -1;
-        for (int n = from + step; n != to; n += step)
-            list.Add(path.nodeIds[n]);
-        return list;
     }
 
     /// <summary>The first river path carrying both nodes, or null when they share none.</summary>
@@ -1926,6 +2622,13 @@ public float canvasOriginX      = 0f;
         return walkways.Find(w => w != null && w.nodeId == nodeId);
     }
 
+    /// <summary>The rim wall set on a node — on or off — or null when it has never had one.</summary>
+    public DesignerRimWall RimWallAt(string nodeId)
+    {
+        if (string.IsNullOrEmpty(nodeId) || rimWalls == null) return null;
+        return rimWalls.Find(w => w != null && w.nodeId == nodeId);
+    }
+
     /// <summary>The River Walkway 2 set on a node — on or off — or null when it has never had one.</summary>
     public DesignerWalkway Walkway2At(string nodeId)
     {
@@ -1933,11 +2636,32 @@ public float canvasOriginX      = 0f;
         return walkways2.Find(w => w != null && w.nodeId == nodeId);
     }
 
+    /// <summary>The river width override set on a node — on or off — or null when it has never had one.</summary>
+    public DesignerRiverWidth RiverWidthAt(string nodeId)
+    {
+        if (string.IsNullOrEmpty(nodeId) || riverWidths == null) return null;
+        return riverWidths.Find(w => w != null && w.nodeId == nodeId);
+    }
+
+    /// <summary>The river porthole set on a node — on or off — or null when it has never had one.</summary>
+    public DesignerRiverPorthole RiverPortholeAt(string nodeId)
+    {
+        if (string.IsNullOrEmpty(nodeId) || riverPortholes == null) return null;
+        return riverPortholes.Find(p => p != null && p.nodeId == nodeId);
+    }
+
     /// <summary>The bridge across the river at a node, or null when it carries none.</summary>
     public DesignerBridge BridgeAt(string nodeId)
     {
         if (string.IsNullOrEmpty(nodeId) || bridges == null) return null;
         return bridges.Find(b => b != null && b.nodeId == nodeId);
+    }
+
+    /// <summary>The archway across one river at a node, or null when it carries none.</summary>
+    public DesignerArchway ArchwayAt(string nodeId, string pathId)
+    {
+        if (string.IsNullOrEmpty(nodeId) || archways == null) return null;
+        return archways.Find(a => a != null && a.nodeId == nodeId && a.pathId == pathId);
     }
 
     /// <summary>The pool sitting on a node, or null when it carries none.</summary>

@@ -123,7 +123,7 @@ public partial class LevelSelectDesignerWindow
             ShiftPinnedCameras(preset, delta);
         }
 
-        // A souls pool tower's cinematic pins to its pool the same way.
+        // A soul juice tank's cinematic pins to its pool the same way.
         foreach (var pool in TowerCinematicPools())
         {
             if (!pool.towerCinematicPinCameras) continue;
@@ -157,16 +157,20 @@ public partial class LevelSelectDesignerWindow
             var ownLink = t.GetComponent<CameraSequenceLink>();
             if (ownLink != null && IsCameraClamped(ownLink.id)) continue;
             Undo.RecordObject(t, "Move Node");
-            t.position += delta;
+            t.position += PinDelta(ownLink != null ? ownLink.id : null, delta);
             PrefabUtility.RecordPrefabInstancePropertyModifications(t);
         }
 
         // The preset's copies are world positions — every one moves.
         Undo.RecordObject(preset, "Move Node");
         foreach (var stored in preset.storedObjects)
-            if (!IsCameraClamped(stored.linkId)) stored.position += delta;
+            if (!IsCameraClamped(stored.linkId)) stored.position += PinDelta(stored.linkId, delta);
         EditorUtility.SetDirty(preset);
     }
+
+    // A View Target holds the height of its shot's camera (and that shot's Orbit Point / End Camera) — the pin moves it across the map only.
+    private static Vector3 PinDelta(string linkId, Vector3 delta)
+        => CameraSequenceViewTargets.HeightHeld(linkId) ? new Vector3(delta.x, 0f, delta.z) : delta;
 
     // The boat reaching this node plays its camera sequence preset.
     private void DrawNodeCinematic(string nodeId)
@@ -243,7 +247,7 @@ public partial class LevelSelectDesignerWindow
 
     /// <summary>
     /// The preset row, Open in Camera Sequence and Pin Cameras — the same for every cinematic the designer
-    /// places, a node's or a souls pool tower's. Hands back whether New Preset was pressed.
+    /// places, a node's or a soul juice tank's. Hands back whether New Preset was pressed.
     /// </summary>
     private bool DrawCinematicPresetFields(string owner, string noPresetNote,
                                            ref CameraSequencePreset preset, ref bool pin)
@@ -270,13 +274,13 @@ public partial class LevelSelectDesignerWindow
     }
 
     // ─────────────────────────────────────────────
-    // SOULS POOL TOWER
+    // SOUL JUICE TANK
     // ─────────────────────────────────────────────
 
-    /// <summary>A pool whose souls pool tower plays a cinematic as its souls are let out.</summary>
+    /// <summary>A pool whose soul juice tank plays a cinematic as its souls are let out.</summary>
     private static bool HasTowerCinematic(LevelSelectDesignerData.DesignerPool pool)
         => pool != null && pool.hasTower && pool.towerCinematic &&
-           pool.towerKind == LevelSelectDesignerData.TowerKind.SoulsPool;
+           pool.towerKind == LevelSelectDesignerData.TowerKind.SoulJuiceTank;
 
     private IEnumerable<LevelSelectDesignerData.DesignerPool> TowerCinematicPools()
         => _data.pools.Where(HasTowerCinematic);
@@ -285,7 +289,7 @@ public partial class LevelSelectDesignerWindow
         => _data.nodes.Find(n => n != null && n.id == pool.nodeId)?.worldPosition ?? Vector3.zero;
 
     /// <summary>
-    /// The souls pool tower's Cinematic: the same Preset, Open and Pin Cameras as a node's. Its trigger is
+    /// The soul juice tank's Cinematic: the same Preset, Open and Pin Cameras as a node's. Its trigger is
     /// always the tower's own Press E — the press that lets the souls out plays it too — so the prompt and
     /// reach shown here are that release point's, written straight onto the generated tower.
     /// </summary>
@@ -370,7 +374,7 @@ public partial class LevelSelectDesignerWindow
     /// <summary>Writes the pool's cinematic onto its generated tower's release, or clears it.</summary>
     private void ApplyTowerCinematic(LevelSelectDesignerData.DesignerPool pool)
     {
-        var release = FindPoolTower(pool)?.GetComponent<SoulsPoolTowerRelease>();
+        var release = FindPoolTower(pool)?.GetComponent<SoulJuiceTankRelease>();
         if (release == null) return;
 
         var wanted = HasTowerCinematic(pool) ? pool.towerCinematicPreset : null;

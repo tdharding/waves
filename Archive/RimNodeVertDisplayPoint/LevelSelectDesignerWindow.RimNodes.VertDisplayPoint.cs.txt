@@ -1,0 +1,43 @@
+// Slices of Assets/Editor/LevelSelectDesignerWindow.RimNodes.cs as they were on 2026-10-14,
+// before the Screen topper replaced the vert display point.
+
+// --- On Top labels ---
+424:    private static readonly GUIContent[] RimNodeTopperLabels =
+425-    {
+426-        new GUIContent("None"), new GUIContent("Lollipop Tower"), new GUIContent("Vert Display Point"),
+427-        new GUIContent("Turret Tower"),
+428-    };
+429-
+
+// --- Panel fields (DrawRimNodeTopping) ---
+287:        if (topping == null || topping.topper != LevelSelectDesignerData.RimNodeTopper.VertDisplayPoint)
+288-            return;
+289-
+290-        var interact = topping.interact;
+291-        if (interact == null || !interact.enabled || interact.radius <= 0f) return;
+292-
+293-        Vector3 centre = WorldToCanvas(at);
+--
+471:        else if (edited.topper == LevelSelectDesignerData.RimNodeTopper.VertDisplayPoint)
+472-        {
+473-            edited.displayHeight = Mathf.Max(0.001f, EditorGUILayout.FloatField(
+474-                new GUIContent("Display Height", "How tall it stands, from the node floor to " +
+475-                                                 "the top marker on its prefab."), edited.displayHeight));
+476-            edited.interact = DrawInteractBlock(edited.interact);
+477-        }
+
+// --- Placement (RefreshRimNodeToppers) ---
+482-
+483:    private const string VertDisplayPointPrefabPath =
+484-        "Assets/Prefab/LevelSelectPrefabs/LevelSelectVertDisplayPoint.prefab";
+485-    private const string RimNodeToppersChild = "OnTop";
+486-
+548:                case LevelSelectDesignerData.RimNodeTopper.VertDisplayPoint:
+549-                {
+550-                    var display = PlaceOffAligner(VertDisplayPointPrefabPath, container.transform,
+551-                                                  $"VertDisplayPoint_{label}", at, toRiver,
+552-                                                  topping.displayHeight);
+553-                    ApplyInteract(display, topping.interact);
+554-                    break;
+555-                }
+556-            }

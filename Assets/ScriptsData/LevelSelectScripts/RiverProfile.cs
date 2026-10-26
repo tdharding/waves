@@ -56,13 +56,67 @@ public class RiverProfile
     /// <summary>The run is built with no outer walls, so the landscape can run onto its rim.</summary>
     [NonSerialized] public bool wallsOff;
 
+    /// <summary>
+    /// Outer Flare, in world units: how far the outer corner is stretched out past the rim's
+    /// outer edge — and how far it drops by the same — before the outer wall goes on down
+    /// vertically. 0 is the plain wall. Only with the outer walls on.
+    /// </summary>
+    [NonSerialized] public float outerFlare;
+
+    /// <summary>
+    /// The river's width at each node of the path one run was swept along, in that run's own
+    /// local space, path order — the node's width override, or this profile's inner width. Null
+    /// leaves the run its one inner width the whole way. Stamped by the Level Select Designer on
+    /// a copy of this profile for the run it builds from it, never on the shared one: the points
+    /// mean nothing in any other run's space.
+    /// </summary>
+    [NonSerialized] public WidthKey[] widthKeys;
+
+    /// <summary>The channel's width at one node of a run — see <see cref="widthKeys"/>.</summary>
+    public struct WidthKey
+    {
+        public Vector3 at;
+        public float   innerWidth;
+    }
+
+    /// <summary>
+    /// The portholes bored across the run one profile copy is built for, in that run's own local
+    /// space — stamped by the Level Select Designer the same way as <see cref="widthKeys"/>. Null
+    /// for none.
+    /// </summary>
+    [NonSerialized] public PortholeKey[] portholes;
+
+    /// <summary>
+    /// A round hole bored straight across a run under its channel, at one node: through both
+    /// outer walls and any walkway beside them.
+    /// </summary>
+    public struct PortholeKey
+    {
+        public Vector3 at;           // the node
+        public float   radius;
+        public float   height;       // the run's underside up to the hole's centre
+        public float   offsetAlong;  // along the river from the node, the way the path was drawn
+        public float   reach;        // how far out from the centreline the bore goes, either side
+    }
+
     /// <summary>Full outer width — derived, never authored.</summary>
     public float OuterWidth => innerWidth + rimWidth * 2f;
 
     public RiverProfile Clone() => (RiverProfile)MemberwiseClone();
 
+    /// <summary>A copy at one width all the way along, for building what stands at one spot of a run.</summary>
+    public RiverProfile WithInnerWidth(float width)
+    {
+        var copy = Clone();
+        copy.innerWidth = Mathf.Max(0.001f, width);
+        copy.widthKeys  = null;
+        copy.portholes  = null;
+        return copy;
+    }
+
     /// <summary>Identifies the shape, so meshes can be reused when nothing changed.</summary>
     public string ShapeKey =>
         $"{innerWidth:F4}|{rimWidth:F4}|{riverDepth:F4}|{depth:F4}|{jointGroove:F4}" +
-        $"|{rimRounding:F4}|{(wallsOff ? 1 : 0)}";
+        $"|{rimRounding:F4}|{(wallsOff ? 1 : 0)}" +
+        (outerFlare > 0f ? $"|{outerFlare:F4}" : "");
 }

@@ -15,7 +15,8 @@ using UnityEngine;
 /// Two ways one gets onto the map:
 ///
 ///   on a tower ..... a perch block on a rim node topper, a pool island tower or an outpost
-///                    tower. The tip is the top of its orb.
+///                    tower. The tip is the top of its orb. A NomKabar tree — freestanding or on
+///                    a pool island — carries one too, its tip the top of its highest TreeNodeEnd.
 ///   a marker ....... dropped anywhere in Perch mode, standing at its own height on nothing at
 ///                    all. This is what covers everything with no block of its own — park one
 ///                    over a pipe, a wall or a hill and she lands there just the same.
@@ -519,8 +520,12 @@ public partial class LevelSelectDesignerWindow
 
         foreach (var pool in _data.pools)
             if (pool != null && pool.hasTower &&
-                pool.towerKind != LevelSelectDesignerData.TowerKind.SoulsPool &&   // no perch on a souls pool
+                pool.towerKind != LevelSelectDesignerData.TowerKind.SoulJuiceTank &&   // no perch on a soul juice tank
+                pool.towerKind != LevelSelectDesignerData.TowerKind.SoulFishBowl &&    // or a soul fish bowl
                 Starts(pool.towerPerch)) count++;
+
+        foreach (var tree in _data.nomKabarTrees)
+            if (tree != null && Starts(tree.perch)) count++;
 
         foreach (var outpost in _data.outposts)
             if (outpost != null)

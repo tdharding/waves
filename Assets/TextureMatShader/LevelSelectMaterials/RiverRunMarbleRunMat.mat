@@ -162,6 +162,7 @@ Material:
     - _Parallax: 0.005
     - _QueueControl: 0
     - _QueueOffset: 0
+    - _RIVER_RUN_INTERIOR: 0
     - _ReceiveShadows: 0
     - _ShadowIntensity: 2.28
     - _Smoothness: 0.609

@@ -17,7 +17,10 @@ using UnityEngine;
 /// </summary>
 public interface IFogRepeller
 {
-    /// <summary>World position at the waterline. Only .xz is read — the fog is a flat field.</summary>
+    /// <summary>
+    /// World position at the waterline. The fog is a flat field, so .xz places it; .y is only
+    /// tested against the Fog Map's height window around the fog plane.
+    /// </summary>
     Vector3 RepelCentre { get; }
 
     /// <summary>The obstacle's own radius at the waterline.</summary>
@@ -55,4 +58,19 @@ public interface IFogRepeller
     float MaskFeather { get; }
 
     bool RepelActive { get; }
+}
+
+/// <summary>
+/// A repeller that stands up from a base to a top — a freestanding structure's column. The Fog
+/// Map's height window tests the whole of that height, not one point: it counts when ANY part of
+/// it, base to top, is within the window of the fog plane. A tall column standing in a channel
+/// the fog passes over still counts once its top reaches the window.
+/// </summary>
+public interface IFogRepellerSpan
+{
+    /// <summary>World height of its base.</summary>
+    float RepelBottomY { get; }
+
+    /// <summary>World height of its top.</summary>
+    float RepelTopY { get; }
 }

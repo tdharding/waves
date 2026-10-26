@@ -85,6 +85,20 @@
                 },
                 "m_SlotId": 0
             }
+        },
+        {
+            "m_OutputSlot": {
+                "m_Node": {
+                    "m_Id": "5b1e0000000000000000000000000050"
+                },
+                "m_SlotId": 4
+            },
+            "m_InputSlot": {
+                "m_Node": {
+                    "m_Id": "5b1e0000000000000000000000000060"
+                },
+                "m_SlotId": 1
+            }
         }
     ],
     "m_VertexContext": {
@@ -344,6 +358,9 @@
         },
         {
             "m_Id": "5b1e0000000000000000000000000054"
+        },
+        {
+            "m_Id": "5b1e0000000000000000000000000055"
         }
     ],
     "synonyms": [
@@ -487,6 +504,9 @@
     "m_Slots": [
         {
             "m_Id": "5b1e0000000000000000000000000061"
+        },
+        {
+            "m_Id": "5b1e0000000000000000000000000062"
         }
     ],
     "synonyms": [],
@@ -510,6 +530,56 @@
     "m_Hidden": false,
     "m_HideConnector": false,
     "m_ShaderOutputName": "Colour",
+    "m_StageCapability": 3,
+    "m_CustomBinding": "",
+    "m_Value": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+    },
+    "m_DefaultValue": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+    },
+    "m_Labels": []
+}
+
+{
+    "m_SGVersion": 0,
+    "m_Type": "UnityEditor.ShaderGraph.Vector3MaterialSlot",
+    "m_ObjectId": "5b1e0000000000000000000000000055",
+    "m_Id": 4,
+    "m_DisplayName": "BentNormal",
+    "m_SlotType": 1,
+    "m_Hidden": false,
+    "m_HideConnector": false,
+    "m_ShaderOutputName": "BentNormal",
+    "m_StageCapability": 3,
+    "m_CustomBinding": "",
+    "m_Value": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+    },
+    "m_DefaultValue": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+    },
+    "m_Labels": []
+}
+
+{
+    "m_SGVersion": 0,
+    "m_Type": "UnityEditor.ShaderGraph.Vector3MaterialSlot",
+    "m_ObjectId": "5b1e0000000000000000000000000062",
+    "m_Id": 1,
+    "m_DisplayName": "Normal",
+    "m_SlotType": 0,
+    "m_Hidden": false,
+    "m_HideConnector": false,
+    "m_ShaderOutputName": "Normal",
     "m_StageCapability": 3,
     "m_CustomBinding": "",
     "m_Value": {

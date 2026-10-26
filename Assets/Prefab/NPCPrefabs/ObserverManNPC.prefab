@@ -51,6 +51,7 @@ MonoBehaviour:
   upEuler: {x: 0, y: 0, z: 0}
   useWallDepth: 0
   wallDepth: 0
+  wallDepthAxis: 0
   useScaleRadius: 0
   scaleRadius: 3
   usePrefabTopMarker: 1
@@ -156,13 +157,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d8b4df3a8768de44ea168fd1fb8d6b50, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ObserverManNPCController
-  outpost: {fileID: 0}
-  floorCentre: {x: 0, y: 0, z: 0}
-  floorHalfSize: {x: 0, y: 0}
+  travelPath: {fileID: 0}
+  pathPoints: []
+  pathWalk: 0
+  pathGround: []
+  pathPauses: []
   standTimeMin: 3
   standTimeMax: 8
   walkSpeed: 1
   turnSpeed: 270
+  rotSecondsPer90: 0.5
   blendTime: 0.25
 --- !u!1001 &1462603969462084987
 PrefabInstance:
@@ -213,13 +217,21 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -2106161764300793749, guid: d37ba923f1f6e8b4a9a8ac9f9377661b, type: 3}
+      propertyPath: m_Mesh
+      value: 
+      objectReference: {fileID: 4300000, guid: 67dc3fb7a6b630242ba21dbd2ab84483, type: 2}
+    - target: {fileID: -2106161764300793749, guid: d37ba923f1f6e8b4a9a8ac9f9377661b, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: 35adb188a62f8424586e77175cd2600e, type: 2}
+      objectReference: {fileID: 2100000, guid: 8b6ab6daf7b12164e9f06306fa2addc8, type: 2}
+    - target: {fileID: -1526964690268444965, guid: d37ba923f1f6e8b4a9a8ac9f9377661b, type: 3}
+      propertyPath: m_Mesh
+      value: 
+      objectReference: {fileID: 4300000, guid: 3704678fd054c334d92200fdfa1c6639, type: 2}
     - target: {fileID: -1526964690268444965, guid: d37ba923f1f6e8b4a9a8ac9f9377661b, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: 35adb188a62f8424586e77175cd2600e, type: 2}
+      objectReference: {fileID: 2100000, guid: e2ec78de646eac64190718ccabb6a11d, type: 2}
     - target: {fileID: -1461304994638716399, guid: d37ba923f1f6e8b4a9a8ac9f9377661b, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 

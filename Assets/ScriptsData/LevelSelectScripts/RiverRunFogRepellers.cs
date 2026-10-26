@@ -153,35 +153,4 @@ public class RiverRunFogRepellers : MonoBehaviour
         }
         return true;
     }
-
-#if UNITY_EDITOR
-    // Drawn at the run's own height, where the structure is, rather than down at the fog plane.
-    // The manager already draws what it is clearing down there; this is for lining the chain up
-    // against the thing it is meant to be covering.
-    void OnDrawGizmosSelected()
-    {
-        var points = new List<Vector3>();
-        if (!SampleChain(points)) return;
-
-        float radius = FogFieldManager.RunRepelRadius;
-        bool  on     = Repels;
-
-        for (int i = 0; i < points.Count; i++)
-        {
-            Vector3 c = points[i];
-            UnityEditor.Handles.color = on ? new Color(0.95f, 0.55f, 0.35f, 0.14f)
-                                           : new Color(0.55f, 0.55f, 0.58f, 0.10f);
-            UnityEditor.Handles.DrawSolidDisc(c, Vector3.up, radius);
-            UnityEditor.Handles.color = on ? new Color(0.95f, 0.45f, 0.30f, 0.5f)
-                                           : new Color(0.55f, 0.55f, 0.58f, 0.4f);
-            UnityEditor.Handles.DrawWireDisc(c, Vector3.up, radius);
-        }
-
-        UnityEditor.Handles.color = Color.white;
-        UnityEditor.Handles.Label(points[0],
-            on ? $"fog chain {points.Count}"
-               : FogFieldManager.RunsRepel ? $"fog chain {points.Count} (natural runs repel off)"
-                                           : $"fog chain {points.Count} (runs repel off)");
-    }
-#endif
 }

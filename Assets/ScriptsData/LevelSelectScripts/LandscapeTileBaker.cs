@@ -112,7 +112,7 @@ public static class LandscapeTileBaker
 
             float   smooth = _s.SmoothHeight(xz, baseY);
             Vector3 noise  = _s.Noise(xz);
-            float   hold   = _s.Lift(xz, out _);
+            float   hold   = _s.Calm(xz);
             float   height = smooth + noise.x * (1f - hold);   // noise in the geometry only
 
             c.position = _toLocal.MultiplyPoint3x4(new Vector3(world.x, baseY + height, world.z));

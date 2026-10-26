@@ -10,14 +10,17 @@ using UnityEngine;
 /// then back to the first or back and forth. One character per path; the path is the only thing
 /// that moves it.
 ///
-/// Characters are the prefabs in the NPC prefabs folder that carry an ObserverManNPCController.
-/// Clicks land on what is drawn (the Scene View Navigation hit), and a character's feet — its
+/// Characters are the level's, kept in its NPC Character Registry file: a name and a body — one of
+/// the prefabs in the NPC prefabs folder that carry an ObserverManNPCController, shared by as many
+/// characters as like. A path picks one to walk it, and Place in Scene puts its body down. Clicks land on what is drawn (the Scene View Navigation hit), and a character's feet — its
 /// PrefabBaselineAlignment disc — go on the clicked point.
 /// </summary>
 public class NPCPathToolWindow : EditorWindow
 {
     private const string PrefabFolder   = "Assets/Prefab/NPCPrefabs";
     private const string PathFolder     = "Assets/ScriptsData/DataScripts/NPCPaths";
+    private const string RegistryFolder = "Assets/ScriptsData/DataScripts/NPCCharacters";
+    private const string CharacterField = "characterId";
     private const string PathField      = "points";
     private const string WalkField      = "walk";
     private const string GroundField    = "ground";
@@ -40,6 +43,15 @@ public class NPCPathToolWindow : EditorWindow
 
     // The path being worked on — kept across script reloads.
     [SerializeField] private NPCTravelPath _path;
+
+    // The character picked to walk the path who isn't in the scene yet — Place in Scene puts them down.
+    [SerializeField] private string _pendingId;
+
+    // The active scene's characters, and the scene they were loaded for.
+    private NPCCharacterRegistry _registry;
+    private string               _registryScene;
+    private string               _newName = "";
+    private bool                 _showCharacters = true;
 
     private readonly List<NPCTravelPath> _pathFiles = new();
     private readonly List<GameObject>    _prefabs   = new();
@@ -80,7 +92,7 @@ public class NPCPathToolWindow : EditorWindow
 
         SceneView.duringSceneGui           += OnSceneGUI;
         EditorApplication.hierarchyChanged += OnHierarchyChanged;
-        EditorApplication.projectChanged   += LoadPathFiles;
+        EditorApplication.projectChanged   += OnProjectChanged;
         Undo.undoRedoPerformed             += Repaint;
     }
 
@@ -88,10 +100,17 @@ public class NPCPathToolWindow : EditorWindow
     {
         SceneView.duringSceneGui           -= OnSceneGUI;
         EditorApplication.hierarchyChanged -= OnHierarchyChanged;
-        EditorApplication.projectChanged   -= LoadPathFiles;
+        EditorApplication.projectChanged   -= OnProjectChanged;
         Undo.undoRedoPerformed             -= Repaint;
         _mode = ClickMode.None;
         SceneView.RepaintAll();
+    }
+
+    private void OnProjectChanged()
+    {
+        LoadPathFiles();
+        _registry = null;
+        Repaint();
     }
 
     private void OnHierarchyChanged()
@@ -106,7 +125,8 @@ public class NPCPathToolWindow : EditorWindow
         var go  = Selection.activeGameObject;
         var npc = go != null ? go.GetComponentInParent<ObserverManNPCController>(true) : null;
         if (npc == null || npc.TravelPath == null || npc.TravelPath == _path) return;
-        _path = npc.TravelPath;
+        _path      = npc.TravelPath;
+        _pendingId = null;
         SetMode(ClickMode.None);
         Repaint();
         SceneView.RepaintAll();
@@ -141,7 +161,11 @@ public class NPCPathToolWindow : EditorWindow
                        .Where(n => !EditorUtility.IsPersistent(n))
                        .OrderBy(Label)
                        .ToList();
-        foreach (var npc in _inScene) MoveScenePathToFile(npc);
+        foreach (var npc in _inScene)
+        {
+            MoveScenePathToFile(npc);
+            AddToRegistry(npc);
+        }
     }
 
     // Grouped by what it stands under — the popup turns "/" into a submenu.
@@ -236,11 +260,12 @@ public class NPCPathToolWindow : EditorWindow
         if (walk != null)
         {
             int was = walk.enumValueIndex;
-            int now = GUILayout.Toolbar(was, new[] { "Loop", "Back and Forth" });
+            int now = GUILayout.Toolbar(was, new[] { "Loop", "Back and Forth", "Static" });
             if (now != was)
             {
                 walk.enumValueIndex = now;
                 Apply(so);
+                StandAtPathStart(CharacterOn(_path));
                 SceneView.RepaintAll();
             }
         }
@@ -303,6 +328,8 @@ public class NPCPathToolWindow : EditorWindow
         if (EditorGUI.EndChangeCheck() && remove < 0)
         {
             Apply(so);
+            // A Static path faces point 1's Rot where it stands.
+            if (_path.walk == NPCTravelPath.PathWalk.Static) StandAtPathStart(CharacterOn(_path));
             SceneView.RepaintAll();
         }
 
@@ -360,6 +387,7 @@ public class NPCPathToolWindow : EditorWindow
 
         if (now == was && !newFile) return;
         SetMode(ClickMode.None);
+        _pendingId = null;
         _path = newFile ? CreatePathFile(EditorSceneManager.GetActiveScene().name + "_Path")
               : now == 0 ? null
               : _pathFiles[now - 1];
@@ -376,18 +404,31 @@ public class NPCPathToolWindow : EditorWindow
 
         EditorGUILayout.LabelField("Character", EditorStyles.boldLabel);
 
-        // Who walks it: none, or any character in the scene.
+        var registry   = LevelRegistry(false);
+        var characters = registry != null ? registry.characters.Where(c => c != null).ToList()
+                                          : new List<NPCCharacterRegistry.Character>();
+
+        // Who walks it: none, or any of the level's characters — placed or not yet.
         var walker = CharacterOn(_path);
+        if (walker != null) _pendingId = null;
+        string current = walker != null ? walker.CharacterId : _pendingId;
+
         var labels = new List<string> { "None" };
-        labels.AddRange(_inScene.Select(n => n.TravelPath != null && n.TravelPath != _path
-                                                 ? $"{Label(n)}  ({n.TravelPath.name})" : Label(n)));
-        int was = walker == null ? 0 : _inScene.IndexOf(walker) + 1;
+        labels.AddRange(characters.Select(CharacterLabel));
+        int was = characters.FindIndex(c => c.id == current) + 1;
+        if (was == 0 && walker != null)
+        {
+            labels.Add($"{walker.name}  (not in the registry)");
+            was = labels.Count - 1;
+        }
+
         using (new EditorGUILayout.HorizontalScope())
         {
             int now = EditorGUILayout.Popup(new GUIContent("Walked By",
                 "The character who walks this path — one per path. Picking one already on another path " +
-                "moves it onto this one."), was, labels.ToArray());
-            if (now != was) GiveCharacterPath(now == 0 ? null : _inScene[now - 1]);
+                "moves it onto this one; one not in the scene yet is put down with Place in Scene."),
+                was, labels.ToArray());
+            if (now != was && now <= characters.Count) WalkedBy(now == 0 ? null : characters[now - 1]);
 
             using (new EditorGUI.DisabledScope(walker == null))
                 if (GUILayout.Button("Frame", GUILayout.Width(72)))
@@ -399,17 +440,23 @@ public class NPCPathToolWindow : EditorWindow
 
         walker = CharacterOn(_path);
         if (walker != null) DrawCharacterSpeeds(walker);
+        else DrawPlace(registry?.Find(_pendingId));
 
-        // A new character, already on this path.
-        EditorGUILayout.Space(4);
-        if (_prefabs.Count == 0)
+        EditorGUILayout.Space(8);
+        DrawCharacterList(registry);
+    }
+
+    // The picked character who isn't in the scene yet: how big, and where to stand them.
+    private void DrawPlace(NPCCharacterRegistry.Character character)
+    {
+        if (character == null) return;
+        if (character.prefab == null)
         {
-            EditorGUILayout.HelpBox($"No prefabs with an ObserverManNPCController in {PrefabFolder}.", MessageType.Info);
-            if (GUILayout.Button("Look Again")) LoadPrefabs();
+            EditorGUILayout.HelpBox($"{character.name} has no prefab to place.", MessageType.Warning);
             return;
         }
 
-        _prefabIndex = EditorGUILayout.Popup("New Character", _prefabIndex, _prefabs.Select(p => p.name).ToArray());
+        EditorGUILayout.HelpBox($"{character.name} isn't in the scene yet.", MessageType.None);
 
         EditorGUI.BeginChangeCheck();
         _height = Mathf.Max(0.001f, EditorGUILayout.FloatField(
@@ -418,10 +465,106 @@ public class NPCPathToolWindow : EditorWindow
         if (EditorGUI.EndChangeCheck()) EditorPrefs.SetFloat(HeightKey, _height);
 
         bool placing = ModeToggle(_mode == ClickMode.Place, "Place in Scene",
-                                  "Click in the Scene view to stand one there, walking this path. Esc to stop.");
+                                  $"Click in the Scene view to stand {character.name} there, walking this path. Esc to stop.");
         SetMode(placing ? ClickMode.Place : (_mode == ClickMode.Place ? ClickMode.None : _mode));
         if (_mode == ClickMode.Place)
-            EditorGUILayout.HelpBox("Click in the Scene view to stand it there.", MessageType.None);
+            EditorGUILayout.HelpBox($"Click in the Scene view to stand {character.name} there.", MessageType.None);
+    }
+
+    // The level's characters: rename, remove, and make new ones from a prefab.
+    private void DrawCharacterList(NPCCharacterRegistry registry)
+    {
+        _showCharacters = EditorGUILayout.Foldout(_showCharacters, "Level's Characters", true);
+        if (!_showCharacters) return;
+
+        if (string.IsNullOrEmpty(EditorSceneManager.GetActiveScene().name))
+        {
+            EditorGUILayout.HelpBox("Save the scene first — its characters are kept in a file named after it.",
+                                    MessageType.Info);
+            return;
+        }
+
+        if (registry == null || registry.characters.Count == 0)
+            EditorGUILayout.HelpBox("No characters yet.", MessageType.None);
+        else
+        {
+            NPCCharacterRegistry.Character remove = null;
+            foreach (var character in registry.characters)
+            {
+                if (character == null) continue;
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    string name = EditorGUILayout.DelayedTextField(character.name);
+                    if (name != character.name && !string.IsNullOrWhiteSpace(name))
+                        RenameCharacter(registry, character, name);
+                    GUILayout.Label(character.prefab != null ? character.prefab.name : "No prefab",
+                                    EditorStyles.miniLabel, GUILayout.Width(110));
+                    if (GUILayout.Button(new GUIContent("✕", "Takes it out of the level's characters. A body " +
+                            "already in the scene stays where it is."), GUILayout.Width(24)))
+                        remove = character;
+                }
+            }
+            if (remove != null) RemoveCharacter(registry, remove);
+
+            if (GUILayout.Button("Show File")) EditorGUIUtility.PingObject(registry);
+        }
+
+        // A new one: a name and the prefab that is its body.
+        EditorGUILayout.Space(4);
+        if (_prefabs.Count == 0)
+        {
+            EditorGUILayout.HelpBox($"No prefabs with an ObserverManNPCController in {PrefabFolder}.", MessageType.Info);
+            if (GUILayout.Button("Look Again")) LoadPrefabs();
+            return;
+        }
+
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            _newName     = EditorGUILayout.TextField(new GUIContent("New Character",
+                "A name for the new character, and the prefab that is its body."), _newName);
+            _prefabIndex = EditorGUILayout.Popup(_prefabIndex, _prefabs.Select(p => p.name).ToArray(),
+                                                 GUILayout.Width(110));
+            using (new EditorGUI.DisabledScope(string.IsNullOrWhiteSpace(_newName)))
+                if (GUILayout.Button("Add", GUILayout.Width(48)))
+                {
+                    AddCharacter(LevelRegistry(true), _newName, _prefabs[_prefabIndex]);
+                    _newName = "";
+                    GUI.FocusControl(null);
+                }
+        }
+    }
+
+    // "Name", "Name  (Other Path)" when it walks another path, "Name  (not placed)" with no body yet.
+    private string CharacterLabel(NPCCharacterRegistry.Character character)
+    {
+        var body = BodyOf(character.id);
+        if (body == null) return $"{character.name}  (not placed)";
+        return body.TravelPath != null && body.TravelPath != _path
+                   ? $"{character.name}  ({body.TravelPath.name})" : character.name;
+    }
+
+    // The character's body in the scene, if it has one.
+    private ObserverManNPCController BodyOf(string id)
+        => string.IsNullOrEmpty(id) ? null : _inScene.FirstOrDefault(n => n != null && n.CharacterId == id);
+
+    // Puts a character on this path. One in the scene walks it at once; one that isn't waits for
+    // Place in Scene, and the old walker comes off now.
+    private void WalkedBy(NPCCharacterRegistry.Character character)
+    {
+        if (_mode == ClickMode.Place) SetMode(ClickMode.None);
+
+        var body = character != null ? BodyOf(character.id) : null;
+        if (character == null || body != null)
+        {
+            _pendingId = null;
+            GiveCharacterPath(body);
+            return;
+        }
+
+        var walker = CharacterOn(_path);
+        if (walker != null) SetPathFile(walker, null);
+        _pendingId = character.id;
+        SceneView.RepaintAll();
     }
 
     // The character's own speeds — on the character, not the path file.
@@ -526,14 +669,23 @@ public class NPCPathToolWindow : EditorWindow
     // PATH FILES
     // ------------------------------------------------------------------------------------------
 
+    private static void EnsureFolder(string folder)
+    {
+        if (AssetDatabase.IsValidFolder(folder)) return;
+        int cut = folder.LastIndexOf('/');
+        AssetDatabase.CreateFolder(folder.Substring(0, cut), folder.Substring(cut + 1));
+    }
+
+    private static string SafeFileName(string name)
+    {
+        foreach (char bad in System.IO.Path.GetInvalidFileNameChars()) name = name.Replace(bad, '_');
+        return name;
+    }
+
     private NPCTravelPath CreatePathFile(string name)
     {
-        if (!AssetDatabase.IsValidFolder(PathFolder))
-        {
-            int cut = PathFolder.LastIndexOf('/');
-            AssetDatabase.CreateFolder(PathFolder.Substring(0, cut), PathFolder.Substring(cut + 1));
-        }
-        foreach (char bad in System.IO.Path.GetInvalidFileNameChars()) name = name.Replace(bad, '_');
+        EnsureFolder(PathFolder);
+        name = SafeFileName(name);
 
         var file = CreateInstance<NPCTravelPath>();
         AssetDatabase.CreateAsset(file, AssetDatabase.GenerateUniqueAssetPath($"{PathFolder}/{name}.asset"));
@@ -564,6 +716,120 @@ public class NPCPathToolWindow : EditorWindow
         SetPathFile(npc, file);
         Debug.Log($"[NPCPathTool] Moved {npc.name}'s path out of the scene into {AssetDatabase.GetAssetPath(file)} " +
                   "— save the scene to keep the link.", file);
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // CHARACTER REGISTRY
+    // ------------------------------------------------------------------------------------------
+
+    // The active scene's characters — made on first need when create is set. None for an unsaved scene.
+    private NPCCharacterRegistry LevelRegistry(bool create)
+    {
+        string scene = EditorSceneManager.GetActiveScene().name;
+        if (_registry == null || _registryScene != scene)
+        {
+            _registry      = LoadRegistry(scene, false);
+            _registryScene = scene;
+        }
+        if (_registry == null && create) _registry = LoadRegistry(scene, true);
+        return _registry;
+    }
+
+    // {scene}_Characters in the characters folder.
+    private static NPCCharacterRegistry LoadRegistry(string scene, bool create)
+    {
+        if (string.IsNullOrEmpty(scene)) return null;
+
+        string path     = $"{RegistryFolder}/{SafeFileName(scene)}_Characters.asset";
+        var    registry = AssetDatabase.LoadAssetAtPath<NPCCharacterRegistry>(path);
+        if (registry != null || !create) return registry;
+
+        EnsureFolder(RegistryFolder);
+        registry = CreateInstance<NPCCharacterRegistry>();
+        AssetDatabase.CreateAsset(registry, path);
+        AssetDatabase.SaveAssets();
+        Debug.Log($"[NPCPathTool] New character registry {path}.", registry);
+        return registry;
+    }
+
+    private static NPCCharacterRegistry.Character AddCharacter(NPCCharacterRegistry registry, string name, GameObject prefab)
+    {
+        Undo.RecordObject(registry, "New Character");
+        var character = new NPCCharacterRegistry.Character
+        {
+            id     = System.Guid.NewGuid().ToString("N"),
+            name   = UniqueName(registry, name, null),
+            prefab = prefab,
+        };
+        registry.characters.Add(character);
+        SaveRegistry(registry);
+        return character;
+    }
+
+    // Renames the body in the scene too, so the Hierarchy reads the same.
+    private void RenameCharacter(NPCCharacterRegistry registry, NPCCharacterRegistry.Character character, string name)
+    {
+        Undo.RecordObject(registry, "Rename Character");
+        character.name = UniqueName(registry, name, character);
+        SaveRegistry(registry);
+
+        foreach (var body in _inScene.Where(n => n != null && n.CharacterId == character.id))
+        {
+            Undo.RecordObject(body.gameObject, "Rename Character");
+            body.gameObject.name = character.name;
+        }
+    }
+
+    private void RemoveCharacter(NPCCharacterRegistry registry, NPCCharacterRegistry.Character character)
+    {
+        Undo.RecordObject(registry, "Remove Character");
+        registry.characters.Remove(character);
+        SaveRegistry(registry);
+        if (_pendingId == character.id)
+        {
+            _pendingId = null;
+            if (_mode == ClickMode.Place) SetMode(ClickMode.None);
+        }
+    }
+
+    // Two characters can't share a name — the dropdown couldn't tell them apart.
+    private static string UniqueName(NPCCharacterRegistry registry, string name, NPCCharacterRegistry.Character except)
+    {
+        string baseName = string.IsNullOrWhiteSpace(name) ? "Character" : name.Trim();
+        string unique   = baseName;
+        for (int k = 2; registry.characters.Any(c => c != null && c != except && c.name == unique); k++)
+            unique = $"{baseName} {k}";
+        return unique;
+    }
+
+    private static void SaveRegistry(NPCCharacterRegistry registry)
+    {
+        EditorUtility.SetDirty(registry);
+        AssetDatabase.SaveAssetIfDirty(registry);
+    }
+
+    private static void SetCharacterId(ObserverManNPCController npc, string id)
+    {
+        var npcSo = new SerializedObject(npc);
+        npcSo.FindProperty(CharacterField).stringValue = id;
+        npcSo.ApplyModifiedProperties();
+    }
+
+    // A character placed before there was a registry joins its scene's, once, under its own name.
+    private static void AddToRegistry(ObserverManNPCController npc)
+    {
+        if (npc == null || !string.IsNullOrEmpty(npc.CharacterId)) return;
+        if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+
+        var registry = LoadRegistry(npc.gameObject.scene.name, true);
+        if (registry == null) return;
+
+        string prefabPath = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(npc.gameObject);
+        var    prefab     = string.IsNullOrEmpty(prefabPath) ? null : AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+        var    character  = AddCharacter(registry, npc.name, prefab);
+        SetCharacterId(npc, character.id);
+        Debug.Log($"[NPCPathTool] Added {npc.name} to {AssetDatabase.GetAssetPath(registry)} as '{character.name}' " +
+                  "— save the scene to keep the link.", registry);
     }
 
     // Applies an edit and, for a path file, writes the file straight away.
@@ -620,11 +886,17 @@ public class NPCPathToolWindow : EditorWindow
 
     private void PlaceCharacter(Vector3 point)
     {
-        if (_prefabs.Count == 0) return;
-        var prefab = _prefabs[_prefabIndex];
+        var character = LevelRegistry(false)?.Find(_pendingId);
+        var prefab    = character?.prefab;
+        if (prefab == null)
+        {
+            SetMode(ClickMode.None);
+            return;
+        }
 
         var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab, EditorSceneManager.GetActiveScene());
         Undo.RegisterCreatedObjectUndo(go, "Place Character");
+        go.name = character.name;
 
         // Feet on the clicked point: the prefab's PrefabBaselineAlignment disc, or its root.
         // Sized by Height against the prefab's top marker.
@@ -635,9 +907,11 @@ public class NPCPathToolWindow : EditorWindow
                               "stands at the prefab's own size.");
 
         var npc = go.GetComponent<ObserverManNPCController>();
+        SetCharacterId(npc, character.id);
         go.transform.position += point - npc.FeetWorld();
         GameObjectUtility.EnsureUniqueNameForSibling(go);
 
+        _pendingId = null;
         SetMode(ClickMode.None);
         FindInScene();
         GiveCharacterPath(npc);

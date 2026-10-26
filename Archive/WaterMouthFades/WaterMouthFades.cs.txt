@@ -1,0 +1,281 @@
+// ARCHIVED 2026-10-25 — verbatim slices of the mouth fades as they stood before removal. Not compiled. See README.md.
+
+// ═══ RiverEdgeRippleSettings.cs — fields ═══
+    [Tooltip("Where a branch's water runs back over the river it leaves, its lines take on that " +
+             "river's Reach (and Bevel) — held along its banks, gone from its middle — easing over " +
+             "across this many metres past that river's waterline. Needs Rebuild Runs once. 0 " +
+             "leaves the branch's own lines running straight out across it.")]
+    [Min(0f)] public float branchMouthFade = 0f;
+
+    [Tooltip("How far back OUT in the branch that change-over starts, in metres. 0 starts it on " +
+             "the waterline of the river it leaves. Needs Rebuild Runs once.")]
+    [Min(0f)] public float branchMouthInset = 0f;
+    [Tooltip("Where a pool's water runs out down a river, its rings take on that river's Reach " +
+             "(and Bevel) — held along the banks, gone from the middle — easing over across this " +
+             "many metres past the pool's circle. Needs Rebuild Runs once. 0 leaves the rings at " +
+             "full all the way down.")]
+    [Min(0f)] public float poolMouthFade = 0f;
+
+    [Tooltip("How far INSIDE the pool's circle that change-over to a river's Reach starts, in " +
+             "metres. 0 starts it on the circle. Needs Rebuild Runs once.")]
+    [FormerlySerializedAs("poolMouthInset")]
+    [Min(0f)] public float poolMouthReachOverlap = 0f;
+
+    [Tooltip("How far past the pool's waterline its rings carry on out into a river, in metres, " +
+             "fading out over that distance. Separate from Reach — this ends the rings outright. " +
+             "The water itself stays solid. 0 leaves them running all the way down.")]
+    [Min(0f)] public float poolMouthExtent = 0f;
+
+// ═══ RiverEdgeRippleSettings.cs — ids / push / copy ═══
+129:    [Min(0f)] public float branchMouthFade = 0f;
+133:    [Min(0f)] public float branchMouthInset = 0f;
+186:    [Min(0f)] public float poolMouthFade = 0f;
+190:    [FormerlySerializedAs("poolMouthInset")]
+191:    [Min(0f)] public float poolMouthReachOverlap = 0f;
+196:    [Min(0f)] public float poolMouthExtent = 0f;
+314:    private static readonly int BranchMouthFadeId     = Shader.PropertyToID("_RiverEdgeRippleBranchMouthFade");
+315:    private static readonly int BranchMouthInsetId    = Shader.PropertyToID("_RiverEdgeRippleBranchMouthInset");
+326:    private static readonly int PoolMouthFadeId       = Shader.PropertyToID("_RiverEdgeRipplePoolMouthFade");
+327:    private static readonly int PoolMouthReachOverlapId = Shader.PropertyToID("_RiverEdgeRipplePoolMouthReachOverlap");
+328:    private static readonly int PoolMouthExtentId     = Shader.PropertyToID("_RiverEdgeRipplePoolMouthExtent");
+399:        Shader.SetGlobalFloat(BranchMouthFadeId,     branchMouthFade);
+400:        Shader.SetGlobalFloat(BranchMouthInsetId,    branchMouthInset);
+412:        Shader.SetGlobalFloat(PoolMouthFadeId,       poolMouthFade);
+413:        Shader.SetGlobalFloat(PoolMouthReachOverlapId, poolMouthReachOverlap);
+414:        Shader.SetGlobalFloat(PoolMouthExtentId,     poolMouthExtent);
+462:        branchMouthFade  = other.branchMouthFade;
+463:        branchMouthInset = other.branchMouthInset;
+475:        poolMouthFade       = other.poolMouthFade;
+476:        poolMouthReachOverlap = other.poolMouthReachOverlap;
+477:        poolMouthExtent     = other.poolMouthExtent;
+
+// ═══ RiverEdgeRipples.hlsl — globals ═══
+float _RiverEdgeRippleBranchMouthFade;  // metres past the joined river's bank a branch's lines take on its reach; 0 = off
+float _RiverEdgeRippleBranchMouthInset; // metres out into the branch that change-over starts
+float _RiverEdgeRipplePoolMouthFade;       // metres past the pool circle the rings take on a river's reach; 0 = off
+float _RiverEdgeRipplePoolMouthReachOverlap; // metres inside the pool circle that change-over starts
+float _RiverEdgeRipplePoolMouthExtent;     // metres past the waterline the rings fade out over; 0 = no end
+
+// ═══ RiverEdgeRipples.hlsl — pool mouth fade/extent ═══
+        // Pool Mouth Fade: toward a river, the rings take on the Reach of that river — held along
+        // its banks, gone from its middle, on the river lines' own curve — easing over from the
+        // pool's own mask across this many metres. The ease starts Pool Mouth Reach Overlap metres inside
+        // the pool's circle (0 = on it) and runs on out down the strip. Only the rings — the
+        // water stays solid, since the river's own water does not reach in under the strip.
+        if (_RiverEdgeRipplePoolMouthFade > 0.0001 && BankData.z > 0.0001)
+        {
+            float bankA = max(BankData.x, 0.0);
+            float bankB = max(BankData.y, 0.0);
+            float be    = min(bankA, bankB);
+            float reach = _RiverEdgeRippleReach * 0.01 * (bankA + bankB);
+            float bh    = 1.0 - saturate(be / max(reach, 0.0001));
+            float bank  = lerp(RiverEdgeSmootherStep(bh), bh, saturate(_RiverEdgeRippleBevel));
+
+            float start = EdgeData.z - max(_RiverEdgeRipplePoolMouthReachOverlap, 0.0);
+            float past  = max(radius - start, 0.0);
+            float blend = RiverEdgeSmootherStep(saturate(past / _RiverEdgeRipplePoolMouthFade))
+                        * saturate(BankData.z);
+            poolMask *= lerp(1.0, bank, blend);
+        }
+
+        // Pool Mouth Extent: past the outer waterline the only water left is a strip running out
+        // down a river, and the rings end outright over this many metres of it — on top of any
+        // change-over to the river's Reach above.
+        if (_RiverEdgeRipplePoolMouthExtent > 0.0001)
+        {
+            float beyond = radius - EdgeData.x;
+            poolMask *= RiverEdgeSmootherStep(1.0 - saturate(beyond / _RiverEdgeRipplePoolMouthExtent));
+        }
+
+// ═══ RiverEdgeRipples.hlsl — branch mouth fade ═══
+    // Branch Mouth Fade: a branch's water runs back across the mouth to the edge of the river it
+    // leaves. Going in toward that river's near waterline, the branch's lines take on THAT
+    // river's Reach — held along its banks, gone from its middle — easing over across
+    // this many metres, so they stop carrying the branch's own banks straight out across it. The
+    // ease starts Branch Mouth Inset metres back out in the branch (0 = on the waterline). The
+    // branch's own mask still applies; this multiplies onto it, as the pool's does.
+    if (_RiverEdgeRippleBranchMouthFade > 0.0001 && BankData.z > 0.0001)
+    {
+        float bankA = max(BankData.x, 0.0);
+        float bankB = max(BankData.y, 0.0);
+        float be    = min(bankA, bankB);
+        float jr    = _RiverEdgeRippleReach * 0.01 * (BankData.x + BankData.y);
+        float bh    = 1.0 - saturate(be / max(jr, 0.0001));
+        float bank  = lerp(RiverEdgeSmootherStep(bh), bh, saturate(_RiverEdgeRippleBevel));
+
+        float past  = BankData.x + max(_RiverEdgeRippleBranchMouthInset, 0.0);
+        float blend = RiverEdgeSmootherStep(saturate(past / _RiverEdgeRippleBranchMouthFade))
+                    * saturate(BankData.z);
+        mask *= lerp(1.0, bank, blend);
+    }
+
+// ═══ RiverMeshBuilder.cs — BuildWater: branch water flagged with the joined river's banks (UV3) ═══
+        // The river a branch leaves. A ring still lying within the joined river's own width of
+        // its near bank carries that river's banks; the first ring past that, and every ring after
+        // it, carries none. Decided per ring pair rather than per corner, so no face is left
+        // half-flagged and interpolating a blend that fades out across it.
+        bool joining = join.HasValue;
+        DebugJoinQuads = 0; DebugJoinAlong = 0f; DebugJoinMaxIn = float.NegativeInfinity;
+        DebugWaterLength = along[rings - 1];
+        for (int j = first; j < rings - 1; j++)
+        {
+            if (joining)
+            {
+                var jn = join.Value;
+                joining = jn.Near(left[j]) || jn.Near(right[j]) ||
+                          jn.Near(left[j + 1]) || jn.Near(right[j + 1]);
+                b.BankAt = joining ? jn.BankAt : null;
+
+                // DEBUG (branch mouth fade at pools): where the flagged stretch reaches, and the
+                // most any flagged corner lies INSIDE the joined river's water.
+                if (joining)
+                {
+                    DebugJoinQuads = j + 1;
+                    DebugJoinAlong = along[j + 1];
+                    DebugJoinMaxIn = Mathf.Max(DebugJoinMaxIn,
+                        Mathf.Max(jn.BankAt(left[j + 1]).x, jn.BankAt(right[j + 1]).x));
+                }
+            }
+
+            // The lines run the whole length of the ribbon — across a junction mouth and over a
+            // pool's rim — with nothing easing them off at either end.
+            int k = j + 1;
+            b.Quad(left[j], left[k], right[k], right[j],
+                   RunEdgeData(shores[j], -halves[j], alongL[j]),
+                   RunEdgeData(shores[k], -halves[k], alongL[k]),
+                   RunEdgeData(shores[k],  halves[k], alongR[k]),
+                   RunEdgeData(shores[j],  halves[j], alongR[j]),
+                   RunFlowData(-halves[j], alongL[j]),
+                   RunFlowData(-halves[k], alongL[k]),
+                   RunFlowData( halves[k], alongR[k]),
+                   RunFlowData( halves[j], alongR[j]));
+        }
+
+        b.BankAt = null;
+
+// ═══ RiverMeshBuilder.cs — RiverJoin ═══
+    /// <summary>
+    /// The river a branch leaves, as its water sees it: a straight line across the junction.
+    ///
+    /// A branch's water runs back across the mouth and stops on the edge of that river's water,
+    /// cut along it (<see cref="ribbon"/>), so the two butt and nothing lies over anything. Near
+    /// that edge its lines should belong to THAT river's banks — held along them, gone from its
+    /// middle — rather than carrying the branch's own banks straight out to it. So every corner
+    /// near the junction carries, on UV3, how far it lies from each of that river's waterlines,
+    /// which the shader turns into that river's Reach and eases the branch's own over to.
+    ///
+    /// The river is taken as straight across the junction: its tangent there. Both distances are
+    /// straight lines, so they interpolate exactly across a face.
+    /// </summary>
+    // DEBUG (branch mouth fade at pools) — read by the designer straight after BuildWater.
+    public static int   DebugJoinQuads;
+    public static float DebugJoinAlong, DebugJoinMaxIn, DebugWaterLength;
+
+    public struct RiverJoin
+    {
+        /// <summary>A point on that river's centreline, in the water's own space.</summary>
+        public Vector3 point;
+
+        /// <summary>Flat unit direction across that river, facing out toward the branch.</summary>
+        public Vector3 across;
+
+        /// <summary>Half the width of that river's water.</summary>
+        public float shore;
+
+        /// <summary>How far out past its near waterline, into the branch, the banks are still
+        /// carried. That river's outer width: past it the branch is its own water.</summary>
+        public float extent;
+
+        /// <summary>Half the width that river's water is BUILT to — the edge of its ribbon, which
+        /// is the line this water is cut on and stops at. 0 leaves it uncut.</summary>
+        public float ribbon;
+
+        private float Out(Vector3 corner)
+        {
+            Vector3 d = corner - point;
+            d.y = 0f;
+            return Vector3.Dot(d, across);
+        }
+
+        /// <summary>Metres a corner lies out past the edge of that river's water, toward the
+        /// branch; negative over that river's water.</summary>
+        public float PastEdge(Vector3 corner) => Out(corner) - ribbon;
+
+        public bool Near(Vector3 corner) => Out(corner) <= shore + extent;
+
+        /// <summary>
+        /// UV3 for one corner: .x metres to that river's NEAR waterline (the branch's side),
+        /// positive inside its water and negative out in the branch; .y metres to its far
+        /// waterline; .z 1, carrying.
+        /// </summary>
+        public Vector4 BankAt(Vector3 corner)
+        {
+            float off = Out(corner);
+            return new Vector4(shore - off, shore + off, 1f, 0f);
+        }
+    }
+
+    /// <summary>
+    /// The frame one corner of a river's water is drawn in: which way is along it, which way is
+    /// across it, and how much of it is really there.
+    ///
+    /// A river's lines lie along its banks, so along is metres down the channel and across is
+    /// metres off the centreline. Because both are measured on the sweep itself rather than in
+    /// the world, they follow the river round its bends — which is what carries the lines round
+    /// a branch as it curves away from the river it left.
+    ///
+    /// The third channel is always 1: no water laps over another's any more.
+    /// </summary>
+    private static Vector4 RunFlowData(float across, float along)
+
+// ═══ RiverMeshBuilder.cs — pool sheet + strip UV3 ═══
+        // It carries UV3 too, so Pool Mouth Reach Overlap can start a river's reach inside the circle:
+        // each corner takes the river it faces. See SheetBank.
+        b.BankAt = corner => SheetBank(corner, flats, waterLevel, edge);
+
+            // UV3: the river this strip runs down — metres to its waterline either side, read off
+            // the corner's offset across it, against the same shore the river's own water measures
+            // from. Straight lines across a flat face, so it interpolates exactly. Only the strip
+            // carries it; the sheet inside the circle has none.
+            float riverShore = WaterHalfWidth(f.section, waterLevel);
+            float centreline = Vector3.Dot(f.end, f.across);
+            b.BankAt = corner =>
+            {
+                float off = Vector3.Dot(corner, f.across) - centreline;
+                return new Vector4(riverShore + off, riverShore - off, 1f, 0f);
+            };
+
+    }
+
+    /// <summary>
+    /// UV3 for a corner of the pool's own sheet: the river whose heading it lies nearest, and
+    /// its metres to that river's waterline either side, exactly as a strip carries them — so
+    /// the two agree along the circle they meet on. .z is 1 only between that river's banks
+    /// (give or take <paramref name="margin"/>), 0 anywhere else, and the shader weights the
+    /// river's reach by it. That keeps a face lying between two rivers — whose corners read two
+    /// different rivers, and whose distances mean nothing interpolated — out of it entirely.
+    /// Past a river's banks its reach is full anyway, so where .z steps off nothing shows.
+    /// </summary>
+    private static Vector4 SheetBank(Vector3 corner, List<WaterFlat> flats, float waterLevel, float margin)
+    {
+        corner.y = 0f;
+        if (flats.Count == 0 || corner.sqrMagnitude < 1e-8f) return Vector4.zero;
+
+        Vector3 heading = corner.normalized;
+        int     best    = -1;
+        float   nearest = 0f;
+        for (int i = 0; i < flats.Count; i++)
+        {
+            float d = Vector3.Dot(heading, flats[i].dir);
+            if (d > nearest) { nearest = d; best = i; }
+        }
+        if (best < 0) return Vector4.zero;
+
+        var   f     = flats[best];
+        float shore = WaterHalfWidth(f.section, waterLevel);
+        float off   = Vector3.Dot(corner, f.across) - Vector3.Dot(f.end, f.across);
+        float held  = Mathf.Abs(off) <= shore + margin ? 1f : 0f;
+        return new Vector4(shore + off, shore - off, held, 0f);
+    }
+
+    /// <summary>

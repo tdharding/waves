@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Unity.Cinemachine;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -21,29 +22,72 @@ public sealed class CinemachinePreviewRig : IDisposable
     int cachedRendererIndex = -1;
     UniversalAdditionalCameraData cachedRendererSource;
 
+    // The watched camera's own post (its Cinemachine Volume Settings), worn for the one render. Switched off
+    // the rest of the time, so the game and the Scene view never see it.
+    Volume previewVolume;
+
+    // The brain's own volumes carry whichever camera is LIVE - muted for the render, or every preview would
+    // wear the live camera's depth of field. Their weights, to put back.
+    readonly List<Volume> mutedVolumes = new List<Volume>();
+    readonly List<float>  mutedWeights = new List<float>();
+
+    // The Depth of Field whose Focus Distance was set for the render, and what it was.
+    DepthOfField focusedDof;
+    float        focusWas;
+    bool         focusOverrideWas;
+
     // Renders the camera's view into the target. False when there is nothing to render with.
     // beforeRender is handed the hidden camera once it is standing where the view is, just before it draws.
-    public bool Render(CinemachineVirtualCameraBase cam, RenderTexture target, Action<Camera> beforeRender = null)
+    // focusOn, when set, is what the camera's depth of field focuses on (as a Camera Sequence's Focus On
+    // View Target does at runtime), in place of its own Focus Tracking. post, when set, is the Volume Settings
+    // worn in place of the camera's own - a Camera Influence camera is seen through the follow camera's post.
+    // shotProfile, when set, is a Camera Sequence shot's own Volume, worn as the shot wears it: in place of the
+    // settings' profile, Focus Tracking off, focused only by focusOn.
+    public bool Render(CinemachineVirtualCameraBase cam, RenderTexture target, Action<Camera> beforeRender = null,
+                       Transform focusOn = null, CinemachineVolumeSettings post = null, VolumeProfile shotProfile = null)
     {
         if (cam == null || target == null) return false;
 
         EnsureRig();
         if (previewCam == null) return false;
 
-        CopySettingsFrom(SourceCamera(cam));
+        var source = SourceCamera(cam);
+        CopySettingsFrom(source);
         bool isolated = PlaceRigFor(cam);
         ApplyState(cam, isolated);
-        beforeRender?.Invoke(previewCam);
 
-        previewCam.targetTexture = target;
-        previewCam.aspect        = (float)target.width / target.height;
+        try
+        {
+            WearPost(cam, source, focusOn, post, shotProfile);
+            beforeRender?.Invoke(previewCam);
 
-        var request = new UniversalRenderPipeline.SingleCameraRequest { destination = target };
-        if (RenderPipeline.SupportsRenderRequest(previewCam, request))
-            RenderPipeline.SubmitRenderRequest(previewCam, request);
-        else
-            previewCam.Render();
+            previewCam.targetTexture = target;
+            previewCam.aspect        = (float)target.width / target.height;
 
+            var request = new UniversalRenderPipeline.SingleCameraRequest { destination = target };
+            if (RenderPipeline.SupportsRenderRequest(previewCam, request))
+                RenderPipeline.SubmitRenderRequest(previewCam, request);
+            else
+                previewCam.Render();
+        }
+        finally
+        {
+            TakeOffPost();
+        }
+
+        return true;
+    }
+
+    // The ray from the last rendered view through a point on it (0-1 across, 0-1 up), and the layers that view
+    // draws. False before anything has rendered.
+    public bool TryViewportRay(Vector2 viewport, out Ray ray, out int cullingMask)
+    {
+        ray = default;
+        cullingMask = 0;
+        if (previewCam == null) return false;
+
+        ray = previewCam.ViewportPointToRay(new Vector3(viewport.x, viewport.y, 0f));
+        cullingMask = previewCam.cullingMask;
         return true;
     }
 
@@ -96,6 +140,7 @@ public sealed class CinemachinePreviewRig : IDisposable
             UnityEngine.Object.DestroyImmediate(previewCam.gameObject);
             previewCam = null;
         }
+        previewVolume = null;
 
         cachedRendererSource = null;
         cachedRendererIndex  = -1;
@@ -224,6 +269,155 @@ public sealed class CinemachinePreviewRig : IDisposable
         {
             previewCam.fieldOfView = Mathf.Clamp(lens.FieldOfView, 1f, 179f);
         }
+    }
+
+    // What the brain would put on the game camera with this camera live: its Volume Settings profile at its
+    // Weight, with the focus worked out the way CinemachineVolumeSettings does it (distance from the camera
+    // to the tracked thing, plus Focus Offset, written only into the Depth of Field's Focus Distance).
+    void WearPost(CinemachineVirtualCameraBase cam, Camera source, Transform focusOn, CinemachineVolumeSettings post,
+                  VolumeProfile shotProfile)
+    {
+        MuteBrainVolumes(source);
+
+        var settings = post;
+        if (settings == null) cam.TryGetComponent(out settings);
+        if (settings == null || !settings.enabled) return;
+        var profile = shotProfile != null ? shotProfile : settings.Profile;
+        if (profile == null || profile.components.Count == 0) return;
+        // Look At / Follow belong to the camera the settings are on.
+        if (post != null && post.TryGetComponent(out CinemachineVirtualCameraBase owner)) cam = owner;
+
+        var tracking = focusOn != null      ? CinemachineVolumeSettings.FocusTrackingMode.CustomTarget
+                     : shotProfile != null  ? CinemachineVolumeSettings.FocusTrackingMode.None
+                     : settings.FocusTracking;
+        if (tracking != CinemachineVolumeSettings.FocusTrackingMode.None && profile.TryGet(out DepthOfField dof))
+        {
+            Transform tracked = null;
+            switch (tracking)
+            {
+                case CinemachineVolumeSettings.FocusTrackingMode.LookAtTarget: tracked = cam.LookAt; break;
+                case CinemachineVolumeSettings.FocusTrackingMode.FollowTarget: tracked = cam.Follow; break;
+                case CinemachineVolumeSettings.FocusTrackingMode.CustomTarget:
+                    tracked = focusOn != null ? focusOn : settings.FocusTarget; break;
+            }
+
+            // A shot's focus is the distance alone, as CameraSequence.FocusedCopy sets it.
+            float distance = shotProfile != null ? 0f : settings.FocusOffset;
+            if (tracked != null) distance += (previewCam.transform.position - tracked.position).magnitude;
+            distance = Mathf.Max(0f, distance);
+
+            // The profile is the shared asset - set for this render only, and put back straight after it.
+            focusedDof       = dof;
+            focusWas         = dof.focusDistance.value;
+            focusOverrideWas = dof.focusDistance.overrideState;
+            dof.focusDistance.value         = distance;
+            dof.focusDistance.overrideState = true;
+            if (previewCam.usePhysicalProperties) previewCam.focusDistance = distance;
+        }
+
+        if (previewVolume == null)
+        {
+            previewVolume = previewCam.gameObject.AddComponent<Volume>();
+            previewVolume.enabled = false;
+        }
+        previewVolume.gameObject.layer = FirstVolumeLayer();
+        previewVolume.isGlobal      = true;
+        previewVolume.priority      = CinemachineVolumeSettings.s_VolumePriority;
+        previewVolume.weight        = settings.Weight;
+        previewVolume.sharedProfile = profile;
+        previewVolume.enabled       = true;
+
+        DebugFocus(cam, settings, profile, shotProfile, focusOn, tracking);
+    }
+
+    // [CmFocusDebug] — temporary: what the preview's depth of field is given, logged when it changes.
+    static string s_lastFocusDebug;
+    void DebugFocus(CinemachineVirtualCameraBase cam, CinemachineVolumeSettings settings, VolumeProfile profile,
+                    VolumeProfile shotProfile, Transform focusOn, CinemachineVolumeSettings.FocusTrackingMode tracking)
+    {
+        string dofText = profile.TryGet(out DepthOfField d)
+            ? $"dof active={d.active} mode={d.mode.value}(ov {d.mode.overrideState}) focus={d.focusDistance.value:F2}(ov {d.focusDistance.overrideState}) " +
+              $"aperture={d.aperture.value} focal={d.focalLength.value}"
+            : "NO DOF";
+        var data = previewCam.GetUniversalAdditionalCameraData();
+        string others = string.Empty;
+        foreach (var v in VolumeManager.instance.GetVolumes(data.volumeLayerMask))
+            if (v != null && v.isActiveAndEnabled && v != previewVolume)
+                others += $" [{v.name} global={v.isGlobal} prio={v.priority} w={v.weight} profile={(v.sharedProfile != null ? v.sharedProfile.name : "null")}]";
+        string line = $"[CmFocusDebug] '{cam.name}' shotProfile={(shotProfile != null ? shotProfile.name : "null")} " +
+                      $"worn={profile.name} settingsProfile={(settings.Profile != null ? settings.Profile.name : "null")} " +
+                      $"tracking={tracking} focusOn={(focusOn != null ? focusOn.name : "null")} " +
+                      $"camPos={previewCam.transform.position} {dofText} post={data.renderPostProcessing} " +
+                      $"volLayer={previewVolume.gameObject.layer} prio={previewVolume.priority} w={previewVolume.weight} others:{others}";
+        // The distance moves a hair as the camera settles - log only real changes.
+        string key = System.Text.RegularExpressions.Regex.Replace(line, @"camPos=\([^)]*\)", "");
+        if (key == s_lastFocusDebug) return;
+        s_lastFocusDebug = key;
+        Debug.Log(line);
+        s_stackLogFor = previewCam;
+        RenderPipelineManager.endCameraRendering -= LogStack;
+        RenderPipelineManager.endCameraRendering += LogStack;
+    }
+
+    // [CmFocusDebug] — what the volume stack held while the preview camera drew, once per logged change.
+    static Camera s_stackLogFor;
+    static void LogStack(ScriptableRenderContext context, Camera camera)
+    {
+        if (camera != s_stackLogFor) return;
+        RenderPipelineManager.endCameraRendering -= LogStack;
+        s_stackLogFor = null;
+        var stack = VolumeManager.instance.stack;
+        var dof   = stack != null ? stack.GetComponent<DepthOfField>() : null;
+        var data  = camera.GetUniversalAdditionalCameraData();
+        Debug.Log($"[CmFocusDebug] STACK while '{camera.name}' drew: " +
+                  (dof != null ? $"active={dof.IsActive()} mode={dof.mode.value} focus={dof.focusDistance.value:F2} aperture={dof.aperture.value} focal={dof.focalLength.value}" : "no DoF in stack") +
+                  $", depthTex={data.requiresDepthTexture} depthMode={camera.depthTextureMode} near={camera.nearClipPlane:F3} far={camera.farClipPlane:F1} " +
+                  $"physical={camera.usePhysicalProperties} target={(camera.targetTexture != null ? $"{camera.targetTexture.width}x{camera.targetTexture.height}" : "none")}");
+    }
+
+    void TakeOffPost()
+    {
+        if (previewVolume != null) previewVolume.enabled = false;
+
+        if (focusedDof != null)
+        {
+            focusedDof.focusDistance.value         = focusWas;
+            focusedDof.focusDistance.overrideState = focusOverrideWas;
+        }
+        focusedDof = null;
+
+        for (int i = 0; i < mutedVolumes.Count; i++)
+            if (mutedVolumes[i] != null) mutedVolumes[i].weight = mutedWeights[i];
+        mutedVolumes.Clear();
+        mutedWeights.Clear();
+    }
+
+    // CinemachineVolumeSettings keeps the live camera's profiles on hidden volumes under the brain's camera.
+    void MuteBrainVolumes(Camera source)
+    {
+        if (source == null) return;
+
+        var t = source.transform;
+        for (int c = 0; c < t.childCount; c++)
+        {
+            var child = t.GetChild(c);
+            if (child.hideFlags != HideFlags.HideAndDontSave) continue;
+            foreach (var volume in child.GetComponents<Volume>())
+            {
+                mutedVolumes.Add(volume);
+                mutedWeights.Add(volume.weight);
+                volume.weight = 0f;
+            }
+        }
+    }
+
+    // The volume has to sit on a layer the camera's Volume Mask sees - the first one, as Cinemachine picks.
+    int FirstVolumeLayer()
+    {
+        int mask = previewCam.GetUniversalAdditionalCameraData().volumeLayerMask;
+        for (int i = 0; i < 32; i++)
+            if ((mask & (1 << i)) != 0) return i;
+        return 0;
     }
 
     static LensSettings LensOf(CinemachineVirtualCameraBase cam)

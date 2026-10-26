@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2b36669c5c2c074e98951dc757d05dd, type: 3}
+  m_Name: DamgeLollyPopTowerPreset1b
+  m_EditorClassIdentifier: Assembly-CSharp::LollipopTowerPreset
+  tower:
+    stemRadius: 0.3
+    stemHeight: 0.2
+    orbRadius: 0.5
+    baseRadius: 0.59
+    baseHeight: 0.2
+    lowerRampHeight: 0.35
+    lowerRampRadius: 0.76
+    rampHeight: 0.3
+    base2Radius: 0.29
+    base2Height: 0
+    destruction: 1
+    holeAround: 62
+    holeUpDown: 20
+    holeSize: 35
+    holeEdgeComplexity: 5
+    holeEdgeDepth: 0.35
+    holeEdgeUnevenness: 0.6
+    holeEdgeRoundness: 0.5
+    holeEdgeThickness: 0.05
